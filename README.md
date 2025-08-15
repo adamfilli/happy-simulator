@@ -1,10 +1,8 @@
-** WORK IN PROGRESS **
-
-
 # happy-simulator
-Simulate systems in a few lines of Python code.
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+Discrete event simulation tool, think Matlab SimEvent but for Python, and free.
+
+Built for my own personal use, so your mileage may vary.
 
 ## Quick Start
 To configure logging, set your `HS_LOGGING` environment variable to `DEBUG`, `INFO`, `WARNING`, `ERROR`. Default is `INFO`.

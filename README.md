@@ -7,6 +7,15 @@ Built for my own personal use, so your mileage may vary.
 ## Quick Start
 To configure logging, set your `HS_LOGGING` environment variable to `DEBUG`, `INFO`, `WARNING`, `ERROR`. Default is `INFO`.
 
+```
+git clone https://github.com/adamfilli/happy-simulator
+cd happy-simulator
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install setuptools
+pip install -e .
+```
+
 ## Examples 
 See `examples/` folder for examples.
 

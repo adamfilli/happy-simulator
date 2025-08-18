@@ -17,7 +17,12 @@ from happysimulator.utils.response_status import ResponseStatus
 logger = logging.getLogger(__name__)
 
 class QueuedServer(Server):
-    def __init__(self, name: str, queue: Queue, server_latency: LatencyDistribution, failure_rate: Profile = ConstantProfile(rate=0.0), threads: int = 1):
+    def __init__(self,
+                 name: str,
+                 queue: Queue,
+                 server_latency: LatencyDistribution,
+                 failure_rate: Profile = ConstantProfile(rate=0.0),
+                 threads: int = 1):
         super().__init__(name, server_latency, failure_rate)
 
         # config
@@ -30,7 +35,7 @@ class QueuedServer(Server):
 
     def start_request(self, request: Event) -> list[Event]:
         # instead of processing this request, put it in the queue.
-        # If I currently have capacity, I will also schedule a queue Pop.
+        # If I currently have capacity, I will also schedule an instant queue Pop.
         logger.info(f"[{request.time.to_seconds()}][{self.name}][{request.name}] Queued Server received request. Server concurrency: {self._concurrent_requests}")
 
         # TODO: ideally, the queue itself would reject the request, not the queued server

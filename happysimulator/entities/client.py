@@ -25,6 +25,8 @@ class Client(Entity):
         self._failed_requests_count = Data()
         self._timeout_requests_count = Data()
         self._requests_latency = Data()
+        self._failed_requests_latency = Data()
+        self._successful_requests_latency = Data()
         self._responses = Data()
 
     def send_request(self, request: Event) -> list[Event]:
@@ -56,8 +58,10 @@ class Client(Entity):
 
         if request_failed:
             self._failed_requests_count.add_stat(1, request.time)
+            self._failed_requests_latency.add_stat(latency, request.time)
         else:
             self._successful_requests_count.add_stat(1, request.time)
+            self._successful_requests_latency.add_stat(latency, request.time)
             return []
 
         # request_failed == True
@@ -82,6 +86,16 @@ class Client(Entity):
 
         self.sink_data(self._requests_latency, event)
 
+    def successful_requests_latency(self, event: MeasurementEvent) -> list[Event]:
+        logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}] Received measurement event for successful request latency")
+
+        self.sink_data(self._successful_requests_latency, event)
+
+    def failed_requests_latency(self, event: MeasurementEvent) -> list[Event]:
+        logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}] Received measurement event for failed request latency")
+
+        self.sink_data(self._failed_requests_latency, event)
+
     def requests_count(self, event: MeasurementEvent) -> list[Event]:
         logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}] Received measurement event for request count")
 
@@ -96,3 +110,8 @@ class Client(Entity):
         logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}] Received measurement event for failed request count")
 
         self.sink_data(self._failed_requests_count, event)
+        
+    def timeout_requests_count(self, event: MeasurementEvent) -> list[Event]:
+        logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}] Received measurement event for timeout request count")
+
+        self.sink_data(self._timeout_requests_count, event)

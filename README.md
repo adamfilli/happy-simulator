@@ -1,8 +1,6 @@
 # happy-simulator
 
-Discrete event simulation tool, think Matlab SimEvent but for Python, and free.
-
-Built for my own personal use, so your mileage may vary.
+Discrete event simulation tool, useful for expplaining concepts.
 
 ## Quick Start
 To configure logging, set your `HS_LOGGING` environment variable to `DEBUG`, `INFO`, `WARNING`, `ERROR`. Default is `INFO`.
@@ -17,7 +15,7 @@ pip install -e .
 ```
 
 ## Examples 
-See `examples/` folder for examples.
+See `examples/` folder for all examples.
 
 The following code simulates a sinusoidal traffic pattern for a server with a queue, and generates CSV file and graphs:
 
@@ -100,12 +98,3 @@ Time to increase our server concurrency! If I increase `threads` in my `QueueSer
 ![img.png](img/queuedepth.png)
 
 Much better!
-
-
-## Development Plan
-* Add oX and uX statistics (i.e. over X and under X)
-* Add Server lambdas for arbitrarily complex server behavior
-* Add Java ExecutorService pipeline simulation components and example
-* Load balancer entity
-* Retry explosion example 
-* unit test coverage (ya right)

@@ -1,6 +1,6 @@
 # happy-simulator
 
-Discrete event simulation tool, useful for expplaining concepts.
+Discrete event simulation tool.
 
 ## Quick Start
 To configure logging, set your `HS_LOGGING` environment variable to `DEBUG`, `INFO`, `WARNING`, `ERROR`. Default is `INFO`.

@@ -58,23 +58,23 @@ simulation_run_result = Simulation(
         Measurement(name="Client Request Volume",
                     func=client.requests_count,
                     stats=[Stat.SUM],
-                    interval=Time.from_seconds(2)),
+                    interval=Time.from_seconds(1)),
         Measurement(name="Client Latency",
                     func=client.requests_latency,
                     stats=[Stat.AVG, Stat.P99, Stat.P0],
-                    interval=Time.from_seconds(2)),
+                    interval=Time.from_seconds(1)),
         Measurement(name="Server Latency",
                     func=server.requests_latency,
                     stats=[Stat.AVG, Stat.P99, Stat.P0],
-                    interval=Time.from_seconds(2)),
+                    interval=Time.from_seconds(1)),
         Measurement(name="Queue Depth",
                     func=queue.depth,
                     stats=[Stat.AVG, Stat.P99, Stat.P0],
-                    interval=Time.from_seconds(2)),
+                    interval=Time.from_seconds(1)),
         Measurement(name="Queue Time",
                     func=queue.queue_time,
                     stats=[Stat.AVG, Stat.P99, Stat.P0],
-                    interval=Time.from_seconds(2))
+                    interval=Time.from_seconds(1))
     ]
 ).run()
 

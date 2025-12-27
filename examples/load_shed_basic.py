@@ -23,8 +23,8 @@ Change the queue size and the client timeout parameters to see how the system be
 The traffic profile is a TPS rampup.
 """
 
-# queue_size = 10
-queue_size = 0 # unbounded
+queue_size = 10
+# queue_size = 0 # unbounded
 
 client_timeout = Time.from_seconds(5)
 

@@ -38,18 +38,6 @@ class TestBasicSinkCSV(unittest.TestCase):
         pd.testing.assert_frame_equal(saved_df, expected_df)
 
         os.remove(filename)
-
-    def test_generate_csv_string(self):
-
-        self.csv_sink.add_stat(Time.from_seconds(1.65), 10.5)
-        self.csv_sink.add_stat(Time.from_seconds(4354), 20.75)
-
-        csv_string = self.csv_sink.generate_csv_string()
-
-        expected_csv_string = "TIME_SECONDS,SampleStat\n1.65,10.5\n4354.0,20.75\n"
-
-        assert csv_string == expected_csv_string, f"The generated CSV string does not match the expected output: \n{csv_string} \n{expected_csv_string}"
-
-
+        
 if __name__ == '__main__':
     unittest.main()

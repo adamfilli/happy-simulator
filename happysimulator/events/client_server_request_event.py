@@ -1,4 +1,3 @@
-from enum import Enum
 from happysimulator.distribution.constant_latency import ConstantLatency
 from happysimulator.entities.client import Client
 from happysimulator.entities.server import Server

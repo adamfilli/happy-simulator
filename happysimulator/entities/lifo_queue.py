@@ -20,7 +20,6 @@ class LifoQueue(Entity):
         self._depth = Data()
         self._queue_time = Data()
 
-
     def put(self, event: QueueEvent) -> list[Event]:
         logger.info(f"[{event.time.to_seconds()}][{self.name}][{event.name}][{event.queued_event.name}] Queue put called. Depth before put is {self._queue.qsize()}")
         self._depth.add_stat(self._queue.qsize(), event.time)

@@ -1,15 +1,17 @@
-from happysimulator.arrival_distribution import ArrivalDistribution
-from happysimulator.distribution.constant_latency import ConstantLatency
-from happysimulator.entities.client import Client
-from happysimulator.entities.queue import Queue
-from happysimulator.entities.queued_server import QueuedServer
-from happysimulator.events.client_server_request_event import Request
-from happysimulator.generator import Generator
-from happysimulator.measurement import Measurement
-from happysimulator.profiles.rampup_profile import RampupProfile
-from happysimulator.simulation import Simulation
-from happysimulator.stat import Stat
-from happysimulator.time import Time
+from happysimulator import (
+    ArrivalDistribution,
+    ConstantLatency,
+    Client,
+    Queue,
+    QueuedServer,
+    Request,
+    Generator,
+    Measurement,
+    RampupProfile,
+    Simulation,
+    Stat,
+    Time,
+)
 
 """
 This is a basic load shedding example.

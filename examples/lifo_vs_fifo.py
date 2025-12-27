@@ -1,16 +1,18 @@
-from happysimulator.arrival_distribution import ArrivalDistribution
-from happysimulator.distribution.constant_latency import ConstantLatency
-from happysimulator.entities.client import Client
-from happysimulator.entities.lifo_queue import LifoQueue
-from happysimulator.entities.queue import Queue
-from happysimulator.entities.queued_server import QueuedServer
-from happysimulator.events.client_server_request_event import Request
-from happysimulator.generator import Generator
-from happysimulator.measurement import Measurement
-from happysimulator.profiles.constant_profile import ConstantProfile
-from happysimulator.simulation import Simulation
-from happysimulator.stat import Stat
-from happysimulator.time import Time
+from happysimulator import (
+    ArrivalDistribution,
+    ConstantLatency,
+    Client,
+    LifoQueue,
+    Queue,
+    QueuedServer,
+    Request,
+    Generator,
+    Measurement,
+    ConstantProfile,
+    Simulation,
+    Stat,
+    Time,
+)
 
 """
 Demonstrates a well known property of FIFO vs LIFO queues, FIFO queues distribute the queue penalty to all requests equally,

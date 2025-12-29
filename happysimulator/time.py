@@ -21,7 +21,6 @@ class Time:
     def to_seconds(self) -> float:
         return float(self.nanoseconds) / 1_000_000_000
 
-    # Implement addition method
     def __add__(self, other: Union['Time', int, float]):
         if isinstance(other, (int, float)):
             return Time(self.nanoseconds + int(other * 1_000_000_000))

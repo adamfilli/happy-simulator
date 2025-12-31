@@ -1,35 +1,35 @@
 import heapq
 from typing import Union
 
-from happysimulator.event import Event
+from happysimulator.events.event import Event
 
-
-# TODO if `event` implements a comparison operator using time(), then there is no need to have time on the heap as well as a separate object
 class EventHeap:
-    def __init__(self, events: list[Event]):
-        self._heap = [(event.time, event) for event in events]  # need to use a tuple with first entry of time
+    def __init__(self, events: list[Event] | None = None):
+        """Store comparable objects (Event / ProcessContinuation) directly on the heap.
+
+        Event and ProcessContinuation implement ordering by `time`, so there's no need
+        to store (time, event) tuples. This keeps the heap simpler and lets the
+        objects' own comparison operators determine ordering.
+        """
+        self._heap = list(events) if events else []
         heapq.heapify(self._heap)
 
     def push(self, events: Union[Event, list[Event]]):
-        # Pushes an event onto the heap, using its time as the comparison key
-        if isinstance(events, Event):
-            heapq.heappush(self._heap, (events.time, events))
-        elif isinstance(events, list):
+        """Push an Event or an iterable of Events/continuations onto the heap."""
+        if isinstance(events, list):
             for event in events:
-                heapq.heappush(self._heap, (event.time, event))
-
-        heapq.heapify(self._heap)  # added events, re-heapify
+                heapq.heappush(self._heap, event)
+        else:
+            heapq.heappush(self._heap, events)
 
     def pop(self) -> Event:
-        _, event = heapq.heappop(self._heap)
-        return event
+        return heapq.heappop(self._heap)
 
     def peek(self) -> Event:
-        _, event = self._heap[0]
-        return event
+        return self._heap[0]
 
     def has_events(self) -> bool:
-        return len(self._heap) > 0
+        return bool(self._heap)
 
     def size(self) -> int:
         return len(self._heap)

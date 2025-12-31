@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 from happysimulator.sinks.basic_sink import BasicSink
-from happysimulator.time import Time
+from happysimulator.utils.instant import Instant
 
 
 class TestBasicSinkCSV(unittest.TestCase):
@@ -16,7 +16,7 @@ class TestBasicSinkCSV(unittest.TestCase):
         self.assertEqual(list(self.csv_sink.df.columns), expected_columns)
 
     def test_add_stat(self):
-        test_time = Time.from_seconds(1.5)
+        test_time = Instant.from_seconds(1.5)
         test_stat = 10.5
         self.csv_sink.add_stat(test_time, test_stat)
 
@@ -26,7 +26,7 @@ class TestBasicSinkCSV(unittest.TestCase):
     def test_save_csv(self):
         """Test if the CSV file is saved correctly."""
         filename = 'test_output.csv'
-        test_time = Time.from_seconds(1.56)
+        test_time = Instant.from_seconds(1.56)
         test_stat = 20.75
         self.csv_sink.add_stat(test_time, test_stat)
         self.csv_sink.save_csv(filename)

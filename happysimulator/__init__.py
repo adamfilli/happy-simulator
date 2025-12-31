@@ -23,33 +23,33 @@ logging.basicConfig(level=get_logging_level(level),
                     ])
 
 # Re-exports for concise imports
-from .arrival_distribution import ArrivalDistribution
-from .generator import Generator
-from .measurement import Measurement
+from ..archive.arrival_distribution import ArrivalDistribution
+from .load.source import Source
+from .data.measurement import Measurement
 from .simulation import Simulation
-from .stat import Stat
-from .time import Time
+from .data.stat import Stat
+from .utils.instant import Instant
 
-from .distribution.constant_latency import ConstantLatency
-from .distribution.exponential_latency import ExponentialLatency
-from .distribution.normal_latency import NormalLatency
+from .math.constant_latency import ConstantLatency
+from .math.exponential_latency import ExponentialLatency
+from .math.normal_latency import NormalLatency
 
-from .profiles.constant_profile import ConstantProfile
-from .profiles.rampup_profile import RampupProfile
-from .profiles.sinusoid_profile import SinusoidProfile
-from .profiles.spike_profile import SpikeProfile
+from ..archive.constant_profile import ConstantProfile
+from ..archive.rampup_profile import RampupProfile
+from ..archive.sinusoid_profile import SinusoidProfile
+from ..archive.spike_profile import SpikeProfile
 
 from .entities import Client, Server, Queue, LifoQueue, QueuedServer
 
-from .events.client_server_request_event import Request
+from ..archive.client_server_request_event import Request
 
 __all__ = [
     "ArrivalDistribution",
-    "Generator",
+    "Source",
     "Measurement",
     "Simulation",
     "Stat",
-    "Time",
+    "Instant",
     "ConstantLatency",
     "ExponentialLatency",
     "NormalLatency",

@@ -1,7 +1,7 @@
 import unittest
 
-from happysimulator.profiles import ConstantProfile
-from happysimulator.time import Time
+from happysimulator.load import ConstantProfile
+from happysimulator.utils.instant import Instant
 
 
 class TestConstantProfile(unittest.TestCase):
@@ -13,13 +13,13 @@ class TestConstantProfile(unittest.TestCase):
     def test_get_rate(self):
         """Tests that get_rate returns the initialized rate, regardless of the time."""
         profile = ConstantProfile(5)
-        time = Time.from_seconds(1)
+        time = Instant.from_seconds(1)
         self.assertEqual(profile.get_rate(time), 5)
 
     def test_from_period(self):
         """Tests that from_period calculates the correct rate based on the period."""
         period_seconds = 10  # 10 seconds
-        time = Time.from_seconds(period_seconds)  # Assuming Time() can be set or initialized to represent 10 seconds somehow
+        time = Instant.from_seconds(period_seconds)  # Assuming Time() can be set or initialized to represent 10 seconds somehow
         profile = ConstantProfile.from_period(time)
         self.assertEqual(profile.get_rate(time), 0.1)  # Since rate = 1 / period
 

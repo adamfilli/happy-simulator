@@ -1,17 +1,17 @@
 import logging
 from typing import Optional
 
-from happysimulator.data import Data
-from happysimulator.entity import Entity
-from happysimulator.event import Event
-from happysimulator.events.measurement_event import MeasurementEvent
-from happysimulator.time import Time
+from happysimulator.data.data import Data
+from happysimulator.entities.entity import Entity
+from happysimulator.events.event import Event
+from archive.measurement_event import MeasurementEvent
+from happysimulator.utils.instant import Instant
 from happysimulator.utils.response_status import ResponseStatus
 
 logger = logging.getLogger(__name__)
 
 class Client(Entity):
-    def __init__(self, name: str, timeout: Optional[Time] = None, retries: int = 0, retry_delay: Time = Time.from_seconds(0)):
+    def __init__(self, name: str, timeout: Optional[Instant] = None, retries: int = 0, retry_delay: Instant = Instant.from_seconds(0)):
         super().__init__(name)
 
         # config

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from happysimulator.entity import Entity
+from happysimulator.entities.entity import Entity
 
 
 class TestEntity(unittest.TestCase):

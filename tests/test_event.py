@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock
 
-from happysimulator.event import Event
-from happysimulator.time import Time
+from happysimulator.events.event import Event
+from happysimulator.utils.instant import Instant
 
 
 class TestableEvent(Event):
@@ -10,7 +10,7 @@ class TestableEvent(Event):
 
 class TestEvent(unittest.TestCase):
     def setUp(self):
-        self.time = MagicMock(spec=Time)
+        self.time = MagicMock(spec=Instant)
         self.callback = MagicMock()
         self.name = "TestEvent"
         self.event1 = TestableEvent(self.time, self.name, self.callback)

@@ -1,14 +1,14 @@
 import unittest
 from unittest.mock import patch
 
-from happysimulator.distribution.normal_latency import NormalLatency
-from happysimulator.time import Time
+from happysimulator.math.normal_latency import NormalLatency
+from happysimulator.utils.instant import Instant
 
 
 class TestNormalLatency(unittest.TestCase):
     def setUp(self):
-        self.mean_latency = Time.from_seconds(10)  # 10 seconds
-        self.std_dev = Time.from_seconds(2)  # 2 seconds variance
+        self.mean_latency = Instant.from_seconds(10)  # 10 seconds
+        self.std_dev = Instant.from_seconds(2)  # 2 seconds variance
         self.normal_latency = NormalLatency(self.mean_latency, self.std_dev)
 
     def test_initialization(self):
@@ -18,18 +18,18 @@ class TestNormalLatency(unittest.TestCase):
     @patch('random.gauss')
     def test_get_latency_returns_time_object(self, mock_random_gauss):
         mock_random_gauss.return_value = 10
-        latency = self.normal_latency.get_latency(Time.from_seconds(0))
-        self.assertIsInstance(latency, Time)
+        latency = self.normal_latency.get_latency(Instant.from_seconds(0))
+        self.assertIsInstance(latency, Instant)
 
     @patch('random.gauss')
     def test_get_latency_non_negative(self, mock_random_gauss):
         mock_random_gauss.return_value = -5  # A value that would normally be invalid
-        latency = self.normal_latency.get_latency(Time.from_seconds(0))
+        latency = self.normal_latency.get_latency(Instant.from_seconds(0))
         self.assertTrue(latency.to_seconds() >= 0)
 
     def test_latency_distribution(self):
         sample_size = 1000
-        generated_latencies = [self.normal_latency.get_latency(Time.from_seconds(0)).to_seconds() for _ in
+        generated_latencies = [self.normal_latency.get_latency(Instant.from_seconds(0)).to_seconds() for _ in
                                range(sample_size)]
 
         mean = sum(generated_latencies) / sample_size

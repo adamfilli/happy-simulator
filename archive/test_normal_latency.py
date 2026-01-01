@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from happysimulator.math.normal_latency import NormalLatency
+from archive.normal_latency import NormalLatency
 from happysimulator.utils.instant import Instant
 
 

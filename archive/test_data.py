@@ -1,8 +1,8 @@
 import unittest
 import pandas as pd
 
-from happysimulator.data.data import Data
-from happysimulator.data.stat import Stat
+from archive.data import Data
+from archive.stat import Stat
 from happysimulator.utils.instant import Instant
 
 

@@ -1,7 +1,7 @@
 import logging
 from typing import Callable, Optional
 
-from happysimulator.data.data import Data
+from archive.data import Data
 from happysimulator.entities.entity import Entity
 from happysimulator.events.event import Event
 from archive.client_server_request_event import Request

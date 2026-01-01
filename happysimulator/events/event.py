@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import Any, Dict, Generator, Optional, Union
 
-from happysimulator.entities.entity import Entity
 from happysimulator.utils.instant import Instant
 
 _global_event_counter = count()
@@ -12,7 +11,7 @@ _global_event_counter = count()
 class Event:
     time: Instant
     event_type: str
-    entity: Entity = field(repr=False)
+    entity: Optional['Entity'] = field(repr=False)
     
     # Unified Payload: Can hold a Generator (for processes) or arbitrary data
     payload: Optional[Union[Generator, Any]] = field(default=None, repr=False, compare=False)
@@ -34,7 +33,7 @@ class Event:
             }
 
     @classmethod
-    def create_continuation(cls, time: Instant, entity: Entity, generator: Generator, parent_context: Dict = None) -> "Event":
+    def create_continuation(cls, time: Instant, entity: 'Entity', generator: Generator, parent_context: Dict = None) -> "Event":
         """
         Helper to create a 'Resume' event that carries over the parent's context.
         """

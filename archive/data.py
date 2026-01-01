@@ -3,7 +3,7 @@ import sys
 import pandas as pd
 
 from .stat import Stat
-from ..utils.instant import Instant
+from ..happysimulator.utils.instant import Instant
 
 
 class Data:

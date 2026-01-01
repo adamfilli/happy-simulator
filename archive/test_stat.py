@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 
-from happysimulator.data.stat import Stat
+from archive.stat import Stat
 
 
 class TestStat(unittest.TestCase):

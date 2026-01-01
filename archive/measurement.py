@@ -3,7 +3,7 @@ from typing import List, Callable, Union
 import pandas as pd
 
 from happysimulator.sinks.basic_sink import BasicSink
-from happysimulator.data.stat import Stat
+from archive.stat import Stat
 from happysimulator.utils.instant import Instant
 
 

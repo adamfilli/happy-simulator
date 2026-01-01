@@ -4,12 +4,12 @@ A server with a queue. There is an extra step before requests are started: the w
 """
 import logging
 
-from happysimulator.data.data import Data
+from archive.data import Data
 from happysimulator.entities.queue import Queue
-from happysimulator.entities.server import Server
+from archive.server import Server
 from happysimulator.events.event import Event
 from archive.queue_event import QueueEvent
-from happysimulator.math.latency_distribution import LatencyDistribution
+from archive.latency_distribution import LatencyDistribution
 from happysimulator.load.profile import Profile
 from happysimulator.load import ConstantProfile
 from happysimulator.utils.response_status import ResponseStatus

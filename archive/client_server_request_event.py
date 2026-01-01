@@ -1,8 +1,8 @@
-from happysimulator.math.constant_latency import ConstantLatency
-from happysimulator.entities.client import Client
-from happysimulator.entities.server import Server
+from archive.constant_latency import ConstantLatency
+from archive.client import Client
+from archive.server import Server
 from happysimulator.events.event import Event
-from happysimulator.math.latency_distribution import LatencyDistribution
+from archive.latency_distribution import LatencyDistribution
 from happysimulator.utils.instant import Instant
 from happysimulator.utils.ids import get_id
 

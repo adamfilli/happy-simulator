@@ -2,7 +2,7 @@ import logging
 
 import queue
 
-from happysimulator.data.data import Data
+from archive.data import Data
 from happysimulator.entities.entity import Entity
 from happysimulator.events.event import Event
 from archive.measurement_event import MeasurementEvent

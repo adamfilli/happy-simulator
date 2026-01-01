@@ -1,0 +1,14 @@
+from dataclasses import dataclass
+from happysimulator.events.event import Event
+from happysimulator.entities.entity import Entity
+from happysimulator.utils.instant import Instant
+
+@dataclass
+class SimulationStartEvent(Event):
+    """
+    A specific control event indicating the simulation has begun.
+    Entities should use this to initialize their state or schedule their first actions.
+    """
+    def __init__(self, time: Instant, entity: Entity):
+        super().__init__(time)
+        self.entity = entity

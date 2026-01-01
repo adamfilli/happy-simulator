@@ -8,7 +8,7 @@ except ImportError:
     gw = None
     get_monitors = None
 from matplotlib import pyplot as plt
-from happysimulator.data.datasink import DataSink
+from archive.datasink import DataSink
 
 
 class SimulationResult:

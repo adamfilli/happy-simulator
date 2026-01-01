@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from happysimulator.load.profile import Profile
 
-# --- 2. The Abstract Base Provider ---
 class ArrivalTimeProvider(ABC):
     def __init__(self, profile: Profile):
         self.profile = profile

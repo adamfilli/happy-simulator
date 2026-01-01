@@ -1,9 +1,9 @@
 from happysimulator.entities.rate_limiter import RateLimiter
 from archive.client_server_request_event import Request
-from happysimulator.entities.client import Client
-from happysimulator.entities.server import Server
+from archive.client import Client
+from archive.server import Server
 from happysimulator.utils.instant import Instant
-from happysimulator.math.constant_latency import ConstantLatency
+from archive.constant_latency import ConstantLatency
 
 
 def test_immediate_forwarding():

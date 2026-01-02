@@ -31,7 +31,7 @@ class RateLimiter(Entity):
 
         # token bucket state
         self._tokens = self._capacity if initial_tokens is None else float(initial_tokens)
-        self._last_refill_time = Instant.from_seconds(0)
+        self._last_refill_time = Instant.Epoch
 
         # stats
         self._queued_requests = Data()

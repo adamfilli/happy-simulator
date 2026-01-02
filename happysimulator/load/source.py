@@ -29,12 +29,11 @@ class Source(Entity):
         Called by Simulation.__init__
         """
         # Sync the provider to the simulation start time
-        self._time_provider.current_time = start_time.to_seconds()
+        self._time_provider.current_time = start_time
         
         try:
             # Calculate when the first event should happen
-            first_time_val = self._time_provider.next_arrival_time()
-            first_time = Instant.from_seconds(first_time_val)
+            first_time = self._time_provider.next_arrival_time()
             
             logger.info(f"[{self.name}] Source starting. First event at {first_time}")
             

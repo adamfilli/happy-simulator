@@ -18,18 +18,18 @@ class TestNormalLatency(unittest.TestCase):
     @patch('random.gauss')
     def test_get_latency_returns_time_object(self, mock_random_gauss):
         mock_random_gauss.return_value = 10
-        latency = self.normal_latency.get_latency(Instant.from_seconds(0))
+        latency = self.normal_latency.get_latency(Instant.Epoch)
         self.assertIsInstance(latency, Instant)
 
     @patch('random.gauss')
     def test_get_latency_non_negative(self, mock_random_gauss):
         mock_random_gauss.return_value = -5  # A value that would normally be invalid
-        latency = self.normal_latency.get_latency(Instant.from_seconds(0))
+        latency = self.normal_latency.get_latency(Instant.Epoch)
         self.assertTrue(latency.to_seconds() >= 0)
 
     def test_latency_distribution(self):
         sample_size = 1000
-        generated_latencies = [self.normal_latency.get_latency(Instant.from_seconds(0)).to_seconds() for _ in
+        generated_latencies = [self.normal_latency.get_latency(Instant.Epoch).to_seconds() for _ in
                                range(sample_size)]
 
         mean = sum(generated_latencies) / sample_size

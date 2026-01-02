@@ -11,7 +11,7 @@ from happysimulator.utils.response_status import ResponseStatus
 logger = logging.getLogger(__name__)
 
 class Client(Entity):
-    def __init__(self, name: str, timeout: Optional[Instant] = None, retries: int = 0, retry_delay: Instant = Instant.from_seconds(0)):
+    def __init__(self, name: str, timeout: Optional[Instant] = None, retries: int = 0, retry_delay: Instant = Instant.Epoch):
         super().__init__(name)
 
         # config

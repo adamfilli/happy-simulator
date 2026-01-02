@@ -29,7 +29,7 @@ class Data:
 
     def flush_stats(self, cutoff: Instant = None):
         if cutoff is None:
-            cutoff = Instant.from_seconds(0)
+            cutoff = Instant.Epoch
 
         self.df = self.df[self.df[self.TIME_NANOS] >= cutoff.nanoseconds].reset_index(drop=True)
 

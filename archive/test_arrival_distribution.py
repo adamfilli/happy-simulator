@@ -8,7 +8,7 @@ from happysimulator.utils.instant import Instant
 class TestArrivalDistribution(unittest.TestCase):
     def test_constant_distribution(self):
         rate_per_second = 1  # 1 event per second
-        current_time = Instant.from_seconds(0)
+        current_time = Instant.Epoch
         expected_time = Instant.from_seconds(1)  # Expecting the next event in 1 second
 
         result = ArrivalDistribution.CONSTANT.get_next_arrival_time(current_time, rate_per_second)

@@ -17,7 +17,7 @@ from happysimulator import (
 SIMULATION_DURATION_SECONDS = 60
 MEASUREMENT_PERIOD_SECONDS = 1
 
-client = Client(name="Basic", retries=3, retry_delay=Instant.from_seconds(0), timeout=Instant.from_seconds(1.0))
+client = Client(name="Basic", retries=3, retry_delay=Instant.Epoch, timeout=Instant.from_seconds(1.0))
 
 queue = Queue(name="MyQueue", size=0) # adjust size to see how it impacts congestive collapse
 

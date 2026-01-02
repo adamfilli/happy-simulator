@@ -54,7 +54,7 @@ def test_basic_constant_simulation():
     profile = ConstantOneProfile()
     provider = PingProvider(counter)
     
-    arrival_time_provider = ConstantArrivalTimeProvider(profile)
+    arrival_time_provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
     
     # Create the Source (Rate=1, Distribution=Constant)
     # This ensures exactly 1 event every 1.0s (t=1.0, t=2.0, etc.)
@@ -66,10 +66,10 @@ def test_basic_constant_simulation():
 
     # B. INITIALIZATION
     sim = Simulation(
-        start_time=Instant.from_seconds(0),
+        start_time=Instant.Epoch,
         end_time=end_time,
         sources=[source],
-        entities=[]
+        entities=[counter]
     )
 
     # C. EXECUTION

@@ -1,16 +1,14 @@
 from abc import ABC, abstractmethod
-import math
-import numpy as np
 import scipy.integrate as integrate
 import scipy.optimize as optimize
-from dataclasses import dataclass
 
 from happysimulator.load.profile import Profile
+from happysimulator.utils.instant import Instant
 
 class ArrivalTimeProvider(ABC):
-    def __init__(self, profile: Profile):
+    def __init__(self, profile: Profile, start_time: Instant):
         self.profile = profile
-        self.current_time = 0.0
+        self.current_time = start_time
 
     @abstractmethod
     def _get_target_integral_value(self) -> float:
@@ -20,7 +18,7 @@ class ArrivalTimeProvider(ABC):
         """
         pass
 
-    def next_arrival_time(self) -> float:
+    def next_arrival_time(self) -> Instant:
         """
         Calculates the absolute time of the next event.
         """

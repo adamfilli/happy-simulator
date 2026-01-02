@@ -10,26 +10,42 @@ from happysimulator.events.event import Event
 from happysimulator.load.profile import Profile
 from happysimulator.simulation import Simulation  # Assuming your generic Simulation class
 
+
+class SideEffectCounterEntity(Entity):
+    def __init__(self):
+        super().__init__("sideeffectcounter")
+        self.counter = 0
+        
+    def handle_event(self, event):
+        self.counter += 1
+
 class PingCounterEntity(Entity):
-    def __init__(self, name):
-        super().__init__(name)
-        self.first_counter = 1
-        self.second_counter  = 1
+    def __init__(self, side_effect_counter: Entity):
+        super().__init__("pingcounter")
+        self.side_effect_counter = side_effect_counter
+        self.first_counter = 0
+        self.second_counter  = 0
     
     def handle_event(self, event: Event):
         self.first_counter += 1
         yield 1, None
         self.second_counter += 1
+        
+        # Yields a side effect (now) to be handled by the SideEffectCounterEntity
+        yield 1, PingEvent(event.time, self.side_effect_counter)
+        return []
 
 class PingEvent(Event):
-    """A simple ping event with no entity to be invoked."""
-    def __init__(self, time: Instant, counter: PingCounterEntity):
+    def __init__(self, time: Instant, counter: Entity):
         super().__init__(time, "Ping", counter, None)
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""
     def get_rate(self, time: Instant) -> float:
-        return 1.0
+        if time <= Instant.from_seconds(60):
+            return 1.0
+        else:
+            return 0
 
 class PingProvider(EventProvider):
     def __init__(self, counter: PingCounterEntity):
@@ -47,17 +63,16 @@ def test_basic_constant_simulation():
     runs for exactly 60 seconds and generates roughly 60 events.
     """
     # A. CONFIGURATION
-    sim_duration = 60.0
-    end_time = Instant.from_seconds(sim_duration)
     
     # Setup the counter entities
-    counter = PingCounterEntity("pingcounter")
+    side_effect_counter = SideEffectCounterEntity()
+    source_event_counter = PingCounterEntity(side_effect_counter)
     
     # Setup the Source components
     profile = ConstantOneProfile()
-    provider = PingProvider(counter)
+    provider = PingProvider(source_event_counter)
     
-    arrival_time_provider = ConstantArrivalTimeProvider(profile)
+    arrival_time_provider = ConstantArrivalTimeProvider(profile, Instant.Epoch)
     
     # Create the Source (Rate=1, Distribution=Constant)
     # This ensures exactly 1 event every 1.0s (t=1.0, t=2.0, etc.)
@@ -69,11 +84,8 @@ def test_basic_constant_simulation():
 
     # B. INITIALIZATION
     sim = Simulation(
-        start_time=Instant.from_seconds(0),
-        end_time=end_time,
         sources=[source],
-        entities=[]
-    )
+        entities=[source_event_counter])
 
     # C. EXECUTION
     # Run the simulation
@@ -81,13 +93,13 @@ def test_basic_constant_simulation():
 
     # D. ASSERTIONS
     
-    # 1. Verify the Source generated the expected number of events
     # We expect events at t=1, 2, ... 60. 
-    assert source._nmb_generated == 60, \
-        f"Expected 60 events, but source generated {source._nmb_generated}"
         
-    assert counter.first_counter == 60, \
-        f"Expected a count of 60 in the first counter, but there were {counter.first_counter}"
+    assert source_event_counter.first_counter == 60, \
+        f"Expected a count of 60 in the first counter, but there were {source_event_counter.first_counter}"
+    
+    assert source_event_counter.second_counter == 60, \
+        f"Expected a count of 59 in the second counter, but there were {source_event_counter.second_counter}"
         
-    assert counter.second_counter == 60, \
-        f"Expected a count of 60 in the second counter, but there were {counter.second_counter}"
+    assert side_effect_counter.counter == 60, \
+        f"Expected a count of 60 in the side effect counter, but there were {source_event_counter.second_counter}"

@@ -1,4 +1,3 @@
-import pytest
 from typing import List
 
 from happysimulator.entities.entity import Entity
@@ -8,8 +7,7 @@ from happysimulator.load.source import Source
 from happysimulator.utils.instant import Instant
 from happysimulator.events.event import Event
 from happysimulator.load.profile import Profile
-from happysimulator.simulation import Simulation  # Assuming your generic Simulation class
-
+from happysimulator.simulation import Simulation
 
 class SideEffectCounterEntity(Entity):
     def __init__(self):
@@ -91,15 +89,12 @@ def test_basic_constant_simulation():
     # Run the simulation
     sim.run()
 
-    # D. ASSERTIONS
-    
-    # We expect events at t=1, 2, ... 60. 
-        
+    # D. ASSERTIONS        
     assert source_event_counter.first_counter == 60, \
         f"Expected a count of 60 in the first counter, but there were {source_event_counter.first_counter}"
     
     assert source_event_counter.second_counter == 60, \
-        f"Expected a count of 59 in the second counter, but there were {source_event_counter.second_counter}"
+        f"Expected a count of 60 in the second counter, but there were {source_event_counter.second_counter}"
         
     assert side_effect_counter.counter == 60, \
         f"Expected a count of 60 in the side effect counter, but there were {source_event_counter.second_counter}"

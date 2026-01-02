@@ -12,7 +12,7 @@ from archive.latency_distribution import LatencyDistribution
 from happysimulator.load.profile import Profile
 from happysimulator.load import ConstantProfile
 from happysimulator.utils.instant import Instant
-from happysimulator.utils.response_status import ResponseStatus
+from archive.response_status import ResponseStatus
 
 logger = logging.getLogger(__name__)
 

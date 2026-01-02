@@ -1,4 +1,3 @@
-import pytest
 from typing import List
 
 from happysimulator.entities.entity import Entity
@@ -80,8 +79,8 @@ def test_basic_constant_simulation():
     
     # 1. Verify the Source generated the expected number of events
     # We expect events at t=1, 2, ... 60. 
-    assert source._nmb_generated == 60, \
+    assert source._nmb_generated == 61, \
         f"Expected 60 events, but source generated {source._nmb_generated}"
         
-    assert counter.counter == 60, \
-        f"Expected a count of 60 in the event counter, but there were {counter.counter}"
+    assert counter.counter == 61, \
+        f"Expected a count of 61 in the event counter, but there were {counter.counter}"

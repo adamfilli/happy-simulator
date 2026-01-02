@@ -1,6 +1,3 @@
-import math
-import numpy as np
-
 from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 
 class ConstantArrivalTimeProvider(ArrivalTimeProvider):

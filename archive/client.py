@@ -6,7 +6,7 @@ from happysimulator.entities.entity import Entity
 from happysimulator.events.event import Event
 from archive.measurement_event import MeasurementEvent
 from happysimulator.utils.instant import Instant
-from happysimulator.utils.response_status import ResponseStatus
+from archive.response_status import ResponseStatus
 
 logger = logging.getLogger(__name__)
 

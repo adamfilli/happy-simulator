@@ -11,6 +11,8 @@ class Instant:
 
         if isinstance(seconds, float):
             return cls(int(seconds * 1_000_000_000))
+        
+        raise TypeError("seconds must be int or float")
 
     def to_seconds(self) -> float:
         return float(self.nanoseconds) / 1_000_000_000

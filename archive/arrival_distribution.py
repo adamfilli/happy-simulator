@@ -15,3 +15,4 @@ class ArrivalDistribution(Enum):
             return current_time + Instant.from_seconds(random.expovariate(rate_per_second))
         else:
             raise NotImplementedError("This ArrivalDistribution type not implemented")
+        

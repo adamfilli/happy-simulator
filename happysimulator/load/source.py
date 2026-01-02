@@ -63,7 +63,7 @@ class Source(Entity):
         
         # --- B. Schedule Next Tick (Self-Perpetuation) ---
         try:
-            next_time = self._time_provider.next_arrival_time()            
+            next_time = self._time_provider.next_arrival_time()     
             next_tick = SourceEvent(time=next_time, source_entity=self)
             
             # Return both the payload AND the next tick to be pushed to the heap

@@ -1,5 +1,10 @@
+from pathlib import Path
 from typing import List
 
+import pytest
+
+from happysimulator.data.data import Data
+from happysimulator.data.probe import Probe
 from happysimulator.entities.entity import Entity
 from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
@@ -9,24 +14,28 @@ from happysimulator.events.event import Event
 from happysimulator.load.profile import Profile
 from happysimulator.simulation import Simulation
 
+
 class ConcurrencyTrackerEntity(Entity):
+    """Entity that tracks concurrent in-flight requests via a generator process."""
+    
     def __init__(self):
         super().__init__("concurrencytracker")
         self.concurrency = 0
         self.first_counter = 0
-        self.second_counter  = 0
+        self.second_counter = 0
     
     def handle_event(self, event: Event):
         self.first_counter += 1
         self.concurrency += 1
-        yield 1, None
+        yield 1, None  # Simulate 1 second of processing time
         self.second_counter += 1
         self.concurrency -= 1
         return []
 
 class PingEvent(Event):
     def __init__(self, time: Instant, counter: Entity):
-        super().__init__(time, "Ping", counter, None)
+        super().__init__(time=time, event_type="Ping", target=counter, callback=None)
+
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""
@@ -36,6 +45,7 @@ class ConstantOneProfile(Profile):
         else:
             return 0
 
+
 class PingProvider(EventProvider):
     def __init__(self, counter: ConcurrencyTrackerEntity):
         super().__init__()
@@ -44,39 +54,147 @@ class PingProvider(EventProvider):
     def get_events(self, time: Instant) -> List[Event]:
         return [PingEvent(time, self.counter)]
 
+
+def _write_csv(path: Path, header: list[str], rows: list[tuple]) -> None:
+    """Helper to write CSV files for test output."""
+    import csv
+    with open(path, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        for row in rows:
+            writer.writerow(row)
+
+
 # --- 2. The Test Case ---
 
-def test_basic_constant_simulation():
+def test_basic_concurrency_probe(test_output_dir: Path):
     """
-    Verifies that a Simulation with a single Constant Source (1 event/sec)
-    runs for exactly 60 seconds and generates roughly 60 events.
+    Verifies that a Probe correctly measures concurrency on a ConcurrencyTrackerEntity.
+    
+    The entity increments concurrency at the start of handling an event, then
+    yields for 1 second (simulating processing), then decrements concurrency.
+    
+    With events arriving at 1/sec and each taking 1 second to process, we expect
+    concurrency to hover around 1 (brief overlap possible due to timing).
     """
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     # A. CONFIGURATION
+    sim_duration = 60.0
+    probe_interval = 0.1  # Sample concurrency every 0.1 second
     
-    # Setup the counter entities
-    source_event_counter = ConcurrencyTrackerEntity()
+    # Setup the concurrency tracking entity
+    tracker = ConcurrencyTrackerEntity()
     
-    # Setup the Source components
+    # Setup the data sink for the probe
+    concurrency_data = Data()
+    
+    # Setup the Source components (generates 1 event/sec)
     profile = ConstantOneProfile()
-    provider = PingProvider(source_event_counter)
-    
+    provider = PingProvider(tracker)
     arrival_time_provider = ConstantArrivalTimeProvider(profile, Instant.Epoch)
     
-    # Create the Source (Rate=1, Distribution=Constant)
-    # This ensures exactly 1 event every 1.0s (t=1.0, t=2.0, etc.)
-    source = Source(
+    # Create the event Source
+    event_source = Source(
         name="PingSource",
         event_provider=provider,
         arrival_time_provider=arrival_time_provider
     )
+    
+    # Create the Probe to measure concurrency
+    concurrency_probe = Probe(
+        target=tracker,
+        metric="concurrency",
+        data=concurrency_data,
+        interval=probe_interval,
+        start_time=Instant.Epoch
+    )
 
     # B. INITIALIZATION
     sim = Simulation(
-        sources=[source],
-        entities=[source_event_counter])
+        sources=[event_source],
+        entities=[tracker],
+        probes=[concurrency_probe],
+        end_time=Instant.from_seconds(sim_duration)
+    )
 
     # C. EXECUTION
-    # Run the simulation
     sim.run()
 
     # D. ASSERTIONS
+    
+    # Verify the probe collected data
+    samples = concurrency_data.values
+    assert len(samples) > 0, "Probe should have collected at least one sample"
+    
+    # Verify sample structure (time, value)
+    times = [s[0] for s in samples]
+    values = [s[1] for s in samples]
+    
+    assert times == sorted(times), "Samples should be in chronological order"
+    assert all(v >= 0 for v in values), "Concurrency should never be negative"
+    
+    # With 1 event/sec and 1 sec processing, concurrency should peak around 1-2
+    max_concurrency = max(values)
+    assert max_concurrency >= 1, f"Expected max concurrency >= 1, got {max_concurrency}"
+    
+    # Verify the tracker processed around 60 events
+    assert 59 <= tracker.first_counter <= 61, f"Expected around 60 events started, got {tracker.first_counter}"
+    assert 59 <= tracker.second_counter <= 61, f"Expected around 60 events completed, got {tracker.second_counter}"
+    
+    # E. VISUALIZATION
+    
+    # Save raw data as CSV
+    _write_csv(
+        test_output_dir / "concurrency_samples.csv",
+        header=["time_s", "concurrency"],
+        rows=[(t, v) for t, v in samples]
+    )
+    
+    # Plot 1: Concurrency over time
+    fig, (ax_conc, ax_hist) = plt.subplots(nrows=2, ncols=1, figsize=(12, 8))
+    
+    # Time series plot
+    ax_conc.step(times, values, where="post", linewidth=1, color="steelblue")
+    ax_conc.fill_between(times, values, step="post", alpha=0.3, color="steelblue")
+    ax_conc.set_xlabel("Time (s)")
+    ax_conc.set_ylabel("Concurrency")
+    ax_conc.set_title("Concurrency Over Time (1 event/sec, 1 sec processing)")
+    ax_conc.grid(True, alpha=0.3)
+    ax_conc.set_xlim(0, sim_duration)
+    ax_conc.set_ylim(bottom=0)
+    
+    # Histogram of concurrency values
+    ax_hist.hist(values, bins=range(int(max(values)) + 3), edgecolor="black", alpha=0.7, color="steelblue")
+    ax_hist.set_xlabel("Concurrency Level")
+    ax_hist.set_ylabel("Frequency (# samples)")
+    ax_hist.set_title("Distribution of Concurrency Levels")
+    ax_hist.grid(True, alpha=0.3, axis="y")
+    
+    fig.tight_layout()
+    fig.savefig(test_output_dir / "concurrency_plot.png", dpi=150)
+    plt.close(fig)
+    
+    # Plot 2: Cumulative events started vs completed over time
+    # (This requires additional tracking, so we'll just note the final counts)
+    fig2, ax2 = plt.subplots(figsize=(10, 5))
+    
+    ax2.step(times, values, where="post", linewidth=1.5, label="Concurrency")
+    ax2.axhline(y=1, color="red", linestyle="--", alpha=0.5, label="Expected (rate × latency)")
+    ax2.set_xlabel("Time (s)")
+    ax2.set_ylabel("Concurrent Requests")
+    ax2.set_title("Concurrency Tracking with Probe")
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    ax2.set_xlim(0, sim_duration)
+    
+    fig2.tight_layout()
+    fig2.savefig(test_output_dir / "concurrency_with_expected.png", dpi=150)
+    plt.close(fig2)
+    
+    print(f"\nSaved plots/data to: {test_output_dir}")
+    print(f"  - Total samples collected: {len(samples)}")
+    print(f"  - Max concurrency observed: {max_concurrency}")
+    print(f"  - Events started: {tracker.first_counter}, completed: {tracker.second_counter}")

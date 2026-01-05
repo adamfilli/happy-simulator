@@ -16,6 +16,7 @@ EventCallback = Callable[['Event'], Any]
 class Event:
     time: Instant
     event_type: str
+    daemon: bool = field(default=False, repr=False)
     
     # Option A: The "Model" way (Send to Entity)
     target: Optional['Entity'] = None
@@ -71,6 +72,7 @@ class Event:
         continuation = ProcessContinuation(
                 time=self.time,
                 event_type=self.event_type,
+                daemon=self.daemon,
                 target=self.target,
                 callback=self.callback,
                 process=gen,   # Pass the SAME generator forward
@@ -135,6 +137,7 @@ class ProcessContinuation(Event):
             next_continuation = ProcessContinuation(
                 time=resume_time,
                 event_type=self.event_type,
+                daemon=self.daemon,
                 target=self.target,     # Keep targeting the same entity
                 callback=self.callback,
                 process=self.process,   # Pass the SAME generator forward
@@ -170,5 +173,5 @@ class ProcessContinuation(Event):
         elif isinstance(value, (int, float)):
             return float(value), []
         else:
-             logger.warning(f"Generator yielded unknown type {type(value)}; assuming 0 delay.")
+             logger.warning("Generator yielded unknown type %s; assuming 0 delay.", type(value))
              return 0.0, []

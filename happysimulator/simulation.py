@@ -4,7 +4,13 @@ from happysimulator.load.source import Source
 from happysimulator.utils.instant import Instant
 
 class Simulation:
-    def __init__(self, start_time: Instant = None, end_time: Instant = None, sources: list[Source] = None, entities: list[Entity] = None):
+    def __init__(self,
+                 start_time: Instant = None,
+                 end_time: Instant = None,
+                 sources: list[Source] = None,
+                 entities: list[Entity] = None,
+                 probes: list[Source] = None):
+        
         self._start_time = start_time
         if self._start_time is None:
             self._start_time = Instant.Epoch
@@ -15,9 +21,8 @@ class Simulation:
         
         self._entities = entities
         self._sources = sources
+        self._probes = probes
         
-        # TODO: add measurements back in, see notepad.
-
         self._event_heap = EventHeap()
         
         for source in self._sources:
@@ -27,11 +32,23 @@ class Simulation:
             # We push it to the heap to prime the simulation
             for event in initial_events:
                 self._event_heap.push(event)
+        
+        for probe in self._probes:
+            initial_events = probe.start(self._start_time)
+            for event in initial_events:
+                self._event_heap.push(event)
 
     def run(self) -> None:
         current_time = Instant.Epoch
         
         while self._event_heap.has_events() and self._end_time >= current_time:
+            
+            # TERMINATION CHECK:
+            # If we rely on auto-termination (end_time is Infinity),
+            # and we have no primary events left (only probes), STOP.
+            if self._end_time == Instant.Infinity and not self._event_heap.has_primary_events():
+                break
+            
             # 1. Pop
             event = self._event_heap.pop()
             current_time = event.time # Advance clock

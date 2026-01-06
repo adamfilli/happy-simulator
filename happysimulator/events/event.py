@@ -46,6 +46,15 @@ class Event:
         self.context.setdefault("metadata", {})
         self.context.setdefault("trace", {"spans": []})
 
+    def __repr__(self) -> str:
+        """Return a concise representation showing time, type, and target/callback."""
+        if self.target is not None:
+            target_name = getattr(self.target, "name", None) or type(self.target).__name__
+            return f"Event({self.time!r}, {self.event_type!r}, target={target_name})"
+        else:
+            callback_name = getattr(self.callback, "__qualname__", None) or repr(self.callback)
+            return f"Event({self.time!r}, {self.event_type!r}, callback={callback_name})"
+
     def trace(self, action: str, **data: Any) -> None:
         """Append a structured span to this event's application-level trace.
 

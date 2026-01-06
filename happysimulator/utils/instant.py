@@ -55,6 +55,23 @@ class Instant:
     def __ge__(self, other):
         return not self.__lt__(other)
 
+    def __repr__(self) -> str:
+        """Return a human-readable ISO-like duration string with microsecond precision.
+        
+        Format: T{hours}:{minutes}:{seconds}.{microseconds}
+        Examples: T00:00:01.500000, T01:23:45.678901
+        """
+        total_us = self.nanoseconds // 1_000  # Convert to microseconds
+        
+        us = total_us % 1_000_000
+        total_seconds = total_us // 1_000_000
+        seconds = total_seconds % 60
+        total_minutes = total_seconds // 60
+        minutes = total_minutes % 60
+        hours = total_minutes // 60
+        
+        return f"T{hours:02d}:{minutes:02d}:{seconds:02d}.{us:06d}"
+
 
 # A singleton representing positive infinity for Instants.
 class _InfiniteInstant(Instant):

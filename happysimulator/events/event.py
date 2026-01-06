@@ -39,34 +39,64 @@ class Event:
         if self.target is not None and self.callback is not None:
             raise ValueError(f"Event {self} cannot have BOTH 'target' and 'callback'.")
         
-        if not self.context:
-            self.context = {
-                "id": str(self._id),
-                "created_at": self.time,
-                "stack": [],
-                "metadata": {}
-            }
+        # Always ensure trace context exists (even if caller passed partial context)
+        self.context.setdefault("id", str(self._id))
+        self.context.setdefault("created_at", self.time)
+        self.context.setdefault("stack", [])
+        self.context.setdefault("metadata", {})
+        self.context.setdefault("trace", {"spans": []})
+
+    def trace(self, action: str, **data: Any) -> None:
+        """Append a structured span to this event's application-level trace.
+
+        Args:
+            action: Short action name (e.g., "handle.start", "process.yield").
+            **data: Extra structured fields for debugging.
+        """
+        entry: Dict[str, Any] = {
+            "time": self.time,
+            "action": action,
+            "event_id": self.context["id"],
+            "event_type": self.event_type,
+        }
+        if data:
+            entry["data"] = data
+        self.context["trace"]["spans"].append(entry)
 
     def invoke(self) -> List['Event']:
-        raw_result = None
+        handler_kind = "callback" if self.callback else "entity"
+        handler_label = (
+            getattr(self.callback, "__qualname__", repr(self.callback))
+            if self.callback
+            else getattr(self.target, "name", type(self.target).__name__)
+        )
+        self.trace("handle.start", handler=handler_kind, handler_label=handler_label)
 
-        # Path 1: Callback (High Priority / Explicit)
-        if self.callback:
-            # We pass 'self' so the callback has access to event data/time
-            raw_result = self.callback(self)
+        try:
+            raw_result = None
 
-        # Path 2: Target Entity (Standard Model Flow)
-        elif self.target:
-            raw_result = self.target.handle_event(self)
-        else:
-            raise ValueError(f"Event {self} must have EITHER a 'target' OR a 'callback'.")
-        
-        # 2. Normalize Result
-        # Did the handler return a Generator? (Start of a Process)
-        if isinstance(raw_result, Generator):
-            return self._start_process(raw_result)
-        
-        return self._normalize_return(raw_result)
+            # Path 1: Callback (High Priority / Explicit)
+            if self.callback:
+                raw_result = self.callback(self)
+
+            # Path 2: Target Entity (Standard Model Flow)
+            elif self.target:
+                raw_result = self.target.handle_event(self)
+            else:
+                raise ValueError(f"Event {self} must have EITHER a 'target' OR a 'callback'.")
+            
+            # Normalize Result: Did the handler return a Generator? (Start of a Process)
+            if isinstance(raw_result, Generator):
+                self.trace("handle.end", result_kind="process")
+                return self._start_process(raw_result)
+            
+            normalized = self._normalize_return(raw_result)
+            self.trace("handle.end", result_kind="immediate", produced=len(normalized))
+            return normalized
+
+        except Exception as exc:
+            self.trace("handle.error", error=type(exc).__name__, message=str(exc))
+            raise
     
     def _start_process(self, gen: Generator) -> List["Event"]:
         continuation = ProcessContinuation(
@@ -122,15 +152,16 @@ class ProcessContinuation(Event):
     process: Generator = field(default=None, repr=False)
 
     def invoke(self) -> List["Event"]:
-        """
-        Resumes the generator, handles the yield, and schedules the NEXT resume.
-        """
+        """Resumes the generator, handles the yield, and schedules the NEXT resume."""
+        self.trace("process.resume.start")
+
         try:
             # 1. Wake up the process
             yielded_val = next(self.process)
             
             # 2. Parse the yield
             delay, side_effects = self._normalize_yield(yielded_val)
+            self.trace("process.yield", delay_s=delay)
 
             # 3. Schedule the next Resume (Recursive Continuation)
             resume_time = self.time + delay
@@ -141,7 +172,7 @@ class ProcessContinuation(Event):
                 target=self.target,     # Keep targeting the same entity
                 callback=self.callback,
                 process=self.process,   # Pass the SAME generator forward
-                context=self.context    # Preserve Trace ID
+                context=self.context    # Preserve trace context
             )
             
             if side_effects is None:
@@ -150,13 +181,20 @@ class ProcessContinuation(Event):
                 side_effects = [side_effects]
                 
             result = list(side_effects)
-            if next_continuation is not None:
-                result.append(next_continuation)
+            result.append(next_continuation)
+
+            self.trace("process.resume.end", produced=len(result))
             return result
 
         except StopIteration as e:
             # Process Finished. Return the final value (if any).
-            return self._normalize_return(e.value)
+            finished = self._normalize_return(e.value)
+            self.trace("process.stop", produced=len(finished))
+            return finished
+
+        except Exception as exc:
+            self.trace("process.error", error=type(exc).__name__, message=str(exc))
+            raise
         
     def _normalize_yield(self, value: Any) -> Tuple[float, List["Event"]]:
         """Unpacks `yield 0.1` vs `yield 0.1, [events]`"""
@@ -173,5 +211,5 @@ class ProcessContinuation(Event):
         elif isinstance(value, (int, float)):
             return float(value), []
         else:
-             logger.warning("Generator yielded unknown type %s; assuming 0 delay.", type(value))
-             return 0.0, []
+            logger.warning("Generator yielded unknown type %s; assuming 0 delay.", type(value))
+            return 0.0, []

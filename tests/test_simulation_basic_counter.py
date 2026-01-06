@@ -20,7 +20,7 @@ class PingCounterEntity(Entity):
 class PingEvent(Event):
     """A simple ping event with no entity to be invoked."""
     def __init__(self, time: Instant, counter: PingCounterEntity):
-        super().__init__(time, "Ping", counter, None)
+        super().__init__(time=time, event_type="Ping", target=counter, callback=None)
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""

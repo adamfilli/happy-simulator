@@ -19,9 +19,9 @@ class Simulation:
         if self._end_time is None:
             self._end_time = Instant.Infinity
         
-        self._entities = entities
-        self._sources = sources
-        self._probes = probes
+        self._entities = entities or []
+        self._sources = sources or []
+        self._probes = probes or []
         
         self._event_heap = EventHeap()
         

@@ -1,10 +1,11 @@
-"""Test: QueuedEntity with FIFO and LIFO policies.
+"""Test: Queue -> QueueDriver -> Server design.
 
 Scenario:
-- Two queued entities (FIFO and LIFO) model a concurrency-limited server.
-- Requests arrive according to a Poisson arrival distribution at 10 req/s.
-- Each request takes 1 second to process, max concurrency=10.
-- Completed requests are forwarded to a final sink entity.
+- A QueueEntity buffers incoming requests
+- A QueueDriver bridges the queue and a concurrency-limited server
+- Requests arrive according to a Poisson arrival distribution at 20 req/s
+- Each request takes 1 second to process, max concurrency=10
+- Completed requests are forwarded to a final sink entity
 
 The sink parses each event's trace context and reports latency statistics:
 - p0 (min), average, p99
@@ -14,16 +15,16 @@ Simulation runs for 60 seconds total.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
+from dataclasses import dataclass, field
+from typing import List, Generator
 
 import pytest
 
 from happysimulator.data.data import Data
 from happysimulator.data.probe import Probe
 from happysimulator.entities.entity import Entity
-from happysimulator.entities.queue_policy import FIFOQueue, LIFOQueue
-from happysimulator.entities.queued_entity import QueuedEntity
+from happysimulator.entities.queue import Queue, QueuePollEvent
+from happysimulator.entities.queue_driver import QueueDriver
 from happysimulator.events.event import Event
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.poisson_arrival_time_provider import PoissonArrivalTimeProvider

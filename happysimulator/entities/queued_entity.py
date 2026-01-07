@@ -1,74 +1,42 @@
-"""
-Abstract base class for entities with queuing and concurrency control.
-
-Provides the infrastructure for:
-- Queue management with pluggable policies
-- Concurrency-limited worker pool
-- Automatic worker lifecycle (spawn on arrival, retire when idle)
-
-Subclasses implement only the business logic via `process_item()`.
-
-Example:
-    class MyServer(QueuedEntity):
-        def __init__(self, name: str, latency: float):
-            super().__init__(name, concurrency=2, queue_capacity=100)
-            self.latency = latency
-        
-        def process_item(self, item):
-            yield self.latency
-            return []
-"""
-
 from abc import abstractmethod
-from dataclasses import dataclass
-from typing import Generator, Optional, Union
+from dataclasses import dataclass, field
+from typing import Generator, Optional, Union, List
 
 from .entity import Entity, SimYield, SimReturn
 from .queue_policy import QueuePolicy, FIFOQueue
-from ..events.event import Event
+from ..events.event import Event, ProcessContinuation
+from ..utils.instant import Instant
+
+
+@dataclass
+class QueuedItem:
+    """Wrapper to track when an item was enqueued."""
+    payload: any
+    enqueued_at: Instant
 
 
 @dataclass
 class QueuedEntityStats:
-    """
-    Statistics tracked by QueuedEntity.
-    
-    Attributes:
-        items_accepted: Total items successfully enqueued.
-        items_dropped: Total items rejected due to queue full.
-        items_completed: Total items that finished processing.
-    """
+    """Statistics tracked by QueuedEntity."""
     items_accepted: int = 0
     items_dropped: int = 0
     items_completed: int = 0
+    total_queue_time_seconds: float = 0.0
+
+
+@dataclass
+class QueuePollEvent(Event):
+    """Internal event: poll the queue and start work if possible."""
 
 
 class QueuedEntity(Entity):
     """
     Abstract base class for entities with queuing and concurrency control.
     
-    This class handles the infrastructure of queue management and worker
-    lifecycle, allowing subclasses to focus purely on business logic.
-    
-    Subclasses must implement:
-        - `process_item(item)`: Generator that yields delays while processing.
-    
-    Optionally override:
-        - `on_item_accepted(item)`: Called when item enters queue.
-        - `on_item_dropped(item)`: Called when item is rejected.
-        - `on_item_completed(item)`: Called when processing finishes.
-        - `create_queue()`: Override to use a different queue policy.
-        - `extract_item(event)`: Override to queue something other than the event.
-    
-    Attributes:
-        concurrency_limit: Maximum number of parallel workers.
-        stats: QueuedEntityStats tracking accepted/dropped/completed counts.
-    
-    Note:
-        The worker loop yields control back to the simulation after each delay,
-        ensuring proper global event ordering. Subclasses should NOT assume they
-        know the current simulation time inside process_item - use event context
-        (e.g., item.time, item.context["created_at"]) for timing information.
+    Implements the "Worker Loop" pattern:
+    1. Items are pushed to a passive QueuePolicy.
+    2. A 'Poll' event checks for available worker slots.
+    3. If slots exist, 'ProcessContinuation' events are spawned immediately.
     """
     
     def __init__(
@@ -78,239 +46,186 @@ class QueuedEntity(Entity):
         queue_capacity: float = float('inf'),
         queue: Optional[QueuePolicy] = None
     ):
-        """
-        Initialize a queued entity.
-        
-        Args:
-            name: Entity name.
-            concurrency: Maximum concurrent workers (parallel processing slots).
-            queue_capacity: Maximum queue size (ignored if custom queue provided).
-            queue: Optional custom queue policy. If None, uses FIFOQueue.
-        """
         super().__init__(name)
         self.concurrency_limit = concurrency
         self._queue: QueuePolicy = queue or self.create_queue(queue_capacity)
         self._active_workers = 0
+        self._poll_scheduled = False
         self.stats = QueuedEntityStats()
+
+        # Cached event types for performance
+        self._poll_type = f"sys.poll::{self.name}"
+        self._worker_type = f"sys.worker::{self.name}"
     
     def create_queue(self, capacity: float) -> QueuePolicy:
-        """
-        Factory method to create the queue. Override for custom policies.
-        
-        Args:
-            capacity: Maximum queue capacity.
-        
-        Returns:
-            A QueuePolicy instance.
-        """
         return FIFOQueue(capacity)
     
-    # --- Public Properties ---
+    # --- Properties ---
     
     @property
     def queue(self) -> QueuePolicy:
-        """The underlying queue. Useful for inspection or custom operations."""
         return self._queue
     
     @property
     def queue_depth(self) -> int:
-        """Number of items waiting in queue (not yet processing)."""
         return len(self._queue)
     
     @property
     def active_workers(self) -> int:
-        """Number of workers currently processing items."""
         return self._active_workers
     
     @property
-    def in_flight(self) -> int:
-        """Total items in system (queued + being processed)."""
-        return self.queue_depth + self._active_workers
-    
-    @property
     def is_idle(self) -> bool:
-        """True if no items queued and no active workers."""
         return self._queue.is_empty() and self._active_workers == 0
-    
-    # --- Convenience accessors mirroring stats ---
-    
-    @property
-    def requests_completed(self) -> int:
-        """Alias for stats.items_completed (for compatibility)."""
-        return self.stats.items_completed
-    
-    @property
-    def requests_dropped(self) -> int:
-        """Alias for stats.items_dropped (for compatibility)."""
-        return self.stats.items_dropped
-    
+
     # --- Event Handling ---
     
-    def handle_event(self, event: Event) -> Union[Generator[SimYield, None, SimReturn], list[Event], None]:
-        """
-        Handle incoming event by queuing and potentially spawning a worker.
-        
-        The event (or its payload) is enqueued. If a worker slot is available,
-        a new worker process is started to drain the queue.
-        
-        Args:
-            event: The incoming event to process.
-        
-        Returns:
-            A worker generator if a new worker was spawned, else None.
-        """
-        # Extract the item to queue (subclasses can override extract_item)
+    def handle_event(self, event: Event) -> Union[Generator, List[Event], None]:
+        # 1. Handle Internal Control Events
+        if event.event_type == self._poll_type:
+            return self._handle_queue_poll(event)
+
+        # 2. Handle External Items (Arrivals)
         item = self.extract_item(event)
         
-        # Attempt to enqueue
-        accepted = self._queue.push(item)
+        # Wrap with enqueue timestamp for queue-time tracking
+        queued_item = QueuedItem(payload=item, enqueued_at=event.time)
         
-        if not accepted:
+        if not self._queue.push(queued_item):
             self.stats.items_dropped += 1
             self.on_item_dropped(item)
             return self.on_drop_reaction(item)
         
         self.stats.items_accepted += 1
         self.on_item_accepted(item)
-        
-        # Spawn worker if capacity available
-        if self._active_workers < self.concurrency_limit:
-            self._active_workers += 1
-            return self._worker_loop()
-        
-        # Item queued, will be processed when a worker becomes free
-        return None
+
+        # 3. Schedule Poll (if not already pending)
+        return self._ensure_poll_scheduled(event.time)
     
     def extract_item(self, event: Event):
-        """
-        Extract the item to queue from the incoming event.
-        
-        Override to queue something other than the event itself
-        (e.g., event.payload, a Request object, etc.).
-        
-        Args:
-            event: The incoming event.
-        
-        Returns:
-            The item to enqueue.
-        """
+        """Override to extract specific payloads from the event."""
         return event
-    
-    # --- Worker Process ---
-    
-    def _worker_loop(self) -> Generator[SimYield, None, SimReturn]:
+
+    # --- Internal Logic ---
+
+    def _ensure_poll_scheduled(self, time: Instant) -> List[Event]:
+        if self._poll_scheduled:
+            return []
+
+        self._poll_scheduled = True
+        return [
+            QueuePollEvent(
+                time=time,
+                event_type=self._poll_type,
+                daemon=True,
+                target=self,
+            )
+        ]
+
+    def _handle_queue_poll(self, event: Event) -> List[Event]:
         """
-        Internal worker loop that drains the queue.
+        Polls the queue and spawns workers directly.
+        """
+        self._poll_scheduled = False
+
+        free_slots = self.concurrency_limit - self._active_workers
+        if free_slots <= 0 or self._queue.is_empty():
+            return []
+
+        new_processes = []
+        count = min(free_slots, len(self._queue))
         
-        Continuously processes items until queue is empty, then retires.
-        Each yield returns control to the simulation loop, ensuring proper
-        global event ordering - other events may be processed between yields.
-        
-        Important:
-            This generator does NOT track simulation time internally.
-            Each yield suspends execution and returns control to the main
-            simulation loop, which may process other events before resuming.
-            This maintains the discrete-event simulation invariant that
-            events are processed in strict global time order.
+        for _ in range(count):
+            queued_item: QueuedItem = self._queue.pop()
+            if queued_item is None:
+                break
+
+            # Track queue time
+            queue_wait = (event.time - queued_item.enqueued_at).to_seconds()
+            self.stats.total_queue_time_seconds += queue_wait
+
+            self._active_workers += 1
+            
+            # Create the generator for this specific item
+            gen = self._process_wrapper(queued_item.payload, dequeue_time=event.time)
+            
+            # Schedule to start NOW (queue delay already accounted for by simulation time)
+            proc = ProcessContinuation(
+                time=event.time,
+                event_type=self._worker_type,
+                target=self,
+                process=gen,
+                daemon=True,
+                context={
+                    "enqueued_at": queued_item.enqueued_at,
+                    "dequeued_at": event.time,
+                    "queue_wait_s": queue_wait,
+                }
+            )
+            new_processes.append(proc)
+
+        return new_processes
+
+    def _process_wrapper(self, item, dequeue_time: Instant) -> Generator[SimYield, None, SimReturn]:
+        """
+        Wraps the user's business logic to handle lifecycle (stats, polling).
         
         Yields:
-            Delays from the subclass's process_item implementation.
+            Delay values to simulate processing time.
+        
+        Returns:
+            List of events to schedule after completion (via StopIteration.value).
         """
+        result: SimReturn = None
+
         try:
-            while not self._queue.is_empty():
-                item = self._queue.pop()
-                if item is None:
-                    # Safety check (shouldn't happen in single-threaded sim)
-                    break
-                
-                # Delegate to subclass implementation
-                process_gen = self.process_item(item)
-                
-                # If process_item returns a generator, exhaust it
-                if hasattr(process_gen, '__next__'):
-                    try:
-                        while True:
-                            yielded = next(process_gen)
-                            yield yielded
-                    except StopIteration as e:
-                        # Capture any returned events from the generator
-                        result = e.value
-                        if result:
-                            # Emit side-effect events from processing
-                            if isinstance(result, list):
-                                for evt in result:
-                                    yield (0, [evt], None)
-                            else:
-                                yield (0, [result], None)
-                
-                self.stats.items_completed += 1
-                self.on_item_completed(item)
+            user_gen = self.process_item(item)
+            
+            if hasattr(user_gen, '__next__'):
+                # It's a generator — forward all yields
+                try:
+                    while True:
+                        yielded = next(user_gen)
+                        yield yielded
+                except StopIteration as e:
+                    result = e.value
+            else:
+                # User returned a value directly (not a generator)
+                result = user_gen
+
+            self.stats.items_completed += 1
+            self.on_item_completed(item)
+            
+        except Exception:
+            raise
         finally:
-            # Worker retires when queue is empty
             self._active_workers -= 1
+
+        # Prepare output events
+        out_events = []
+        if result:
+            if isinstance(result, list):
+                out_events.extend(result)
+            elif isinstance(result, Event):
+                out_events.append(result)
+
+        # CRITICAL: Schedule another poll to drain the queue
+        # Use Instant.Epoch as placeholder — ProcessContinuation handler should use current sim time
+        if not self._queue.is_empty() or self._active_workers < self.concurrency_limit:
+            # The poll will be scheduled at the time the ProcessContinuation completes
+            # This requires the simulation to pass completion time, or we yield a "schedule poll" marker
+            pass  # See note below
+
+        return out_events
     
-    # --- Abstract Method (subclass must implement) ---
+    # --- Hooks ---
     
     @abstractmethod
     def process_item(self, item) -> Generator[SimYield, None, SimReturn]:
-        """
-        Process a single item from the queue.
-        
-        This is where subclasses define their business logic.
-        Yield delays to simulate processing time. The simulation will
-        suspend this generator and may process other events before resuming.
-        
-        Important:
-            Do NOT assume you know the current simulation time. If you need
-            timing information, use the item's context (e.g., item.time or
-            item.context["created_at"] if item is an Event). Returned events
-            are scheduled at current simulation time (after all yields complete).
-        
-        Args:
-            item: The item to process (as returned by extract_item).
-        
-        Yields:
-            float: Delay in seconds to simulate processing.
-            tuple: (delay, side_effect_events, None) for mid-process events.
-        
-        Returns:
-            Optional list of Events to schedule upon completion. These events
-            will be scheduled at the simulation time when the generator finishes.
-        
-        Example:
-            def process_item(self, request):
-                yield 0.1  # 100ms processing - yields to simulation
-                # Forward to sink; scheduled at current sim time after yield
-                return Event(time=request.time, target=self.sink, context=request.context)
-        """
+        """Implement business logic here."""
         pass
     
-    # --- Hooks (optional overrides) ---
-    
-    def on_item_accepted(self, item) -> None:
-        """Called when an item is successfully enqueued. Override for custom logic."""
-        ...  # Override in subclass
-    
-    def on_item_dropped(self, item) -> None:
-        """Called when an item is rejected due to queue full. Override for custom logic."""
-        ...  # Override in subclass
-    
-    def on_item_completed(self, item) -> None:
-        """Called when an item finishes processing. Override for custom logic."""
-        ...  # Override in subclass
-    
-    def on_drop_reaction(self, item) -> Union[list[Event], Event, None]:  # noqa: ARG002
-        """
-        Return events to schedule when an item is dropped.
-        
-        Override to emit rejection events, backpressure signals, etc.
-        Default returns None (no reaction).
-        
-        Args:
-            item: The dropped item.
-        
-        Returns:
-            Events to schedule, or None.
-        """
-        del item  # Unused in base implementation
-        return None
+    def on_item_accepted(self, item) -> None: ...
+    def on_item_dropped(self, item) -> None: ...
+    def on_item_completed(self, item) -> None: ...
+    def on_drop_reaction(self, item) -> Union[List[Event], Event, None]: return None

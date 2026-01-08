@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
-from collections import deque
 
 from happysimulator.entities.entity import Entity
+from happysimulator.entities.queue_policy import QueuePolicy, FIFOQueue
 from happysimulator.events.event import Event
 
 
@@ -32,23 +32,30 @@ class Queue(Entity):
     
     The queue doesn't interact with the server directly—it only knows
     about its egress (typically a QueueDriver that wraps the server).
+    
+    Args:
+        name: Entity name for identification.
+        egress: The downstream entity (typically a QueueDriver) to notify.
+        policy: Queue policy controlling item ordering (FIFO, LIFO, Priority).
+                Defaults to FIFOQueue with unlimited capacity.
     """
     name: str = "Queue"
     egress: Entity = None  # The driver that will process items
-    capacity: int = 0  # 0 = unbounded
-    
-    # Internal storage
-    _queue: deque = field(default_factory=deque, init=False)
+    policy: QueuePolicy = None  # Queue policy (FIFO, LIFO, Priority, etc.)
     
     # Statistics
     stats_dropped: int = field(default=0, init=False)
     stats_accepted: int = field(default=0, init=False)
 
+    def __post_init__(self):
+        # Default to unbounded FIFO if no policy provided
+        if self.policy is None:
+            self.policy = FIFOQueue()
+
     def has_capacity(self) -> bool:
         """Return True if the queue can accept more items."""
-        if self.capacity == 0:
-            return True
-        return len(self._queue) < self.capacity
+        # Delegate capacity check to policy
+        return len(self.policy) < self.policy.capacity
 
     def handle_event(self, event: Event) -> list[Event]:
         if isinstance(event, QueuePollEvent):
@@ -59,13 +66,13 @@ class Queue(Entity):
 
     def _handle_enqueue(self, event: Event) -> list[Event]:
         """Buffer incoming work and notify driver if queue was empty."""
-        if not self.has_capacity():
+        was_empty = self.policy.is_empty()
+        
+        accepted = self.policy.push(event)
+        if not accepted:
             self.stats_dropped += 1
             return []
-
-        was_empty = len(self._queue) == 0
         
-        self._queue.append(event)
         self.stats_accepted += 1
         
         # If queue was empty, the driver might be idle—wake it up
@@ -79,11 +86,11 @@ class Queue(Entity):
 
     def _handle_poll(self, event: QueuePollEvent) -> list[Event]:
         """Driver is asking for work."""
-        if not self._queue:
+        next_item = self.policy.pop()
+        if next_item is None:
             # Nothing available; driver will wait for QueueNotifyEvent
             return []
         
-        next_item = self._queue.popleft()
         next_item.target = event.requestor
         next_item.time = event.time
         
@@ -91,4 +98,4 @@ class Queue(Entity):
 
     @property
     def depth(self) -> int:
-        return len(self._queue)
+        return len(self.policy)

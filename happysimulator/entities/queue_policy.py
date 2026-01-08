@@ -17,7 +17,6 @@ from typing import Generic, TypeVar, Optional, Callable, Protocol, runtime_check
 
 T = TypeVar('T')
 
-
 class QueuePolicy(ABC, Generic[T]):
     """
     Abstract queue policy defining how items are stored and retrieved.
@@ -25,6 +24,12 @@ class QueuePolicy(ABC, Generic[T]):
     Implementations control ordering semantics (FIFO, LIFO, priority, etc.)
     and optionally enforce capacity limits.
     """
+    
+    @property
+    @abstractmethod
+    def capacity(self) -> float:
+        """Return the maximum capacity of this queue."""
+        pass
     
     @abstractmethod
     def push(self, item: T) -> bool:
@@ -82,8 +87,12 @@ class FIFOQueue(QueuePolicy[T]):
     """
     
     def __init__(self, capacity: float = float('inf')):
-        self.capacity = capacity
+        self._capacity = capacity
         self._queue: deque[T] = deque()
+
+    @property
+    def capacity(self) -> float:
+        return self._capacity
 
     def push(self, item: T) -> bool:
         if len(self._queue) >= self.capacity:
@@ -120,8 +129,12 @@ class LIFOQueue(QueuePolicy[T]):
     """
     
     def __init__(self, capacity: float = float('inf')):
-        self.capacity = capacity
+        self._capacity = capacity
         self._queue: deque[T] = deque()
+
+    @property
+    def capacity(self) -> float:
+        return self._capacity
 
     def push(self, item: T) -> bool:
         if len(self._queue) >= self.capacity:
@@ -233,10 +246,14 @@ class PriorityQueue(QueuePolicy[T]):
         capacity: float = float('inf'),
         key: Optional[Callable[[T], float]] = None
     ):
-        self.capacity = capacity
+        self._capacity = capacity
         self._key = key
         self._heap: list[_PriorityEntry[T]] = []
         self._insert_counter = 0
+
+    @property
+    def capacity(self) -> float:
+        return self._capacity
     
     def _get_priority(self, item: T) -> float:
         """Extract priority from item using configured strategy."""

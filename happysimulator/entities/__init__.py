@@ -8,10 +8,7 @@ from .queue_policy import (
     PriorityQueue,
     Prioritized,
 )
-from .queued_entity import (
-    QueuedEntity,
-    QueuedEntityStats,
-)
+
 from .token_bucket_rate_limiter import (
     TokenBucketRateLimiter,
     RateLimiterStats,
@@ -36,9 +33,6 @@ __all__ = [
     "LIFOQueue",
     "PriorityQueue",
     "Prioritized",
-    # Queued entity
-    "QueuedEntity",
-    "QueuedEntityStats",
     # Rate limiter
     "TokenBucketRateLimiter",
     "RateLimiterStats",

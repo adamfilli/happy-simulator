@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Generator, Optional, Tuple, Union
 
+from archive.experiments.arrival_distributions import Instant
+from happysimulator.utils.clock import Clock
+
 from ..events.event import Event
 
 # Alias for what the Generator yields: 
@@ -13,6 +16,18 @@ SimReturn = Optional[Union[list[Event], Event]]
 class Entity(ABC):
     def __init__(self, name):
         self.name = name
+        self._clock: Optional[Clock] = None # Injected later
+
+    def set_clock(self, clock: Clock):
+        """Called by Simulation during initialization."""
+        self._clock = clock
+
+    @property
+    def now(self) -> Instant:
+        """Convenience accessor for current simulation time."""
+        if self._clock is None:
+            raise RuntimeError(f"Entity {self.name} is not attached to a simulation (Clock is None).")
+        return self._clock.now
         
     @abstractmethod
     def handle_event(self, event: Event) -> Union[Generator[SimYield, None, SimReturn], list[Event], Event, None]:

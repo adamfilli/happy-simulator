@@ -5,3 +5,6 @@
     - Burst suppression 
 4. Queueing network recreations: https://www.grotto-networking.com/DiscreteEventPython.html
 5. Model client server ping pong communications
+6. Add global clock to simulation and entities
+
+

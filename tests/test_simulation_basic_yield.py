@@ -30,7 +30,7 @@ class PingCounterEntity(Entity):
         self.second_counter += 1
         
         # Yields a side effect (now) to be handled by the SideEffectCounterEntity
-        yield 1, PingEvent(event.time, self.side_effect_counter)
+        yield 1, PingEvent(self.now, self.side_effect_counter)
         return []
 
 class PingEvent(Event):

@@ -1,9 +1,11 @@
 import logging
 
 from happysimulator.entities.entity import Entity
+from happysimulator.events.event import Event
 from happysimulator.event_heap import EventHeap
 from happysimulator.load.source import Source
 from happysimulator.tracing.recorder import TraceRecorder, NullTraceRecorder
+from happysimulator.utils.clock import Clock
 from happysimulator.utils.instant import Instant
 
 logger = logging.getLogger(__name__)
@@ -26,10 +28,17 @@ class Simulation:
         self._end_time = end_time
         if self._end_time is None:
             self._end_time = Instant.Infinity
+            
+        self._clock = Clock(self._start_time)
         
         self._entities = entities or []
         self._sources = sources or []
         self._probes = probes or []
+        
+        all_components = self._entities + self._sources + self._probes
+        for component in all_components:
+            if isinstance(component, Entity):
+                component.set_clock(self._clock)
         
         self._trace = trace_recorder or NullTraceRecorder()
         self._event_heap = EventHeap(trace_recorder=self._trace)
@@ -70,6 +79,10 @@ class Simulation:
         """Access the trace recorder for inspection after simulation."""
         return self._trace
 
+    def schedule(self, events: Event | list[Event]) -> None:
+        """Schedule one or more events into the simulation heap."""
+        self._event_heap.push(events)
+
     def run(self) -> None:
         current_time = self._start_time
         self._event_heap.set_current_time(current_time)
@@ -106,6 +119,16 @@ class Simulation:
             
             # 1. Pop
             event = self._event_heap.pop()
+
+            if event.time < current_time:
+                logger.warning(
+                    "Time travel detected: next event scheduled at %r, but current simulation time is %r. "
+                    "event_type=%s event_id=%s",
+                    event.time,
+                    current_time,
+                    event.event_type,
+                    event.context.get("id"),
+                )
             current_time = event.time  # Advance clock
             self._event_heap.set_current_time(current_time)
             events_processed += 1

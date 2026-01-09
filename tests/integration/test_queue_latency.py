@@ -13,7 +13,7 @@ from happysimulator.data.probe import Probe
 from happysimulator.entities.entity import Entity
 from happysimulator.entities.queue import Queue
 from happysimulator.entities.queue_driver import QueueDriver
-from happysimulator.entities.queue_policy import FIFOQueue
+from happysimulator.entities.queue_policy import FIFOQueue, LIFOQueue, QueuePolicy
 from happysimulator.events.event import Event
 from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
@@ -84,17 +84,18 @@ class LatencyTrackingSink(Entity):
 @dataclass
 class ConcurrencyLimitedServer(Entity):
 
-    """A server with concurrency=1 and fixed service time."""
+    """A server with configurable concurrency and fixed service time."""
 
     name: str = "Server"
     service_time_s: float = 0.5
+    concurrency: int = 1
     downstream: Entity | None = None
 
     _in_flight: int = field(default=0, init=False)
     stats_processed: int = field(default=0, init=False)
 
     def has_capacity(self) -> bool:
-        return self._in_flight == 0
+        return self._in_flight < self.concurrency
 
     def handle_event(self, event: Event) -> Generator[Instant, None, list[Event]]:
         self._in_flight += 1
@@ -140,20 +141,34 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
     return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
 
 
-def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
-
-    """Ramp load above capacity should increase average end-to-end latency."""
-
-    duration_s = 30.0
-    service_time_s = 0.2  # capacity ~5 req/s
-
-    # Ramp from below capacity to well above capacity.
-    profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
+def run_queue_latency_scenario(
+    *,
+    profile: Profile,
+    service_time_s: float,
+    server_concurrency: int,
+    queue_policy: QueuePolicy,
+    test_output_dir: Path | None = None,
+    duration_s: float = 30.0,
+    probe_interval_s: float = 0.1,
+    bucket_size_s: float = 1.0,
+) -> tuple[LatencyTrackingSink, ConcurrencyLimitedServer, Data]:
+    if server_concurrency <= 0:
+        raise ValueError("server_concurrency must be > 0")
+    if duration_s <= 0:
+        raise ValueError("duration_s must be > 0")
+    if probe_interval_s <= 0:
+        raise ValueError("probe_interval_s must be > 0")
+    if bucket_size_s <= 0:
+        raise ValueError("bucket_size_s must be > 0")
 
     sink = LatencyTrackingSink(name="Sink")
-    server = ConcurrencyLimitedServer(service_time_s=service_time_s, downstream=sink)
+    server = ConcurrencyLimitedServer(
+        service_time_s=service_time_s,
+        concurrency=server_concurrency,
+        downstream=sink,
+    )
     driver = QueueDriver(name="Driver", queue=None, target=server)
-    queue = Queue(name="RequestQueue", egress=driver, policy=FIFOQueue())
+    queue = Queue(name="RequestQueue", egress=driver, policy=queue_policy)
     driver.queue = queue
 
     queue_depth_data = Data()
@@ -161,7 +176,7 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
         target=queue,
         metric="depth",
         data=queue_depth_data,
-        interval=0.1,
+        interval=probe_interval_s,
         start_time=Instant.Epoch,
     )
 
@@ -178,14 +193,8 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
     )
     sim.run()
 
-    assert sink.events_received > 0
-    assert server.stats_processed >= sink.events_received
-
-    avg_latency = sink.average_latency()
-
     times_s, latencies_s = sink.latency_time_series_seconds()
 
-    bucket_size_s = 1.0
     buckets: dict[int, list[float]] = defaultdict(list)
     for t_s, latency_s in zip(times_s, latencies_s, strict=False):
         bucket = int(math.floor(t_s / bucket_size_s))
@@ -196,79 +205,150 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
     bucket_p0_s: list[float] = []
     bucket_p50_s: list[float] = []
     bucket_p99_s: list[float] = []
+    bucket_p100_s: list[float] = []
     for bucket in sorted(buckets.keys()):
-        vals = buckets[bucket]
-        vals_sorted = sorted(vals)
-
+        vals_sorted = sorted(buckets[bucket])
         bucket_start = bucket * bucket_size_s
+
         bucket_times_s.append(bucket_start)
         bucket_avg_s.append(sum(vals_sorted) / len(vals_sorted))
         bucket_p0_s.append(_percentile_sorted(vals_sorted, 0.0))
         bucket_p50_s.append(_percentile_sorted(vals_sorted, 0.50))
         bucket_p99_s.append(_percentile_sorted(vals_sorted, 0.99))
+        bucket_p100_s.append(_percentile_sorted(vals_sorted, 1.0))
 
     queue_depth_times_s = [t for (t, _v) in queue_depth_data.values]
     queue_depth_values = [int(v) for (_t, v) in queue_depth_data.values]
 
-    _write_csv(
-        test_output_dir / "latency_events.csv",
-        header=[
-            "index",
-            "completion_time_s",
-            "latency_s",
-        ],
-        rows=[[i, t, l] for i, (t, l) in enumerate(zip(times_s, latencies_s, strict=False))],
+    if test_output_dir is not None:
+        _write_csv(
+            test_output_dir / "latency_events.csv",
+            header=[
+                "index",
+                "completion_time_s",
+                "latency_s",
+            ],
+            rows=[[i, t, l] for i, (t, l) in enumerate(zip(times_s, latencies_s, strict=False))],
+        )
+
+        _write_csv(
+            test_output_dir / "latency_timeseries.csv",
+            header=[
+                "bucket_start_s",
+                "bucket_size_s",
+                "avg_latency_s",
+                "p0_latency_s",
+                "p50_latency_s",
+                "p99_latency_s",
+                "p100_latency_s",
+            ],
+            rows=[
+                [t, bucket_size_s, a, p0, p50, p99, p100]
+                for (t, a, p0, p50, p99, p100) in zip(
+                    bucket_times_s,
+                    bucket_avg_s,
+                    bucket_p0_s,
+                    bucket_p50_s,
+                    bucket_p99_s,
+                    bucket_p100_s,
+                    strict=False,
+                )
+            ],
+        )
+
+        _write_csv(
+            test_output_dir / "queue_depth_timeseries.csv",
+            header=["index", "time_s", "queue_depth"],
+            rows=[[i, t, d] for i, (t, d) in enumerate(zip(queue_depth_times_s, queue_depth_values, strict=False))],
+        )
+
+        matplotlib = pytest.importorskip("matplotlib")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(bucket_times_s, bucket_avg_s, label="avg")
+        ax.plot(bucket_times_s, bucket_p0_s, label="p0")
+        ax.plot(bucket_times_s, bucket_p50_s, label="p50")
+        ax.plot(bucket_times_s, bucket_p99_s, label="p99")
+        ax.plot(bucket_times_s, bucket_p100_s, label="p100")
+        ax.set_title("Queue end-to-end latency over time (bucketed)")
+        ax.set_xlabel("completion time (s)")
+        ax.set_ylabel("latency (s)")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best")
+        fig.tight_layout()
+        fig.savefig(test_output_dir / "latency_timeseries.png", dpi=150)
+        plt.close(fig)
+
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(queue_depth_times_s, queue_depth_values)
+        ax.set_title("Queue depth over time")
+        ax.set_xlabel("time (s)")
+        ax.set_ylabel("queue depth")
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(test_output_dir / "queue_depth_timeseries.png", dpi=150)
+        plt.close(fig)
+
+    return sink, server, queue_depth_data
+
+
+def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
+
+    """Ramp load above capacity should increase average end-to-end latency."""
+
+    duration_s = 30.0
+    service_time_s = 0.2  # capacity ~5 req/s
+    server_concurrency = 1
+    queue_policy = FIFOQueue()
+
+    # Ramp from below capacity to well above capacity.
+    profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
+
+    sink, server, _queue_depth_data = run_queue_latency_scenario(
+        profile=profile,
+        service_time_s=service_time_s,
+        server_concurrency=server_concurrency,
+        queue_policy=queue_policy,
+        test_output_dir=test_output_dir,
+        duration_s=duration_s,
+        probe_interval_s=0.1,
+        bucket_size_s=1.0,
     )
 
-    _write_csv(
-        test_output_dir / "latency_timeseries.csv",
-        header=["bucket_start_s", "bucket_size_s", "avg_latency_s", "p0_latency_s", "p50_latency_s", "p99_latency_s"],
-        rows=[
-            [t, bucket_size_s, a, p0, p50, p99]
-            for (t, a, p0, p50, p99) in zip(
-                bucket_times_s,
-                bucket_avg_s,
-                bucket_p0_s,
-                bucket_p50_s,
-                bucket_p99_s,
-                strict=False,
-            )
-        ],
-    )
-
-    _write_csv(
-        test_output_dir / "queue_depth_timeseries.csv",
-        header=["index", "time_s", "queue_depth"],
-        rows=[[i, t, d] for i, (t, d) in enumerate(zip(queue_depth_times_s, queue_depth_values, strict=False))],
-    )
-
-    matplotlib = pytest.importorskip("matplotlib")
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(bucket_times_s, bucket_avg_s, label="avg")
-    ax.plot(bucket_times_s, bucket_p0_s, label="p0")
-    ax.plot(bucket_times_s, bucket_p50_s, label="p50")
-    ax.plot(bucket_times_s, bucket_p99_s, label="p99")
-    ax.set_title("Queue end-to-end latency over time (1s buckets)")
-    ax.set_xlabel("completion time (s)")
-    ax.set_ylabel("latency (s)")
-    ax.grid(True, alpha=0.3)
-    ax.legend(loc="best")
-    fig.tight_layout()
-    fig.savefig(test_output_dir / "latency_timeseries.png", dpi=150)
-    plt.close(fig)
-
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(queue_depth_times_s, queue_depth_values)
-    ax.set_title("Queue depth over time")
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("queue depth")
-    ax.grid(True, alpha=0.3)
-    fig.tight_layout()
-    fig.savefig(test_output_dir / "queue_depth_timeseries.png", dpi=150)
-    plt.close(fig)
+    assert sink.events_received > 0
+    assert server.stats_processed >= sink.events_received
 
     # Under overload, queueing delay should push average latency above service time.
+    avg_latency = sink.average_latency()
+    assert avg_latency > service_time_s
+
+
+def test_queue_latency_with_ramp_source_lifo(test_output_dir: Path) -> None:
+
+    """Same scenario as FIFO test, but with a LIFO queue policy."""
+
+    duration_s = 30.0
+    service_time_s = 0.2  # capacity ~5 req/s
+    server_concurrency = 1
+    queue_policy = LIFOQueue()
+
+    profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
+
+    sink, server, _queue_depth_data = run_queue_latency_scenario(
+        profile=profile,
+        service_time_s=service_time_s,
+        server_concurrency=server_concurrency,
+        queue_policy=queue_policy,
+        test_output_dir=test_output_dir,
+        duration_s=duration_s,
+        probe_interval_s=0.1,
+        bucket_size_s=1.0,
+    )
+
+    assert sink.events_received > 0
+    assert server.stats_processed >= sink.events_received
+
+    avg_latency = sink.average_latency()
     assert avg_latency > service_time_s

@@ -42,13 +42,33 @@ class LinearRampProfile(Profile):
 
 class RequestProvider(EventProvider):
 
-    """Generates request events targeting the queue."""
+    """Generates request events targeting the queue.
 
-    def __init__(self, queue: Entity):
+    Optionally stops emitting events after a cutoff time. This lets tests generate
+    load for a bounded window, then let the system drain without injecting more work.
+    """
+
+    def __init__(self, queue: Entity, *, stop_after: Instant | None = None):
         self._queue = queue
+        self._stop_after = stop_after
+        self.generated_requests: int = 0
 
     def get_events(self, time: Instant) -> List[Event]:
-        return [Event(time=time, event_type="Request", target=self._queue)]
+        if self._stop_after is not None and time > self._stop_after:
+            return []
+
+        self.generated_requests += 1
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._queue,
+                context={
+                    "created_at": time,
+                    "request_id": self.generated_requests,
+                },
+            )
+        ]
 
 
 class LatencyTrackingSink(Entity):
@@ -141,6 +161,14 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
     return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
 
 
+@dataclass(frozen=True)
+class QueueLatencyScenarioResult:
+    sink: LatencyTrackingSink
+    server: ConcurrencyLimitedServer
+    queue_depth_data: Data
+    requests_generated: int
+
+
 def run_queue_latency_scenario(
     *,
     profile: Profile,
@@ -149,13 +177,16 @@ def run_queue_latency_scenario(
     queue_policy: QueuePolicy,
     test_output_dir: Path | None = None,
     duration_s: float = 30.0,
+    drain_s: float = 0.0,
     probe_interval_s: float = 0.1,
     bucket_size_s: float = 1.0,
-) -> tuple[LatencyTrackingSink, ConcurrencyLimitedServer, Data]:
+) -> QueueLatencyScenarioResult:
     if server_concurrency <= 0:
         raise ValueError("server_concurrency must be > 0")
     if duration_s <= 0:
         raise ValueError("duration_s must be > 0")
+    if drain_s < 0:
+        raise ValueError("drain_s must be >= 0")
     if probe_interval_s <= 0:
         raise ValueError("probe_interval_s must be > 0")
     if bucket_size_s <= 0:
@@ -180,13 +211,14 @@ def run_queue_latency_scenario(
         start_time=Instant.Epoch,
     )
 
-    provider = RequestProvider(queue)
+    stop_after = Instant.from_seconds(duration_s)
+    provider = RequestProvider(queue, stop_after=stop_after)
     arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
     source = Source(name="RequestSource", event_provider=provider, arrival_time_provider=arrival)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        end_time=Instant.from_seconds(duration_s + drain_s),
         sources=[source],
         entities=[queue, driver, server, sink],
         probes=[queue_depth_probe],
@@ -291,7 +323,12 @@ def run_queue_latency_scenario(
         fig.savefig(test_output_dir / "queue_depth_timeseries.png", dpi=150)
         plt.close(fig)
 
-    return sink, server, queue_depth_data
+    return QueueLatencyScenarioResult(
+        sink=sink,
+        server=server,
+        queue_depth_data=queue_depth_data,
+        requests_generated=provider.generated_requests,
+    )
 
 
 def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
@@ -299,6 +336,7 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
     """Ramp load above capacity should increase average end-to-end latency."""
 
     duration_s = 30.0
+    drain_s = 10.0
     service_time_s = 0.2  # capacity ~5 req/s
     server_concurrency = 1
     queue_policy = FIFOQueue()
@@ -306,22 +344,24 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
     # Ramp from below capacity to well above capacity.
     profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
 
-    sink, server, _queue_depth_data = run_queue_latency_scenario(
+    result = run_queue_latency_scenario(
         profile=profile,
         service_time_s=service_time_s,
         server_concurrency=server_concurrency,
         queue_policy=queue_policy,
         test_output_dir=test_output_dir,
         duration_s=duration_s,
+        drain_s=drain_s,
         probe_interval_s=0.1,
         bucket_size_s=1.0,
     )
 
-    assert sink.events_received > 0
-    assert server.stats_processed >= sink.events_received
+    assert result.requests_generated > 0
+    assert result.sink.events_received == result.requests_generated
+    assert result.server.stats_processed >= result.sink.events_received
 
     # Under overload, queueing delay should push average latency above service time.
-    avg_latency = sink.average_latency()
+    avg_latency = result.sink.average_latency()
     assert avg_latency > service_time_s
 
 
@@ -330,25 +370,69 @@ def test_queue_latency_with_ramp_source_lifo(test_output_dir: Path) -> None:
     """Same scenario as FIFO test, but with a LIFO queue policy."""
 
     duration_s = 30.0
+    drain_s = 10.0
     service_time_s = 0.2  # capacity ~5 req/s
     server_concurrency = 1
     queue_policy = LIFOQueue()
 
     profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
 
-    sink, server, _queue_depth_data = run_queue_latency_scenario(
+    result = run_queue_latency_scenario(
         profile=profile,
         service_time_s=service_time_s,
         server_concurrency=server_concurrency,
         queue_policy=queue_policy,
         test_output_dir=test_output_dir,
         duration_s=duration_s,
+        drain_s=drain_s,
         probe_interval_s=0.1,
         bucket_size_s=1.0,
     )
 
-    assert sink.events_received > 0
-    assert server.stats_processed >= sink.events_received
+    assert result.requests_generated > 0
+    assert result.sink.events_received == result.requests_generated
+    assert result.server.stats_processed >= result.sink.events_received
 
-    avg_latency = sink.average_latency()
+    avg_latency = result.sink.average_latency()
     assert avg_latency > service_time_s
+
+
+def test_queue_latency_fifo_and_lifo_have_same_average_when_drained() -> None:
+
+    """FIFO vs LIFO averages only differ under censoring; draining removes bias."""
+
+    duration_s = 30.0
+    drain_s = 10.0
+    service_time_s = 0.2
+    server_concurrency = 1
+    profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
+
+    fifo = run_queue_latency_scenario(
+        profile=profile,
+        service_time_s=service_time_s,
+        server_concurrency=server_concurrency,
+        queue_policy=FIFOQueue(),
+        test_output_dir=None,
+        duration_s=duration_s,
+        drain_s=drain_s,
+        probe_interval_s=0.1,
+        bucket_size_s=1.0,
+    )
+    lifo = run_queue_latency_scenario(
+        profile=profile,
+        service_time_s=service_time_s,
+        server_concurrency=server_concurrency,
+        queue_policy=LIFOQueue(),
+        test_output_dir=None,
+        duration_s=duration_s,
+        drain_s=drain_s,
+        probe_interval_s=0.1,
+        bucket_size_s=1.0,
+    )
+
+    assert fifo.requests_generated > 0
+    assert lifo.requests_generated > 0
+    assert fifo.sink.events_received == fifo.requests_generated
+    assert lifo.sink.events_received == lifo.requests_generated
+
+    assert lifo.sink.average_latency() == pytest.approx(fifo.sink.average_latency(), abs=1e-6)

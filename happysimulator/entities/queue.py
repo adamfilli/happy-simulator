@@ -24,6 +24,19 @@ class QueueNotifyEvent(Event):
     event_type: str = field(default="QUEUE_NOTIFY", init=False)
     queue_entity: Entity = None
 
+@dataclass
+class QueueDeliverEvent(Event):
+    """
+    Sent by the Queue to the Driver.
+    Meaning: "Here is one payload event you asked for."
+
+    Note:
+        The payload is not mutated by the queue. The driver is responsible for
+        cloning/retargeting as needed before re-emitting to the simulation.
+    """
+    event_type: str = field(default="QUEUE_DELIVER", init=False)
+    payload: Event | None = None
+    queue_entity: Entity | None = None
 
 @dataclass
 class Queue(Entity):
@@ -91,10 +104,14 @@ class Queue(Entity):
             # Nothing available; driver will wait for QueueNotifyEvent
             return []
         
-        next_item.target = event.requestor
-        next_item.time = self.now
-        
-        return [next_item]
+        # Do not mutate `next_item` (events are treated as immutable payloads).
+        # Wrap it in a delivery event timestamped to the global simulation clock.
+        return [QueueDeliverEvent(
+            time=self.now,
+            target=event.requestor,
+            payload=next_item,
+            queue_entity=self
+        )]
 
     @property
     def depth(self) -> int:

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.entities.entity import Entity
-from happysimulator.entities.queue import QueueNotifyEvent, QueuePollEvent
+from happysimulator.entities.queue import QueueDeliverEvent, QueueNotifyEvent, QueuePollEvent
 from happysimulator.events.event import Event
 from happysimulator.utils.instant import Instant
 
@@ -28,7 +28,29 @@ class QueueDriver(Entity):
         if isinstance(event, QueueNotifyEvent):
             return self._handle_notify(event)
         
-        return self._handle_work(event)
+        if isinstance(event, QueueDeliverEvent):
+            return self._handle_delivery(event)
+        
+        return None
+        
+    def _handle_delivery(self, event: QueueDeliverEvent) -> list[Event]:
+        """Queue delivered one payload event; clone/retarget and re-emit."""
+        if event.payload is None:
+            return []
+        return self._handle_work_payload(event.payload)
+    
+    def _handle_work_payload(self, payload: Event) -> list[Event]:
+        def schedule_poll(time: Instant):
+            # Always emit using the current simulation time (global clock).
+            if self.server.has_capacity():
+                return QueuePollEvent(time=time, target=self.queue, requestor=self)
+            return None
+        
+        server_event = payload
+        server_event.time = self.now
+        server_event.target = self.server
+        server_event.add_completion_hook(schedule_poll)
+        return [server_event]   
 
     def _handle_notify(self, _: QueueNotifyEvent) -> list[Event]:
         """Queue has work available—poll if server has capacity."""

@@ -130,6 +130,7 @@ class Simulation:
                     event.context.get("id"),
                 )
             current_time = event.time  # Advance clock
+            self._clock.update(current_time)
             self._event_heap.set_current_time(current_time)
             events_processed += 1
             

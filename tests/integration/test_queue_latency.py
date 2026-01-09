@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Generator, List
+
+import pytest
+
+from happysimulator.entities.entity import Entity
+from happysimulator.entities.queue import Queue
+from happysimulator.entities.queue_driver import QueueDriver
+from happysimulator.entities.queue_policy import FIFOQueue
+from happysimulator.events.event import Event
+from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
+from happysimulator.load.event_provider import EventProvider
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
+from happysimulator.simulation import Simulation
+from happysimulator.utils.instant import Instant
+
+
+@dataclass(frozen=True)
+class LinearRampProfile(Profile):
+
+    """Linear ramp from start_rate to end_rate over t_end_s seconds."""
+
+    t_end_s: float
+    start_rate: float
+    end_rate: float
+
+    def get_rate(self, time: Instant) -> float:
+        t = max(0.0, min(time.to_seconds(), self.t_end_s))
+        if self.t_end_s <= 0:
+            return float(self.end_rate)
+        frac = t / self.t_end_s
+        return float(self.start_rate + frac * (self.end_rate - self.start_rate))
+
+
+class RequestProvider(EventProvider):
+
+    """Generates request events targeting the queue."""
+
+    def __init__(self, queue: Entity):
+        self._queue = queue
+
+    def get_events(self, time: Instant) -> List[Event]:
+        return [Event(time=time, event_type="Request", target=self._queue)]
+
+
+class LatencyTrackingSink(Entity):
+
+    """Sink that records end-to-end latency using the event context."""
+
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.events_received: int = 0
+        self.completion_times: list[Instant] = []
+        self.latencies_s: list[float] = []
+
+    def handle_event(self, event: Event) -> list[Event]:
+        self.events_received += 1
+
+        created_at: Instant = event.context.get("created_at", event.time)
+        latency_s = (event.time - created_at).to_seconds()
+        self.completion_times.append(event.time)
+        self.latencies_s.append(latency_s)
+
+        return []
+
+    def average_latency(self) -> float:
+        if not self.latencies_s:
+            return 0.0
+        return sum(self.latencies_s) / len(self.latencies_s)
+
+    def latency_time_series_seconds(self) -> tuple[list[float], list[float]]:
+        """Return (completion_times_s, latencies_s) for plotting."""
+        return [t.to_seconds() for t in self.completion_times], list(self.latencies_s)
+
+
+@dataclass
+class ConcurrencyLimitedServer(Entity):
+
+    """A server with concurrency=1 and fixed service time."""
+
+    name: str = "Server"
+    service_time_s: float = 0.5
+    downstream: Entity | None = None
+
+    _in_flight: int = field(default=0, init=False)
+    stats_processed: int = field(default=0, init=False)
+
+    def has_capacity(self) -> bool:
+        return self._in_flight == 0
+
+    def handle_event(self, event: Event) -> Generator[Instant, None, list[Event]]:
+        self._in_flight += 1
+        yield self.service_time_s, None
+        self._in_flight -= 1
+        self.stats_processed += 1
+
+        if self.downstream is None:
+            return []
+
+        # Use current simulation time (self.now) as the completion time.
+        completed = Event(
+            time=self.now,
+            event_type="Completed",
+            target=self.downstream,
+            context=event.context,
+        )
+        return [completed]
+
+
+def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
+    import csv
+
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+
+
+def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
+
+    """Ramp load above capacity should increase average end-to-end latency."""
+
+    duration_s = 30.0
+    service_time_s = 0.2  # capacity ~5 req/s
+
+    # Ramp from below capacity to well above capacity.
+    profile = LinearRampProfile(t_end_s=duration_s, start_rate=0.5, end_rate=10.0)
+
+    sink = LatencyTrackingSink(name="Sink")
+    server = ConcurrencyLimitedServer(service_time_s=service_time_s, downstream=sink)
+    driver = QueueDriver(name="Driver", queue=None, server=server)
+    queue = Queue(name="RequestQueue", egress=driver, policy=FIFOQueue())
+    driver.queue = queue
+
+    provider = RequestProvider(queue)
+    arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
+    source = Source(name="RequestSource", event_provider=provider, arrival_time_provider=arrival)
+
+    sim = Simulation(
+        start_time=Instant.Epoch,
+        end_time=Instant.from_seconds(duration_s),
+        sources=[source],
+        entities=[queue, driver, server, sink],
+    )
+    sim.run()
+
+    assert sink.events_received > 0
+    assert server.stats_processed >= sink.events_received
+
+    avg_latency = sink.average_latency()
+
+    times_s, latencies_s = sink.latency_time_series_seconds()
+
+    _write_csv(
+        test_output_dir / "latency_timeseries.csv",
+        header=["index", "completion_time_s", "latency_s"],
+        rows=[[i, t, l] for i, (t, l) in enumerate(zip(times_s, latencies_s, strict=False))],
+    )
+
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(times_s, latencies_s)
+    ax.set_title("Queue end-to-end latency over time")
+    ax.set_xlabel("completion time (s)")
+    ax.set_ylabel("latency (s)")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(test_output_dir / "latency_timeseries.png", dpi=150)
+    plt.close(fig)
+
+    # Under overload, queueing delay should push average latency above service time.
+    assert avg_latency > service_time_s

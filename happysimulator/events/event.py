@@ -124,18 +124,26 @@ class Event:
             raise
         
     def _run_completion_hooks(self, time: Instant) -> List['Event']:
-        """Helper to execute all hooks and flatten results."""
-        results = []
-        for hook in self.on_complete:
-            # Call the factory with the CORRECT time
+        """Helper to execute all hooks and flatten results.
+
+        Hooks are expected to be one-shot: they run once when the event (or
+        generator-based process) finishes. After running, the hook list is
+        cleared to prevent accidental double execution.
+        """
+        hooks = list(self.on_complete)
+        self.on_complete.clear()
+
+        results: List["Event"] = []
+        for hook in hooks:
             hook_result = hook(time)
-            
-            # Normalize return types
-            if hook_result:
-                if isinstance(hook_result, list):
-                    results.extend(hook_result)
-                else:
-                    results.append(hook_result)
+
+            if not hook_result:
+                continue
+            if isinstance(hook_result, list):
+                results.extend(hook_result)
+            else:
+                results.append(hook_result)
+
         return results
     
     def _start_process(self, gen: Generator) -> List["Event"]:
@@ -229,10 +237,16 @@ class ProcessContinuation(Event):
             return result
 
         except StopIteration as e:
-            # Process Finished. Return the final value (if any).
+            # Process finished. Return the final value (if any) PLUS completion hooks.
             finished = self._normalize_return(e.value)
-            self.trace("process.stop", produced=len(finished))
-            return finished
+            completion_events = self._run_completion_hooks(self.time)
+            self.trace(
+                "process.stop",
+                produced=len(finished) + len(completion_events),
+                finished_produced=len(finished),
+                completion_produced=len(completion_events),
+            )
+            return finished + completion_events
 
         except Exception as exc:
             self.trace("process.error", error=type(exc).__name__, message=str(exc))

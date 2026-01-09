@@ -39,7 +39,7 @@ def test_queue_driver_single_event_trace_flow(caplog):
 
     trace = InMemoryTraceRecorder()
     server = YieldingServer(service_time_s=1.0)
-    driver = QueueDriver(name="Driver", queue=None, server=server)
+    driver = QueueDriver(name="Driver", queue=None, target=server)
     queue = Queue(name="RequestQueue", egress=driver, policy=FIFOQueue())
     driver.queue = queue
 
@@ -107,7 +107,7 @@ def test_queue_driver_overload_serializes_requests(caplog):
 
     trace = InMemoryTraceRecorder()
     server = YieldingServer(service_time_s=1.0)
-    driver = QueueDriver(name="Driver", queue=None, server=server)
+    driver = QueueDriver(name="Driver", queue=None, target=server)
     queue = Queue(name="RequestQueue", egress=driver, policy=FIFOQueue())
     driver.queue = queue
 

@@ -78,7 +78,7 @@ class Queue(Entity):
         # If queue was empty, the driver might be idle—wake it up
         if was_empty:
             return [QueueNotifyEvent(
-                time=event.time,
+                time=self.now,
                 target=self.egress,
                 queue_entity=self
             )]
@@ -92,7 +92,7 @@ class Queue(Entity):
             return []
         
         next_item.target = event.requestor
-        next_item.time = event.time
+        next_item.time = self.now
         
         return [next_item]
 

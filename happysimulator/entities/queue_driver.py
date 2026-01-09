@@ -30,30 +30,31 @@ class QueueDriver(Entity):
         
         return self._handle_work(event)
 
-    def _handle_notify(self, event: QueueNotifyEvent) -> list[Event]:
+    def _handle_notify(self, _: QueueNotifyEvent) -> list[Event]:
         """Queue has work available—poll if server has capacity."""
         if not self.server.has_capacity():
             return []
         
-        return [
-            QueuePollEvent(time=event.time, target=self.queue, requestor=self)]
+        return [QueuePollEvent(time=self.now, target=self.queue, requestor=self)]
 
     def _handle_work(self, event: Event) -> Generator[Instant, None, list[Event]]:
-        """Process a work item by delegating to the server."""
-        result = self.server.handle_event(event)
+        # 1. Re-target to server
+        event.target = self.server
         
-        if isinstance(result, Generator):
-            server_output = yield from result
-        else:
-            server_output = result if result else []
+        # 2. Define the Hook
+        # "When you finish (at time 't'), please check the queue again."
+        def schedule_poll(finish_time: Instant):
+            # Check capacity again NOW (at finish time)
+            if self.server.has_capacity():
+                return QueuePollEvent(
+                    time=finish_time,
+                    target=self.queue,
+                    requestor=self
+                )
+            return []
+
+        # 3. Attach it
+        event.add_completion_hook(schedule_poll)
         
-        # After server completes, poll for more work if server still has capacity
-        if self.server.has_capacity():
-            poll = QueuePollEvent(
-                time=event.time,
-                target=self.queue,
-                requestor=self
-            )
-            return server_output + [poll]
-        
-        return server_output
+        # 4. Re-emit
+        return [event]

@@ -28,7 +28,10 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.simulation import Simulation
+from happysimulator.tracing.recorder import InMemoryTraceRecorder
 from happysimulator.utils.instant import Instant
+
+import logging
 
 @dataclass
 class ConcurrencyLimitedServer(Entity):
@@ -179,3 +182,66 @@ def test_queue_driver_basic_flow():
     assert queue.stats_accepted > 0, "Queue should have accepted events"
     print(f"Queue accepted: {queue.stats_accepted}, Sink received: {sink.events_received}")
     print(f"Average latency: {sink.average_latency():.3f}s")
+
+
+def test_queue_driver_single_event_trace_flow(caplog):
+    """Single-event trace: Queue notifies driver, driver polls, server processes, driver polls again."""
+
+    @dataclass
+    class YieldingServer(Entity):
+        """A minimal server that yields once (simulated service time)."""
+
+        name: str = "Server"
+        service_time_s: float = 1.0
+
+        _in_flight: int = field(default=0, init=False)
+        stats_processed: int = field(default=0, init=False)
+
+        def has_capacity(self) -> bool:
+            return self._in_flight == 0
+
+        def handle_event(self, event: Event) -> Generator[Instant, None, list[Event]]:
+            self._in_flight += 1
+            yield Instant.from_seconds(self.service_time_s)
+            self._in_flight -= 1
+            self.stats_processed += 1
+            return []
+
+    trace = InMemoryTraceRecorder()
+    server = YieldingServer(service_time_s=1.0)
+    driver = QueueDriver(name="Driver", queue=None, server=server)
+    queue = Queue(name="RequestQueue", egress=driver, policy=FIFOQueue())
+    driver.queue = queue
+
+    sim = Simulation(
+        start_time=Instant.Epoch,
+        end_time=Instant.from_seconds(5.0),
+        sources=[],
+        entities=[queue, driver, server],
+        trace_recorder=trace,
+    )
+
+    sim.schedule(Event(time=Instant.Epoch, event_type="Request", target=queue))
+
+    with caplog.at_level(logging.WARNING, logger="happysimulator.simulation"):
+        sim.run()
+
+    assert queue.stats_accepted == 1
+    assert server.stats_processed == 1
+    assert not any("Time travel detected" in rec.message for rec in caplog.records)
+
+    scheduled = [
+        s for s in trace.spans
+        if s["kind"] == "simulation.schedule" and s.get("event_type") in {"QUEUE_NOTIFY", "QUEUE_POLL"}
+    ]
+    scheduled_types = {s.get("event_type") for s in scheduled}
+    assert "QUEUE_NOTIFY" in scheduled_types
+    assert "QUEUE_POLL" in scheduled_types
+
+    poll_times = [
+        s["data"]["scheduled_time"]
+        for s in scheduled
+        if s.get("event_type") == "QUEUE_POLL"
+    ]
+    assert Instant.Epoch in poll_times
+    assert Instant.from_seconds(1.0) in poll_times

@@ -2,7 +2,7 @@ import uuid
 import logging
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from happysimulator.utils.instant import Instant
 
@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 _global_event_counter = count()
 
 EventCallback = Callable[['Event'], Any]
+
+CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
 
 @dataclass
 class Event:
@@ -23,7 +25,10 @@ class Event:
     
     # Option B: The "Scripting" way (Call specific function)
     callback: Optional[EventCallback] = field(default=None, repr=False)
-
+    
+    # New Field: Events to schedule automatically when this event's processing finishes.
+    on_complete: List[CompletionHook] = field(default_factory=list, repr=False, compare=False)
+    
     # Context & Tracing
     context: Dict[str, Any] = field(default_factory=dict, compare=False)
     
@@ -71,6 +76,13 @@ class Event:
         if data:
             entry["data"] = data
         self.context["trace"]["spans"].append(entry)
+        
+    def add_completion_hook(self, hook: CompletionHook):
+        """
+        Attach a function to be called when this event finishes processing.
+        The function receives the 'finish_time' as an argument.
+        """
+        self.on_complete.append(hook)
 
     def invoke(self) -> List['Event']:
         handler_kind = "callback" if self.callback else "entity"
@@ -101,11 +113,30 @@ class Event:
             
             normalized = self._normalize_return(raw_result)
             self.trace("handle.end", result_kind="immediate", produced=len(normalized))
-            return normalized
+            
+            
+            completion_events = self._run_completion_hooks(self.time)
+            
+            return normalized + completion_events
 
         except Exception as exc:
             self.trace("handle.error", error=type(exc).__name__, message=str(exc))
             raise
+        
+    def _run_completion_hooks(self, time: Instant) -> List['Event']:
+        """Helper to execute all hooks and flatten results."""
+        results = []
+        for hook in self.on_complete:
+            # Call the factory with the CORRECT time
+            hook_result = hook(time)
+            
+            # Normalize return types
+            if hook_result:
+                if isinstance(hook_result, list):
+                    results.extend(hook_result)
+                else:
+                    results.append(hook_result)
+        return results
     
     def _start_process(self, gen: Generator) -> List["Event"]:
         continuation = ProcessContinuation(
@@ -114,7 +145,8 @@ class Event:
                 daemon=self.daemon,
                 target=self.target,
                 callback=self.callback,
-                process=gen,   # Pass the SAME generator forward
+                process=gen,
+                on_complete=self.on_complete,
                 context=self.context)
         
         # Execute it immediately to get to the first 'yield'
@@ -180,6 +212,7 @@ class ProcessContinuation(Event):
                 daemon=self.daemon,
                 target=self.target,     # Keep targeting the same entity
                 callback=self.callback,
+                on_complete=self.on_complete,
                 process=self.process,   # Pass the SAME generator forward
                 context=self.context    # Preserve trace context
             )

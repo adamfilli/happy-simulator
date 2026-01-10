@@ -105,7 +105,5 @@ Much better!
 ## Development Plan
 * Add oX and uX statistics (i.e. over X and under X)
 * Add Server lambdas for arbitrarily complex server behavior
-* Add Java ExecutorService pipeline simulation components and example
-* Load balancer entity
-* Retry explosion example 
+
 * unit test coverage (ya right)

@@ -1,6 +1,6 @@
 ## DEV
 
-1. Queued Entity - still in progress, having issues with a good queued entity
+1. Queue Dropping
 2. Event Lifecycles (i.e. a source that creates an event with a predefined lifecycle)
 3. Rate Limiter
     - Distributed convergence example
@@ -8,7 +8,9 @@
 4. Queueing network recreations: https://www.grotto-networking.com/DiscreteEventPython.html
 5. Model client server ping pong communications
 
-
+* Add Java ExecutorService pipeline simulation components and example
+* Load balancer entity
+* Retry explosion example 
 
 ## Content
 0. Unintuitive - Unstable Queue when Arrival Rate = Service Rate

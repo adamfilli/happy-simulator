@@ -22,6 +22,8 @@ from .sliding_window_rate_limiter import (
     SlidingWindowStats,
 )
 
+from .queued_resource import QueuedResource
+
 __all__ = [
     # Base entity
     "Entity",
@@ -40,4 +42,6 @@ __all__ = [
     "LeakyBucketStats",
     "SlidingWindowRateLimiter",
     "SlidingWindowStats",
+    # Queued resources
+    "QueuedResource",
 ]

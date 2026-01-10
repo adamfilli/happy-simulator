@@ -1,6 +1,6 @@
 import random
 
-from archive.latency_distribution import LatencyDistribution
+from happysimulator.math.latency_distribution import LatencyDistribution
 from happysimulator.utils.instant import Instant
 
 

@@ -1,7 +1,6 @@
 ## DEV
 
-1. Queue Dropping
-2. Event Lifecycles (i.e. a source that creates an event with a predefined lifecycle)
+2. Event Lifecy cles (i.e. a source that creates an event with a predefined lifecycle)
 3. Rate Limiter
     - Distributed convergence example
     - Burst suppression 

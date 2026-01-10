@@ -1,3 +1,10 @@
+"""Core simulation orchestrator for the discrete-event simulation engine.
+
+This module implements the main simulation loop using a pop-invoke-push pattern:
+events are popped from a priority heap, invoked to perform their work, and any
+resulting events are pushed back for future processing.
+"""
+
 import logging
 
 from happysimulator.entities.entity import Entity
@@ -12,6 +19,27 @@ logger = logging.getLogger(__name__)
 
 
 class Simulation:
+    """Orchestrates discrete-event simulation execution.
+
+    The simulation maintains a central event heap and advances time by processing
+    events in chronological order. It supports two termination modes:
+
+    - Explicit: Run until `end_time` is reached
+    - Auto: Run until no primary (non-daemon) events remain, allowing probes
+      to keep running without blocking termination
+
+    All entities share a common Clock instance, ensuring consistent time views
+    across the simulation. Sources and probes are bootstrapped during initialization,
+    priming the heap with their first events.
+
+    Args:
+        start_time: When the simulation begins. Defaults to Instant.Epoch (t=0).
+        end_time: When to stop processing. Defaults to Instant.Infinity (auto-terminate).
+        sources: Load generators that produce events at specified intervals.
+        entities: Simulation actors that respond to events.
+        probes: Measurement sources that run as daemons (won't block termination).
+        trace_recorder: Optional recorder for debugging/visualization.
+    """
     def __init__(
         self,
         start_time: Instant = None,
@@ -80,10 +108,28 @@ class Simulation:
         return self._trace
 
     def schedule(self, events: Event | list[Event]) -> None:
-        """Schedule one or more events into the simulation heap."""
+        """Inject events into the simulation from outside the event loop.
+
+        Useful for adding events programmatically after initialization but before
+        or during simulation execution.
+        """
         self._event_heap.push(events)
 
     def run(self) -> None:
+        """Execute the simulation until termination.
+
+        Implements the core pop-invoke-push loop:
+        1. Pop the earliest event from the heap
+        2. Advance simulation time to that event's timestamp
+        3. Invoke the event (calling its target entity or callback)
+        4. Push any resulting events back onto the heap
+        5. Repeat until termination condition is met
+
+        Termination occurs when:
+        - The event heap is exhausted, or
+        - Current time exceeds end_time, or
+        - Auto-terminate mode with no primary events remaining
+        """
         current_time = self._start_time
         self._event_heap.set_current_time(current_time)
         

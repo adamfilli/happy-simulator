@@ -3,12 +3,12 @@ import random
 from typing import Callable, Generator
 
 from archive.data import Data
-from archive.constant_latency import ConstantLatency
+from happysimulator.math.constant_latency import ConstantLatency
 from happysimulator.entities.entity import Entity
 from happysimulator.events.event import Event
 from archive.client_server_request_event import Request
 from archive.measurement_event import MeasurementEvent
-from archive.latency_distribution import LatencyDistribution
+from happysimulator.math.latency_distribution import LatencyDistribution
 from happysimulator.load.profile import Profile
 from happysimulator.load import ConstantProfile
 from happysimulator.utils.instant import Instant

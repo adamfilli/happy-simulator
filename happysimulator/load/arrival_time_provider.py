@@ -1,3 +1,14 @@
+"""Base class for computing event arrival times from rate profiles.
+
+Uses numerical integration to find when the accumulated rate (area under
+the rate curve) reaches a target value. Subclasses define how that target
+is determined:
+- ConstantArrivalTimeProvider: target = 1.0 (deterministic spacing)
+- PoissonArrivalTimeProvider: target = exponential random (stochastic)
+
+This approach handles non-homogeneous (time-varying) rate profiles.
+"""
+
 from abc import ABC, abstractmethod
 import scipy.integrate as integrate
 import scipy.optimize as optimize
@@ -5,20 +16,47 @@ import scipy.optimize as optimize
 from happysimulator.load.profile import Profile
 from happysimulator.utils.instant import Instant
 
+
 class ArrivalTimeProvider(ABC):
+    """Computes arrival times by integrating a rate profile.
+
+    Finds the time t such that the integral of the rate from current_time
+    to t equals a target value. The target value determines the arrival
+    distribution (constant for deterministic, exponential for Poisson).
+
+    Uses scipy's numerical integration and root-finding for accuracy with
+    arbitrary rate profiles.
+
+    Attributes:
+        profile: Rate function over time.
+        current_time: Time of the last arrival (updated after each call).
+    """
+
     def __init__(self, profile: Profile, start_time: Instant):
         self.profile = profile
         self.current_time = start_time
 
     @abstractmethod
     def _get_target_integral_value(self) -> float:
-        """
-        Returns the amount of 'probability mass' (area under the rate curve) 
-        to accumulate before the next event occurs.
+        """Return the target area under the rate curve for the next event.
+
+        - Return 1.0 for deterministic arrivals (constant rate spacing)
+        - Return exponential random for Poisson arrivals
         """
         pass
 
     def next_arrival_time(self) -> Instant:
+        """Compute the next event arrival time.
+
+        Integrates the rate profile forward until the accumulated area
+        reaches the target value from _get_target_integral_value().
+
+        Returns:
+            The next arrival time.
+
+        Raises:
+            RuntimeError: If the rate is zero indefinitely or optimization fails.
+        """
         target_area = self._get_target_integral_value()
         
         # 1. Bridge to floats

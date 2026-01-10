@@ -1,8 +1,13 @@
 """Token bucket rate limiter entity.
 
-Implements a classic token bucket algorithm as a simulation Entity.
-Tokens are refilled at a constant rate up to a maximum capacity.
-Incoming requests consume tokens; requests are either forwarded or dropped.
+Implements the classic token bucket algorithm. Tokens refill at a constant
+rate up to a maximum capacity. Each request consumes one token if available;
+otherwise the request is dropped. This allows controlled bursting up to
+the bucket capacity.
+
+Token bucket vs leaky bucket:
+- Token bucket allows bursts (requests pass immediately while tokens exist)
+- Leaky bucket enforces strict output rate (no bursting)
 """
 
 import logging

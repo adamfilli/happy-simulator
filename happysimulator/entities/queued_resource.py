@@ -1,16 +1,17 @@
-"""Queued resources.
+"""Composite entity combining queue buffering with worker logic.
 
-A queued resource is an entity fronted by a queue.
+QueuedResource is a convenience base class that wires together the
+Queue + QueueDriver + Worker pattern into a single entity. Users
+subclass QueuedResource and implement handle_queued_event() to define
+the work processing logic.
 
-Users implement only the resource logic by subclassing :class:`QueuedResource` and
-implementing :meth:`QueuedResource.handle_queued_event`.
+Internal structure:
+- Queue: Buffers incoming events according to the configured policy
+- QueueDriver: Polls the queue and feeds work to the worker
+- Worker Adapter: Internal entity that delegates to handle_queued_event()
 
-Under the hood, the resource wires together:
-1) a :class:`~happysimulator.entities.queue.Queue` for buffering
-2) a :class:`~happysimulator.entities.queue_driver.QueueDriver` for polling
-3) an internal worker adapter entity that invokes the user's logic
-
-This intentionally hides the "queue + driver" composition pattern from users.
+This composition is transparent to external code. Events sent to the
+QueuedResource are automatically buffered and processed in order.
 """
 
 from __future__ import annotations

@@ -1,7 +1,10 @@
 """Trace recorders for engine-level simulation instrumentation.
 
-Engine traces capture scheduling decisions (heap push/pop, simulation loop events)
-and are kept separate from application-level traces on Event.context["trace"].
+Engine traces capture low-level scheduling decisions (heap push/pop, simulation
+loop events) separate from application-level traces stored in Event.context["trace"].
+
+Use InMemoryTraceRecorder for debugging and testing. Use NullTraceRecorder (the
+default) when tracing is not needed, avoiding any overhead.
 """
 
 from dataclasses import dataclass, field
@@ -11,12 +14,12 @@ from happysimulator.utils.instant import Instant
 
 
 class TraceRecorder(Protocol):
-    """Protocol for recording engine-level trace spans.
-    
-    Implementations can store traces in memory, write to files,
-    send to external systems, or simply discard them.
+    """Protocol defining the trace recording interface.
+
+    Implementations can store traces in memory, write to files, send to
+    external monitoring systems, or discard them entirely.
     """
-    
+
     def record(
         self,
         *,
@@ -27,22 +30,27 @@ class TraceRecorder(Protocol):
         **data: Any,
     ) -> None:
         """Record an engine-level trace span.
-        
+
         Args:
             time: Simulation time when the span occurred.
-            kind: Category of span (e.g., "heap.push", "heap.pop", "simulation.dequeue").
+            kind: Category (e.g., "heap.push", "heap.pop", "simulation.dequeue").
             event_id: ID of the associated event (from event.context["id"]).
             event_type: Type of the associated event.
             **data: Additional structured data for the span.
         """
 
+
 @dataclass
 class InMemoryTraceRecorder:
-    """Stores engine traces in memory for later inspection.
-    
-    Useful for testing and debugging simulation behavior.
+    """Trace recorder that stores spans in memory.
+
+    Useful for debugging, testing, and post-simulation analysis.
+    Provides filtering methods to query specific span types or events.
+
+    Attributes:
+        spans: List of recorded spans as dictionaries.
     """
-    
+
     spans: list[dict[str, Any]] = field(default_factory=list)
     
     def record(

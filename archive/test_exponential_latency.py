@@ -1,7 +1,7 @@
 import unittest
 import random
 
-from archive.exponential_latency import ExponentialLatency
+from happysimulator.math.exponential_latency import ExponentialLatency
 from happysimulator.utils.instant import Instant
 
 

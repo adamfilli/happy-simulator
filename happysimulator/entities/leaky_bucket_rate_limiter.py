@@ -1,8 +1,12 @@
 """Leaky bucket rate limiter entity.
 
-Implements a leaky bucket algorithm as a simulation Entity.
-Requests are queued and "leak" out at a constant rate.
-If the queue is full, incoming requests are dropped.
+Implements the leaky bucket algorithm. Incoming requests enter a queue
+(the bucket) and exit at a fixed rate (the leak). When the bucket is full,
+new requests are dropped. Unlike token bucket, this enforces a strict
+output rate with no bursting.
+
+The implementation schedules "leak" events to forward queued requests
+at regular intervals determined by leak_rate.
 """
 
 import logging

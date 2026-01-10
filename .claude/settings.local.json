@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python.exe -m pytest tests/integration/test_simple_client_server.py -v)"
+    ]
+  }
+}

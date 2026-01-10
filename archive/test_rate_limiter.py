@@ -3,7 +3,7 @@ from archive.client_server_request_event import Request
 from archive.client import Client
 from archive.server import Server
 from happysimulator.utils.instant import Instant
-from archive.constant_latency import ConstantLatency
+from happysimulator.math.constant_latency import ConstantLatency
 
 
 def test_immediate_forwarding():

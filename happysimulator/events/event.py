@@ -1,3 +1,14 @@
+"""Event types that form the fundamental units of simulation work.
+
+Events drive the simulation forward. Each event represents something that happens
+at a specific point in simulation time. When invoked, an event either calls its
+target entity's handle_event() method (model-style) or executes a callback function
+(scripting-style).
+
+This module also provides ProcessContinuation for generator-based multi-step
+processes, enabling entities to yield delays and resume execution later.
+"""
+
 import uuid
 import logging
 from dataclasses import dataclass, field
@@ -11,11 +22,44 @@ logger = logging.getLogger(__name__)
 _global_event_counter = count()
 
 EventCallback = Callable[['Event'], Any]
+"""Signature for callback-style event handlers."""
 
 CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
+"""Signature for hooks that run when an event or process finishes."""
+
 
 @dataclass
 class Event:
+    """The fundamental unit of simulation work.
+
+    Events are scheduled onto the EventHeap and processed in chronological order.
+    Each event must specify exactly one invocation method:
+
+    - **Model-style** (target): The event is passed to an Entity's handle_event()
+    - **Callback-style** (callback): A function is called directly with the event
+
+    Events support two additional mechanisms:
+
+    1. **Generators**: When handle_event() returns a generator, the simulation
+       wraps it as a ProcessContinuation, enabling multi-step processes that
+       yield delays between steps.
+
+    2. **Completion Hooks**: Functions registered via on_complete run when the
+       event finishes (including after generator exhaustion). Used for chaining
+       actions or notifying dependent entities.
+
+    Sorting uses (time, insertion_order) to ensure deterministic FIFO ordering
+    for events scheduled at the same instant.
+
+    Attributes:
+        time: When this event should be processed.
+        event_type: Human-readable label for debugging and tracing.
+        daemon: If True, this event won't block auto-termination.
+        target: Entity to receive this event (model-style).
+        callback: Function to invoke (scripting-style).
+        on_complete: Hooks to run when processing finishes.
+        context: Arbitrary metadata for tracing and debugging.
+    """
     time: Instant
     event_type: str
     daemon: bool = field(default=False, repr=False)
@@ -77,14 +121,31 @@ class Event:
             entry["data"] = data
         self.context["trace"]["spans"].append(entry)
         
-    def add_completion_hook(self, hook: CompletionHook):
-        """
-        Attach a function to be called when this event finishes processing.
-        The function receives the 'finish_time' as an argument.
+    def add_completion_hook(self, hook: CompletionHook) -> None:
+        """Attach a function to run when this event finishes processing.
+
+        Completion hooks enable dependency chains and notification patterns.
+        For example, a QueueDriver uses hooks to know when its target entity
+        has finished processing work and is ready for more.
+
+        Args:
+            hook: Function called with the finish time when processing completes.
         """
         self.on_complete.append(hook)
 
     def invoke(self) -> List['Event']:
+        """Execute this event and return any resulting events.
+
+        Dispatches to either the callback function or the target entity's
+        handle_event() method. If the handler returns a generator, it's
+        automatically wrapped as a ProcessContinuation for multi-step execution.
+
+        Returns:
+            New events to schedule, including any from completion hooks.
+
+        Raises:
+            ValueError: If neither target nor callback is set.
+        """
         handler_kind = "callback" if self.callback else "entity"
         handler_label = (
             getattr(self.callback, "__qualname__", repr(self.callback))
@@ -195,13 +256,32 @@ class Event:
     
 @dataclass
 class ProcessContinuation(Event):
-    """
-    Internal Event Type: Represents a paused Python generator waiting to resume.
+    """Internal event that resumes a paused generator-based process.
+
+    When an entity's handle_event() returns a generator, the simulation wraps
+    it in a ProcessContinuation. Each invocation advances the generator to its
+    next yield point, schedules another continuation for the yielded delay,
+    and collects any side-effect events.
+
+    This enables entities to express multi-step, time-consuming operations
+    naturally using Python's generator syntax:
+
+        def handle_event(self, event):
+            yield 0.05  # Wait 50ms for network latency
+            yield self.compute_time  # Wait for processing
+            return self.create_response(event)
+
+    Yields are interpreted as:
+    - ``yield delay`` - Wait for delay seconds before resuming
+    - ``yield (delay, events)`` - Wait and also schedule side-effect events
+
+    Attributes:
+        process: The Python generator being executed incrementally.
     """
     process: Generator = field(default=None, repr=False)
 
     def invoke(self) -> List["Event"]:
-        """Resumes the generator, handles the yield, and schedules the NEXT resume."""
+        """Advance the generator to its next yield and schedule the continuation."""
         self.trace("process.resume.start")
 
         try:

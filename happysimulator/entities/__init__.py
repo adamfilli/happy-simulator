@@ -23,6 +23,8 @@ from .sliding_window_rate_limiter import (
 )
 
 from .queued_resource import QueuedResource
+from .simple_server import SimpleServer
+from .simple_client import SimpleClient
 
 __all__ = [
     # Base entity
@@ -44,4 +46,7 @@ __all__ = [
     "SlidingWindowStats",
     # Queued resources
     "QueuedResource",
+    # Client/Server
+    "SimpleServer",
+    "SimpleClient",
 ]

@@ -1,3 +1,9 @@
+"""Base class for simulation actors that respond to events.
+
+Entities are the building blocks of a simulation model. Each entity receives
+events via handle_event() and returns reactions (new events or generators).
+"""
+
 from abc import ABC, abstractmethod
 from typing import Generator, Optional, Tuple, Union
 
@@ -6,46 +12,64 @@ from happysimulator.utils.clock import Clock
 
 from ..events.event import Event
 
-# Alias for what the Generator yields: 
-# Either a delay (float) OR a tuple of (delay, side_effect_events)
 SimYield = Union[float, Tuple[float, list[Event], Event]]
+"""Type alias for generator yield values: delay or (delay, side_effects)."""
 
-# Alias for what the Generator returns when it finishes (via return statement)
 SimReturn = Optional[Union[list[Event], Event]]
+"""Type alias for generator return values: events to schedule on completion."""
+
 
 class Entity(ABC):
-    def __init__(self, name):
-        self.name = name
-        self._clock: Optional[Clock] = None # Injected later
+    """Abstract base class for all simulation actors.
 
-    def set_clock(self, clock: Clock):
-        """Called by Simulation during initialization."""
+    Entities receive events through handle_event() and produce reactions.
+    They maintain a reference to the simulation clock for time-aware logic.
+
+    The simulation injects the clock during initialization, so entities
+    should not be used outside a simulation context.
+
+    Subclasses must implement handle_event() to define their behavior.
+    Optionally override has_capacity() to model resource constraints.
+
+    Attributes:
+        name: Identifier for logging and debugging.
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        self._clock: Optional[Clock] = None
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject the simulation clock. Called automatically during setup."""
         self._clock = clock
 
     @property
     def now(self) -> Instant:
-        """Convenience accessor for current simulation time."""
+        """Current simulation time from the injected clock.
+
+        Raises:
+            RuntimeError: If accessed before clock injection.
+        """
         if self._clock is None:
             raise RuntimeError(f"Entity {self.name} is not attached to a simulation (Clock is None).")
         return self._clock.now
-        
+
     @abstractmethod
     def handle_event(self, event: Event) -> Union[Generator[SimYield, None, SimReturn], list[Event], Event, None]:
-        """Handle an event and return the reaction.
+        """Process an incoming event and return any resulting events.
 
         Returns:
-            Generator: For sequential processes that yield delays/control (e.g., yield 0.1).
-                The generator may also return a final list[Event] upon completion.
-            list[Event] | Event | None: For immediate, atomic event scheduling.
+            Generator: For multi-step processes. Yield delays; optionally return
+                events on completion.
+            list[Event] | Event | None: For immediate, single-step responses.
         """
         raise NotImplementedError
 
     def has_capacity(self) -> bool:
-        """
-        Return True if this entity can accept more work.
-        
-        Override in subclasses that have concurrency limits, rate limits,
-        or other resource constraints. Default implementation always returns True.
+        """Check if this entity can accept additional work.
+
+        Override in subclasses with concurrency limits, rate limits, or
+        other resource constraints. Returns True by default.
         """
         return True
 

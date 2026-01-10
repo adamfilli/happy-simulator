@@ -1,8 +1,12 @@
 """Sliding window rate limiter entity.
 
-Implements a sliding window log algorithm as a simulation Entity.
-Tracks request timestamps and enforces a maximum number of requests
-within a rolling time window.
+Implements the sliding window log algorithm. Maintains a log of request
+timestamps and limits the number of requests within a rolling time window.
+Old timestamps are pruned on each request arrival.
+
+Sliding window avoids the "boundary burst" problem of fixed windows,
+where 2x the limit could pass if requests cluster around window edges.
+The tradeoff is memory usage proportional to request rate.
 """
 
 import logging

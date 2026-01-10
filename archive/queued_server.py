@@ -9,7 +9,7 @@ from happysimulator.entities.queue import Queue
 from archive.server import Server
 from happysimulator.events.event import Event
 from archive.queue_event import QueueEvent
-from archive.latency_distribution import LatencyDistribution
+from happysimulator.math.latency_distribution import LatencyDistribution
 from happysimulator.load.profile import Profile
 from happysimulator.load import ConstantProfile
 from archive.response_status import ResponseStatus

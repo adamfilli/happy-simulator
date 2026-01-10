@@ -1,12 +1,13 @@
-"""
-Queue policies for QueuedEntity.
+"""Pluggable queue ordering policies for bounded buffers.
 
-Provides pluggable queue implementations with different ordering semantics:
-- FIFOQueue: First-In-First-Out (standard queue)
-- LIFOQueue: Last-In-First-Out (stack)
-- PriorityQueue: Priority-based ordering (lowest priority value first)
+Defines the QueuePolicy interface and three implementations:
+- FIFOQueue: First-In-First-Out (standard queue behavior)
+- LIFOQueue: Last-In-First-Out (stack behavior)
+- PriorityQueue: Ordered by priority value (lowest first)
 
-Additional policies can be added by subclassing QueuePolicy.
+All policies support optional capacity limits. Items exceeding capacity
+are rejected at push time. Subclass QueuePolicy to implement custom
+ordering strategies.
 """
 
 from abc import ABC, abstractmethod

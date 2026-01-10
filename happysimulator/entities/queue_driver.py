@@ -1,3 +1,10 @@
+"""Queue driver that mediates between a queue and its target entity.
+
+The driver decouples the target from queue awareness. The target entity
+receives work events without knowing they came from a queue. The driver
+manages polling based on target capacity and re-polls after work completion.
+"""
+
 from dataclasses import dataclass
 from typing import Generator
 
@@ -9,16 +16,23 @@ from happysimulator.utils.instant import Instant
 
 @dataclass
 class QueueDriver(Entity):
-    """
-    Bridges a Queue and a downstream target without the target knowing about queues.
-    
-    The driver polls for work whenever the target has capacity. It delegates
-    all capacity decisions to the target via `target.has_capacity()`.
-    
-    Flow:
-        Queue --QueueNotifyEvent--> Driver --poll (if target has capacity)--> Queue
-        Queue --WorkEvent--------> Driver --delegate--> Target
-        Target --response--------> Driver --poll (if target has capacity)--> Queue
+    """Mediator between Queue and target entity.
+
+    Polls the queue for work when the target has capacity. Retargets
+    delivered events to the target and attaches completion hooks to
+    re-poll after processing finishes.
+
+    Event flow:
+    1. Queue sends QueueNotifyEvent when items are available
+    2. Driver checks target.has_capacity() and polls if ready
+    3. Queue sends QueueDeliverEvent with payload
+    4. Driver retargets payload to target and schedules it
+    5. On completion, driver re-polls if target has capacity
+
+    Attributes:
+        name: Identifier for logging.
+        queue: The upstream Queue entity.
+        target: The downstream entity that processes work.
     """
     name: str = "QueueDriver"
     queue: Entity = None

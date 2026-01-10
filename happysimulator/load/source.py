@@ -1,3 +1,13 @@
+"""Self-perpetuating event generator for load generation.
+
+A Source periodically generates payload events (e.g., requests) using an
+EventProvider. The timing between events is determined by an ArrivalTimeProvider,
+which can be constant (deterministic) or follow a distribution (e.g., Poisson).
+
+Sources bootstrap themselves by scheduling a SourceEvent, which triggers
+payload generation and schedules the next SourceEvent.
+"""
+
 import logging
 from typing import List
 
@@ -11,22 +21,39 @@ from happysimulator.utils.instant import Instant
 
 logger = logging.getLogger(__name__)
 
+
 class Source(Entity):
+    """Self-scheduling entity that generates load events at specified intervals.
+
+    Combines an EventProvider (what to generate) with an ArrivalTimeProvider
+    (when to generate) to produce a stream of events. The source maintains
+    its own schedule by creating SourceEvents that trigger the next generation.
+
+    Attributes:
+        name: Identifier for logging.
+
+    Args:
+        name: Source identifier.
+        event_provider: Creates the payload events.
+        arrival_time_provider: Determines timing between events.
+    """
+
     def __init__(
         self,
         name: str,
         event_provider: EventProvider,
         arrival_time_provider: ArrivalTimeProvider,
     ):
-        super().__init__(name) # If Entity requires init
+        super().__init__(name)
         self._event_provider = event_provider
         self._time_provider = arrival_time_provider
         self._nmb_generated = 0
 
     def start(self, start_time: Instant) -> List[Event]:
-        """
-        BOOTSTRAP: Schedules the very first wake-up call.
-        Called by Simulation.__init__
+        """Bootstrap the source by scheduling its first tick.
+
+        Called by Simulation during initialization. Synchronizes the
+        arrival time provider to the simulation start time.
         """
         # Sync the provider to the simulation start time
         self._time_provider.current_time = start_time
@@ -45,10 +72,13 @@ class Source(Entity):
             return []
 
     def handle_event(self, event: Event) -> List[Event]:
-        """
-        THE LOOP: 
-        1. Generate Payload
-        2. Schedule Next Tick
+        """Generate payload events and schedule the next tick.
+
+        This implements the source's self-perpetuating loop:
+        1. Create payload events via the EventProvider
+        2. Calculate next arrival time
+        3. Schedule the next SourceEvent
+        4. Return both payload and next tick for scheduling
         """
         if not isinstance(event, SourceEvent):
             # If for some reason a Source receives a non-generate event, ignore it

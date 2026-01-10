@@ -1,20 +1,52 @@
+"""Time representation with nanosecond precision.
+
+Instant provides precise time handling for discrete-event simulation.
+Using nanoseconds internally avoids floating-point precision issues that
+can cause non-deterministic behavior when comparing event times.
+
+Special values:
+- Instant.Epoch: Time zero (start of simulation)
+- Instant.Infinity: Represents unbounded time (for auto-termination)
+"""
+
 from typing import Union
 
+
 class Instant:
+    """Immutable time value with nanosecond precision.
+
+    Stores time as an integer number of nanoseconds to avoid floating-point
+    errors. Supports arithmetic with other Instants or float seconds.
+
+    Attributes:
+        nanoseconds: The time value in nanoseconds.
+    """
     def __init__(self, nanoseconds: int):
         self.nanoseconds = nanoseconds
 
     @classmethod
-    def from_seconds(cls, seconds):
+    def from_seconds(cls, seconds: int | float) -> "Instant":
+        """Create an Instant from a seconds value.
+
+        Args:
+            seconds: Time in seconds (int or float).
+
+        Returns:
+            New Instant representing the given time.
+
+        Raises:
+            TypeError: If seconds is not int or float.
+        """
         if isinstance(seconds, int):
             return cls(seconds * 1_000_000_000)
 
         if isinstance(seconds, float):
             return cls(int(seconds * 1_000_000_000))
-        
+
         raise TypeError("seconds must be int or float")
 
     def to_seconds(self) -> float:
+        """Convert this Instant to seconds as a float."""
         return float(self.nanoseconds) / 1_000_000_000
 
     def __add__(self, other: Union['Instant', int, float]):
@@ -73,10 +105,15 @@ class Instant:
         return f"T{hours:02d}:{minutes:02d}:{seconds:02d}.{us:06d}"
 
 
-# A singleton representing positive infinity for Instants.
 class _InfiniteInstant(Instant):
+    """Singleton representing positive infinity for time comparisons.
+
+    Used as the default end_time for auto-terminating simulations.
+    Greater than all finite Instants. Arithmetic with infinity yields
+    infinity (absorbing).
+    """
+
     def __init__(self):
-        # use float('inf') so arithmetic with it gives inf
         super().__init__(float('inf'))
 
     def __add__(self, other: Union['Instant', int, float]):

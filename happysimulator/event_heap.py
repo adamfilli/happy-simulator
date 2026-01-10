@@ -1,3 +1,9 @@
+"""Priority queue for scheduling and dispatching simulation events.
+
+The heap ensures events are processed in chronological order, breaking ties
+by insertion order for deterministic FIFO behavior among simultaneous events.
+"""
+
 import heapq
 from typing import Union
 
@@ -7,6 +13,20 @@ from happysimulator.utils.instant import Instant
 
 
 class EventHeap:
+    """Min-heap priority queue for event scheduling.
+
+    Events are ordered by (time, insertion_order) to guarantee deterministic
+    execution order. The heap distinguishes between primary and daemon events
+    to support auto-termination: when only daemon events remain, the simulation
+    can choose to stop rather than run forever.
+
+    The heap tracks a separate count of primary (non-daemon) events to enable
+    O(1) checks for auto-termination without scanning the entire heap.
+
+    Args:
+        events: Optional initial events to populate the heap.
+        trace_recorder: Optional recorder for debugging heap operations.
+    """
     def __init__(
         self,
         events: list[Event] | None = None,
@@ -22,7 +42,12 @@ class EventHeap:
         """Update the current simulation time for accurate trace timestamps."""
         self._current_time = time
 
-    def push(self, events: Union[Event, list[Event]]):
+    def push(self, events: Union[Event, list[Event]]) -> None:
+        """Schedule one or more events for future processing.
+
+        Events are inserted in O(log n) time per event. Each push is traced
+        for debugging and visualization purposes.
+        """
         if isinstance(events, list):
             for event in events:
                 self._push_single(event)
@@ -30,6 +55,11 @@ class EventHeap:
             self._push_single(events)
 
     def pop(self) -> Event:
+        """Remove and return the earliest scheduled event.
+
+        Also updates the internal primary event counter for auto-termination
+        tracking and advances the heap's time reference.
+        """
         popped = heapq.heappop(self._heap)
         if not popped.daemon:
             self._primary_event_count -= 1
@@ -44,19 +74,22 @@ class EventHeap:
         return popped
 
     def peek(self) -> Event:
+        """Return the next event without removing it from the heap."""
         return self._heap[0]
 
     def has_events(self) -> bool:
+        """Check if any events remain to be processed."""
         return bool(self._heap)
-    
+
     def has_primary_events(self) -> bool:
-        """Returns True if there is at least one non-daemon event pending."""
+        """Check if non-daemon events remain for auto-termination decisions."""
         return self._primary_event_count > 0
 
     def size(self) -> int:
+        """Return the total number of pending events."""
         return len(self._heap)
-    
-    def _push_single(self, event: Event):
+
+    def _push_single(self, event: Event) -> None:
         heapq.heappush(self._heap, event)
         if not event.daemon:
             self._primary_event_count += 1

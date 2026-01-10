@@ -1,3 +1,14 @@
+"""Bounded buffer queue with pluggable ordering policy.
+
+Implements a queue entity that buffers incoming events and delivers them
+to a downstream driver on demand. Uses QueuePolicy implementations to
+control ordering (FIFO, LIFO, Priority).
+
+The Queue/QueueDriver separation exists to decouple queue management from
+the target entity. The target entity does not need to know it is being fed
+by a queue.
+"""
+
 from dataclasses import dataclass, field
 
 from happysimulator.entities.entity import Entity
@@ -7,9 +18,10 @@ from happysimulator.events.event import Event
 
 @dataclass
 class QueuePollEvent(Event):
-    """
-    Sent by the Driver to the Queue.
-    Meaning: "I am free. Give me the next item."
+    """Request from driver to queue for the next work item.
+
+    Sent when the driver's target has capacity and is ready for work.
+    The queue responds with QueueDeliverEvent if items are available.
     """
     event_type: str = field(default="QUEUE_POLL", init=False)
     requestor: Entity = None
@@ -17,40 +29,43 @@ class QueuePollEvent(Event):
 
 @dataclass
 class QueueNotifyEvent(Event):
-    """
-    Sent by the Queue to the Driver.
-    Meaning: "I have data available. You should poll me."
+    """Notification from queue to driver that work is available.
+
+    Sent when an item is enqueued into a previously empty queue.
+    The driver should check target capacity and poll if ready.
     """
     event_type: str = field(default="QUEUE_NOTIFY", init=False)
     queue_entity: Entity = None
 
+
 @dataclass
 class QueueDeliverEvent(Event):
-    """
-    Sent by the Queue to the Driver.
-    Meaning: "Here is one payload event you asked for."
+    """Delivery from queue to driver containing one work item.
 
-    Note:
-        The payload is not mutated by the queue. The driver is responsible for
-        cloning/retargeting as needed before re-emitting to the simulation.
+    The payload event is passed unmodified. The driver is responsible
+    for retargeting it to the downstream entity before scheduling.
     """
     event_type: str = field(default="QUEUE_DELIVER", init=False)
     payload: Event | None = None
     queue_entity: Entity | None = None
 
+
 @dataclass
 class Queue(Entity):
-    """
-    A bounded buffer that stores events and notifies a downstream driver.
-    
-    The queue doesn't interact with the server directly—it only knows
-    about its egress (typically a QueueDriver that wraps the server).
-    
-    Args:
-        name: Entity name for identification.
-        egress: The downstream entity (typically a QueueDriver) to notify.
-        policy: Queue policy controlling item ordering (FIFO, LIFO, Priority).
-                Defaults to FIFOQueue with unlimited capacity.
+    """Bounded buffer that stores events and delivers them on demand.
+
+    Accepts incoming events and buffers them according to its QueuePolicy.
+    Notifies the egress (typically a QueueDriver) when items are available.
+    Responds to poll requests by delivering the next item.
+
+    The queue tracks acceptance and drop statistics for capacity analysis.
+
+    Attributes:
+        name: Identifier for logging.
+        egress: Downstream entity to notify (usually QueueDriver).
+        policy: Ordering strategy (FIFO, LIFO, Priority). Defaults to FIFO.
+        stats_dropped: Count of items rejected due to capacity.
+        stats_accepted: Count of items successfully enqueued.
     """
     name: str = "Queue"
     egress: Entity = None  # The driver that will process items

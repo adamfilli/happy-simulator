@@ -23,44 +23,28 @@ logging.basicConfig(level=get_logging_level(level),
                         logging.StreamHandler()
                     ])
 
-# Core exports
-from happysimulator.core import (
-    Simulation,
-    Event,
-    Entity,
-    Instant,
-    Clock,
-)
-
-# Load generation
-from happysimulator.load import (
-    Source,
-    EventProvider,
+# Public facade exports (keeps common imports stable)
+from happysimulator.api import (
     ConstantArrivalTimeProvider,
-    PoissonArrivalTimeProvider,
-)
-
-# Components
-from happysimulator.components import (
+    Data,
+    Entity,
+    Event,
+    EventProvider,
+    FIFOQueue,
+    Instant,
+    Probe,
+    Profile,
     Queue,
     QueueDriver,
-    QueuedResource,
-    FIFOQueue,
-    LIFOQueue,
-    PriorityQueue,
+    Simulation,
+    Source,
 )
 
-# Distributions
-from happysimulator.distributions import (
-    ConstantLatency,
-    ExponentialLatency,
-)
-
-# Instrumentation
-from happysimulator.instrumentation import (
-    Data,
-    Probe,
-)
+# Additional top-level convenience exports
+from happysimulator.core import Clock
+from happysimulator.load import PoissonArrivalTimeProvider
+from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource
+from happysimulator.distributions import ConstantLatency, ExponentialLatency
 
 __all__ = [
     # Core
@@ -72,6 +56,7 @@ __all__ = [
     # Load
     "Source",
     "EventProvider",
+    "Profile",
     "ConstantArrivalTimeProvider",
     "PoissonArrivalTimeProvider",
     # Components

@@ -27,19 +27,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Generator, List
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
-from happysimulator.core.simulation import Simulation
-from happysimulator.components.queue import Queue
-from happysimulator.components.queue_driver import QueueDriver
-from happysimulator.components.queue_policy import FIFOQueue
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.probe import Probe
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.source import Source
+from happysimulator import (
+    ConstantArrivalTimeProvider,
+    Data,
+    Entity,
+    Event,
+    EventProvider,
+    FIFOQueue,
+    Instant,
+    Probe,
+    Profile,
+    Queue,
+    QueueDriver,
+    Simulation,
+    Source,
+)
 
 
 # =============================================================================

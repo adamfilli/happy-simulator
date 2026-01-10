@@ -9,9 +9,9 @@ This example demonstrates a queuing system with:
 - Stepwise load function (stable, then one source overloads)
 
 Architecture:
-    Source1 --> Queue1 --> Entity1 (fast: 0.1s) --\
-                                                   --> Queue3 --> Entity3 --> Sink
-    Source2 --> Queue2 --> Entity2 (slow: 0.2s) --/
+    Source1 --> Entity1 (fast: 0.1s) --\
+                                        --> Entity3 --> Sink
+    Source2 --> Entity2 (slow: 0.2s) --/
 
 Expected results:
 - Entity3 should see twice the volume of Entity1 or Entity2
@@ -27,21 +27,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Generator, List
 
-from happysimulator import (
-    ConstantArrivalTimeProvider,
-    Data,
-    Entity,
-    Event,
-    EventProvider,
-    FIFOQueue,
-    Instant,
-    Probe,
-    Profile,
-    Queue,
-    QueueDriver,
-    Simulation,
-    Source,
-)
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.instant import Instant
+from happysimulator.core.simulation import Simulation
+from happysimulator.components.queued_resource import QueuedResource
+from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.instrumentation.data import Data
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.load.event_provider import EventProvider
+from happysimulator.load.profile import Profile
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
+from happysimulator.load.source import Source
 
 
 # =============================================================================
@@ -159,29 +156,37 @@ class LatencyTrackingSink(Entity):
 
 
 # =============================================================================
-# Queued Server Entity
+# Queued Server using QueuedResource
 # =============================================================================
 
 
-@dataclass
-class QueuedServer(Entity):
-    """A server with configurable service time and optional downstream target.
+class Server(QueuedResource):
+    """A queued server with configurable service time and downstream target.
 
+    Uses QueuedResource to automatically handle queue + driver composition.
     Supports concurrency limiting and tracks processed request count.
     """
 
-    name: str = "Server"
-    service_time_s: float = 0.1
-    concurrency: int = 1
-    downstream: Entity | None = None
-
-    _in_flight: int = field(default=0, init=False)
-    stats_processed: int = field(default=0, init=False)
+    def __init__(
+        self,
+        name: str,
+        *,
+        service_time_s: float = 0.1,
+        concurrency: int = 1,
+        downstream: Entity | None = None,
+    ):
+        super().__init__(name, policy=FIFOQueue())
+        self.service_time_s = service_time_s
+        self.concurrency = concurrency
+        self.downstream = downstream
+        self._in_flight: int = 0
+        self.stats_processed: int = 0
 
     def has_capacity(self) -> bool:
         return self._in_flight < self.concurrency
 
-    def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
+    def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
+        """Process a request: wait for service time, then forward downstream."""
         self._in_flight += 1
         yield self.service_time_s, None
         self._in_flight -= 1
@@ -255,25 +260,6 @@ def bucket_latencies(
     return result
 
 
-def create_queued_entity(
-    name: str,
-    service_time_s: float,
-    downstream: Entity,
-    concurrency: int = 1,
-) -> tuple[Queue, QueueDriver, QueuedServer]:
-    """Create a queue + driver + server chain."""
-    server = QueuedServer(
-        name=f"{name}Server",
-        service_time_s=service_time_s,
-        concurrency=concurrency,
-        downstream=downstream,
-    )
-    driver = QueueDriver(name=f"{name}Driver", queue=None, target=server)
-    queue = Queue(name=f"{name}Queue", egress=driver, policy=FIFOQueue())
-    driver.queue = queue
-    return queue, driver, server
-
-
 # =============================================================================
 # Main Simulation
 # =============================================================================
@@ -283,9 +269,9 @@ def create_queued_entity(
 class SimulationResult:
     """Results from the dual-path queue simulation."""
     sink: LatencyTrackingSink
-    entity1_processed: int
-    entity2_processed: int
-    entity3_processed: int
+    entity1: Server
+    entity2: Server
+    entity3: Server
     queue1_depth_data: Data
     queue2_depth_data: Data
     queue3_depth_data: Data
@@ -310,9 +296,9 @@ def run_dual_path_simulation(
     """Run the dual-path queue simulation.
 
     Architecture:
-        Source1 --> Queue1 --> Entity1 (fast) --\
-                                                 --> Queue3 --> Entity3 --> Sink
-        Source2 --> Queue2 --> Entity2 (slow) --/
+        Source1 --> Entity1 (fast) --\
+                                      --> Entity3 --> Sink
+        Source2 --> Entity2 (slow) --/
 
     Load profile:
         - Source1: rate_before until step_time_s, then rate_after_source1
@@ -322,34 +308,34 @@ def run_dual_path_simulation(
     # Create sink (end of pipeline)
     sink = LatencyTrackingSink(name="Sink")
 
-    # Create final queued entity (Entity3)
-    queue3, driver3, server3 = create_queued_entity(
+    # Create Entity3 (final, receives from both paths)
+    entity3 = Server(
         name="Entity3",
         service_time_s=entity3_service_time_s,
-        downstream=sink,
         concurrency=2,  # Higher concurrency to handle combined load
+        downstream=sink,
     )
 
     # Create Entity1 (fast path)
-    queue1, driver1, server1 = create_queued_entity(
+    entity1 = Server(
         name="Entity1",
         service_time_s=entity1_service_time_s,
-        downstream=queue3,
         concurrency=1,
+        downstream=entity3,
     )
 
     # Create Entity2 (slow path - 2x latency)
-    queue2, driver2, server2 = create_queued_entity(
+    entity2 = Server(
         name="Entity2",
         service_time_s=entity2_service_time_s,
-        downstream=queue3,
         concurrency=1,
+        downstream=entity3,
     )
 
-    # Create probes for queue depths
+    # Create probes for queue depths (QueuedResource exposes depth property)
     queue1_depth_data = Data()
     queue1_probe = Probe(
-        target=queue1,
+        target=entity1,
         metric="depth",
         data=queue1_depth_data,
         interval=probe_interval_s,
@@ -358,7 +344,7 @@ def run_dual_path_simulation(
 
     queue2_depth_data = Data()
     queue2_probe = Probe(
-        target=queue2,
+        target=entity2,
         metric="depth",
         data=queue2_depth_data,
         interval=probe_interval_s,
@@ -367,7 +353,7 @@ def run_dual_path_simulation(
 
     queue3_depth_data = Data()
     queue3_probe = Probe(
-        target=queue3,
+        target=entity3,
         metric="depth",
         data=queue3_depth_data,
         interval=probe_interval_s,
@@ -383,7 +369,7 @@ def run_dual_path_simulation(
         rate_before=rate_before,
         rate_after=rate_after_source1,
     )
-    provider1 = RequestProvider(queue1, source_id="source1", stop_after=stop_after)
+    provider1 = RequestProvider(entity1, source_id="source1", stop_after=stop_after)
     arrival1 = ConstantArrivalTimeProvider(profile1, start_time=Instant.Epoch)
     source1 = Source(name="Source1", event_provider=provider1, arrival_time_provider=arrival1)
 
@@ -393,7 +379,7 @@ def run_dual_path_simulation(
         rate_before=rate_source2,
         rate_after=rate_source2,
     )
-    provider2 = RequestProvider(queue2, source_id="source2", stop_after=stop_after)
+    provider2 = RequestProvider(entity2, source_id="source2", stop_after=stop_after)
     arrival2 = ConstantArrivalTimeProvider(profile2, start_time=Instant.Epoch)
     source2 = Source(name="Source2", event_provider=provider2, arrival_time_provider=arrival2)
 
@@ -402,16 +388,16 @@ def run_dual_path_simulation(
         start_time=Instant.Epoch,
         end_time=Instant.from_seconds(duration_s + drain_s),
         sources=[source1, source2],
-        entities=[queue1, driver1, server1, queue2, driver2, server2, queue3, driver3, server3, sink],
+        entities=[entity1, entity2, entity3, sink],
         probes=[queue1_probe, queue2_probe, queue3_probe],
     )
     sim.run()
 
     return SimulationResult(
         sink=sink,
-        entity1_processed=server1.stats_processed,
-        entity2_processed=server2.stats_processed,
-        entity3_processed=server3.stats_processed,
+        entity1=entity1,
+        entity2=entity2,
+        entity3=entity3,
         queue1_depth_data=queue1_depth_data,
         queue2_depth_data=queue2_depth_data,
         queue3_depth_data=queue3_depth_data,
@@ -483,7 +469,7 @@ def visualize_results(result: SimulationResult, output_dir: Path, step_time_s: f
     fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
 
     axes[0].plot(q1_times, q1_depths, label="Entity1 Queue", color="blue")
-    axes[0].axvline(x=step_time_s, color="red", linestyle=":", label=f"Load step")
+    axes[0].axvline(x=step_time_s, color="red", linestyle=":", label="Load step")
     axes[0].set_ylabel("Queue Depth")
     axes[0].set_title("Entity1 Queue Depth (fast path, overloaded after step)")
     axes[0].legend(loc="upper left")
@@ -567,14 +553,14 @@ def print_summary(result: SimulationResult, step_time_s: float) -> None:
     print(f"  Total:   {result.source1_generated + result.source2_generated}")
 
     print(f"\nRequests Processed:")
-    print(f"  Entity1 (fast, 0.1s): {result.entity1_processed}")
-    print(f"  Entity2 (slow, 0.2s): {result.entity2_processed}")
-    print(f"  Entity3 (final):      {result.entity3_processed}")
+    print(f"  Entity1 (fast, 0.1s): {result.entity1.stats_processed}")
+    print(f"  Entity2 (slow, 0.2s): {result.entity2.stats_processed}")
+    print(f"  Entity3 (final):      {result.entity3.stats_processed}")
     print(f"  Sink received:        {result.sink.events_received}")
 
     # Verify Entity3 sees combined volume
-    combined_e1_e2 = result.entity1_processed + result.entity2_processed
-    print(f"\n  Entity3 received {result.entity3_processed} (Entity1 + Entity2 = {combined_e1_e2})")
+    combined_e1_e2 = result.entity1.stats_processed + result.entity2.stats_processed
+    print(f"\n  Entity3 received {result.entity3.stats_processed} (Entity1 + Entity2 = {combined_e1_e2})")
 
     # Latency statistics
     latencies = result.sink.latencies_s

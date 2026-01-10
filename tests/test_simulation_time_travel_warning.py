@@ -1,8 +1,8 @@
 import logging
 
-from happysimulator.events.event import Event
-from happysimulator.simulation import Simulation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.instant import Instant
 
 
 def test_simulation_logs_warning_on_time_travel(caplog):

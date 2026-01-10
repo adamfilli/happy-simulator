@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Generator
 
-from happysimulator.events.event import Event, ProcessContinuation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.event import Event, ProcessContinuation
+from happysimulator.core.instant import Instant
 
 
 def test_completion_hooks_run_for_regular_event() -> None:

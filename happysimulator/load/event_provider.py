@@ -8,8 +8,8 @@ messages) with appropriate targets and payloads.
 from abc import ABC, abstractmethod
 from typing import List, Union
 
-from happysimulator.events.event import Event
-from happysimulator.utils.instant import Instant
+from happysimulator.core.event import Event
+from happysimulator.core.instant import Instant
 
 
 class EventProvider(ABC):

@@ -29,7 +29,7 @@ class Duration:
     def __radd__(self, other: Union['Duration', 'Instant', int, float]):
         # support Instant + Duration by handling Instant on the right-hand side
         try:
-            from .instant import Instant
+            from happysimulator.core.instant import Instant
         except Exception:  # pragma: no cover - defensive import
             Instant = None
 
@@ -47,7 +47,7 @@ class Duration:
 
     def __rsub__(self, other: Union['Instant', int, float]):
         try:
-            from .instant import Instant
+            from happysimulator.core.instant import Instant
         except Exception:  # pragma: no cover - defensive import
             Instant = None
 

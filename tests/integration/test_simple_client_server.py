@@ -7,19 +7,19 @@ from typing import List
 
 import pytest
 
-from happysimulator.entities.simple_client import SimpleClient
-from happysimulator.entities.simple_server import SimpleServer
-from happysimulator.events.event import Event
-from happysimulator.events.request import Request
-from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
+from happysimulator.modules.client_server.simple_client import SimpleClient
+from happysimulator.modules.client_server.simple_server import SimpleServer
+from happysimulator.core.event import Event
+from happysimulator.modules.client_server.request import Request
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.simulation import Simulation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.instant import Instant
 
-from happysimulator.math.constant_latency import ConstantLatency
-from happysimulator.math.exponential_latency import ExponentialLatency
+from happysimulator.distributions.constant import ConstantLatency
+from happysimulator.distributions.exponential import ExponentialLatency
 
 
 @dataclass(frozen=True)

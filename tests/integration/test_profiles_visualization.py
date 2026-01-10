@@ -20,14 +20,14 @@ from typing import Iterable, List
 
 import pytest
 
-from happysimulator.entities.entity import Entity
-from happysimulator.events.event import Event
-from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.simulation import Simulation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.instant import Instant
 
 
 class TimeSeriesCounterEntity(Entity):

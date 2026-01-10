@@ -8,19 +8,19 @@ from typing import Generator, List
 
 import pytest
 
-from happysimulator.data.data import Data
-from happysimulator.data.probe import Probe
-from happysimulator.entities.entity import Entity
-from happysimulator.entities.queue import Queue
-from happysimulator.entities.queue_driver import QueueDriver
-from happysimulator.entities.queue_policy import FIFOQueue, LIFOQueue, QueuePolicy
-from happysimulator.events.event import Event
-from happysimulator.load.constant_arrival_time_provider import ConstantArrivalTimeProvider
+from happysimulator.instrumentation.data import Data
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.core.entity import Entity
+from happysimulator.components.queue import Queue
+from happysimulator.components.queue_driver import QueueDriver
+from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue, QueuePolicy
+from happysimulator.core.event import Event
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.simulation import Simulation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.instant import Instant
 
 
 @dataclass(frozen=True)

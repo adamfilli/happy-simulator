@@ -11,12 +11,12 @@ payload generation and schedules the next SourceEvent.
 import logging
 from typing import List
 
-from happysimulator.entities.entity import Entity
-from happysimulator.events.event import Event
-from happysimulator.events.source_event import SourceEvent
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.instant import Instant
+from happysimulator.load.source_event import SourceEvent
 from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
-from happysimulator.utils.instant import Instant
 
 
 logger = logging.getLogger(__name__)

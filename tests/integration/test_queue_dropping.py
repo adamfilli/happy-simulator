@@ -4,13 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Generator
 
-from happysimulator.entities.entity import Entity
-from happysimulator.entities.queue import Queue
-from happysimulator.entities.queue_driver import QueueDriver
-from happysimulator.entities.queue_policy import FIFOQueue
-from happysimulator.events.event import Event
-from happysimulator.simulation import Simulation
-from happysimulator.utils.instant import Instant
+from happysimulator.core.entity import Entity
+from happysimulator.components.queue import Queue
+from happysimulator.components.queue_driver import QueueDriver
+from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.instant import Instant
 
 
 def test_queue_drops_when_capacity_is_one_and_three_arrive() -> None:

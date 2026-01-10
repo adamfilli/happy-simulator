@@ -1,3 +1,5 @@
+"""happy-simulator: A discrete-event simulation library for Python."""
+
 import logging
 import os
 
@@ -11,7 +13,6 @@ def get_logging_level(level):
         'ERROR': logging.ERROR,
         'CRITICAL': logging.CRITICAL
     }
-
     return switcher.get(level.upper(), logging.INFO)
 
 
@@ -22,48 +23,68 @@ logging.basicConfig(level=get_logging_level(level),
                         logging.StreamHandler()
                     ])
 
-# Re-exports for concise imports
-"""
-from ..archive.arrival_distribution import ArrivalDistribution
-from .load.source import Source
-from ..archive.measurement import Measurement
-from .simulation import Simulation
-from ..archive.stat import Stat
-from .utils.instant import Instant
+# Core exports
+from happysimulator.core import (
+    Simulation,
+    Event,
+    Entity,
+    Instant,
+    Clock,
+)
 
-from ..archive.constant_latency import ConstantLatency
-from ..archive.exponential_latency import ExponentialLatency
-from ..archive.normal_latency import NormalLatency
+# Load generation
+from happysimulator.load import (
+    Source,
+    EventProvider,
+    ConstantArrivalTimeProvider,
+    PoissonArrivalTimeProvider,
+)
 
-from ..archive.constant_profile import ConstantProfile
-from ..archive.rampup_profile import RampupProfile
-from ..archive.sinusoid_profile import SinusoidProfile
-from ..archive.spike_profile import SpikeProfile
+# Components
+from happysimulator.components import (
+    Queue,
+    QueueDriver,
+    QueuedResource,
+    FIFOQueue,
+    LIFOQueue,
+    PriorityQueue,
+)
 
-from .entities import Client, Server, Queue, LifoQueue, QueuedServer
+# Distributions
+from happysimulator.distributions import (
+    ConstantLatency,
+    ExponentialLatency,
+)
 
-from ..archive.client_server_request_event import Request
+# Instrumentation
+from happysimulator.instrumentation import (
+    Data,
+    Probe,
+)
 
 __all__ = [
-    "ArrivalDistribution",
-    "Source",
-    "Measurement",
+    # Core
     "Simulation",
-    "Stat",
+    "Event",
+    "Entity",
     "Instant",
+    "Clock",
+    # Load
+    "Source",
+    "EventProvider",
+    "ConstantArrivalTimeProvider",
+    "PoissonArrivalTimeProvider",
+    # Components
+    "Queue",
+    "QueueDriver",
+    "QueuedResource",
+    "FIFOQueue",
+    "LIFOQueue",
+    "PriorityQueue",
+    # Distributions
     "ConstantLatency",
     "ExponentialLatency",
-    "NormalLatency",
-    "ConstantProfile",
-    "RampupProfile",
-    "SinusoidProfile",
-    "SpikeProfile",
-    "Client",
-    "Server",
-    "Queue",
-    "LifoQueue",
-    "QueuedServer",
-    "Request",
+    # Instrumentation
+    "Data",
+    "Probe",
 ]
-"""
-

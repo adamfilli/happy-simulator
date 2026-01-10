@@ -4,7 +4,9 @@
       "Bash(.venv/Scripts/python.exe -m pytest tests/integration/test_simple_client_server.py -v)",
       "Bash(git mv:*)",
       "Bash(python -c:*)",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/ -q)"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/ -q)",
+      "Bash(..venvScriptspython.exe examplesdual_path_queue_latency.py --duration 30 --step-time 15 --drain 5)",
+      "Bash(.venv/Scripts/python.exe:*)"
     ]
   }
 }

@@ -160,9 +160,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
-.claude/
-
-.github/
-
+.claude
+.github
 .pytest_cache
 test_output
+output

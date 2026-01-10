@@ -5,6 +5,7 @@ receives work events without knowing they came from a queue. The driver
 manages polling based on target capacity and re-polls after work completion.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Generator
 
@@ -12,6 +13,8 @@ from happysimulator.entities.entity import Entity
 from happysimulator.entities.queue import QueueDeliverEvent, QueueNotifyEvent, QueuePollEvent
 from happysimulator.events.event import Event
 from happysimulator.utils.instant import Instant
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -50,16 +53,22 @@ class QueueDriver(Entity):
     def _handle_delivery(self, event: QueueDeliverEvent) -> list[Event]:
         """Queue delivered one payload event; clone/retarget and re-emit."""
         if event.payload is None:
+            logger.debug("[%s] Received empty delivery", self.name)
             return []
+        logger.debug(
+            "[%s] Received delivery: type=%s, forwarding to target",
+            self.name, event.payload.event_type
+        )
         return self._handle_work_payload(event.payload)
-    
+
     def _handle_work_payload(self, payload: Event) -> list[Event]:
         def schedule_poll(time: Instant):
-            # Always emit using the current simulation time (global clock).
             if self.target.has_capacity():
+                logger.debug("[%s] Target has capacity, scheduling poll", self.name)
                 return QueuePollEvent(time=time, target=self.queue, requestor=self)
+            logger.debug("[%s] Target at capacity, deferring poll", self.name)
             return None
-        
+
         target_event = payload
         target_event.time = self.now
         target_event.target = self.target
@@ -69,8 +78,10 @@ class QueueDriver(Entity):
     def _handle_notify(self, _: QueueNotifyEvent) -> list[Event]:
         """Queue has work available—poll if target has capacity."""
         if not self.target.has_capacity():
+            logger.debug("[%s] Notify received but target at capacity", self.name)
             return []
-        
+
+        logger.debug("[%s] Notify received, polling queue", self.name)
         return [QueuePollEvent(time=self.now, target=self.queue, requestor=self)]
 
     def _handle_work(self, event: Event) -> Generator[Instant, None, list[Event]]:

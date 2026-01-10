@@ -9,12 +9,15 @@ is determined:
 This approach handles non-homogeneous (time-varying) rate profiles.
 """
 
+import logging
 from abc import ABC, abstractmethod
 import scipy.integrate as integrate
 import scipy.optimize as optimize
 
 from happysimulator.load.profile import Profile
 from happysimulator.utils.instant import Instant
+
+logger = logging.getLogger(__name__)
 
 
 class ArrivalTimeProvider(ABC):
@@ -108,13 +111,22 @@ class ArrivalTimeProvider(ABC):
             t_high += step * 2.0
             
         if not found_bracket:
+            logger.error(
+                "Could not bracket arrival time: target_area=%.4f start=%.4f",
+                target_area, t_start_sec
+            )
             raise RuntimeError(f"Could not find event event with target area {target_area} starting at {t_start_sec}")
 
         # 6. Root Finding
         result = optimize.root_scalar(objective_func, bracket=[t_low, t_high], method='brentq')
-        
+
         if result.converged:
             self.current_time = Instant.from_seconds(result.root)
+            logger.debug(
+                "Next arrival computed: time=%.6f target_area=%.4f",
+                result.root, target_area
+            )
             return self.current_time
         else:
+            logger.error("Root-finding failed for arrival time optimization")
             raise RuntimeError("Optimization for next arrival time failed.")

@@ -4,6 +4,7 @@ Entities are the building blocks of a simulation model. Each entity receives
 events via handle_event() and returns reactions (new events or generators).
 """
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Generator, Optional, Tuple, Union
 
@@ -11,6 +12,8 @@ from archive.experiments.arrival_distributions import Instant
 from happysimulator.utils.clock import Clock
 
 from ..events.event import Event
+
+logger = logging.getLogger(__name__)
 
 SimYield = Union[float, Tuple[float, list[Event], Event]]
 """Type alias for generator yield values: delay or (delay, side_effects)."""
@@ -42,6 +45,7 @@ class Entity(ABC):
     def set_clock(self, clock: Clock) -> None:
         """Inject the simulation clock. Called automatically during setup."""
         self._clock = clock
+        logger.debug("[%s] Clock injected", self.name)
 
     @property
     def now(self) -> Instant:
@@ -51,6 +55,7 @@ class Entity(ABC):
             RuntimeError: If accessed before clock injection.
         """
         if self._clock is None:
+            logger.error("[%s] Attempted to access time before clock injection", self.name)
             raise RuntimeError(f"Entity {self.name} is not attached to a simulation (Clock is None).")
         return self._clock.now
 

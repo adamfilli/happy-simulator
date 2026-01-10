@@ -5,10 +5,13 @@ configured mean. The exponential distribution models memoryless waiting
 times and is commonly used for service times in queuing theory.
 """
 
+import logging
 import random
 
 from happysimulator.math.latency_distribution import LatencyDistribution
 from happysimulator.utils.instant import Instant
+
+logger = logging.getLogger(__name__)
 
 
 class ExponentialLatency(LatencyDistribution):
@@ -27,7 +30,10 @@ class ExponentialLatency(LatencyDistribution):
         """Initialize with mean latency (expected value of distribution)."""
         super().__init__(mean_latency)
         self._lambda = 1 / self._mean_latency
+        logger.debug("ExponentialLatency created: mean=%.6fs lambda=%.6f", self._mean_latency, self._lambda)
 
     def get_latency(self, current_time: Instant) -> Instant:
         """Sample a random latency from the exponential distribution."""
-        return Instant.from_seconds(random.expovariate(self._lambda))
+        sample = random.expovariate(self._lambda)
+        logger.debug("ExponentialLatency sampled: %.6fs (mean=%.6fs)", sample, self._mean_latency)
+        return Instant.from_seconds(sample)

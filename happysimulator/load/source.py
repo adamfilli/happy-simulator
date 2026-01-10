@@ -85,23 +85,26 @@ class Source(Entity):
             return []
 
         current_time = event.time
-        
+
         # --- A. Generate Payload (The "Real" Events) ---
-        # Delegate to the EventProvider (e.g., create an HttpRequest)
         payload_events = self._event_provider.get_events(current_time)
         self._nmb_generated += 1
-        
+
+        logger.debug(
+            "[%s] Generated %d payload event(s) (#%d total)",
+            self.name, len(payload_events), self._nmb_generated
+        )
+
         # --- B. Schedule Next Tick (Self-Perpetuation) ---
         try:
-            next_time = self._time_provider.next_arrival_time()     
+            next_time = self._time_provider.next_arrival_time()
             next_tick = SourceEvent(time=next_time, source_entity=self)
-            
-            # Return both the payload AND the next tick to be pushed to the heap
+
+            logger.debug("[%s] Next tick scheduled for %r", self.name, next_time)
             return payload_events + [next_tick]
-            
+
         except RuntimeError:
-            # Rate has dropped to zero forever (or profile ended)
-            logger.info(f"[{self.name}] Source exhausted. Stopping.")
+            logger.info("[%s] Source exhausted after %d events. Stopping.", self.name, self._nmb_generated)
             return payload_events
             
     def __repr__(self):

@@ -9,11 +9,14 @@ the target entity. The target entity does not need to know it is being fed
 by a queue.
 """
 
+import logging
 from dataclasses import dataclass, field
 
 from happysimulator.entities.entity import Entity
 from happysimulator.entities.queue_policy import QueuePolicy, FIFOQueue
 from happysimulator.events.event import Event
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -95,16 +98,25 @@ class Queue(Entity):
     def _handle_enqueue(self, event: Event) -> list[Event]:
         """Buffer incoming work and notify driver if queue was empty."""
         was_empty = self.policy.is_empty()
-        
+
         accepted = self.policy.push(event)
         if not accepted:
             self.stats_dropped += 1
+            logger.debug(
+                "[%s] Dropped event (capacity full): type=%s depth=%d capacity=%s",
+                self.name, event.event_type, len(self.policy), self.policy.capacity
+            )
             return []
-        
+
         self.stats_accepted += 1
-        
+        logger.debug(
+            "[%s] Enqueued event: type=%s depth=%d",
+            self.name, event.event_type, len(self.policy)
+        )
+
         # If queue was empty, the driver might be idle—wake it up
         if was_empty:
+            logger.debug("[%s] Queue was empty, notifying driver", self.name)
             return [QueueNotifyEvent(
                 time=self.now,
                 target=self.egress,
@@ -116,11 +128,13 @@ class Queue(Entity):
         """Driver is asking for work."""
         next_item = self.policy.pop()
         if next_item is None:
-            # Nothing available; driver will wait for QueueNotifyEvent
+            logger.debug("[%s] Poll received but queue is empty", self.name)
             return []
-        
-        # Do not mutate `next_item` (events are treated as immutable payloads).
-        # Wrap it in a delivery event timestamped to the global simulation clock.
+
+        logger.debug(
+            "[%s] Delivering event to driver: type=%s depth=%d",
+            self.name, next_item.event_type, len(self.policy)
+        )
         return [QueueDeliverEvent(
             time=self.now,
             target=event.requestor,

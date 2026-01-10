@@ -5,11 +5,14 @@ by insertion order for deterministic FIFO behavior among simultaneous events.
 """
 
 import heapq
+import logging
 from typing import Union
 
 from happysimulator.events.event import Event
 from happysimulator.tracing.recorder import TraceRecorder, NullTraceRecorder
 from happysimulator.utils.instant import Instant
+
+logger = logging.getLogger(__name__)
 
 
 class EventHeap:
@@ -64,6 +67,10 @@ class EventHeap:
         if not popped.daemon:
             self._primary_event_count -= 1
         self._current_time = popped.time
+        logger.debug(
+            "Popped event: type=%s time=%r heap_size=%d primary_remaining=%d",
+            popped.event_type, popped.time, len(self._heap), self._primary_event_count
+        )
         self._trace.record(
             time=self._current_time,
             kind="heap.pop",
@@ -93,6 +100,10 @@ class EventHeap:
         heapq.heappush(self._heap, event)
         if not event.daemon:
             self._primary_event_count += 1
+        logger.debug(
+            "Pushed event: type=%s scheduled_for=%r daemon=%s heap_size=%d",
+            event.event_type, event.time, event.daemon, len(self._heap)
+        )
         self._trace.record(
             time=self._current_time,
             kind="heap.push",

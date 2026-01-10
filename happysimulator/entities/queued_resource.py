@@ -16,6 +16,7 @@ QueuedResource are automatically buffered and processed in order.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generator
@@ -26,6 +27,8 @@ from happysimulator.entities.queue_driver import QueueDriver
 from happysimulator.entities.queue_policy import FIFOQueue, QueuePolicy
 from happysimulator.events.event import Event
 from happysimulator.utils.clock import Clock
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -77,6 +80,10 @@ class QueuedResource(Entity, ABC):
             target=self._worker,
         )
         self._queue.egress = self._driver
+        logger.debug(
+            "[%s] QueuedResource initialized with queue=%s driver=%s",
+            name, self._queue.name, self._driver.name
+        )
 
     @property
     def queue(self) -> Queue:

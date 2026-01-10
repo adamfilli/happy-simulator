@@ -8,6 +8,7 @@ The metric is accessed via reflection (getattr), supporting both
 attributes and callable properties.
 """
 
+import logging
 from typing import List
 from happysimulator.data.data import Data
 from happysimulator.entities.entity import Entity
@@ -17,6 +18,8 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.utils.instant import Instant
+
+logger = logging.getLogger(__name__)
 
 
 class _ProbeProfile(Profile):
@@ -55,7 +58,16 @@ class _ProbeEventProvider(EventProvider):
                     val = raw_val()
                 else:
                     val = raw_val
+            else:
+                logger.warning(
+                    "Probe target '%s' has no attribute '%s'",
+                    target.name, metric
+                )
             data_sink.add_stat(val, event.time)
+            logger.debug(
+                "Probe sampled %s.%s = %s at %r",
+                target.name, metric, val, event.time
+            )
             return []
 
         return measure_callback
@@ -94,16 +106,20 @@ class Probe(Source):
         self.target = target
         self.metric = metric
         self.data_sink = data
-        
+
         if start_time is None:
             start_time = Instant.Epoch
-        
+
         profile = _ProbeProfile(interval)
         provider = _ProbeEventProvider(target, metric, data)
         arrival_time_provider = ConstantArrivalTimeProvider(profile, start_time=start_time)
-        
+
         super().__init__(
             name=f"Probe_{target.name}_{metric}",
             event_provider=provider,
             arrival_time_provider=arrival_time_provider
+        )
+        logger.info(
+            "Probe created: target=%s metric=%s interval=%.3fs",
+            target.name, metric, interval
         )

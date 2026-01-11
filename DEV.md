@@ -156,3 +156,72 @@ python -m build
 The package version is defined in two places (keep them in sync):
 - `pyproject.toml`: `version = "0.1.0"`
 - `happysimulator/__init__.py`: `__version__ = "0.1.0"`
+
+## Publishing to PyPI
+
+### Prerequisites
+
+```powershell
+# Install/upgrade build and twine
+pip install --upgrade build twine
+```
+
+### Step 1: Clean and Build
+
+```powershell
+# Remove old builds
+Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+
+# Build wheel and sdist
+python -m build
+```
+
+### Step 2: Upload to TestPyPI (Optional but Recommended)
+
+Test the upload before publishing to production:
+
+```powershell
+python -m twine upload --repository testpypi dist/*
+```
+
+When prompted:
+- Username: `__token__`
+- Password: Your TestPyPI API token (starts with `pypi-`)
+
+Verify at: https://test.pypi.org/project/happysim/
+
+Test installation:
+```powershell
+pip install --index-url https://test.pypi.org/simple/ happysim
+```
+
+### Step 3: Upload to PyPI
+
+```powershell
+python -m twine upload dist/*
+```
+
+When prompted:
+- Username: `__token__`
+- Password: Your PyPI API token (starts with `pypi-`)
+
+Verify at: https://pypi.org/project/happysim/
+
+### API Token Setup
+
+1. Create accounts at https://pypi.org and https://test.pypi.org
+2. Go to Account Settings → API tokens
+3. Create a token scoped to this project (or account-wide for first upload)
+4. Store tokens securely (e.g., in a `.pypirc` file or password manager)
+
+Optional `.pypirc` for automated uploads (place in `$HOME`):
+```ini
+[pypi]
+username = __token__
+password = pypi-YOUR_TOKEN_HERE
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = pypi-YOUR_TEST_TOKEN_HERE
+```

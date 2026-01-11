@@ -10,7 +10,8 @@
       "Bash(..venvScriptspython.exe -m pip install --upgrade build twine)",
       "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m pip:*)",
       "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m build)",
-      "Bash(python -m venv:*)"
+      "Bash(python -m venv:*)",
+      "WebFetch(domain:packaging.python.org)"
     ]
   }
 }

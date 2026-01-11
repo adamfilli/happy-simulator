@@ -1,4 +1,3 @@
 # happy-simulator
 
-Discrete event simulation tool, think Matlab SimEvent but for Python, and free.
-
+Discrete event simulation tool.

@@ -23,22 +23,24 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator, List
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
-from happysimulator.core.simulation import Simulation
-from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.components.queue_policy import FIFOQueue
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.probe import Probe
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.source import Source
+from happysimulator import (
+    ConstantArrivalTimeProvider,
+    Data,
+    Entity,
+    Event,
+    EventProvider,
+    FIFOQueue,
+    Instant,
+    Probe,
+    Profile,
+    QueuedResource,
+    Simulation,
+    Source,
+)
 
 
 # =============================================================================

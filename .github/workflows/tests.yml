@@ -4,10 +4,10 @@ on:
   schedule:
     # Run every day at 06:00 UTC
     - cron: '0 6 * * *'
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+ # push:
+ #   branches: [main]
+ # pull_request:
+ #   branches: [main]
   workflow_dispatch:  # Allow manual trigger
 
 jobs:

@@ -1,3 +1,7 @@
+"""happy-simulator: A discrete-event simulation library for Python."""
+
+__version__ = "0.1.0"
+
 import logging
 import os
 
@@ -11,7 +15,6 @@ def get_logging_level(level):
         'ERROR': logging.ERROR,
         'CRITICAL': logging.CRITICAL
     }
-
     return switcher.get(level.upper(), logging.INFO)
 
 
@@ -21,3 +24,56 @@ logging.basicConfig(level=get_logging_level(level),
                         logging.FileHandler("happysimulator.log"),
                         logging.StreamHandler()
                     ])
+
+# Public facade exports (keeps common imports stable)
+from happysimulator.api import (
+    ConstantArrivalTimeProvider,
+    Data,
+    Entity,
+    Event,
+    EventProvider,
+    FIFOQueue,
+    Instant,
+    Probe,
+    Profile,
+    Queue,
+    QueueDriver,
+    Simulation,
+    Source,
+)
+
+# Additional top-level convenience exports
+from happysimulator.core import Clock
+from happysimulator.load import PoissonArrivalTimeProvider
+from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource
+from happysimulator.distributions import ConstantLatency, ExponentialLatency
+
+__all__ = [
+    # Package metadata
+    "__version__",
+    # Core
+    "Simulation",
+    "Event",
+    "Entity",
+    "Instant",
+    "Clock",
+    # Load
+    "Source",
+    "EventProvider",
+    "Profile",
+    "ConstantArrivalTimeProvider",
+    "PoissonArrivalTimeProvider",
+    # Components
+    "Queue",
+    "QueueDriver",
+    "QueuedResource",
+    "FIFOQueue",
+    "LIFOQueue",
+    "PriorityQueue",
+    # Distributions
+    "ConstantLatency",
+    "ExponentialLatency",
+    # Instrumentation
+    "Data",
+    "Probe",
+]

@@ -12,6 +12,9 @@
 4. Queueing network recreations: https://www.grotto-networking.com/DiscreteEventPython.html
 5. Model client server ping pong communications
 6. Publish to PyPi
+7. Remove scipy dependency
+   - Only used in `arrival_time_provider.py` for `scipy.integrate`
+   - Consider implementing the integration manually or using numpy alternatives
 
 * Add Java ExecutorService pipeline simulation components and example
 * Load balancer entity

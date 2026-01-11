@@ -6,7 +6,11 @@
       "Bash(python -c:*)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/ -q)",
       "Bash(..venvScriptspython.exe examplesdual_path_queue_latency.py --duration 30 --step-time 15 --drain 5)",
-      "Bash(.venv/Scripts/python.exe:*)"
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(..venvScriptspython.exe -m pip install --upgrade build twine)",
+      "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m pip:*)",
+      "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m build)",
+      "Bash(python -m venv:*)"
     ]
   }
 }

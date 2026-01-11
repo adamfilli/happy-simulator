@@ -13,9 +13,12 @@ import uuid
 import logging
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
 from happysimulator.core.instant import Instant
+
+if TYPE_CHECKING:
+    from happysimulator.core.protocols import Simulatable
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +67,8 @@ class Event:
     event_type: str
     daemon: bool = field(default=False, repr=False)
     
-    # Option A: The "Model" way (Send to Entity)
-    target: Optional['Entity'] = None
+    # Option A: The "Model" way (Send to Entity or any Simulatable)
+    target: Optional['Simulatable'] = None
     
     # Option B: The "Scripting" way (Call specific function)
     callback: Optional[EventCallback] = field(default=None, repr=False)

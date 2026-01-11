@@ -9,6 +9,7 @@ import logging
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.protocols import Simulatable
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
 from happysimulator.core.instant import Instant
@@ -45,7 +46,7 @@ class Simulation:
         start_time: Instant = None,
         end_time: Instant = None,
         sources: list[Source] = None,
-        entities: list[Entity] = None,
+        entities: list[Simulatable] = None,
         probes: list[Source] = None,
         trace_recorder: TraceRecorder | None = None,
     ):
@@ -65,7 +66,7 @@ class Simulation:
         
         all_components = self._entities + self._sources + self._probes
         for component in all_components:
-            if isinstance(component, Entity):
+            if isinstance(component, Simulatable):
                 component.set_clock(self._clock)
         
         self._trace = trace_recorder or NullTraceRecorder()

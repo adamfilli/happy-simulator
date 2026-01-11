@@ -1,5 +1,10 @@
 ## DEV
 
+1. Improve type checker support for `@simulatable` decorator
+   - Currently, static type checkers (Pylance, mypy) cannot see dynamically added attributes (`now`, `set_clock`)
+   - Options to explore: `@dataclass_transform` (PEP 681), type checker plugins, or improved generic typing
+   - See `happysimulator/core/decorators.py`
+
 2. Event Lifecy cles (i.e. a source that creates an event with a predefined lifecycle)
 3. Rate Limiter
     - Distributed convergence example

@@ -1,5 +1,7 @@
 """happy-simulator: A discrete-event simulation library for Python."""
 
+__version__ = "0.1.0"
+
 import logging
 import os
 
@@ -47,6 +49,8 @@ from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource
 from happysimulator.distributions import ConstantLatency, ExponentialLatency
 
 __all__ = [
+    # Package metadata
+    "__version__",
     # Core
     "Simulation",
     "Event",

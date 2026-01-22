@@ -8,10 +8,73 @@ This example demonstrates a queuing system with:
 - Volume probes at each entity
 - Stepwise load function (stable, then one source overloads)
 
-Architecture:
-    Source1 --> Entity1 (fast: 0.1s) --\
-                                        --> Entity3 --> Sink
-    Source2 --> Entity2 (slow: 0.2s) --/
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     DUAL-PATH QUEUE LATENCY SIMULATION                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                            LOAD GENERATION
+       ┌──────────────────────────────────────────────────────────────────┐
+       │                                                                  │
+       │   ┌─────────┐                         ┌─────────┐                │
+       │   │ Source1 │  (stepwise profile)     │ Source2 │  (constant)    │
+       │   │ 4→12/s  │                         │   4/s   │                │
+       │   └────┬────┘                         └────┬────┘                │
+       │        │                                   │                     │
+       └────────┼───────────────────────────────────┼─────────────────────┘
+                │                                   │
+                ▼                                   ▼
+       ┌─────────────────────┐            ┌─────────────────────┐
+       │      Entity1        │            │      Entity2        │
+       │    ┌─────────┐      │            │    ┌─────────┐      │
+       │    │  Queue  │      │            │    │  Queue  │      │
+       │    └────┬────┘      │            │    └────┬────┘      │
+       │         ▼           │            │         ▼           │
+       │    ┌─────────┐      │            │    ┌─────────┐      │
+       │    │ Server  │      │            │    │ Server  │      │
+       │    │  0.1s   │      │            │    │  0.2s   │      │
+       │    │ 10 rps  │      │            │    │  5 rps  │      │
+       │    └────┬────┘      │            │    └────┬────┘      │
+       └─────────┼───────────┘            └─────────┼───────────┘
+                 │    FAST PATH                     │    SLOW PATH
+                 │       ▲                          │       ▲
+                 │       │depth                     │       │depth
+                 │       │                          │       │
+                 │  ┌─────────┐                     │  ┌─────────┐
+                 │  │ Probe1  │                     │  │ Probe2  │
+                 │  └─────────┘                     │  └─────────┘
+                 │                                  │
+                 └─────────────┬────────────────────┘
+                               │
+                               ▼
+                  ┌─────────────────────────┐
+                  │        Entity3          │
+                  │    ┌─────────────┐      │
+                  │    │    Queue    │      │
+                  │    └──────┬──────┘      │
+                  │           ▼             │
+                  │    ┌─────────────┐      │
+                  │    │   Server    │      │
+                  │    │    0.05s    │      │
+                  │    │ concurrency │      │
+                  │    │     = 2     │      │
+                  │    └─────────────┘      │◄──── depth ────┐
+                  └───────────┬─────────────┘                │
+                              │                         ┌─────────┐
+                              │                         │ Probe3  │
+                              ▼                         └─────────┘
+                  ┌─────────────────────────┐
+                  │          Sink           │
+                  │   (Latency Tracking)    │
+                  │                         │
+                  │  • Records arrival time │
+                  │  • Computes latency     │
+                  │  • Tracks by source     │
+                  └─────────────────────────┘
+
+```
 
 Expected results:
 - Entity3 should see twice the volume of Entity1 or Entity2

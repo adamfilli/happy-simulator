@@ -44,7 +44,7 @@ from happysimulator.api import (
 
 # Additional top-level convenience exports
 from happysimulator.core import Clock
-from happysimulator.load import PoissonArrivalTimeProvider
+from happysimulator.load import PoissonArrivalTimeProvider, ConstantRateProfile, LinearRampProfile
 from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource
 from happysimulator.distributions import ConstantLatency, ExponentialLatency
 
@@ -61,6 +61,8 @@ __all__ = [
     "Source",
     "EventProvider",
     "Profile",
+    "ConstantRateProfile",
+    "LinearRampProfile",
     "ConstantArrivalTimeProvider",
     "PoissonArrivalTimeProvider",
     # Components

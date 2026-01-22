@@ -6,6 +6,7 @@ by other components to model time-dependent behavior.
 """
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from happysimulator.core.instant import Instant
 
@@ -32,3 +33,43 @@ class Profile(ABC):
             The rate value (interpretation depends on usage context).
         """
         pass
+
+
+@dataclass(frozen=True)
+class ConstantRateProfile(Profile):
+    """Profile that returns a constant rate regardless of time.
+
+    Args:
+        rate: The constant rate value (e.g., requests per second).
+    """
+
+    rate: float
+
+    def get_rate(self, time: Instant) -> float:
+        return self.rate
+
+
+@dataclass(frozen=True)
+class LinearRampProfile(Profile):
+    """Load profile that ramps linearly from start_rate to end_rate.
+
+    Args:
+        duration_s: Time over which to ramp.
+        start_rate: Initial rate (e.g., requests per second).
+        end_rate: Final rate (e.g., requests per second).
+    """
+
+    duration_s: float
+    start_rate: float
+    end_rate: float
+
+    def get_rate(self, time: Instant) -> float:
+        t = time.to_seconds()
+        if t <= 0:
+            return self.start_rate
+        if t >= self.duration_s:
+            return self.end_rate
+
+        # Linear interpolation
+        fraction = t / self.duration_s
+        return self.start_rate + fraction * (self.end_rate - self.start_rate)

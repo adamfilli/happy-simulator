@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Pytest: Current File",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}"],
+      "justMyCode": true
+    },
+    {
+      "name": "Pytest: All Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${workspaceFolder}/tests", "-v"],
+      "justMyCode": true
+    }
+  ]
+}

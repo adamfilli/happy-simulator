@@ -33,6 +33,7 @@
 ## Other Sim work
 
 SimpPy
+https://github.com/MaineKuehn/usim
 https://github.com/djordon/queueing-tool
 https://www.simio.com/
 https://github.com/salabim/salabim

@@ -22,7 +22,6 @@
 
 
 ## Content
-0. Unintuitive - Unstable Queue when Arrival Rate = Service Rate
 1. LIFO vs. FIFO queuing strategies
 2. Active Queue Managemetn
 3. Priority Queues
@@ -30,3 +29,13 @@
 5. Rate Limiting
     - Accuracy: temporal and volumetric
 
+
+## Other Sim work
+
+SimpPy
+https://github.com/djordon/queueing-tool
+https://www.simio.com/
+https://github.com/salabim/salabim
+https://www.simio.com/
+https://github.com/CiwPython/Ciw, https://ciw.readthedocs.io/en/latest/
+https://ki-oss.github.io/hades/

@@ -4,7 +4,7 @@
 [![Tests](https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml/badge.svg)](https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml)
 [![Docs](https://github.com/adamfilli/happy-simulator/actions/workflows/docs.yml/badge.svg)](https://adamfilli.github.io/happy-simulator/)
 
-A discrete-event simulation library for Python 3.13+, inspired by MATLAB SimEvents. Model systems using an event-driven architecture where a central `EventHeap` schedules and executes `Event` objects until the simulation ends.
+A discrete-event simulation library with a focus on distributed systems.
 
 ## Installation
 

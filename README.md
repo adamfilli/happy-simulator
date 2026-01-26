@@ -4,6 +4,8 @@
 [![Tests](https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml/badge.svg)](https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml)
 [![Docs](https://github.com/adamfilli/happy-simulator/actions/workflows/docs.yml/badge.svg)](https://adamfilli.github.io/happy-simulator/)
 
+** ALPHA ** Still Under ongoing development, large changes are expected.
+
 A discrete-event simulation library with a focus on distributed systems.
 
 ## Installation

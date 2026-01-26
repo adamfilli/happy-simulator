@@ -11,7 +11,9 @@
       "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m pip:*)",
       "Bash(C:/AdamsRoot/Src/happy-simulator/.venv/Scripts/python.exe -m build)",
       "Bash(python -m venv:*)",
-      "WebFetch(domain:packaging.python.org)"
+      "WebFetch(domain:packaging.python.org)",
+      "Bash(python examples/load_aware_routing.py:*)",
+      "Bash(pytest:*)"
     ]
   }
 }

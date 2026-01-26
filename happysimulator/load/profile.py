@@ -73,3 +73,42 @@ class LinearRampProfile(Profile):
         # Linear interpolation
         fraction = t / self.duration_s
         return self.start_rate + fraction * (self.end_rate - self.start_rate)
+
+
+@dataclass(frozen=True)
+class SpikeProfile(Profile):
+    """Load profile that models a spike pattern.
+
+    Timeline:
+    - [0, warmup_s): baseline_rate (warm up period)
+    - [warmup_s, warmup_s + spike_duration_s): spike_rate (overload)
+    - [warmup_s + spike_duration_s, ...): baseline_rate (recovery)
+
+    This models a realistic scenario where a customer suddenly increases
+    their request rate, potentially saturating a server.
+
+    Args:
+        baseline_rate: Normal request rate.
+        spike_rate: Rate during spike (should saturate server).
+        warmup_s: Time before spike starts.
+        spike_duration_s: How long the spike lasts.
+    """
+
+    baseline_rate: float = 10.0
+    spike_rate: float = 150.0
+    warmup_s: float = 10.0
+    spike_duration_s: float = 15.0
+
+    def get_rate(self, time: Instant) -> float:
+        t = time.to_seconds()
+
+        # Warmup phase: baseline
+        if t < self.warmup_s:
+            return self.baseline_rate
+
+        # Spike phase: high rate
+        if t < self.warmup_s + self.spike_duration_s:
+            return self.spike_rate
+
+        # Recovery phase: back to baseline
+        return self.baseline_rate

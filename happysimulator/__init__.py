@@ -1,6 +1,6 @@
 """happy-simulator: A discrete-event simulation library for Python."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 import logging
 import os
@@ -44,8 +44,8 @@ from happysimulator.api import (
 
 # Additional top-level convenience exports
 from happysimulator.core import Clock
-from happysimulator.load import PoissonArrivalTimeProvider, ConstantRateProfile, LinearRampProfile
-from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource
+from happysimulator.load import PoissonArrivalTimeProvider, ConstantRateProfile, LinearRampProfile, SpikeProfile
+from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource, RandomRouter
 from happysimulator.distributions import ConstantLatency, ExponentialLatency
 
 __all__ = [
@@ -63,6 +63,7 @@ __all__ = [
     "Profile",
     "ConstantRateProfile",
     "LinearRampProfile",
+    "SpikeProfile",
     "ConstantArrivalTimeProvider",
     "PoissonArrivalTimeProvider",
     # Components
@@ -72,6 +73,7 @@ __all__ = [
     "FIFOQueue",
     "LIFOQueue",
     "PriorityQueue",
+    "RandomRouter",
     # Distributions
     "ConstantLatency",
     "ExponentialLatency",

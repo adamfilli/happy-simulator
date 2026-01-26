@@ -13,6 +13,7 @@ from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.token_bucket_rate_limiter import TokenBucketRateLimiter, RateLimiterStats
 from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter, LeakyBucketStats
 from happysimulator.components.sliding_window_rate_limiter import SlidingWindowRateLimiter, SlidingWindowStats
+from happysimulator.components.random_router import RandomRouter
 
 __all__ = [
     # Queue components
@@ -34,4 +35,6 @@ __all__ = [
     "LeakyBucketStats",
     "SlidingWindowRateLimiter",
     "SlidingWindowStats",
+    # Routing
+    "RandomRouter",
 ]

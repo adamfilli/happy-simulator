@@ -8,6 +8,8 @@
 
 A discrete-event simulation library with a focus on distributed systems.
 
+https://adamfillion.com/posts/simulation-enhanced-reasoning/
+
 ## Installation
 
 ```bash

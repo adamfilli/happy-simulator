@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "happysim"
-version = "0.1.2"
+version = "0.1.3"
 description = "Discrete event simulation library for Python, similar to MATLAB SimEvent"
 readme = "README.md"
 license = "Apache-2.0"

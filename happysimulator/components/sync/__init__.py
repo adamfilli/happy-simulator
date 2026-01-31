@@ -21,6 +21,7 @@ from happysimulator.components.sync.mutex import Mutex, MutexStats
 from happysimulator.components.sync.semaphore import Semaphore, SemaphoreStats
 from happysimulator.components.sync.rwlock import RWLock, RWLockStats
 from happysimulator.components.sync.condition import Condition, ConditionStats
+from happysimulator.components.sync.barrier import Barrier, BarrierStats
 
 __all__ = [
     "Mutex",
@@ -31,4 +32,6 @@ __all__ = [
     "RWLockStats",
     "Condition",
     "ConditionStats",
+    "Barrier",
+    "BarrierStats",
 ]

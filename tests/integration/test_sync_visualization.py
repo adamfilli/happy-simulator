@@ -18,7 +18,7 @@ from typing import Generator, List
 
 import pytest
 
-from happysimulator.components.sync import Mutex, Semaphore, RWLock, Condition
+from happysimulator.components.sync import Mutex, Semaphore, RWLock, Condition, Barrier
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
@@ -543,3 +543,173 @@ class TestSyncComparison:
 
         # Just verify the test completed
         assert True
+
+
+class TestBarrierVisualization:
+    """Visual tests for Barrier behavior."""
+
+    def test_barrier_phased_computation(self, test_output_dir):
+        """
+        Visualize barrier synchronization in phased computation.
+
+        Shows how workers synchronize at barriers between phases,
+        with faster workers waiting for slower ones.
+        """
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+
+        # Simulate 4 workers with 3 phases
+        num_workers = 4
+        num_phases = 3
+        barrier = Barrier(name="phase_sync", parties=num_workers)
+
+        # Each worker has different processing times per phase
+        # (simulates heterogeneous workers)
+        worker_times = {
+            "W1": [0.05, 0.08, 0.04],  # Fast worker
+            "W2": [0.10, 0.06, 0.12],  # Variable worker
+            "W3": [0.08, 0.10, 0.06],  # Medium worker
+            "W4": [0.12, 0.04, 0.08],  # Slow first phase
+        }
+
+        # Track events
+        events = []
+
+        # Simulate phased execution
+        for phase in range(num_phases):
+            # Each worker processes its phase
+            worker_completions = []
+            for worker, times in worker_times.items():
+                work_time = times[phase]
+                # Calculate when this worker finishes its work
+                if phase == 0:
+                    start = 0.0
+                else:
+                    # Start after previous barrier
+                    start = events[-1]["time"] if events else 0.0
+                    start = max(e["time"] for e in events if e["event"] == "barrier_break" and e["phase"] == phase - 1)
+
+                finish = start + work_time
+                worker_completions.append((finish, worker))
+                events.append({
+                    "worker": worker,
+                    "phase": phase,
+                    "event": "work_start",
+                    "time": start,
+                })
+                events.append({
+                    "worker": worker,
+                    "phase": phase,
+                    "event": "work_done",
+                    "time": finish,
+                })
+
+            # Barrier breaks when last worker finishes
+            worker_completions.sort()
+            barrier_time = worker_completions[-1][0]
+
+            for finish, worker in worker_completions:
+                wait_time = barrier_time - finish
+                events.append({
+                    "worker": worker,
+                    "phase": phase,
+                    "event": "waiting",
+                    "time": finish,
+                    "wait_duration": wait_time,
+                })
+
+            events.append({
+                "worker": "all",
+                "phase": phase,
+                "event": "barrier_break",
+                "time": barrier_time,
+            })
+
+        # Create visualization
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+
+        workers = list(worker_times.keys())
+        colors = plt.cm.Set2(np.linspace(0, 1, num_workers))
+        y_positions = {w: i for i, w in enumerate(workers)}
+
+        # Phase timeline (Gantt-style)
+        for worker in workers:
+            y = y_positions[worker]
+            worker_events = [e for e in events if e.get("worker") == worker]
+
+            for phase in range(num_phases):
+                phase_events = [e for e in worker_events if e.get("phase") == phase]
+                work_start = next((e["time"] for e in phase_events if e["event"] == "work_start"), None)
+                work_done = next((e["time"] for e in phase_events if e["event"] == "work_done"), None)
+                waiting_event = next((e for e in phase_events if e["event"] == "waiting"), None)
+
+                if work_start is not None and work_done is not None:
+                    # Work period
+                    ax1.barh(y, work_done - work_start, left=work_start, height=0.6,
+                            color=colors[y_positions[worker]], edgecolor='black', alpha=0.8)
+
+                    # Wait period (if any)
+                    if waiting_event and waiting_event["wait_duration"] > 0.001:
+                        ax1.barh(y, waiting_event["wait_duration"], left=work_done, height=0.6,
+                                color='lightgray', edgecolor='gray', hatch='//')
+
+        # Draw barrier lines
+        barrier_times = [e["time"] for e in events if e["event"] == "barrier_break"]
+        for bt in barrier_times:
+            ax1.axvline(x=bt, color='red', linestyle='--', linewidth=2, alpha=0.7)
+
+        ax1.set_yticks(range(len(workers)))
+        ax1.set_yticklabels(workers)
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Worker')
+        ax1.set_title('Barrier Synchronization: Phased Computation')
+        ax1.grid(True, alpha=0.3, axis='x')
+
+        # Add legend
+        from matplotlib.patches import Patch
+        legend_elements = [
+            Patch(facecolor='steelblue', edgecolor='black', label='Working'),
+            Patch(facecolor='lightgray', edgecolor='gray', hatch='//', label='Waiting at Barrier'),
+            Patch(facecolor='red', alpha=0.7, label='Barrier Break'),
+        ]
+        ax1.legend(handles=legend_elements, loc='upper right')
+
+        # Wait time analysis
+        wait_times_by_worker = {w: [] for w in workers}
+        for e in events:
+            if e["event"] == "waiting" and e.get("wait_duration", 0) > 0:
+                wait_times_by_worker[e["worker"]].append(e["wait_duration"])
+
+        total_waits = [sum(wait_times_by_worker[w]) for w in workers]
+        work_times = [sum(worker_times[w]) for w in workers]
+
+        x = np.arange(len(workers))
+        width = 0.35
+
+        ax2.bar(x - width/2, [wt * 1000 for wt in work_times], width, label='Work Time', color='steelblue')
+        ax2.bar(x + width/2, [wt * 1000 for wt in total_waits], width, label='Wait Time', color='lightcoral')
+
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(workers)
+        ax2.set_ylabel('Time (ms)')
+        ax2.set_title('Work vs Wait Time by Worker')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3, axis='y')
+
+        # Efficiency annotation
+        total_work = sum(work_times)
+        total_wait = sum(total_waits)
+        efficiency = total_work / (total_work + total_wait) * 100
+        ax2.annotate(f'Parallel Efficiency: {efficiency:.1f}%',
+                    xy=(0.95, 0.95), xycoords='axes fraction',
+                    ha='right', va='top', fontsize=12,
+                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        plt.tight_layout()
+        plt.savefig(test_output_dir / 'barrier_phased_computation.png', dpi=150)
+        plt.close()
+
+        # Verify barrier synchronization occurred
+        assert len(barrier_times) == num_phases

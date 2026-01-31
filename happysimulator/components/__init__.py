@@ -13,6 +13,15 @@ from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.token_bucket_rate_limiter import TokenBucketRateLimiter, RateLimiterStats
 from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter, LeakyBucketStats
 from happysimulator.components.sliding_window_rate_limiter import SlidingWindowRateLimiter, SlidingWindowStats
+from happysimulator.components.rate_limiter import (
+    FixedWindowRateLimiter,
+    FixedWindowStats,
+    AdaptiveRateLimiter,
+    AdaptiveRateLimiterStats,
+    RateAdjustmentReason,
+    DistributedRateLimiter,
+    DistributedRateLimiterStats,
+)
 from happysimulator.components.random_router import RandomRouter
 from happysimulator.components.resilience import (
     CircuitBreaker,
@@ -72,6 +81,23 @@ from happysimulator.components.datastore import (
     WriteThrough,
     WriteBack,
     WriteAround,
+    CacheWarmer,
+    CacheWarmerStats,
+    MultiTierCache,
+    MultiTierCacheStats,
+    PromotionPolicy,
+    ReplicatedStore,
+    ReplicatedStoreStats,
+    ConsistencyLevel,
+    ShardedStore,
+    ShardedStoreStats,
+    HashSharding,
+    RangeSharding,
+    ConsistentHashSharding,
+    Database,
+    DatabaseStats,
+    Transaction,
+    TransactionState,
 )
 
 __all__ = [
@@ -94,6 +120,13 @@ __all__ = [
     "LeakyBucketStats",
     "SlidingWindowRateLimiter",
     "SlidingWindowStats",
+    "FixedWindowRateLimiter",
+    "FixedWindowStats",
+    "AdaptiveRateLimiter",
+    "AdaptiveRateLimiterStats",
+    "RateAdjustmentReason",
+    "DistributedRateLimiter",
+    "DistributedRateLimiterStats",
     # Routing
     "RandomRouter",
     # Resilience
@@ -151,4 +184,21 @@ __all__ = [
     "WriteThrough",
     "WriteBack",
     "WriteAround",
+    "CacheWarmer",
+    "CacheWarmerStats",
+    "MultiTierCache",
+    "MultiTierCacheStats",
+    "PromotionPolicy",
+    "ReplicatedStore",
+    "ReplicatedStoreStats",
+    "ConsistencyLevel",
+    "ShardedStore",
+    "ShardedStoreStats",
+    "HashSharding",
+    "RangeSharding",
+    "ConsistentHashSharding",
+    "Database",
+    "DatabaseStats",
+    "Transaction",
+    "TransactionState",
 ]

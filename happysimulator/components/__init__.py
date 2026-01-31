@@ -41,6 +41,16 @@ from happysimulator.components.queue_policies import (
     AdaptiveLIFO,
     AdaptiveLIFOStats,
 )
+from happysimulator.components.sync import (
+    Mutex,
+    MutexStats,
+    Semaphore,
+    SemaphoreStats,
+    RWLock,
+    RWLockStats,
+    Condition,
+    ConditionStats,
+)
 
 __all__ = [
     # Queue components
@@ -89,4 +99,13 @@ __all__ = [
     "DeadlineQueueStats",
     "AdaptiveLIFO",
     "AdaptiveLIFOStats",
+    # Synchronization Primitives
+    "Mutex",
+    "MutexStats",
+    "Semaphore",
+    "SemaphoreStats",
+    "RWLock",
+    "RWLockStats",
+    "Condition",
+    "ConditionStats",
 ]

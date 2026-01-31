@@ -38,6 +38,31 @@ from happysimulator.components.datastore.write_policies import (
     WriteBack,
     WriteAround,
 )
+from happysimulator.components.datastore.cache_warming import CacheWarmer, CacheWarmerStats
+from happysimulator.components.datastore.multi_tier_cache import (
+    MultiTierCache,
+    MultiTierCacheStats,
+    PromotionPolicy,
+)
+from happysimulator.components.datastore.replicated_store import (
+    ReplicatedStore,
+    ReplicatedStoreStats,
+    ConsistencyLevel,
+)
+from happysimulator.components.datastore.sharded_store import (
+    ShardedStore,
+    ShardedStoreStats,
+    ShardingStrategy,
+    HashSharding,
+    RangeSharding,
+    ConsistentHashSharding,
+)
+from happysimulator.components.datastore.database import (
+    Database,
+    DatabaseStats,
+    Transaction,
+    TransactionState,
+)
 
 __all__ = [
     # Key-Value Store
@@ -62,4 +87,27 @@ __all__ = [
     "WriteThrough",
     "WriteBack",
     "WriteAround",
+    # Cache Warming
+    "CacheWarmer",
+    "CacheWarmerStats",
+    # Multi-Tier Cache
+    "MultiTierCache",
+    "MultiTierCacheStats",
+    "PromotionPolicy",
+    # Replicated Store
+    "ReplicatedStore",
+    "ReplicatedStoreStats",
+    "ConsistencyLevel",
+    # Sharded Store
+    "ShardedStore",
+    "ShardedStoreStats",
+    "ShardingStrategy",
+    "HashSharding",
+    "RangeSharding",
+    "ConsistentHashSharding",
+    # Database
+    "Database",
+    "DatabaseStats",
+    "Transaction",
+    "TransactionState",
 ]

@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import List, Union
 
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 class EventProvider(ABC):

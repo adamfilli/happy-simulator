@@ -13,7 +13,7 @@ from typing import List
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.load.source_event import SourceEvent
 from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider

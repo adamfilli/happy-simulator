@@ -4,7 +4,7 @@ from happysimulator.core.entity import Entity
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.source import Source
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.core.event import Event
 from happysimulator.load.profile import Profile
 from happysimulator.core.simulation import Simulation  # Assuming your generic Simulation class

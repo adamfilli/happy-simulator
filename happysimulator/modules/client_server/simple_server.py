@@ -11,7 +11,7 @@ from typing import Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.data import Data
 from happysimulator.load.profile import Profile
 from happysimulator.distributions.latency_distribution import LatencyDistribution
@@ -61,9 +61,7 @@ class SimpleServer(Entity):
     ):
         super().__init__(name)
 
-        self._processing_latency = processing_latency or ConstantLatency(
-            Instant.from_seconds(0.1)
-        )
+        self._processing_latency = processing_latency or ConstantLatency(0.1)
         self._failure_rate = failure_rate or _ZeroFailureProfile()
 
         # State

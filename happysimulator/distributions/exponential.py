@@ -26,12 +26,11 @@ class ExponentialLatency(LatencyDistribution):
     can range from near-zero to several multiples of the mean.
     """
 
-    def __init__(self, mean_latency: Duration | Instant | float):
+    def __init__(self, mean_latency: Duration | float):
         """Initialize with mean latency (expected value of distribution).
 
         Args:
-            mean_latency: Expected mean latency as Duration, Instant (deprecated),
-                or seconds (float).
+            mean_latency: Expected mean latency as Duration or seconds (float).
         """
         super().__init__(mean_latency)
         self._lambda = 1 / self._mean_latency

@@ -10,7 +10,7 @@ from typing import Optional
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+from happysimulator.core.temporal import Duration
 from happysimulator.instrumentation.data import Data
 from happysimulator.modules.client_server.request import Request, ResponseStatus
 
@@ -39,21 +39,21 @@ class SimpleClient(Entity):
         name: Client identifier for logging.
         timeout: Maximum round-trip time before declaring timeout. None disables.
         retries: Number of additional attempts after initial failure.
-        retry_delay: Wait time before retrying. Defaults to immediate (Epoch).
+        retry_delay: Wait time before retrying. Defaults to immediate (zero).
     """
 
     def __init__(
         self,
         name: str,
-        timeout: Optional[Instant] = None,
+        timeout: Duration | float | None = None,
         retries: int = 0,
-        retry_delay: Optional[Instant] = None,
+        retry_delay: Duration | float | None = None,
     ):
         super().__init__(name)
 
-        self._timeout = timeout
+        self._timeout = self._to_duration(timeout)
         self._max_retries = retries
-        self._retry_delay = retry_delay or Instant.Epoch
+        self._retry_delay = self._to_duration(retry_delay) or Duration.ZERO
 
         # Statistics
         self._requests_sent = Data()
@@ -68,6 +68,15 @@ class SimpleClient(Entity):
         self._total_latency = Data()
         self._successful_latency = Data()
         self._failed_latency = Data()
+
+    @staticmethod
+    def _to_duration(value: Duration | float | None) -> Duration | None:
+        """Convert Duration or float to Duration."""
+        if value is None:
+            return None
+        if isinstance(value, Duration):
+            return value
+        return Duration.from_seconds(float(value))
 
     def handle_event(self, event: Event) -> list[Event] | None:
         """Entry point - delegates based on callback."""
@@ -170,8 +179,7 @@ class SimpleClient(Entity):
             )
 
             # Schedule retry after delay
-            retry_time = request.time + self._retry_delay.to_seconds()
-            request.time = retry_time
+            request.time = request.time + self._retry_delay
             request.callback = self.send_request
 
             # Reset timing for new attempt

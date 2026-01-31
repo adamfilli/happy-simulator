@@ -21,12 +21,11 @@ class ConstantLatency(LatencyDistribution):
     Use for deterministic tests or when modeling fixed processing delays.
     """
 
-    def __init__(self, latency: Duration | Instant | float):
+    def __init__(self, latency: Duration | float):
         """Initialize with a fixed latency value.
 
         Args:
-            latency: The constant latency as Duration, Instant (deprecated),
-                or seconds (float).
+            latency: The constant latency as Duration or seconds (float).
         """
         super().__init__(latency)
         logger.debug("ConstantLatency created: latency=%.6fs", self._mean_latency)

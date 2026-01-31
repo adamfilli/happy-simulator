@@ -1,3 +1,20 @@
+## BUGS
+
+1. **Simulation processes events past end_time**
+   - Location: `happysimulator/core/simulation.py:150`
+   - The loop condition `while self._event_heap.has_events() and self._end_time >= current_time` checks `current_time` BEFORE popping the next event
+   - This means if current_time is 0.011s and end_time is 1.0s, the loop continues and pops an event at 60.0s
+   - The event at 60.0s is processed even though it's past end_time
+   - **Fix**: Check the next event's time before processing: peek at the heap and break if event.time > end_time
+
+## SIMULATIONS TO BUILD
+
+1. **Cold Start Simulation**
+   - Model application cold start behavior (JVM warmup, cache population, connection pool initialization)
+   - Show how systems behave during startup vs steady-state
+   - Demonstrate thundering herd problems when multiple instances restart
+   - Visualize cache hit rate progression over time
+
 ## DEV
 
 1. Improve type checker support for `@simulatable` decorator
@@ -22,7 +39,6 @@
 
 
 ## Content
-0. Unintuitive - Unstable Queue when Arrival Rate = Service Rate
 1. LIFO vs. FIFO queuing strategies
 2. Active Queue Managemetn
 3. Priority Queues
@@ -30,3 +46,14 @@
 5. Rate Limiting
     - Accuracy: temporal and volumetric
 
+
+## Other Sim work
+
+SimpPy
+https://github.com/MaineKuehn/usim
+https://github.com/djordon/queueing-tool
+https://www.simio.com/
+https://github.com/salabim/salabim
+https://www.simio.com/
+https://github.com/CiwPython/Ciw, https://ciw.readthedocs.io/en/latest/
+https://ki-oss.github.io/hades/

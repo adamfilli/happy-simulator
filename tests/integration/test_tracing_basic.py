@@ -42,7 +42,7 @@ class FirstEntity(Entity):
         
         # Forward to the middle processor via callback
         next_event = Event(
-            time=event.time + Instant.from_seconds(0.1),
+            time=event.time + 0.1,
             event_type="MiddleEvent",
             callback=self.next_processor.process,
             context=event.context,  # Preserve trace context
@@ -64,7 +64,7 @@ class MiddleProcessor:
         
         # Forward to the sink entity
         sink_event = Event(
-            time=event.time + Instant.from_seconds(0.1),
+            time=event.time + 0.1,
             event_type="SinkEvent",
             target=self.sink,
             context=event.context,  # Preserve trace context

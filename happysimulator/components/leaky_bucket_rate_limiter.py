@@ -191,7 +191,7 @@ class LeakyBucketRateLimiter(Entity):
             return []
 
         self._leak_scheduled = True
-        leak_time = now + Instant.from_seconds(self._leak_interval)
+        leak_time = now + self._leak_interval
 
         return [
             Event(

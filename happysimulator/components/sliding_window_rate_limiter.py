@@ -64,7 +64,7 @@ class SlidingWindowRateLimiter(Entity):
         super().__init__(name)
 
         self._downstream = downstream
-        self._window_size = Instant.from_seconds(window_size_seconds)
+        self._window_size = window_size_seconds  # Store as float seconds
         self._window_size_seconds = float(window_size_seconds)
         self._max_requests = int(max_requests)
 

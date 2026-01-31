@@ -28,15 +28,13 @@ class LatencyDistribution(ABC):
         _mean_latency: Mean latency in seconds (stored as float for calculations).
     """
 
-    def __init__(self, mean_latency: Duration | Instant | float):
+    def __init__(self, mean_latency: Duration | float):
         """Initialize with a mean latency value.
 
         Args:
-            mean_latency: Expected mean latency as Duration, Instant (deprecated),
-                or seconds (float). Instant is accepted for backwards compatibility
-                but Duration or float is preferred.
+            mean_latency: Expected mean latency as Duration or seconds (float).
         """
-        if isinstance(mean_latency, (Duration, Instant)):
+        if isinstance(mean_latency, Duration):
             self._mean_latency = mean_latency.to_seconds()
         else:
             self._mean_latency = float(mean_latency)

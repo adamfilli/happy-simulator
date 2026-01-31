@@ -38,7 +38,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from happysimulator.core.clock import Clock
-    from happysimulator.core.instant import Instant
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 

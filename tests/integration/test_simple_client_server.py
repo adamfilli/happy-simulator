@@ -16,7 +16,7 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 from happysimulator.distributions.constant import ConstantLatency
 from happysimulator.distributions.exponential import ExponentialLatency

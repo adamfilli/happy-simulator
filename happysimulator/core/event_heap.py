@@ -9,7 +9,7 @@ import logging
 from typing import Union
 
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
 
 logger = logging.getLogger(__name__)

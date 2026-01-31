@@ -6,7 +6,7 @@ from happysimulator.core.decorators import simulatable
 from happysimulator.core.protocols import Simulatable
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.core.clock import Clock
 
 

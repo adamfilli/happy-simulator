@@ -11,7 +11,7 @@ from typing import Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.components.queue import QueueDeliverEvent, QueueNotifyEvent, QueuePollEvent
 
 logger = logging.getLogger(__name__)

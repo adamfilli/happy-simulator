@@ -10,7 +10,7 @@ from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 import logging
 

@@ -8,7 +8,7 @@ by other components to model time-dependent behavior.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 class Profile(ABC):

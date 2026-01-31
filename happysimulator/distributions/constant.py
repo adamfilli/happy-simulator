@@ -6,7 +6,7 @@ predictable, reproducible scenarios or as a baseline for testing.
 
 import logging
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Duration, Instant
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 logger = logging.getLogger(__name__)
@@ -21,11 +21,16 @@ class ConstantLatency(LatencyDistribution):
     Use for deterministic tests or when modeling fixed processing delays.
     """
 
-    def __init__(self, latency: Instant):
-        """Initialize with a fixed latency value."""
+    def __init__(self, latency: Duration | Instant | float):
+        """Initialize with a fixed latency value.
+
+        Args:
+            latency: The constant latency as Duration, Instant (deprecated),
+                or seconds (float).
+        """
         super().__init__(latency)
         logger.debug("ConstantLatency created: latency=%.6fs", self._mean_latency)
 
-    def get_latency(self, current_time: Instant) -> Instant:
+    def get_latency(self, current_time: Instant) -> Duration:
         """Return the constant latency value."""
-        return Instant.from_seconds(self._mean_latency)
+        return Duration.from_seconds(self._mean_latency)

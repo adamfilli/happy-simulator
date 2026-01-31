@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 

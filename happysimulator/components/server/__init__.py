@@ -11,6 +11,7 @@ from happysimulator.components.server.concurrency import (
     DynamicConcurrency,
     WeightedConcurrency,
 )
+from happysimulator.components.server.thread_pool import ThreadPool, ThreadPoolStats
 
 __all__ = [
     "Server",
@@ -19,4 +20,6 @@ __all__ = [
     "FixedConcurrency",
     "DynamicConcurrency",
     "WeightedConcurrency",
+    "ThreadPool",
+    "ThreadPoolStats",
 ]

@@ -965,6 +965,8 @@ class DeadLetterQueue(Entity):
 I want Profiles to be pluggable into variables very easily, so that a component can have a variable parameter according to simulation
 time
 
+What about a garbage collector simulation?
+
 ---
 
 ## Testing Strategy

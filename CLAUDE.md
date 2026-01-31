@@ -86,3 +86,11 @@ def handle_request(self, request: Request) -> Generator[float, None, None]:
 source = Source(name="Traffic", event_provider=my_provider, arrival_time_provider=ConstantArrivalTimeProvider(...))
 # Source.start() returns initial SourceEvent to prime the simulation
 ```
+
+
+## Skills and plugins
+
+/code-review:code-review
+/claude-automation-recommender
+code simplifier?? Subagents - I invoke them internally when working on tasks
+/commit commit commands

@@ -962,6 +962,9 @@ class DeadLetterQueue(Entity):
 16. Message Queue (Phase 10.1)
 17. Topic, Dead Letter Queue (Phase 10.2, 10.3)
 
+I want Profiles to be pluggable into variables very easily, so that a component can have a variable parameter according to simulation
+time
+
 ---
 
 ## Testing Strategy

@@ -1,3 +1,12 @@
+## BUGS
+
+1. **Simulation processes events past end_time**
+   - Location: `happysimulator/core/simulation.py:150`
+   - The loop condition `while self._event_heap.has_events() and self._end_time >= current_time` checks `current_time` BEFORE popping the next event
+   - This means if current_time is 0.011s and end_time is 1.0s, the loop continues and pops an event at 60.0s
+   - The event at 60.0s is processed even though it's past end_time
+   - **Fix**: Check the next event's time before processing: peek at the heap and break if event.time > end_time
+
 ## DEV
 
 1. Improve type checker support for `@simulatable` decorator

@@ -14,6 +14,19 @@ from happysimulator.components.token_bucket_rate_limiter import TokenBucketRateL
 from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter, LeakyBucketStats
 from happysimulator.components.sliding_window_rate_limiter import SlidingWindowRateLimiter, SlidingWindowStats
 from happysimulator.components.random_router import RandomRouter
+from happysimulator.components.resilience import (
+    CircuitBreaker,
+    CircuitState,
+    CircuitBreakerStats,
+    Bulkhead,
+    BulkheadStats,
+    TimeoutWrapper,
+    TimeoutStats,
+    Fallback,
+    FallbackStats,
+    Hedge,
+    HedgeStats,
+)
 
 __all__ = [
     # Queue components
@@ -37,4 +50,16 @@ __all__ = [
     "SlidingWindowStats",
     # Routing
     "RandomRouter",
+    # Resilience
+    "CircuitBreaker",
+    "CircuitState",
+    "CircuitBreakerStats",
+    "Bulkhead",
+    "BulkheadStats",
+    "TimeoutWrapper",
+    "TimeoutStats",
+    "Fallback",
+    "FallbackStats",
+    "Hedge",
+    "HedgeStats",
 ]

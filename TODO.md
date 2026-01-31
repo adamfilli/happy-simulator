@@ -7,6 +7,14 @@
    - The event at 60.0s is processed even though it's past end_time
    - **Fix**: Check the next event's time before processing: peek at the heap and break if event.time > end_time
 
+## SIMULATIONS TO BUILD
+
+1. **Cold Start Simulation**
+   - Model application cold start behavior (JVM warmup, cache population, connection pool initialization)
+   - Show how systems behave during startup vs steady-state
+   - Demonstrate thundering herd problems when multiple instances restart
+   - Visualize cache hit rate progression over time
+
 ## DEV
 
 1. Improve type checker support for `@simulatable` decorator

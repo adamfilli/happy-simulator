@@ -748,6 +748,77 @@ class CachedStore(Entity):
     def miss_rate(self) -> float: ...
 ```
 
+### 8.2.1 Additional Cache Strategies (`components/datastore/cache_strategies.py`)
+
+```python
+class ARCEviction(CacheEvictionPolicy):
+    """Adaptive Replacement Cache - balances recency and frequency."""
+
+class TwoQEviction(CacheEvictionPolicy):
+    """2Q algorithm - handles scan-resistant caching."""
+
+class SLRUEviction(CacheEvictionPolicy):
+    """Segmented LRU - probationary and protected segments."""
+
+class RandomEviction(CacheEvictionPolicy):
+    """Random eviction for baseline comparison."""
+```
+
+### 8.2.2 Cache Warming (`components/datastore/cache_warming.py`)
+
+```python
+class CacheWarmer(Entity):
+    """Pre-populates cache during cold start."""
+
+    def __init__(
+        self,
+        name: str,
+        cache: CachedStore,
+        keys_to_warm: list[str] | Callable[[], list[str]],
+        warmup_rate: float = 100.0,  # keys per second
+        warmup_latency: LatencyDistribution = ConstantLatency(0.001),
+    ): ...
+
+    def start_warming(self) -> Event: ...
+
+    @property
+    def progress(self) -> float: ...  # 0.0 to 1.0
+    @property
+    def is_complete(self) -> bool: ...
+```
+
+### 8.2.3 Write Policies (`components/datastore/write_policies.py`)
+
+```python
+class WritePolicy(Protocol):
+    """Defines how writes propagate to backing store."""
+
+class WriteThrough(WritePolicy):
+    """Write to cache and backing store synchronously."""
+
+class WriteBack(WritePolicy):
+    """Write to cache, async flush to backing store."""
+    def __init__(self, flush_interval: float, max_dirty: int): ...
+
+class WriteAround(WritePolicy):
+    """Write directly to backing store, bypass cache."""
+```
+
+### 8.2.4 Multi-Tier Cache (`components/datastore/multi_tier_cache.py`)
+
+```python
+class MultiTierCache(Entity):
+    """L1/L2/etc hierarchical caching."""
+
+    def __init__(
+        self,
+        name: str,
+        tiers: list[CachedStore],  # [L1, L2, ...] fastest to slowest
+        backing_store: Entity,
+        promotion_policy: str = "always",  # "always", "on_second_access"
+    ): ...
+```
+
 ### 8.3 Replicated Store (`components/datastore/replicated_store.py`)
 
 ```python
@@ -1033,6 +1104,10 @@ happysimulator/
     │   ├── __init__.py
     │   ├── kv_store.py
     │   ├── cached_store.py
+    │   ├── cache_strategies.py
+    │   ├── cache_warming.py
+    │   ├── write_policies.py
+    │   ├── multi_tier_cache.py
     │   ├── replicated_store.py
     │   ├── sharded_store.py
     │   └── database.py

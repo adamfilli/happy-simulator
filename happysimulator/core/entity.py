@@ -8,7 +8,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Generator, Optional, Tuple, Union
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.core.clock import Clock
 from happysimulator.core.event import Event
 

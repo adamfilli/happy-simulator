@@ -10,7 +10,7 @@ from typing import Optional
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.data import Data
 from happysimulator.modules.client_server.request import Request, ResponseStatus
 

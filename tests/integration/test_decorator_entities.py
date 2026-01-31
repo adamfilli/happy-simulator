@@ -12,7 +12,7 @@ import pytest
 
 from happysimulator.core.decorators import simulatable
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.core.simulation import Simulation
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile

@@ -5,7 +5,7 @@ The Simulation advances the clock as it processes events. Entities access
 the current time via their injected clock reference.
 """
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 class Clock:

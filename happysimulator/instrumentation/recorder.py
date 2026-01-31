@@ -10,7 +10,7 @@ default) when tracing is not needed, avoiding any overhead.
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 class TraceRecorder(Protocol):

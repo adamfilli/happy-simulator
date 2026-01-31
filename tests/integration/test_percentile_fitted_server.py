@@ -20,7 +20,7 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 from happysimulator.distributions.constant import ConstantLatency
 from happysimulator.distributions.percentile_fitted import PercentileFittedLatency
@@ -47,7 +47,7 @@ class RequestProvider(EventProvider):
         self.client = client
         self.server = server
         self.network_latency = network_latency or ConstantLatency(
-            Instant.from_seconds(0.001)
+            0.001
         )
         self.stop_after = stop_after
         self.generated = 0
@@ -128,7 +128,7 @@ def run_percentile_fitted_scenario(
 
     provider = RequestProvider(
         client, server,
-        network_latency=ConstantLatency(Instant.from_seconds(network_latency_s)),
+        network_latency=ConstantLatency(network_latency_s),
         stop_after=Instant.from_seconds(duration_s),
     )
     arrival = ConstantArrivalTimeProvider(
@@ -332,8 +332,8 @@ class TestPercentileFittedServerLatency:
     def test_server_uses_percentile_fitted_latency(self):
         """Server should use PercentileFittedLatency for processing time."""
         processing_latency = PercentileFittedLatency(
-            p50=Instant.from_seconds(0.050),
-            p99=Instant.from_seconds(0.200),
+            p50=0.050,
+            p99=0.200,
         )
 
         client = SimpleClient("client")
@@ -341,7 +341,7 @@ class TestPercentileFittedServerLatency:
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(50.0),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -370,9 +370,9 @@ class TestPercentileFittedServerLatency:
         target_p99 = 0.4605
 
         distribution = PercentileFittedLatency(
-            p50=Instant.from_seconds(target_p50),
-            p90=Instant.from_seconds(target_p90),
-            p99=Instant.from_seconds(target_p99),
+            p50=target_p50,
+            p90=target_p90,
+            p99=target_p99,
         )
 
         result = run_percentile_fitted_scenario(
@@ -399,7 +399,7 @@ class TestPercentileFittedServerLatency:
         """Client-observed latency should include server processing time."""
         target_processing_p50 = 0.100
         processing_latency = PercentileFittedLatency(
-            p50=Instant.from_seconds(target_processing_p50),
+            p50=target_processing_p50,
         )
 
         network_latency_value = 0.010
@@ -409,7 +409,7 @@ class TestPercentileFittedServerLatency:
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(network_latency_value)),
+            network_latency=ConstantLatency(network_latency_value),
             stop_after=Instant.from_seconds(100.0),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -440,7 +440,7 @@ class TestPercentileFittedServerLatency:
         target_p99 = 0.500
 
         distribution = PercentileFittedLatency(
-            p99=Instant.from_seconds(target_p99),
+            p99=target_p99,
         )
 
         result = run_percentile_fitted_scenario(
@@ -462,8 +462,8 @@ class TestPercentileFittedServerLatency:
 
     def test_multiple_servers_independent_distributions(self, test_output_dir: Path):
         """Multiple servers can have independent latency distributions."""
-        fast_latency = PercentileFittedLatency(p50=Instant.from_seconds(0.020))
-        slow_latency = PercentileFittedLatency(p50=Instant.from_seconds(0.100))
+        fast_latency = PercentileFittedLatency(p50=0.020)
+        slow_latency = PercentileFittedLatency(p50=0.100)
 
         client1 = SimpleClient("client1")
         client2 = SimpleClient("client2")
@@ -472,12 +472,12 @@ class TestPercentileFittedServerLatency:
 
         provider1 = RequestProvider(
             client1, fast_server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(50.0),
         )
         provider2 = RequestProvider(
             client2, slow_server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(50.0),
         )
 

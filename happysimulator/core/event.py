@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 if TYPE_CHECKING:
     from happysimulator.core.protocols import Simulatable

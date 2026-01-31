@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Optional
 
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 

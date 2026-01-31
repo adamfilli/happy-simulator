@@ -99,6 +99,17 @@ from happysimulator.components.datastore import (
     Transaction,
     TransactionState,
 )
+from happysimulator.components.messaging import (
+    MessageQueue,
+    MessageQueueStats,
+    Message,
+    MessageState,
+    Topic,
+    TopicStats,
+    Subscription,
+    DeadLetterQueue,
+    DeadLetterStats,
+)
 
 __all__ = [
     # Queue components
@@ -201,4 +212,14 @@ __all__ = [
     "DatabaseStats",
     "Transaction",
     "TransactionState",
+    # Messaging
+    "MessageQueue",
+    "MessageQueueStats",
+    "Message",
+    "MessageState",
+    "Topic",
+    "TopicStats",
+    "Subscription",
+    "DeadLetterQueue",
+    "DeadLetterStats",
 ]

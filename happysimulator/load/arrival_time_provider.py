@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 import scipy.integrate as integrate
 import scipy.optimize as optimize
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.load.profile import Profile
 
 logger = logging.getLogger(__name__)

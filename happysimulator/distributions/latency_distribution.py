@@ -11,7 +11,7 @@ the mean, returning modified copies.
 import copy
 from abc import ABC, abstractmethod
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Duration, Instant
 
 
 class LatencyDistribution(ABC):
@@ -25,22 +25,29 @@ class LatencyDistribution(ABC):
     instances (original is unchanged).
 
     Attributes:
-        _mean_latency: Mean latency in seconds.
+        _mean_latency: Mean latency in seconds (stored as float for calculations).
     """
 
-    def __init__(self, mean_latency: Instant):
-        """Initialize with a mean latency value."""
-        self._mean_latency = mean_latency.to_seconds()
+    def __init__(self, mean_latency: Duration | float):
+        """Initialize with a mean latency value.
+
+        Args:
+            mean_latency: Expected mean latency as Duration or seconds (float).
+        """
+        if isinstance(mean_latency, Duration):
+            self._mean_latency = mean_latency.to_seconds()
+        else:
+            self._mean_latency = float(mean_latency)
 
     @abstractmethod
-    def get_latency(self, current_time: Instant) -> Instant:
+    def get_latency(self, current_time: Instant) -> Duration:
         """Sample a latency value.
 
         Args:
             current_time: Current simulation time (for time-varying distributions).
 
         Returns:
-            Sampled latency as an Instant.
+            Sampled latency as a Duration.
         """
         pass
 

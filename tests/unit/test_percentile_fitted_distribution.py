@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.distributions import PercentileFittedLatency
 
 
@@ -19,37 +19,37 @@ class TestPercentileFittedConstruction:
 
     def test_constructs_with_single_p50(self):
         """Can construct with only p50."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
         assert dist._lambda > 0
         assert dist._mean_latency > 0
 
     def test_constructs_with_single_p99(self):
         """Can construct with only p99."""
-        dist = PercentileFittedLatency(p99=Instant.from_seconds(0.5))
+        dist = PercentileFittedLatency(p99=0.5)
         assert dist._lambda > 0
 
     def test_constructs_with_all_percentiles(self):
         """Can construct with all percentiles provided."""
         dist = PercentileFittedLatency(
-            p50=Instant.from_seconds(0.07),
-            p90=Instant.from_seconds(0.23),
-            p99=Instant.from_seconds(0.46),
-            p999=Instant.from_seconds(0.69),
-            p9999=Instant.from_seconds(0.92),
+            p50=0.07,
+            p90=0.23,
+            p99=0.46,
+            p999=0.69,
+            p9999=0.92,
         )
         assert dist._lambda > 0
 
     def test_single_percentile_exact_fit(self):
         """Single percentile should be matched exactly."""
         target_p50 = 0.1
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(target_p50))
+        dist = PercentileFittedLatency(p50=target_p50)
 
         fitted_p50 = dist.get_percentile(0.50).to_seconds()
         assert abs(fitted_p50 - target_p50) < 1e-9
 
     def test_get_percentile_method(self):
         """get_percentile returns correct values for fitted distribution."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
 
         # For exponential: Q(p) = -ln(1-p) / λ
         # p50 should be exactly 0.1 (what we fitted to)
@@ -73,7 +73,7 @@ class TestPercentileFittedSampling:
     def test_single_p50_sampling(self):
         """Samples from p50-fitted distribution have correct median."""
         target_p50 = 0.1
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(target_p50))
+        dist = PercentileFittedLatency(p50=target_p50)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()
@@ -89,7 +89,7 @@ class TestPercentileFittedSampling:
     def test_single_p99_sampling(self):
         """Samples from p99-fitted distribution have correct 99th percentile."""
         target_p99 = 0.5
-        dist = PercentileFittedLatency(p99=Instant.from_seconds(target_p99))
+        dist = PercentileFittedLatency(p99=target_p99)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()
@@ -113,9 +113,9 @@ class TestPercentileFittedSampling:
         target_p99 = 4.605 * scale
 
         dist = PercentileFittedLatency(
-            p50=Instant.from_seconds(target_p50),
-            p90=Instant.from_seconds(target_p90),
-            p99=Instant.from_seconds(target_p99),
+            p50=target_p50,
+            p90=target_p90,
+            p99=target_p99,
         )
 
         samples = [
@@ -135,7 +135,7 @@ class TestPercentileFittedSampling:
 
     def test_mean_matches_expected(self):
         """Sampled mean should match 1/lambda."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
         expected_mean = dist._mean_latency
 
         samples = [
@@ -150,7 +150,7 @@ class TestPercentileFittedSampling:
 
     def test_all_samples_positive(self):
         """All sampled latencies should be positive."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()
@@ -173,8 +173,8 @@ class TestPercentileFittedWithInconsistentTargets:
         # These targets are NOT consistent with any exponential distribution
         # (p99 is too close to p50 for exponential)
         dist = PercentileFittedLatency(
-            p50=Instant.from_seconds(0.1),
-            p99=Instant.from_seconds(0.2),  # Would be ~0.66 for true exponential
+            p50=0.1,
+            p99=0.2,  # Would be ~0.66 for true exponential
         )
 
         # The fit should still produce a valid distribution
@@ -200,8 +200,8 @@ class TestPercentileFittedWithInconsistentTargets:
         """Larger percentile values have more influence in least-squares fit."""
         # p999 value is much larger, so it will dominate the fit
         dist = PercentileFittedLatency(
-            p50=Instant.from_seconds(0.01),
-            p999=Instant.from_seconds(1.0),
+            p50=0.01,
+            p999=1.0,
         )
 
         # The p999 should be closer to target than p50
@@ -220,7 +220,7 @@ class TestPercentileFittedArithmetic:
 
     def test_add_increases_mean(self):
         """Adding to distribution increases mean latency."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
         original_mean = dist._mean_latency
 
         new_dist = dist + 0.05
@@ -230,7 +230,7 @@ class TestPercentileFittedArithmetic:
 
     def test_subtract_decreases_mean(self):
         """Subtracting from distribution decreases mean latency."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
         original_mean = dist._mean_latency
 
         new_dist = dist - 0.02
@@ -249,7 +249,7 @@ class TestPercentileFittedStatisticalProperties:
 
     def test_coefficient_of_variation_is_one(self):
         """Exponential distribution has CV = 1 (std dev equals mean)."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()
@@ -266,7 +266,7 @@ class TestPercentileFittedStatisticalProperties:
 
     def test_memoryless_property_approximation(self):
         """Samples above median should follow same relative distribution."""
-        dist = PercentileFittedLatency(p50=Instant.from_seconds(0.1))
+        dist = PercentileFittedLatency(p50=0.1)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()
@@ -289,9 +289,7 @@ class TestPercentileFittedStatisticalProperties:
 
     def test_large_sample_percentile_accuracy(self):
         """With many samples, observed percentiles converge to theoretical."""
-        dist = PercentileFittedLatency(
-            p90=Instant.from_seconds(0.5),
-        )
+        dist = PercentileFittedLatency(p90=0.5)
 
         samples = [
             dist.get_latency(Instant.Epoch).to_seconds()

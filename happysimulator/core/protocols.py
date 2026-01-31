@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING, Any, Generator, Protocol, Union, runtime_check
 if TYPE_CHECKING:
     from happysimulator.core.clock import Clock
     from happysimulator.core.event import Event
-    from happysimulator.core.instant import Instant
+    from happysimulator.core.temporal import Instant
 
 
 # Type alias matching Entity's return type

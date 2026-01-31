@@ -12,7 +12,7 @@ from happysimulator.core.event import Event
 from happysimulator.core.protocols import Simulatable
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
 

@@ -19,7 +19,7 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.instrumentation import InMemoryTraceRecorder, NullTraceRecorder
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 # --- Test Fixtures ---

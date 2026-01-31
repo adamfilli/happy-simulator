@@ -10,7 +10,7 @@ import math
 import random
 from dataclasses import dataclass
 
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Duration, Instant
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 logger = logging.getLogger(__name__)
@@ -44,25 +44,37 @@ class PercentileFittedLatency(LatencyDistribution):
     values and the exponential quantile function.
 
     Args:
-        p50: Optional target value for 50th percentile (median).
-        p90: Optional target value for 90th percentile.
-        p99: Optional target value for 99th percentile.
-        p999: Optional target value for 99.9th percentile.
-        p9999: Optional target value for 99.99th percentile.
+        p50: Optional target value for 50th percentile (median) in seconds.
+        p90: Optional target value for 90th percentile in seconds.
+        p99: Optional target value for 99th percentile in seconds.
+        p999: Optional target value for 99.9th percentile in seconds.
+        p9999: Optional target value for 99.99th percentile in seconds.
 
     Raises:
         ValueError: If no percentiles are provided.
+
+    Example:
+        >>> dist = PercentileFittedLatency(p50=0.1, p99=0.5)
+        >>> latency = dist.get_latency(current_time)
     """
 
     def __init__(
         self,
-        p50: Instant | None = None,
-        p90: Instant | None = None,
-        p99: Instant | None = None,
-        p999: Instant | None = None,
-        p9999: Instant | None = None,
+        p50: float | None = None,
+        p90: float | None = None,
+        p99: float | None = None,
+        p999: float | None = None,
+        p9999: float | None = None,
     ):
-        """Initialize by fitting an exponential to the provided percentiles."""
+        """Initialize by fitting an exponential to the provided percentiles.
+
+        Args:
+            p50: Target latency at 50th percentile in seconds.
+            p90: Target latency at 90th percentile in seconds.
+            p99: Target latency at 99th percentile in seconds.
+            p999: Target latency at 99.9th percentile in seconds.
+            p9999: Target latency at 99.99th percentile in seconds.
+        """
         targets = self._build_targets(p50, p90, p99, p999, p9999)
         if not targets:
             raise ValueError("At least one percentile must be provided")
@@ -70,7 +82,7 @@ class PercentileFittedLatency(LatencyDistribution):
         self._lambda = self._fit_exponential(targets)
         mean_latency = 1.0 / self._lambda
 
-        super().__init__(Instant.from_seconds(mean_latency))
+        super().__init__(mean_latency)
 
         logger.debug(
             "PercentileFittedLatency created: lambda=%.6f mean=%.6fs from %d percentile(s)",
@@ -81,24 +93,24 @@ class PercentileFittedLatency(LatencyDistribution):
 
     def _build_targets(
         self,
-        p50: Instant | None,
-        p90: Instant | None,
-        p99: Instant | None,
-        p999: Instant | None,
-        p9999: Instant | None,
+        p50: float | None,
+        p90: float | None,
+        p99: float | None,
+        p999: float | None,
+        p9999: float | None,
     ) -> list[PercentileTarget]:
-        """Convert provided percentile Instants to PercentileTarget objects."""
+        """Convert provided percentile values to PercentileTarget objects."""
         targets = []
         if p50 is not None:
-            targets.append(PercentileTarget(0.50, p50.to_seconds()))
+            targets.append(PercentileTarget(0.50, p50))
         if p90 is not None:
-            targets.append(PercentileTarget(0.90, p90.to_seconds()))
+            targets.append(PercentileTarget(0.90, p90))
         if p99 is not None:
-            targets.append(PercentileTarget(0.99, p99.to_seconds()))
+            targets.append(PercentileTarget(0.99, p99))
         if p999 is not None:
-            targets.append(PercentileTarget(0.999, p999.to_seconds()))
+            targets.append(PercentileTarget(0.999, p999))
         if p9999 is not None:
-            targets.append(PercentileTarget(0.9999, p9999.to_seconds()))
+            targets.append(PercentileTarget(0.9999, p9999))
         return targets
 
     def _fit_exponential(self, targets: list[PercentileTarget]) -> float:
@@ -155,7 +167,7 @@ class PercentileFittedLatency(LatencyDistribution):
 
         return fitted_lambda
 
-    def get_latency(self, current_time: Instant) -> Instant:
+    def get_latency(self, current_time: Instant) -> Duration:
         """Sample a random latency from the fitted exponential distribution."""
         sample = random.expovariate(self._lambda)
         logger.debug(
@@ -163,16 +175,16 @@ class PercentileFittedLatency(LatencyDistribution):
             sample,
             self._mean_latency,
         )
-        return Instant.from_seconds(sample)
+        return Duration.from_seconds(sample)
 
-    def get_percentile(self, p: float) -> Instant:
+    def get_percentile(self, p: float) -> Duration:
         """Get the latency value at a given percentile.
 
         Args:
             p: Percentile as a fraction (0 < p < 1).
 
         Returns:
-            Latency value at the given percentile.
+            Latency value at the given percentile as a Duration.
         """
         value = -math.log(1.0 - p) / self._lambda
-        return Instant.from_seconds(value)
+        return Duration.from_seconds(value)

@@ -16,7 +16,7 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 from happysimulator.distributions.constant import ConstantLatency
 from happysimulator.distributions.exponential import ExponentialLatency
@@ -42,9 +42,7 @@ class RequestProvider(EventProvider):
     ):
         self.client = client
         self.server = server
-        self.network_latency = network_latency or ConstantLatency(
-            Instant.from_seconds(0.01)
-        )
+        self.network_latency = network_latency or ConstantLatency(0.01)
         self.stop_after = stop_after
         self.generated = 0
 
@@ -100,13 +98,13 @@ class TestSimpleClientServer:
         client = SimpleClient("client")
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.05)),
+            processing_latency=ConstantLatency(0.05),
         )
 
         # 5 requests per second, server takes 50ms = can handle ~20/s
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.8),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -132,13 +130,13 @@ class TestSimpleClientServer:
         client = SimpleClient("client")
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(1.0)),
+            processing_latency=ConstantLatency(1.0),
         )
 
         # Send 5 requests per second, server takes 1s to process
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.5),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -167,16 +165,16 @@ class TestSimpleClientServer:
         """Client should detect timeout when latency exceeds threshold."""
         client = SimpleClient(
             "client",
-            timeout=Instant.from_seconds(0.1),
+            timeout=0.1,
         )
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.5)),
+            processing_latency=ConstantLatency(0.5),
         )
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.01),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -202,17 +200,17 @@ class TestSimpleClientServer:
         client = SimpleClient(
             "client",
             retries=2,
-            retry_delay=Instant.from_seconds(0.5),
+            retry_delay=0.5,
         )
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.3)),
+            processing_latency=ConstantLatency(0.3),
         )
 
         # Send 2 requests very close together - second will be rejected initially
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.05),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -243,18 +241,18 @@ class TestSimpleClientServer:
         """Client should retry when request times out."""
         client = SimpleClient(
             "client",
-            timeout=Instant.from_seconds(0.1),
+            timeout=0.1,
             retries=2,
-            retry_delay=Instant.from_seconds(0.05),
+            retry_delay=0.05,
         )
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.5)),
+            processing_latency=ConstantLatency(0.5),
         )
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.01),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -283,12 +281,12 @@ class TestSimpleClientServer:
         client = SimpleClient("client")
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.1)),
+            processing_latency=ConstantLatency(0.1),
         )
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.01)),
+            network_latency=ConstantLatency(0.01),
             stop_after=Instant.from_seconds(0.5),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -318,13 +316,13 @@ class TestSimpleClientServer:
         client = SimpleClient("client")
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.01)),
+            processing_latency=ConstantLatency(0.01),
         )
 
         # Use exponential network latency
         provider = RequestProvider(
             client, server,
-            network_latency=ExponentialLatency(Instant.from_seconds(0.05)),
+            network_latency=ExponentialLatency(0.05),
             stop_after=Instant.from_seconds(1.0),
         )
         arrival = ConstantArrivalTimeProvider(
@@ -355,12 +353,12 @@ class TestSimpleServerStats:
         client = SimpleClient("client")
         server = SimpleServer(
             "server",
-            processing_latency=ConstantLatency(Instant.from_seconds(0.1)),
+            processing_latency=ConstantLatency(0.1),
         )
 
         provider = RequestProvider(
             client, server,
-            network_latency=ConstantLatency(Instant.from_seconds(0.001)),
+            network_latency=ConstantLatency(0.001),
             stop_after=Instant.from_seconds(0.5),
         )
         arrival = ConstantArrivalTimeProvider(

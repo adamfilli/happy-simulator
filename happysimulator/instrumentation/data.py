@@ -6,7 +6,7 @@ throughput, queue depth) and by Probes for periodic measurements.
 """
 
 from typing import Any, List, Tuple
-from happysimulator.core.instant import Instant
+from happysimulator.core.temporal import Instant
 
 
 class Data:

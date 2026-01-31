@@ -32,6 +32,16 @@ Build a browser-based visual editor for creating and running discrete-event simu
 ## System Architecture
 
 ```
+happysimulator/                # Core library
+├── ...existing modules...
+├── loader.py                  # SimulationLoader (new)
+├── controller.py              # SimulationController (new)
+└── entities/                  # Built-in entity types (new)
+    ├── __init__.py            # Entity registry
+    ├── queued_server.py
+    ├── sink.py
+    └── router.py
+
 visual/
 ├── editor/                    # React + React Flow frontend
 │   └── src/
@@ -40,11 +50,9 @@ visual/
 │       ├── serialization/     # JSON schema ↔ React Flow
 │       └── api/               # Backend communication
 │
-├── server/                    # FastAPI backend (new)
-│   ├── loader.py              # SimulationLoader
-│   ├── controller.py          # SimulationController
+├── server/                    # Thin FastAPI layer (new)
 │   ├── api.py                 # REST + WebSocket endpoints
-│   └── entities/              # Built-in entity registry
+│   └── schema.py              # Pydantic models for API
 │
 ├── schema.md                  # JSON schema reference
 ├── Render.md                  # Runtime design
@@ -62,12 +70,12 @@ visual/
 
 #### 1.1 JSON Schema & Types
 - [ ] Create TypeScript types from `schema.md`
-- [ ] Create Python dataclasses matching the schema
+- [ ] Create Pydantic models for API validation
 - [ ] Write validation logic for both (or use JSON Schema validation)
 
 **Deliverable**: `visual/editor/src/types/schema.ts`, `visual/server/schema.py`
 
-#### 1.2 Python Runtime Layer
+#### 1.2 Core Library Extensions
 - [ ] Implement `SimulationLoader.load(definition) -> SimulationController`
 - [ ] Implement `SimulationController` with:
   - `step()` - execute one event
@@ -78,7 +86,7 @@ visual/
   - `Sink` (new, simple terminal)
   - `RandomRouter` (new, distributes to outputs)
 
-**Deliverable**: Working `loader.py`, `controller.py`, entity classes
+**Deliverable**: `happysimulator/loader.py`, `happysimulator/controller.py`, `happysimulator/entities/`
 
 #### 1.3 FastAPI Server
 - [ ] `POST /simulations` - load JSON, return simulation ID
@@ -86,7 +94,7 @@ visual/
 - [ ] `POST /simulations/{id}/run` - run until time/count
 - [ ] `GET /simulations/{id}/state` - get current state
 
-**Deliverable**: `visual/server/api.py`, runnable with `uvicorn`
+**Deliverable**: `visual/server/api.py` (thin layer importing from happysimulator)
 
 #### 1.4 Minimal React Editor
 - [ ] Scaffold Vite + React + TypeScript project
@@ -214,34 +222,29 @@ visual/
                              │
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
-     ┌────────────────┐ ┌────────────┐ ┌────────────────┐
-     │ TypeScript     │ │ Python     │ │ Validation     │
-     │ Types          │ │ Dataclasses│ │ Logic          │
-     └───────┬────────┘ └─────┬──────┘ └────────────────┘
-             │                │
-             ▼                ▼
-     ┌────────────────┐ ┌────────────────┐
-     │ Serialization  │ │ Loader         │
-     │ (TS)           │ │ (Python)       │
-     └───────┬────────┘ └───────┬────────┘
-             │                  │
-             ▼                  ▼
-     ┌────────────────┐ ┌────────────────┐
-     │ Editor         │ │ Controller     │
-     │ (React Flow)   │ │ (Python)       │
-     └───────┬────────┘ └───────┬────────┘
-             │                  │
-             └────────┬─────────┘
-                      ▼
-              ┌────────────────┐
-              │  FastAPI       │
-              │  Server        │
-              └───────┬────────┘
-                      ▼
-              ┌────────────────┐
-              │  Integration   │
-              │  (WebSocket)   │
-              └────────────────┘
+     ┌────────────────┐ ┌─────────────────────────────────────┐
+     │ TypeScript     │ │          happysimulator/            │
+     │ Types          │ │  ┌────────────┐  ┌────────────────┐ │
+     └───────┬────────┘ │  │ Loader     │  │ Entities       │ │
+             │          │  └─────┬──────┘  └───────┬────────┘ │
+             │          │        │                 │          │
+             │          │        ▼                 │          │
+             │          │  ┌────────────────┐      │          │
+             │          │  │ Controller     │◄─────┘          │
+             │          │  └───────┬────────┘                 │
+             │          └──────────┼──────────────────────────┘
+             │                     │
+             ▼                     ▼
+     ┌────────────────┐    ┌────────────────┐
+     │ Serialization  │    │  FastAPI       │
+     │ (TS)           │    │  (visual/      │
+     └───────┬────────┘    │   server/)     │
+             │             └───────┬────────┘
+             ▼                     │
+     ┌────────────────┐            │
+     │ Editor         │            │
+     │ (React Flow)   │◄───────────┘
+     └────────────────┘     WebSocket
 ```
 
 ---
@@ -266,19 +269,24 @@ Built-in types to implement:
 
 ## File Inventory
 
-### Backend (Python)
+### Core Library (happysimulator/)
 
 | File | Purpose | Phase |
 |------|---------|-------|
-| `server/__init__.py` | Package init | 1 |
-| `server/schema.py` | Pydantic models for JSON schema | 1 |
-| `server/loader.py` | `SimulationLoader` class | 1 |
-| `server/controller.py` | `SimulationController` class | 1 |
-| `server/api.py` | FastAPI routes | 1 |
-| `server/entities/__init__.py` | Entity registry | 1 |
-| `server/entities/queued_server.py` | QueuedServer implementation | 1 |
-| `server/entities/sink.py` | Sink implementation | 1 |
-| `server/entities/router.py` | RandomRouter implementation | 1 |
+| `happysimulator/loader.py` | `SimulationLoader` class | 1 |
+| `happysimulator/controller.py` | `SimulationController` class | 1 |
+| `happysimulator/entities/__init__.py` | Entity registry | 1 |
+| `happysimulator/entities/queued_server.py` | QueuedServer implementation | 1 |
+| `happysimulator/entities/sink.py` | Sink implementation | 1 |
+| `happysimulator/entities/router.py` | RandomRouter implementation | 1 |
+
+### API Server (visual/server/)
+
+| File | Purpose | Phase |
+|------|---------|-------|
+| `visual/server/__init__.py` | Package init | 1 |
+| `visual/server/schema.py` | Pydantic models for API requests | 1 |
+| `visual/server/api.py` | FastAPI routes (imports from happysimulator) | 1 |
 
 ### Frontend (TypeScript/React)
 
@@ -304,28 +312,35 @@ Built-in types to implement:
 
 ## Getting Started
 
-### 1. Set up the Python server
+### 1. Extend the core library
+
+```bash
+# Use existing project venv
+.\.venv\Scripts\Activate.ps1  # Windows
+
+# Install additional dependencies
+pip install fastapi uvicorn pydantic
+
+# Create new files in happysimulator/
+# - happysimulator/loader.py
+# - happysimulator/controller.py
+# - happysimulator/entities/
+```
+
+### 2. Set up the API server
 
 ```bash
 cd visual
 mkdir server
-cd server
 
-# Create virtual environment (or use project's)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1  # Windows
-
-# Install dependencies
-pip install fastapi uvicorn pydantic
-
-# Create initial files
-# ... implement loader.py, controller.py, api.py
+# Create visual/server/api.py (imports from happysimulator)
 
 # Run server
-uvicorn api:app --reload --port 8000
+cd ..  # back to repo root
+python -m uvicorn visual.server.api:app --reload --port 8000
 ```
 
-### 2. Set up the React editor
+### 3. Set up the React editor
 
 ```bash
 cd visual
@@ -344,12 +359,11 @@ npm install @radix-ui/react-select @radix-ui/react-popover
 npm run dev
 ```
 
-### 3. Test the integration
+### 4. Test the integration
 
 ```bash
-# Terminal 1: Python server
-cd visual/server
-uvicorn api:app --reload --port 8000
+# Terminal 1: Python server (from repo root)
+python -m uvicorn visual.server.api:app --reload --port 8000
 
 # Terminal 2: React dev server
 cd visual/editor

@@ -27,6 +27,20 @@ from happysimulator.components.resilience import (
     Hedge,
     HedgeStats,
 )
+from happysimulator.components.queue_policies import (
+    CoDelQueue,
+    CoDelStats,
+    REDQueue,
+    REDStats,
+    FairQueue,
+    FairQueueStats,
+    WeightedFairQueue,
+    WeightedFairQueueStats,
+    DeadlineQueue,
+    DeadlineQueueStats,
+    AdaptiveLIFO,
+    AdaptiveLIFOStats,
+)
 
 __all__ = [
     # Queue components
@@ -62,4 +76,17 @@ __all__ = [
     "FallbackStats",
     "Hedge",
     "HedgeStats",
+    # Advanced Queue Policies
+    "CoDelQueue",
+    "CoDelStats",
+    "REDQueue",
+    "REDStats",
+    "FairQueue",
+    "FairQueueStats",
+    "WeightedFairQueue",
+    "WeightedFairQueueStats",
+    "DeadlineQueue",
+    "DeadlineQueueStats",
+    "AdaptiveLIFO",
+    "AdaptiveLIFOStats",
 ]

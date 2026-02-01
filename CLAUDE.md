@@ -58,6 +58,7 @@ All scheduling uses `Instant` (nanoseconds internally). Use `Instant.from_second
 - `examples/` - Runnable example scenarios
 - `archive/` - Reference implementations for patterns like measurements, queued servers, rate limiters (not fully integrated but useful for guidance)
 - `tests/` - pytest tests; unit tests use `ConstantArrivalTimeProvider` and `Instant.from_seconds()` for deterministic timing
+- `.dev/` - Development plans and design documents
 
 ## Code Style
 

@@ -47,6 +47,8 @@ from happysimulator.core import Clock
 from happysimulator.load import PoissonArrivalTimeProvider, ConstantRateProfile, LinearRampProfile, SpikeProfile
 from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource, RandomRouter
 from happysimulator.distributions import ConstantLatency, ExponentialLatency, PercentileFittedLatency
+from happysimulator.distributions import ZipfDistribution, UniformDistribution, ValueDistribution
+from happysimulator.load import DistributedFieldProvider
 from happysimulator.core.temporal import Duration
 
 __all__ = [
@@ -80,6 +82,11 @@ __all__ = [
     "ConstantLatency",
     "ExponentialLatency",
     "PercentileFittedLatency",
+    "ZipfDistribution",
+    "UniformDistribution",
+    "ValueDistribution",
+    # Load providers
+    "DistributedFieldProvider",
     # Instrumentation
     "Data",
     "Probe",

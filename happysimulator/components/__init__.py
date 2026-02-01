@@ -110,6 +110,11 @@ from happysimulator.components.messaging import (
     DeadLetterQueue,
     DeadLetterStats,
 )
+from happysimulator.components.sketching import (
+    SketchCollector,
+    TopKCollector,
+    QuantileEstimator,
+)
 
 __all__ = [
     # Queue components
@@ -222,4 +227,8 @@ __all__ = [
     "Subscription",
     "DeadLetterQueue",
     "DeadLetterStats",
+    # Sketching
+    "SketchCollector",
+    "TopKCollector",
+    "QuantileEstimator",
 ]

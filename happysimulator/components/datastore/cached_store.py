@@ -144,8 +144,10 @@ class CachedStore(Entity):
         if key in self._cache:
             self.stats.hits += 1
             self._eviction_policy.on_access(key)
+            # Capture value before yielding to avoid TOCTOU race
+            value = self._cache[key]
             yield self._cache_read_latency
-            return self._cache[key]
+            return value
 
         # Cache miss - fetch from backing store
         self.stats.misses += 1

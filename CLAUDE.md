@@ -770,6 +770,7 @@ The following skills are available for use in this project:
 | `/gen-test` | Generate a pytest test following project conventions |
 | `/run-example` | Run a simulation example and analyze the output |
 | `/update-claudemd` | Review recent changes and update CLAUDE.md if needed |
+| `/update-pypi` | Bump the package version for PyPI release |
 | `/claude-automation-recommender` | Analyze codebase and recommend Claude Code automations |
 
 ### Subagents (Internal)

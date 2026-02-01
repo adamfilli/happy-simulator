@@ -14,7 +14,9 @@
       "WebFetch(domain:packaging.python.org)",
       "Bash(python examples/load_aware_routing.py:*)",
       "Bash(pytest:*)",
-      "Bash(python -m pytest:*)"
+      "Bash(python -m pytest:*)",
+      "Bash(python -m mypy:*)",
+      "Bash(find:*)"
     ]
   }
 }

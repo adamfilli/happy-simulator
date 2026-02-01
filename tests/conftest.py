@@ -74,9 +74,11 @@ def reset_happysimulator_logging():
     """
     logger = logging.getLogger("happysimulator")
 
-    # Remove all handlers
+    # Remove and close all handlers
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
+        if not isinstance(handler, logging.NullHandler):
+            handler.close()
 
     # Add back NullHandler (library default)
     logger.addHandler(logging.NullHandler())
@@ -89,5 +91,7 @@ def reset_happysimulator_logging():
     # Cleanup after test
     for handler in logger.handlers[:]:
         logger.removeHandler(handler)
+        if not isinstance(handler, logging.NullHandler):
+            handler.close()
     logger.addHandler(logging.NullHandler())
     logger.setLevel(logging.NOTSET)

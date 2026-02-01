@@ -681,6 +681,7 @@ class MyServer(QueuedResource):
 3. **File logging with rotation** (prevents disk space issues):
    ```python
    happysimulator.enable_file_logging("simulation.log", max_bytes=10_000_000)
+   ```
 
 ---
 

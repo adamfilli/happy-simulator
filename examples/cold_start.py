@@ -71,7 +71,31 @@ from happysimulator import (
     UniformDistribution,
     ZipfDistribution,
 )
-from happysimulator.components.datastore import CachedStore, KVStore, LRUEviction
+from happysimulator.components.datastore import (
+    CachedStore,
+    CacheEvictionPolicy,
+    ClockEviction,
+    FIFOEviction,
+    KVStore,
+    LFUEviction,
+    LRUEviction,
+    RandomEviction,
+    SampledLRUEviction,
+    SLRUEviction,
+    TwoQueueEviction,
+)
+
+# Available cache eviction policies
+EVICTION_POLICIES: dict[str, type[CacheEvictionPolicy]] = {
+    "lru": LRUEviction,
+    "lfu": LFUEviction,
+    "fifo": FIFOEviction,
+    "random": RandomEviction,
+    "slru": SLRUEviction,
+    "sampled-lru": SampledLRUEviction,
+    "clock": ClockEviction,
+    "2q": TwoQueueEviction,
+}
 
 
 # =============================================================================
@@ -89,6 +113,7 @@ class ColdStartConfig:
         distribution_type: "zipf" or "uniform" for customer ID selection.
         zipf_s: Zipf exponent (higher = more skewed, only used if distribution_type="zipf").
         cache_capacity: Maximum number of entries in cache.
+        cache_policy: Cache eviction policy (lru, lfu, fifo, random, slru, sampled-lru, clock, 2q).
         cache_read_latency_s: Latency for cache hits in seconds.
         ingress_latency_s: Network delay from customer to server.
         db_network_latency_s: Network round-trip delay from server to datastore.
@@ -105,6 +130,7 @@ class ColdStartConfig:
     distribution_type: str = "zipf"
     zipf_s: float = 1.5
     cache_capacity: int = 150
+    cache_policy: str = "lru"
     cache_read_latency_s: float = 0.0001  # 100 microseconds (local cache)
     ingress_latency_s: float = 0.010  # 10ms network delay (customer -> server)
     db_network_latency_s: float = 0.010  # 10ms network RTT (server <-> datastore)
@@ -143,6 +169,7 @@ class CachedServer(QueuedResource):
         cache_capacity: int,
         cache_read_latency_s: float,
         ingress_latency_s: float,
+        eviction_policy: CacheEvictionPolicy | None = None,
         downstream: Entity | None = None,
     ):
         """Initialize the cached server.
@@ -153,6 +180,7 @@ class CachedServer(QueuedResource):
             cache_capacity: Maximum entries in local cache.
             cache_read_latency_s: Latency for local cache hits.
             ingress_latency_s: Network delay from customer to this server.
+            eviction_policy: Cache eviction policy (default: LRUEviction).
             downstream: Entity to forward responses to.
         """
         super().__init__(name, policy=FIFOQueue())
@@ -165,7 +193,7 @@ class CachedServer(QueuedResource):
             name=f"{name}_cache",
             backing_store=datastore,
             cache_capacity=cache_capacity,
-            eviction_policy=LRUEviction(),
+            eviction_policy=eviction_policy or LRUEviction(),
             cache_read_latency=cache_read_latency_s,
             write_through=True,
         )
@@ -327,6 +355,10 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
             {"id": customer_id, "balance": 100.0 + customer_id},
         )
 
+    # Create eviction policy
+    policy_class = EVICTION_POLICIES.get(config.cache_policy, LRUEviction)
+    eviction_policy = policy_class()
+
     # Create sink and server
     sink = LatencyTrackingSink(name="Sink")
     server = CachedServer(
@@ -335,6 +367,7 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
         cache_capacity=config.cache_capacity,
         cache_read_latency_s=config.cache_read_latency_s,
         ingress_latency_s=config.ingress_latency_s,
+        eviction_policy=eviction_policy,
         downstream=sink,
     )
 
@@ -715,7 +748,7 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Arrival rate: {config.arrival_rate} req/s")
     print(f"  Customers: {config.num_customers}")
     print(f"  Distribution: {config.distribution_type}" + (f" (s={config.zipf_s})" if config.distribution_type == "zipf" else ""))
-    print(f"  Cache capacity: {config.cache_capacity}")
+    print(f"  Cache: {config.cache_capacity} entries ({config.cache_policy.upper()})")
     print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
     print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")
     print(f"  Cache reset time: {config.cold_start_time_s}s" if config.cold_start_time_s else "  Cache reset: None")
@@ -790,6 +823,12 @@ if __name__ == "__main__":
     parser.add_argument("--customers", type=int, default=200, help="Number of unique customers")
     parser.add_argument("--cache-size", type=int, default=150, help="Cache capacity")
     parser.add_argument(
+        "--cache-policy",
+        choices=list(EVICTION_POLICIES.keys()),
+        default="lru",
+        help="Cache eviction policy",
+    )
+    parser.add_argument(
         "--distribution", choices=["zipf", "uniform"], default="zipf", help="Customer ID distribution"
     )
     parser.add_argument("--zipf-s", type=float, default=1.5, help="Zipf exponent (if using zipf)")
@@ -817,6 +856,7 @@ if __name__ == "__main__":
         distribution_type=args.distribution,
         zipf_s=args.zipf_s,
         cache_capacity=args.cache_size,
+        cache_policy=args.cache_policy,
         db_network_latency_s=args.db_network_latency,
         datastore_read_latency_s=args.datastore_latency,
         cold_start_time_s=reset_time,
@@ -827,7 +867,7 @@ if __name__ == "__main__":
     print("Running cold start simulation...")
     print(f"  Arrival rate: {config.arrival_rate} req/s")
     print(f"  Customers: {config.num_customers}")
-    print(f"  Cache capacity: {config.cache_capacity}")
+    print(f"  Cache capacity: {config.cache_capacity} ({config.cache_policy.upper()})")
     print(f"  Distribution: {config.distribution_type}")
     print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
     print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")

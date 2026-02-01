@@ -68,7 +68,7 @@ class QueuedResource(Entity, ABC):
         self._queue = Queue(
             name=queue_name or f"{name}.queue",
             egress=None,
-            policy=policy or FIFOQueue(),
+            policy=policy if policy is not None else FIFOQueue(),
         )
         self._worker = _QueuedResourceWorkerAdapter(
             name=worker_name or f"{name}.worker",

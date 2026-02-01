@@ -25,29 +25,57 @@ logging.basicConfig(level=get_logging_level(level),
                         logging.StreamHandler()
                     ])
 
-# Public facade exports (keeps common imports stable)
-from happysimulator.api import (
-    ConstantArrivalTimeProvider,
-    Data,
+# Core simulation types
+from happysimulator.core import (
+    Clock,
     Entity,
     Event,
-    EventProvider,
-    FIFOQueue,
     Instant,
-    Probe,
-    Profile,
-    Queue,
-    QueueDriver,
     Simulation,
+    Simulatable,
+    simulatable,
+)
+from happysimulator.core.temporal import Duration
+
+# Load generation
+from happysimulator.load import (
+    ConstantArrivalTimeProvider,
+    ConstantRateProfile,
+    DistributedFieldProvider,
+    EventProvider,
+    LinearRampProfile,
+    PoissonArrivalTimeProvider,
+    Profile,
     Source,
+    SpikeProfile,
 )
 
-# Additional top-level convenience exports
-from happysimulator.core import Clock
-from happysimulator.load import PoissonArrivalTimeProvider, ConstantRateProfile, LinearRampProfile, SpikeProfile
-from happysimulator.components import LIFOQueue, PriorityQueue, QueuedResource, RandomRouter
-from happysimulator.distributions import ConstantLatency, ExponentialLatency, PercentileFittedLatency
-from happysimulator.core.temporal import Duration
+# Components
+from happysimulator.components import (
+    FIFOQueue,
+    LIFOQueue,
+    PriorityQueue,
+    Queue,
+    QueueDriver,
+    QueuedResource,
+    RandomRouter,
+)
+
+# Distributions
+from happysimulator.distributions import (
+    ConstantLatency,
+    ExponentialLatency,
+    PercentileFittedLatency,
+    UniformDistribution,
+    ValueDistribution,
+    ZipfDistribution,
+)
+
+# Instrumentation
+from happysimulator.instrumentation import (
+    Data,
+    Probe,
+)
 
 __all__ = [
     # Package metadata
@@ -59,6 +87,8 @@ __all__ = [
     "Instant",
     "Duration",
     "Clock",
+    "Simulatable",
+    "simulatable",
     # Load
     "Source",
     "EventProvider",
@@ -80,6 +110,11 @@ __all__ = [
     "ConstantLatency",
     "ExponentialLatency",
     "PercentileFittedLatency",
+    "ZipfDistribution",
+    "UniformDistribution",
+    "ValueDistribution",
+    # Load providers
+    "DistributedFieldProvider",
     # Instrumentation
     "Data",
     "Probe",

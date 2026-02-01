@@ -3,27 +3,10 @@
 __version__ = "0.1.3"
 
 import logging
-import os
 
-level = os.environ.get("HS_LOGGING", "INFO")
-
-def get_logging_level(level):
-    switcher = {
-        'DEBUG': logging.DEBUG,
-        'INFO': logging.INFO,
-        'WARNING': logging.WARNING,
-        'ERROR': logging.ERROR,
-        'CRITICAL': logging.CRITICAL
-    }
-    return switcher.get(level.upper(), logging.INFO)
-
-
-logging.basicConfig(level=get_logging_level(level),
-                    format='%(asctime)s - %(module)s - %(levelname)s - %(message)s',
-                    handlers=[
-                        logging.FileHandler("happysimulator.log"),
-                        logging.StreamHandler()
-                    ])
+# Library best practice: silent by default
+# Users must explicitly enable logging using the configure functions below
+logging.getLogger("happysimulator").addHandler(logging.NullHandler())
 
 # Core simulation types
 from happysimulator.core import (
@@ -95,6 +78,19 @@ from happysimulator.components.sketching import (
     QuantileEstimator,
 )
 
+# Logging configuration utilities
+from happysimulator.logging_config import (
+    configure_from_env,
+    disable_logging,
+    enable_console_logging,
+    enable_file_logging,
+    enable_json_file_logging,
+    enable_json_logging,
+    enable_timed_file_logging,
+    set_level,
+    set_module_level,
+)
+
 __all__ = [
     # Package metadata
     "__version__",
@@ -148,4 +144,14 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Logging configuration
+    "configure_from_env",
+    "disable_logging",
+    "enable_console_logging",
+    "enable_file_logging",
+    "enable_json_file_logging",
+    "enable_json_logging",
+    "enable_timed_file_logging",
+    "set_level",
+    "set_module_level",
 ]

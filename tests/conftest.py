@@ -2,6 +2,7 @@
 Shared pytest fixtures for happy-simulator tests.
 """
 
+import logging
 import pytest
 from pathlib import Path
 from datetime import datetime
@@ -49,13 +50,44 @@ def timestamped_output_dir(request, test_output_root) -> Path:
     """
     Like test_output_dir but includes a timestamp, useful when you want to
     keep multiple runs of the same test for comparison.
-    
+
     Directory structure: test_output/<module>/<test>/<timestamp>/
     """
     module_name = request.module.__name__.split(".")[-1]
     test_name = request.node.name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     test_dir = test_output_root / module_name / test_name / timestamp
     test_dir.mkdir(parents=True, exist_ok=True)
     return test_dir
+
+
+@pytest.fixture(autouse=True)
+def reset_happysimulator_logging():
+    """Reset logging state before each test.
+
+    Ensures tests start with a clean logging configuration:
+    - Removes all handlers except NullHandler
+    - Resets level to NOTSET (inherit from parent)
+
+    This prevents logging configuration from one test affecting another.
+    """
+    logger = logging.getLogger("happysimulator")
+
+    # Remove all handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # Add back NullHandler (library default)
+    logger.addHandler(logging.NullHandler())
+
+    # Reset level to inherit
+    logger.setLevel(logging.NOTSET)
+
+    yield
+
+    # Cleanup after test
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+    logger.addHandler(logging.NullHandler())
+    logger.setLevel(logging.NOTSET)

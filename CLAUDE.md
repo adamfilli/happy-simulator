@@ -61,10 +61,43 @@ pytest tests/integration/test_queue.py -q    # single file
 # Run examples
 python examples/m_m_1_queue.py
 
-# Debugging (set logging level)
-$env:HS_LOGGING='DEBUG'   # PowerShell
-# Logs written to happysimulator.log in repo root
+# Enable logging (silent by default)
+python -c "import happysimulator; happysimulator.enable_console_logging('DEBUG')"
 ```
+
+---
+
+## Logging
+
+By default, happysimulator is **silent** (follows Python library best practices). Enable logging explicitly:
+
+```python
+import happysimulator
+
+# Console logging
+happysimulator.enable_console_logging(level="DEBUG")
+
+# Rotating file logging (prevents disk space issues)
+happysimulator.enable_file_logging("simulation.log", max_bytes=10_000_000)
+
+# JSON logging for log aggregation (ELK, Datadog, etc.)
+happysimulator.enable_json_logging()
+
+# Configure from environment variables
+happysimulator.configure_from_env()
+
+# Per-module control
+happysimulator.set_module_level("core.simulation", "DEBUG")
+happysimulator.set_module_level("distributions", "WARNING")
+
+# Silence completely
+happysimulator.disable_logging()
+```
+
+**Environment variables** (used with `configure_from_env()`):
+- `HS_LOGGING`: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- `HS_LOG_FILE`: Path to log file (enables rotating file handler)
+- `HS_LOG_JSON`: Set to "1" for JSON output
 
 ---
 
@@ -621,10 +654,19 @@ class MyServer(QueuedResource):
 
 ### Debugging Tips
 
-1. **Enable debug logging**:
+1. **Enable debug logging** (library is silent by default):
+   ```python
+   import happysimulator
+   happysimulator.enable_console_logging(level="DEBUG")
+   ```
+
+   Or via environment variables:
    ```powershell
    $env:HS_LOGGING='DEBUG'
-   pytest -s tests/my_test.py
+   ```
+   ```python
+   import happysimulator
+   happysimulator.configure_from_env()
    ```
 
 2. **Add probes** to monitor queue depth, latency, etc.:
@@ -636,7 +678,10 @@ class MyServer(QueuedResource):
    sim = Simulation(..., probes=[probe])
    ```
 
-3. **Check log file**: `happysimulator.log` in repo root
+3. **File logging with rotation** (prevents disk space issues):
+   ```python
+   happysimulator.enable_file_logging("simulation.log", max_bytes=10_000_000)
+   ```
 
 ---
 

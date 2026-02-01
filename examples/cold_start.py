@@ -100,18 +100,18 @@ class ColdStartConfig:
         use_poisson: Use Poisson arrivals (True) or constant rate (False).
     """
 
-    arrival_rate: float = 50.0
-    num_customers: int = 1000
+    arrival_rate: float = 1000.0
+    num_customers: int = 200
     distribution_type: str = "zipf"
-    zipf_s: float = 1.0
-    cache_capacity: int = 100
+    zipf_s: float = 1.5
+    cache_capacity: int = 150
     cache_read_latency_s: float = 0.0001  # 100 microseconds (local cache)
-    ingress_latency_s: float = 0.005  # 5ms network delay (customer -> server)
-    db_network_latency_s: float = 0.002  # 2ms network RTT (server <-> datastore)
+    ingress_latency_s: float = 0.010  # 10ms network delay (customer -> server)
+    db_network_latency_s: float = 0.010  # 10ms network RTT (server <-> datastore)
     datastore_read_latency_s: float = 0.001  # 1ms processing at datastore
     cold_start_time_s: float | None = 90.0
     duration_s: float = 180.0
-    probe_interval_s: float = 1.0
+    probe_interval_s: float = 0.1
     seed: int | None = 42
     use_poisson: bool = True
 
@@ -174,6 +174,9 @@ class CachedServer(QueuedResource):
         self._last_cache_hits = 0
         self._last_cache_misses = 0
 
+        # Track in-flight requests (currently being processed)
+        self._in_flight = 0
+
     @property
     def hit_rate(self) -> float:
         """Windowed cache hit rate since last reset (0.0 to 1.0)."""
@@ -204,6 +207,11 @@ class CachedServer(QueuedResource):
         """Total reads from the remote datastore."""
         return self._datastore.stats.reads
 
+    @property
+    def in_flight(self) -> int:
+        """Number of requests currently being processed."""
+        return self._in_flight
+
     def reset_cache(self) -> None:
         """Clear the local cache, triggering cold start behavior."""
         self._cache.invalidate_all()
@@ -217,17 +225,21 @@ class CachedServer(QueuedResource):
         Yields:
             Delays in seconds for network and processing latencies.
         """
-        # Simulate network ingress delay (customer -> server)
-        yield self._ingress_latency_s
+        self._in_flight += 1
+        try:
+            # Simulate network ingress delay (customer -> server)
+            yield self._ingress_latency_s
 
-        # Look up customer data in local cache (on miss, fetches from remote datastore)
-        customer_id = event.context.get("customer_id", 0)
-        key = f"customer:{customer_id}"
-        # Cache.get() yields cache latency on hit, or datastore latency on miss
-        _customer_data = yield from self._cache.get(key)
+            # Look up customer data in local cache (on miss, fetches from remote datastore)
+            customer_id = event.context.get("customer_id", 0)
+            key = f"customer:{customer_id}"
+            # Cache.get() yields cache latency on hit, or datastore latency on miss
+            _customer_data = yield from self._cache.get(key)
 
-        # Simulate some processing time
-        yield 0.001  # 1ms processing
+            # Simulate some processing time
+            yield 0.001  # 1ms processing
+        finally:
+            self._in_flight -= 1
 
         if self.downstream is None:
             return []
@@ -284,6 +296,7 @@ class SimulationResult:
     cache_size_data: Data
     datastore_reads_data: Data
     queue_depth_data: Data
+    in_flight_data: Data
     config: ColdStartConfig
 
 
@@ -355,6 +368,7 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     cache_size_data = Data()
     datastore_reads_data = Data()
     queue_depth_data = Data()
+    in_flight_data = Data()
 
     probes = [
         Probe(
@@ -389,6 +403,13 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
             target=server,
             metric="depth",
             data=queue_depth_data,
+            interval=config.probe_interval_s,
+            start_time=Instant.Epoch,
+        ),
+        Probe(
+            target=server,
+            metric="in_flight",
+            data=in_flight_data,
             interval=config.probe_interval_s,
             start_time=Instant.Epoch,
         ),
@@ -433,6 +454,7 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
         cache_size_data=cache_size_data,
         datastore_reads_data=datastore_reads_data,
         queue_depth_data=queue_depth_data,
+        in_flight_data=in_flight_data,
         config=config,
     )
 
@@ -521,14 +543,21 @@ def compute_datastore_read_rate(
 # =============================================================================
 
 
-def visualize_results(result: SimulationResult, output_dir: Path) -> None:
-    """Generate visualizations of simulation results."""
-    import matplotlib.pyplot as plt
+def _plot_all_charts(
+    axes: list,
+    result: SimulationResult,
+    reset_time: float | None,
+    xlim: tuple[float, float] | None,
+) -> None:
+    """Plot all 5 charts on the given axes.
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
+    Args:
+        axes: List of 5 matplotlib axes.
+        result: Simulation results.
+        reset_time: Time of cache reset (or None).
+        xlim: Optional (xmin, xmax) to zoom the view.
+    """
     config = result.config
-    reset_time = config.cold_start_time_s
 
     # Extract data
     hr_times = [t for (t, _) in result.hit_rate_data.values]
@@ -542,146 +571,130 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     dr_rate_times, dr_rate_values = compute_datastore_read_rate(result.datastore_reads_data)
 
-    qd_times = [t for (t, _) in result.queue_depth_data.values]
-    qd_values = [v for (_, v) in result.queue_depth_data.values]
+    if_times = [t for (t, _) in result.in_flight_data.values]
+    if_values = [v for (_, v) in result.in_flight_data.values]
 
-    # Figure 1: Overview (2x2)
-    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    times_s, latencies_s = result.sink.latency_time_series_seconds()
+    latency_buckets = bucket_latencies(times_s, latencies_s, bucket_size_s=1.0)
 
-    # Top-left: Hit/Miss rate
-    ax = axes[0, 0]
+    # Chart 1: Hit/Miss Rate
+    ax = axes[0]
     ax.plot(hr_times, hr_values, "g-", linewidth=2, label="Hit Rate")
     ax.plot(mr_times, mr_values, "r-", linewidth=1.5, alpha=0.7, label="Miss Rate")
     if reset_time is not None:
-        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
+        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Reset")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Rate")
-    ax.set_title("Cache Hit/Miss Rate Over Time")
-    ax.legend(loc="right")
+    ax.set_title("Cache Hit/Miss Rate")
+    ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
     ax.set_ylim(-0.05, 1.05)
+    if xlim:
+        ax.set_xlim(xlim)
 
-    # Top-right: Cache size
-    ax = axes[0, 1]
+    # Chart 2: Cache Size
+    ax = axes[1]
     ax.plot(cs_times, cs_values, "b-", linewidth=2)
     ax.axhline(
         y=config.cache_capacity,
         color="r",
         linestyle="--",
         alpha=0.7,
-        label=f"Capacity ({config.cache_capacity})",
+        label=f"Cap ({config.cache_capacity})",
     )
     if reset_time is not None:
-        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
+        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Reset")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Entries")
-    ax.set_title("Cache Size Over Time")
-    ax.legend(loc="right")
+    ax.set_title("Cache Size")
+    ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
+    if xlim:
+        ax.set_xlim(xlim)
 
-    # Bottom-left: Datastore load rate
-    ax = axes[1, 0]
+    # Chart 3: Datastore Read Rate
+    ax = axes[2]
     ax.plot(dr_rate_times, dr_rate_values, "orange", linewidth=2)
     if reset_time is not None:
-        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
+        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Reset")
     ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Reads/second")
-    ax.set_title("Remote Datastore Read Rate")
-    ax.legend(loc="upper right")
+    ax.set_ylabel("Reads/s")
+    ax.set_title("Datastore Read Rate")
+    ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
+    if xlim:
+        ax.set_xlim(xlim)
 
-    # Bottom-right: Queue depth
-    ax = axes[1, 1]
-    ax.plot(qd_times, qd_values, "m-", linewidth=2)
+    # Chart 4: Server Concurrency (In-Flight)
+    ax = axes[3]
+    ax.plot(if_times, if_values, "m-", linewidth=2)
     if reset_time is not None:
-        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
+        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Reset")
     ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Queue Depth")
-    ax.set_title("Server Queue Depth")
-    ax.legend(loc="upper right")
+    ax.set_ylabel("In-Flight")
+    ax.set_title("Server Concurrency")
+    ax.legend(loc="best", fontsize=8)
     ax.grid(True, alpha=0.3)
+    if xlim:
+        ax.set_xlim(xlim)
+
+    # Chart 5: Client Latency (in milliseconds)
+    ax = axes[4]
+    if latency_buckets["time_s"]:
+        avg_ms = [v * 1000 for v in latency_buckets["avg"]]
+        ax.plot(latency_buckets["time_s"], avg_ms, "b-", linewidth=2, label="Avg")
+    if reset_time is not None:
+        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Reset")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Latency (ms)")
+    ax.set_title("Client Latency")
+    ax.legend(loc="best", fontsize=8)
+    ax.grid(True, alpha=0.3)
+    if xlim:
+        ax.set_xlim(xlim)
+
+
+def visualize_results(result: SimulationResult, output_dir: Path) -> None:
+    """Generate visualizations of simulation results.
+
+    Creates a 2x5 figure:
+    - Row 1: Full timeline view
+    - Row 2: Zoomed view around cold start time (+/- 5 seconds)
+    """
+    import matplotlib.pyplot as plt
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    config = result.config
+    reset_time = config.cold_start_time_s
+
+    # Figure: 2x5 grid (full timeline + zoomed)
+    fig, axes = plt.subplots(2, 5, figsize=(25, 8))
+
+    # Row 1: Full timeline (trimmed: skip first/last 5 seconds)
+    full_xlim = (5, config.duration_s - 5)
+    _plot_all_charts(list(axes[0]), result, reset_time, xlim=full_xlim)
+
+    # Row 2: Zoomed to cold start (+/- 5 seconds)
+    if reset_time is not None:
+        zoom_xlim = (reset_time - 5, reset_time + 5)
+        _plot_all_charts(list(axes[1]), result, reset_time, xlim=zoom_xlim)
+        # Add row labels
+        axes[0, 0].set_ylabel("Full Timeline\n\nRate", fontsize=10)
+        axes[1, 0].set_ylabel(f"Zoomed (t={reset_time-5:.0f}s-{reset_time+5:.0f}s)\n\nRate", fontsize=10)
+    else:
+        # No reset time - just duplicate full timeline
+        _plot_all_charts(list(axes[1]), result, reset_time, xlim=full_xlim)
 
     fig.suptitle(
-        f"Cold Start Simulation Overview\n"
-        f"({config.arrival_rate} req/s, {config.num_customers} customers, "
-        f"cache capacity {config.cache_capacity}, {config.distribution_type} distribution)",
-        fontsize=12,
+        f"Cold Start Simulation "
+        f"({config.arrival_rate:.0f} req/s, {config.num_customers} customers, cache={config.cache_capacity})",
+        fontsize=14,
     )
     fig.tight_layout()
     fig.savefig(output_dir / "cold_start_overview.png", dpi=150)
     plt.close(fig)
     print(f"Saved: {output_dir / 'cold_start_overview.png'}")
-
-    # Figure 2: Latency analysis (1x2)
-    times_s, latencies_s = result.sink.latency_time_series_seconds()
-    latency_buckets = bucket_latencies(times_s, latencies_s, bucket_size_s=1.0)
-
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-    # Left: Latency over time
-    ax = axes[0]
-    if latency_buckets["time_s"]:
-        ax.plot(latency_buckets["time_s"], latency_buckets["avg"], "b-", linewidth=2, label="Avg")
-        ax.plot(latency_buckets["time_s"], latency_buckets["p99"], "r-", linewidth=1.5, label="p99")
-        ax.fill_between(
-            latency_buckets["time_s"],
-            latency_buckets["p50"],
-            latency_buckets["p99"],
-            alpha=0.2,
-            color="blue",
-        )
-    if reset_time is not None:
-        ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Latency (s)")
-    ax.set_title("End-to-End Latency Over Time")
-    ax.legend(loc="upper right")
-    ax.grid(True, alpha=0.3)
-
-    # Right: Latency histogram comparison
-    ax = axes[1]
-    if reset_time is not None and times_s:
-        # Compare steady state vs post-reset
-        warmup_end = min(30.0, reset_time - 10.0) if reset_time > 40.0 else reset_time / 2
-        steady_latencies = [
-            lat for t, lat in zip(times_s, latencies_s) if warmup_end <= t < reset_time
-        ]
-        post_reset_latencies = [
-            lat for t, lat in zip(times_s, latencies_s) if reset_time <= t < reset_time + 30.0
-        ]
-
-        if steady_latencies:
-            ax.hist(
-                steady_latencies,
-                bins=30,
-                alpha=0.5,
-                label=f"Steady state ({warmup_end:.0f}s-{reset_time:.0f}s)",
-                color="green",
-            )
-        if post_reset_latencies:
-            ax.hist(
-                post_reset_latencies,
-                bins=30,
-                alpha=0.5,
-                label=f"Post-reset ({reset_time:.0f}s-{reset_time + 30:.0f}s)",
-                color="red",
-            )
-        ax.legend()
-    else:
-        # No reset - just show overall distribution
-        if latencies_s:
-            ax.hist(latencies_s, bins=50, alpha=0.7, color="blue")
-
-    ax.set_xlabel("Latency (s)")
-    ax.set_ylabel("Count")
-    ax.set_title("Latency Distribution Comparison")
-    ax.grid(True, alpha=0.3)
-
-    fig.suptitle("Cold Start Latency Analysis", fontsize=12)
-    fig.tight_layout()
-    fig.savefig(output_dir / "cold_start_latency.png", dpi=150)
-    plt.close(fig)
-    print(f"Saved: {output_dir / 'cold_start_latency.png'}")
 
 
 # =============================================================================
@@ -773,15 +786,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Cold start simulation demonstrating cache warmup and reset behavior"
     )
-    parser.add_argument("--rate", type=float, default=50.0, help="Arrival rate (req/s)")
-    parser.add_argument("--customers", type=int, default=1000, help="Number of unique customers")
-    parser.add_argument("--cache-size", type=int, default=100, help="Cache capacity")
+    parser.add_argument("--rate", type=float, default=1000.0, help="Arrival rate (req/s)")
+    parser.add_argument("--customers", type=int, default=200, help="Number of unique customers")
+    parser.add_argument("--cache-size", type=int, default=150, help="Cache capacity")
     parser.add_argument(
         "--distribution", choices=["zipf", "uniform"], default="zipf", help="Customer ID distribution"
     )
-    parser.add_argument("--zipf-s", type=float, default=1.0, help="Zipf exponent (if using zipf)")
+    parser.add_argument("--zipf-s", type=float, default=1.5, help="Zipf exponent (if using zipf)")
     parser.add_argument(
-        "--db-network-latency", type=float, default=0.002, help="DB network RTT in seconds"
+        "--db-network-latency", type=float, default=0.010, help="DB network RTT in seconds"
     )
     parser.add_argument(
         "--datastore-latency", type=float, default=0.001, help="Datastore processing latency in seconds"

@@ -277,6 +277,38 @@ class TestTopKMerge:
         assert topk1.estimate(1) == 10
         assert topk1.estimate(2) == 5
 
+    def test_merge_total_count_correct(self):
+        """Merging correctly updates total count without double-counting."""
+        topk1 = TopK[int](k=10)
+        topk2 = TopK[int](k=10)
+
+        topk1.add(1, count=10)  # topk1 total = 10
+        topk2.add(2, count=5)   # topk2 total = 5
+
+        topk1.merge(topk2)
+
+        # Total should be 10 + 5 = 15, not over-counted
+        assert topk1.item_count == 15
+
+    def test_merge_total_count_with_overlap(self):
+        """Merging with overlapping items has correct total count."""
+        topk1 = TopK[int](k=10)
+        topk2 = TopK[int](k=10)
+
+        topk1.add(1, count=10)
+        topk1.add(2, count=5)   # topk1 total = 15
+        topk2.add(2, count=3)
+        topk2.add(3, count=7)   # topk2 total = 10
+
+        topk1.merge(topk2)
+
+        # Total should be 15 + 10 = 25
+        assert topk1.item_count == 25
+        # Verify counts are correct
+        assert topk1.estimate(1) == 10
+        assert topk1.estimate(2) == 8  # 5 + 3
+        assert topk1.estimate(3) == 7
+
     def test_merge_rejects_different_k(self):
         """Cannot merge sketches with different k."""
         topk1 = TopK[int](k=10)

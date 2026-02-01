@@ -1,0 +1,121 @@
+# .clocignore - Patterns to exclude from cloc line counting
+#
+# ============================================================================
+# USAGE
+# ============================================================================
+#
+# Full project count:
+#   cloc . --exclude-dir=.venv,venv,.git,__pycache__,.pytest_cache,test_output,output,dist,.egg-info,.github,.vscode,.claude,.dev,htmlcov,site,.mypy_cache,.tox,.nox
+#
+# Library code only:
+#   cloc happysimulator/ --exclude-dir=__pycache__,.egg-info
+#
+# Test code only:
+#   cloc tests/ --exclude-dir=__pycache__
+#
+# Examples only:
+#   cloc examples/ --exclude-dir=__pycache__
+#
+# ============================================================================
+# EXAMPLE OUTPUT
+# ============================================================================
+#
+# $ cloc happysimulator/ --exclude-dir=__pycache__,.egg-info
+# -------------------------------------------------------------------------------
+# Language                     files          blank        comment           code
+# -------------------------------------------------------------------------------
+# Python                         107           4286           6160          10238
+# -------------------------------------------------------------------------------
+#
+# $ cloc tests/ --exclude-dir=__pycache__
+# -------------------------------------------------------------------------------
+# Language                     files          blank        comment           code
+# -------------------------------------------------------------------------------
+# Python                          85           6633           4173          21339
+# -------------------------------------------------------------------------------
+#
+# $ cloc examples/ --exclude-dir=__pycache__
+# -------------------------------------------------------------------------------
+# Language                     files          blank        comment           code
+# -------------------------------------------------------------------------------
+# Python                           6            796            832           2691
+# -------------------------------------------------------------------------------
+#
+# ============================================================================
+# SUMMARY (as of 2025-01-31)
+# ============================================================================
+#
+#   Library (happysimulator/):  10,238 lines of Python code
+#   Tests (tests/):             21,339 lines of Python code
+#   Examples (examples/):        2,691 lines of Python code
+#   ---------------------------------------------------------
+#   Total Python:               34,268 lines of code
+#
+# ============================================================================
+
+# =============================================================================
+# Directories to exclude (use with --exclude-dir)
+# =============================================================================
+
+# Virtual environments
+.venv
+venv
+env
+ENV
+
+# Version control
+.git
+
+# Python cache
+__pycache__
+.pytest_cache
+.mypy_cache
+.tox
+.nox
+.cache
+.hypothesis
+
+# Build artifacts
+dist
+build
+*.egg-info
+sdist
+wheels
+
+# Test/example output (generated files, not source code)
+test_output
+output
+htmlcov
+cover
+
+# IDE and editor configs
+.vscode
+.idea
+.claude
+
+# Development plans and docs (not source code)
+.dev
+docs
+site
+
+# CI/CD configs
+.github
+
+# =============================================================================
+# File patterns to exclude
+# =============================================================================
+
+# Log files
+*.log
+
+# Compiled Python
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage data
+.coverage
+*.cover
+
+# Generated documentation
+docs/_build

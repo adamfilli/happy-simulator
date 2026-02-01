@@ -11,11 +11,10 @@ This approach handles non-homogeneous (time-varying) rate profiles.
 
 import logging
 from abc import ABC, abstractmethod
-import scipy.integrate as integrate
-import scipy.optimize as optimize
 
 from happysimulator.core.temporal import Instant
-from happysimulator.load.profile import Profile
+from happysimulator.load.profile import ConstantRateProfile, Profile
+from happysimulator.numerics import brentq, integrate_adaptive_simpson
 
 logger = logging.getLogger(__name__)
 
@@ -61,64 +60,72 @@ class ArrivalTimeProvider(ABC):
             RuntimeError: If the rate is zero indefinitely or optimization fails.
         """
         target_area = self._get_target_integral_value()
-        
-        # 1. Bridge to floats
         t_start_sec = self.current_time.to_seconds()
 
-        # 2. Wrapper for Scipy
-        def rate_fn_for_scipy(t_seconds: float) -> float:
+        # Fast path for ConstantRateProfile: O(1) direct calculation
+        if isinstance(self.profile, ConstantRateProfile):
+            rate = self.profile.rate
+            if rate <= 0:
+                raise RuntimeError("Cannot compute arrival with zero or negative rate")
+            t_next = t_start_sec + target_area / rate
+            self.current_time = Instant.from_seconds(t_next)
+            logger.debug(
+                "Next arrival computed (fast path): time=%.6f target_area=%.4f",
+                t_next, target_area
+            )
+            return self.current_time
+
+        # General numerical solution for arbitrary profiles
+        def rate_fn(t_seconds: float) -> float:
             return self.profile.get_rate(Instant.from_seconds(t_seconds))
 
-        # 3. Integral Equation
         def objective_func(t_candidate_sec: float) -> float:
-            # Note: limit=50 improves performance for simple profiles by restricting subdivision depth
-            current_area, _ = integrate.quad(rate_fn_for_scipy, t_start_sec, t_candidate_sec, limit=50)
+            current_area, _ = integrate_adaptive_simpson(
+                rate_fn, t_start_sec, t_candidate_sec, tol=1e-10
+            )
             return current_area - target_area
 
-        # 4. Smart Initial Guess (The Fix)
-        # Get the instantaneous rate to predict where the target area might be reached.
-        current_rate = rate_fn_for_scipy(t_start_sec)
-        
+        # Smart initial guess based on instantaneous rate
+        current_rate = rate_fn(t_start_sec)
+
         if current_rate > 0:
             # Linear prediction: Time = Area / Rate
-            # We multiply by 2.0 to be "optimistic" and try to bracket it immediately.
+            # Multiply by 2.0 to be optimistic and try to bracket immediately
             estimated_delay = (target_area / current_rate) * 2.0
-            
-            # Clamp: Don't let the guess be too microscopic (e.g. < 1ns) or Scipy might underflow
-            # Don't let it be too huge (e.g. > 1 hour) if rate is tiny
+            # Clamp to reasonable bounds
             estimated_delay = max(1e-9, min(estimated_delay, 3600.0))
-            
             t_high = t_start_sec + estimated_delay
         else:
-            # Rate is 0? Fallback to a small default step to probe for future rate increases.
+            # Rate is 0? Fallback to probe for future rate increases
             t_high = t_start_sec + 0.1
 
-        # 5. Bracket Search (Expansion)
+        # Bracket search with geometric expansion
         t_low = t_start_sec
         max_iter = 50
         found_bracket = False
-        
+
         for _ in range(max_iter):
             val = objective_func(t_high)
-            
+
             if val > 0:
                 found_bracket = True
                 break
-            
-            # Geometric Expansion: Double the window if we haven't found the event yet.
-            # (e.g. Rate dropped unexpectedly)
+
+            # Geometric expansion: double the window
             step = max(1e-6, t_high - t_low)
             t_high += step * 2.0
-            
+
         if not found_bracket:
             logger.error(
                 "Could not bracket arrival time: target_area=%.4f start=%.4f",
                 target_area, t_start_sec
             )
-            raise RuntimeError(f"Could not find event event with target area {target_area} starting at {t_start_sec}")
+            raise RuntimeError(
+                f"Could not find event with target area {target_area} starting at {t_start_sec}"
+            )
 
-        # 6. Root Finding
-        result = optimize.root_scalar(objective_func, bracket=[t_low, t_high], method='brentq')
+        # Root finding using Brent's method
+        result = brentq(objective_func, t_low, t_high)
 
         if result.converged:
             self.current_time = Instant.from_seconds(result.root)

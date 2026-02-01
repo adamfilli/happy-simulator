@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **Last Updated:** 2026-01-31
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ---
@@ -720,11 +722,15 @@ The following skills are available for use in this project:
 | `/commit` | Create a git commit with conventional message |
 | `/commit-push-pr` | Commit, push, and open a pull request |
 | `/code-review` | Review a pull request for issues and improvements |
+| `/gen-test` | Generate a pytest test following project conventions |
+| `/run-example` | Run a simulation example and analyze the output |
+| `/update-claudemd` | Review recent changes and update CLAUDE.md if needed |
 | `/claude-automation-recommender` | Analyze codebase and recommend Claude Code automations |
 
 ### Subagents (Internal)
 
 Claude Code uses specialized subagents internally:
+- **simulation-reviewer**: Specialized code reviewer for discrete-event simulation code
 - **code-simplifier**: Simplifies and refines code for clarity and maintainability
 - **Explore**: Fast codebase exploration and search
 - **Plan**: Implementation planning and architecture design

@@ -35,9 +35,9 @@ This example enables visualization and analysis of:
    - Cache read latency
 
 3. **Configurable delays:**
-   - Network delay: customer → cached server
-   - Network delay: cached server → datastore (included in datastore latency)
-   - Datastore read latency
+   - Network delay: customer → cached server (ingress)
+   - Network delay: cached server → datastore (explicit round-trip)
+   - Datastore read latency (processing time at datastore)
 
 4. **Cache reset capability:**
    - Trigger cache invalidation at specified time
@@ -57,6 +57,10 @@ This example enables visualization and analysis of:
 
 ## Architecture
 
+The datastore (KVStore) is a **separate entity** from the CachedServer, representing a remote
+database like DynamoDB, Redis, or PostgreSQL. The server has a local in-memory cache and
+communicates with the remote datastore over the network on cache misses.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                       COLD START SIMULATION ARCHITECTURE                         │
@@ -72,38 +76,64 @@ This example enables visualization and analysis of:
              │
              ▼
     ┌─────────────────┐
-    │  Network Delay  │◄───── Configurable ingress latency
-    │  (via yield)    │
+    │  Network Delay  │◄───── Configurable ingress latency (customer → server)
+    │  (ingress)      │
     └────────┬────────┘
              │
              ▼
     ─────────────────────────────────────────────────────────────────────────────
-    CACHED SERVER (Compositional Entity)
+    CACHED SERVER (Application Server with Local Cache)
     ─────────────────────────────────────────────────────────────────────────────
 
     ┌─────────────────────────────────────────────────────────────────────────┐
     │                           CachedServer                                   │
     │                                                                          │
     │   ┌─────────────────┐         ┌─────────────────────────────────────┐   │
-    │   │  Request Queue  │         │           CachedStore               │   │
+    │   │  Request Queue  │         │      Local Cache (CachedStore)      │   │
     │   │    (FIFO)       │────────►│  ┌─────────────┐  ┌──────────────┐  │   │
     │   └─────────────────┘         │  │   L1 Cache  │  │   Eviction   │  │   │
     │          ▲                    │  │  (LRU/TTL)  │  │    Policy    │  │   │
     │          │                    │  └──────┬──────┘  └──────────────┘  │   │
     │     depth probe               │         │                            │   │
-    │                               │         │ miss                       │   │
-    │                               │         ▼                            │   │
-    │                               │  ┌─────────────────┐                 │   │
-    │                               │  │    KVStore      │◄─── datastore   │   │
-    │                               │  │   (datastore)   │     latency     │   │
-    │                               │  └─────────────────┘                 │   │
-    │                               └─────────────────────────────────────┘   │
+    │                               │         │ cache miss                 │   │
+    │                               └─────────┼────────────────────────────┘   │
+    └─────────────────────────────────────────┼────────────────────────────────┘
+                                              │
+                                              ▼
+    ─────────────────────────────────────────────────────────────────────────────
+    NETWORK (Server ↔ Datastore)
+    ─────────────────────────────────────────────────────────────────────────────
+
+    ┌─────────────────┐
+    │  Network Delay  │◄───── Configurable db_network_latency (round-trip)
+    │  (db network)   │       e.g., 2-5ms for same-region, 50ms+ cross-region
+    └────────┬────────┘
+             │
+             ▼
+    ─────────────────────────────────────────────────────────────────────────────
+    REMOTE DATASTORE (Separate Entity - e.g., DynamoDB, Redis, PostgreSQL)
+    ─────────────────────────────────────────────────────────────────────────────
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                           Datastore (KVStore)                            │
     │                                                                          │
-    │   reset_cache() ──► cache.invalidate_all()                              │
+    │   Pre-populated with customer data at simulation start                   │
+    │   ┌─────────────────────────────────────────────────────────────────┐   │
+    │   │   customer:0 → {id: 0, balance: 100.0}                          │   │
+    │   │   customer:1 → {id: 1, balance: 101.0}                          │   │
+    │   │   ...                                                            │   │
+    │   │   customer:999 → {id: 999, balance: 1099.0}                     │   │
+    │   └─────────────────────────────────────────────────────────────────┘   │
     │                                                                          │
-    └──────────────────────────────────┬───────────────────────────────────────┘
-                                       │
-                                       ▼
+    │   Latency: datastore_read_latency (processing time at DB)               │
+    │                                                                          │
+    └─────────────────────────────────────────────────────────────────────────┘
+             │
+             ▼
+    ─────────────────────────────────────────────────────────────────────────────
+    RESPONSE PATH
+    ─────────────────────────────────────────────────────────────────────────────
+
     ┌─────────────────┐
     │ LatencyTracking │◄───── Records end-to-end latency
     │      Sink       │       from created_at context
@@ -118,6 +148,15 @@ This example enables visualization and analysis of:
     │  (hit_rate)     │ │ (miss_rate)     │ │ Probe (depth)   │ │ Probe (reads)   │
     └─────────────────┘ └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
+
+**Key Design Decision: Separate Datastore Entity**
+
+The datastore is created as a separate `KVStore` entity and passed to the `CachedServer`.
+This models real-world architectures where:
+- The application server and database are separate services
+- Network latency exists between them
+- The datastore may be shared by multiple application servers
+- The datastore's load can be monitored independently
 
 **Timeline:**
 ```
@@ -153,84 +192,98 @@ class ColdStartConfig:
     # Cache parameters
     cache_capacity: int = 100           # max cached entries
     cache_read_latency_s: float = 0.0001  # 100us cache hit
-    cache_ttl_s: float | None = None    # None = LRU only
 
     # Network/latency parameters
     ingress_latency_s: float = 0.005    # 5ms customer → server
-    datastore_read_latency_s: float = 0.010  # 10ms (includes network)
+    db_network_latency_s: float = 0.002 # 2ms server ↔ datastore RTT
+    datastore_read_latency_s: float = 0.001  # 1ms DB processing time
 
     # Timing
     cold_start_time_s: float = 90.0     # when to reset cache
-    total_duration_s: float = 180.0     # total simulation time
-    probe_interval_s: float = 0.5       # metric sampling interval
+    duration_s: float = 180.0           # total simulation time
+    probe_interval_s: float = 1.0       # metric sampling interval
 
     # Reproducibility
     seed: int | None = 42
     use_poisson: bool = True            # False for deterministic
 ```
 
+### Datastore Entity (External)
+
+The datastore is created separately and passed to the server:
+
+```python
+# Create remote datastore (separate entity)
+datastore = KVStore(
+    name="Datastore",
+    read_latency=config.db_network_latency_s + config.datastore_read_latency_s,
+    write_latency=config.db_network_latency_s + config.datastore_read_latency_s,
+)
+
+# Pre-populate with customer data
+for i in range(config.num_customers):
+    datastore.put_sync(f"customer:{i}", {"id": i, "balance": 100.0 + i})
+
+# Create server with reference to external datastore
+server = CachedServer(
+    name="Server",
+    datastore=datastore,  # External dependency
+    cache_capacity=config.cache_capacity,
+    ...
+)
+```
+
 ### CachedServer Entity
 
-Extends `QueuedResource` for queue management with internal cache composition:
+Extends `QueuedResource` with a local cache that wraps an external datastore:
 
 ```python
 class CachedServer(QueuedResource):
-    def __init__(self, name: str, config: ColdStartConfig, downstream: Entity):
+    def __init__(
+        self,
+        name: str,
+        *,
+        datastore: KVStore,  # External datastore dependency
+        cache_capacity: int,
+        cache_read_latency_s: float,
+        ingress_latency_s: float,
+        downstream: Entity | None = None,
+    ):
         super().__init__(name, policy=FIFOQueue())
+        self._datastore = datastore  # Reference to external datastore
+        self._ingress_latency_s = ingress_latency_s
 
-        # Backing datastore (pre-populated)
-        self.datastore = KVStore(
-            name=f"{name}.datastore",
-            read_latency=config.datastore_read_latency_s,
+        # Local cache layer wrapping the external datastore
+        self._cache = CachedStore(
+            name=f"{name}_cache",
+            backing_store=datastore,
+            cache_capacity=cache_capacity,
+            eviction_policy=LRUEviction(),
+            cache_read_latency=cache_read_latency_s,
         )
-        for i in range(config.num_customers):
-            self.datastore.put_sync(f"customer_{i}", {"id": i, "data": f"value_{i}"})
-
-        # Eviction policy
-        if config.cache_ttl_s is not None:
-            eviction = TTLEviction(
-                ttl=config.cache_ttl_s,
-                clock_func=lambda: self.now.to_seconds(),
-            )
-        else:
-            eviction = LRUEviction()
-
-        # Cache layer
-        self.cache = CachedStore(
-            name=f"{name}.cache",
-            backing_store=self.datastore,
-            cache_capacity=config.cache_capacity,
-            eviction_policy=eviction,
-            cache_read_latency=config.cache_read_latency_s,
-        )
+        ...
 
     def reset_cache(self) -> None:
-        """Trigger cold start by invalidating all cache entries."""
-        self.cache.invalidate_all()
-
-    @property
-    def hit_rate(self) -> float:
-        return self.cache.hit_rate
+        """Trigger cold start by invalidating local cache."""
+        self._cache.invalidate_all()
+        # Reset windowed stats tracking
+        ...
 
     @property
     def datastore_reads(self) -> int:
-        return self.datastore.stats.reads
+        """Total reads from external datastore."""
+        return self._datastore.stats.reads
 
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         # Network delay (customer → server)
-        yield self.config.ingress_latency_s
+        yield self._ingress_latency_s
 
-        # Cache lookup (hit: fast, miss: goes to datastore)
+        # Cache lookup (hit: fast local, miss: goes to remote datastore)
         customer_id = event.context.get("customer_id", 0)
-        value = yield from self.cache.get(f"customer_{customer_id}")
+        value = yield from self._cache.get(f"customer:{customer_id}")
 
         # Forward response to sink
-        return [Event(
-            time=self.now,
-            event_type="Response",
-            target=self.downstream,
-            context=event.context,
-        )]
+        return [Event(...)]
 ```
 
 ### Cache Reset Mechanism
@@ -252,6 +305,40 @@ def create_cache_reset_event(server: CachedServer, reset_time: Instant) -> Event
 # In simulation setup:
 reset_event = create_cache_reset_event(server, Instant.from_seconds(config.cold_start_time_s))
 sim.schedule(reset_event)
+```
+
+### Simulation Setup
+
+The datastore is created first and registered as an entity:
+
+```python
+def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
+    # Create external datastore
+    datastore = KVStore(
+        name="Datastore",
+        read_latency=config.db_network_latency_s + config.datastore_read_latency_s,
+    )
+    # Pre-populate datastore
+    for i in range(config.num_customers):
+        datastore.put_sync(f"customer:{i}", {"id": i, "balance": 100.0 + i})
+
+    # Create server with reference to external datastore
+    sink = LatencyTrackingSink(name="Sink")
+    server = CachedServer(
+        name="Server",
+        datastore=datastore,
+        cache_capacity=config.cache_capacity,
+        cache_read_latency_s=config.cache_read_latency_s,
+        ingress_latency_s=config.ingress_latency_s,
+        downstream=sink,
+    )
+
+    # Run simulation with both entities
+    sim = Simulation(
+        ...
+        entities=[datastore, server, sink],  # Datastore is a separate entity
+        ...
+    )
 ```
 
 ### Probes Configuration
@@ -295,6 +382,8 @@ python examples/cold_start.py \
   --cache-size 100 \
   --distribution zipf \
   --zipf-s 1.0 \
+  --db-network-latency 0.002 \
+  --datastore-latency 0.001 \
   --reset-time 90.0 \
   --duration 180.0 \
   --seed 42 \
@@ -324,13 +413,14 @@ config = ColdStartConfig(
 ## Implementation Plan
 
 1. Create `ColdStartConfig` dataclass with all parameters
-2. Implement `CachedServer(QueuedResource)` with internal cache composition
-3. Create `LatencyTrackingSink` for end-to-end latency tracking
-4. Implement `run_cold_start_simulation()` main function
-5. Add cache reset event scheduling mechanism
-6. Create `visualize_results()` function with matplotlib
-7. Add CLI entry point with argparse
-8. Write integration tests
+2. Create external `KVStore` as separate datastore entity
+3. Implement `CachedServer(QueuedResource)` with local cache wrapping external datastore
+4. Create `LatencyTrackingSink` for end-to-end latency tracking
+5. Implement `run_cold_start_simulation()` main function
+6. Add cache reset event scheduling mechanism
+7. Create `visualize_results()` function with matplotlib
+8. Add CLI entry point with argparse
+9. Write integration tests
 
 ## Verification
 

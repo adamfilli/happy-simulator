@@ -7,13 +7,24 @@ This example shows:
 
 ## Architecture Diagram
 
+The datastore is a SEPARATE entity from the server, representing a remote database
+(like DynamoDB, Redis, or PostgreSQL). The server has a local in-memory cache and
+communicates with the remote datastore over the network on cache misses.
+
 ```
-Customer Traffic -> [network delay] -> CachedServer -> [cache hit] -> Response
+Customer Traffic -> [ingress delay] -> CachedServer (local cache)
                                             |
-                                            v [cache miss]
-                                       Datastore (KVStore)
+                                            | [cache miss]
+                                            v
+                                    [db network delay]
                                             |
-                                            v [hydrate cache]
+                                            v
+                                    Remote Datastore (KVStore)
+                                            |
+                                            v
+                                    [hydrate local cache]
+                                            |
+                                            v
                                        Response
 ```
 
@@ -80,7 +91,8 @@ class ColdStartConfig:
         cache_capacity: Maximum number of entries in cache.
         cache_read_latency_s: Latency for cache hits in seconds.
         ingress_latency_s: Network delay from customer to server.
-        datastore_read_latency_s: Latency for datastore reads (includes network).
+        db_network_latency_s: Network round-trip delay from server to datastore.
+        datastore_read_latency_s: Processing latency at the datastore.
         cold_start_time_s: When to reset the cache (None = no reset).
         duration_s: Total simulation duration.
         probe_interval_s: Metric sampling interval.
@@ -93,9 +105,10 @@ class ColdStartConfig:
     distribution_type: str = "zipf"
     zipf_s: float = 1.0
     cache_capacity: int = 100
-    cache_read_latency_s: float = 0.0001  # 100 microseconds
-    ingress_latency_s: float = 0.005  # 5ms network delay
-    datastore_read_latency_s: float = 0.010  # 10ms (includes network)
+    cache_read_latency_s: float = 0.0001  # 100 microseconds (local cache)
+    ingress_latency_s: float = 0.005  # 5ms network delay (customer -> server)
+    db_network_latency_s: float = 0.002  # 2ms network RTT (server <-> datastore)
+    datastore_read_latency_s: float = 0.001  # 1ms processing at datastore
     cold_start_time_s: float | None = 90.0
     duration_s: float = 180.0
     probe_interval_s: float = 1.0
@@ -109,10 +122,11 @@ class ColdStartConfig:
 
 
 class CachedServer(QueuedResource):
-    """Server with an internal cache backed by a datastore.
+    """Application server with a local cache backed by a remote datastore.
 
-    Composes a KVStore (datastore) with a CachedStore (cache layer).
-    Processes requests by looking up customer data, using cache when possible.
+    The server has a local in-memory cache (CachedStore) that wraps an external
+    datastore (KVStore). On cache hits, responses are fast. On cache misses,
+    requests go to the remote datastore over the network.
 
     Properties exposed for probing:
     - hit_rate: Windowed cache hit rate since last reset (0.0 to 1.0)
@@ -125,35 +139,31 @@ class CachedServer(QueuedResource):
         self,
         name: str,
         *,
-        num_customers: int,
+        datastore: KVStore,
         cache_capacity: int,
         cache_read_latency_s: float,
-        datastore_read_latency_s: float,
         ingress_latency_s: float,
         downstream: Entity | None = None,
     ):
+        """Initialize the cached server.
+
+        Args:
+            name: Server name.
+            datastore: External KVStore representing the remote database.
+            cache_capacity: Maximum entries in local cache.
+            cache_read_latency_s: Latency for local cache hits.
+            ingress_latency_s: Network delay from customer to this server.
+            downstream: Entity to forward responses to.
+        """
         super().__init__(name, policy=FIFOQueue())
         self.downstream = downstream
         self._ingress_latency_s = ingress_latency_s
+        self._datastore = datastore
 
-        # Create backing datastore
-        self._datastore = KVStore(
-            name=f"{name}_datastore",
-            read_latency=datastore_read_latency_s,
-            write_latency=datastore_read_latency_s,
-        )
-
-        # Pre-populate datastore with customer data
-        for customer_id in range(num_customers):
-            self._datastore.put_sync(
-                f"customer:{customer_id}",
-                {"id": customer_id, "balance": 100.0 + customer_id},
-            )
-
-        # Create cache layer with LRU eviction
+        # Create local cache layer wrapping the external datastore
         self._cache = CachedStore(
             name=f"{name}_cache",
-            backing_store=self._datastore,
+            backing_store=datastore,
             cache_capacity=cache_capacity,
             eviction_policy=LRUEviction(),
             cache_read_latency=cache_read_latency_s,
@@ -161,15 +171,12 @@ class CachedServer(QueuedResource):
         )
 
         # Track windowed hit rate (reset when cache is cleared)
-        self._window_hits = 0
-        self._window_misses = 0
         self._last_cache_hits = 0
         self._last_cache_misses = 0
 
     @property
     def hit_rate(self) -> float:
         """Windowed cache hit rate since last reset (0.0 to 1.0)."""
-        # Calculate hits/misses since window start
         current_hits = self._cache.stats.hits - self._last_cache_hits
         current_misses = self._cache.stats.misses - self._last_cache_misses
         total = current_hits + current_misses
@@ -194,24 +201,29 @@ class CachedServer(QueuedResource):
 
     @property
     def datastore_reads(self) -> int:
-        """Total reads from backing datastore."""
+        """Total reads from the remote datastore."""
         return self._datastore.stats.reads
 
     def reset_cache(self) -> None:
-        """Clear the cache, triggering cold start behavior."""
+        """Clear the local cache, triggering cold start behavior."""
         self._cache.invalidate_all()
         # Reset windowed stats tracking
         self._last_cache_hits = self._cache.stats.hits
         self._last_cache_misses = self._cache.stats.misses
 
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
-        """Process a customer request."""
-        # Simulate network ingress delay
+        """Process a customer request.
+
+        Yields:
+            Delays in seconds for network and processing latencies.
+        """
+        # Simulate network ingress delay (customer -> server)
         yield self._ingress_latency_s
 
-        # Look up customer data (cache or datastore)
+        # Look up customer data in local cache (on miss, fetches from remote datastore)
         customer_id = event.context.get("customer_id", 0)
         key = f"customer:{customer_id}"
+        # Cache.get() yields cache latency on hit, or datastore latency on miss
         _customer_data = yield from self._cache.get(key)
 
         # Simulate some processing time
@@ -266,6 +278,7 @@ class SimulationResult:
 
     sink: LatencyTrackingSink
     server: CachedServer
+    datastore: KVStore
     hit_rate_data: Data
     miss_rate_data: Data
     cache_size_data: Data
@@ -286,14 +299,28 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     if config.seed is not None:
         random.seed(config.seed)
 
+    # Create external datastore (separate entity representing remote DB)
+    # Total latency = network RTT + DB processing time
+    datastore = KVStore(
+        name="Datastore",
+        read_latency=config.db_network_latency_s + config.datastore_read_latency_s,
+        write_latency=config.db_network_latency_s + config.datastore_read_latency_s,
+    )
+
+    # Pre-populate datastore with customer data
+    for customer_id in range(config.num_customers):
+        datastore.put_sync(
+            f"customer:{customer_id}",
+            {"id": customer_id, "balance": 100.0 + customer_id},
+        )
+
     # Create sink and server
     sink = LatencyTrackingSink(name="Sink")
     server = CachedServer(
         name="Server",
-        num_customers=config.num_customers,
+        datastore=datastore,
         cache_capacity=config.cache_capacity,
         cache_read_latency_s=config.cache_read_latency_s,
-        datastore_read_latency_s=config.datastore_read_latency_s,
         ingress_latency_s=config.ingress_latency_s,
         downstream=sink,
     )
@@ -370,19 +397,24 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     # Create cache reset event if configured
     extra_events: list[Event] = []
     if config.cold_start_time_s is not None:
+
+        def reset_callback(_e: Event) -> list[Event]:
+            server.reset_cache()
+            return []
+
         reset_event = Event(
             time=Instant.from_seconds(config.cold_start_time_s),
             event_type="CacheReset",
-            callback=lambda _e: (server.reset_cache(), [])[1],
+            callback=reset_callback,
         )
         extra_events.append(reset_event)
 
-    # Run simulation
+    # Run simulation - datastore is a separate entity
     sim = Simulation(
         start_time=Instant.Epoch,
         end_time=Instant.from_seconds(config.duration_s + 10.0),  # Extra drain time
         sources=[source],
-        entities=[server, sink],
+        entities=[datastore, server, sink],  # Datastore is a separate entity
         probes=probes,
     )
 
@@ -395,6 +427,7 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     return SimulationResult(
         sink=sink,
         server=server,
+        datastore=datastore,
         hit_rate_data=hit_rate_data,
         miss_rate_data=miss_rate_data,
         cache_size_data=cache_size_data,
@@ -553,7 +586,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         ax.axvline(x=reset_time, color="purple", linestyle="--", alpha=0.7, label="Cache Reset")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Reads/second")
-    ax.set_title("Datastore Read Rate (Load)")
+    ax.set_title("Remote Datastore Read Rate")
     ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
@@ -670,6 +703,8 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Customers: {config.num_customers}")
     print(f"  Distribution: {config.distribution_type}" + (f" (s={config.zipf_s})" if config.distribution_type == "zipf" else ""))
     print(f"  Cache capacity: {config.cache_capacity}")
+    print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
+    print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")
     print(f"  Cache reset time: {config.cold_start_time_s}s" if config.cold_start_time_s else "  Cache reset: None")
     print(f"  Duration: {config.duration_s}s")
 
@@ -677,7 +712,7 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Requests completed: {result.sink.events_received}")
     print(f"  Final hit rate: {result.server.hit_rate:.1%}")
     print(f"  Final cache size: {result.server.cache_size}")
-    print(f"  Total datastore reads: {result.server.datastore_reads}")
+    print(f"  Total datastore reads: {result.datastore.stats.reads}")
 
     # Analyze phases
     reset_time = config.cold_start_time_s
@@ -746,6 +781,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--zipf-s", type=float, default=1.0, help="Zipf exponent (if using zipf)")
     parser.add_argument(
+        "--db-network-latency", type=float, default=0.002, help="DB network RTT in seconds"
+    )
+    parser.add_argument(
+        "--datastore-latency", type=float, default=0.001, help="Datastore processing latency in seconds"
+    )
+    parser.add_argument(
         "--reset-time", type=float, default=90.0, help="When to reset cache (use -1 for no reset)"
     )
     parser.add_argument("--duration", type=float, default=180.0, help="Simulation duration (s)")
@@ -763,6 +804,8 @@ if __name__ == "__main__":
         distribution_type=args.distribution,
         zipf_s=args.zipf_s,
         cache_capacity=args.cache_size,
+        db_network_latency_s=args.db_network_latency,
+        datastore_read_latency_s=args.datastore_latency,
         cold_start_time_s=reset_time,
         duration_s=args.duration,
         seed=seed,
@@ -773,6 +816,8 @@ if __name__ == "__main__":
     print(f"  Customers: {config.num_customers}")
     print(f"  Cache capacity: {config.cache_capacity}")
     print(f"  Distribution: {config.distribution_type}")
+    print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
+    print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")
     print(f"  Reset time: {config.cold_start_time_s}s" if config.cold_start_time_s else "  Reset: disabled")
     print(f"  Duration: {config.duration_s}s")
     print(f"  Seed: {seed if seed is not None else 'random'}")

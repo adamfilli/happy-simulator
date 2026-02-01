@@ -15,8 +15,26 @@
       "Bash(python examples/load_aware_routing.py:*)",
       "Bash(pytest:*)",
       "Bash(python -m pytest:*)",
-      "Bash(python -m mypy:*)",
-      "Bash(find:*)"
+      "Bash(ruff format:*)",
+      "Bash(ruff check:*)",
+      "Bash(mypy:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruff format $CLAUDE_FILE_PATHS && ruff check --fix $CLAUDE_FILE_PATHS"
+          },
+          {
+            "type": "command",
+            "command": "mypy $CLAUDE_FILE_PATHS --no-error-summary"
+          }
+        ]
+      }
     ]
   }
 }

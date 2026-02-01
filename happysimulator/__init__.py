@@ -77,6 +77,24 @@ from happysimulator.instrumentation import (
     Probe,
 )
 
+# Sketching algorithms
+from happysimulator.sketching import (
+    TopK,
+    CountMinSketch,
+    TDigest,
+    HyperLogLog,
+    BloomFilter,
+    ReservoirSampler,
+    FrequencyEstimate,
+)
+
+# Sketching entity wrappers
+from happysimulator.components.sketching import (
+    SketchCollector,
+    TopKCollector,
+    QuantileEstimator,
+)
+
 __all__ = [
     # Package metadata
     "__version__",
@@ -118,4 +136,16 @@ __all__ = [
     # Instrumentation
     "Data",
     "Probe",
+    # Sketching algorithms
+    "TopK",
+    "CountMinSketch",
+    "TDigest",
+    "HyperLogLog",
+    "BloomFilter",
+    "ReservoirSampler",
+    "FrequencyEstimate",
+    # Sketching entity wrappers
+    "SketchCollector",
+    "TopKCollector",
+    "QuantileEstimator",
 ]

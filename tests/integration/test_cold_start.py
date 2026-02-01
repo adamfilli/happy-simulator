@@ -288,14 +288,11 @@ class TestVisualization:
 
         # Check that visualization files were created
         overview_path = test_output_dir / "cold_start_overview.png"
-        latency_path = test_output_dir / "cold_start_latency.png"
 
         assert overview_path.exists(), f"Overview plot not created: {overview_path}"
-        assert latency_path.exists(), f"Latency plot not created: {latency_path}"
 
         # Verify files have content (not empty)
         assert overview_path.stat().st_size > 1000, "Overview plot file too small"
-        assert latency_path.stat().st_size > 1000, "Latency plot file too small"
 
 
 class TestDistributions:

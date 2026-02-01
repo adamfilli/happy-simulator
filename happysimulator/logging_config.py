@@ -106,11 +106,12 @@ def _get_logger() -> logging.Logger:
 
 
 def _clear_handlers() -> None:
-    """Remove all handlers from the happysimulator logger except NullHandler."""
+    """Remove and close all handlers from the happysimulator logger except NullHandler."""
     logger = _get_logger()
     for handler in logger.handlers[:]:
         if not isinstance(handler, logging.NullHandler):
             logger.removeHandler(handler)
+            handler.close()
 
 
 def enable_console_logging(

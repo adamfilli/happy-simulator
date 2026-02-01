@@ -333,6 +333,36 @@ class TestDistributions:
         )
 
 
+class TestArchitecture:
+    """Tests verifying the architecture with separate datastore entity."""
+
+    def test_datastore_is_separate_entity(self):
+        """Datastore should be a separate entity from the server."""
+        config = ColdStartConfig(
+            arrival_rate=50.0,
+            num_customers=100,
+            cache_capacity=20,
+            cold_start_time_s=None,
+            duration_s=10.0,
+            seed=42,
+            use_poisson=False,
+        )
+
+        result = run_cold_start_simulation(config)
+
+        # Datastore should be accessible separately
+        assert result.datastore is not None, "Datastore should be in result"
+        assert result.datastore.name == "Datastore", "Datastore should have its own name"
+
+        # Datastore stats should be accessible
+        assert result.datastore.stats.reads > 0, "Datastore should have recorded reads"
+
+        # Server's datastore_reads should match external datastore stats
+        assert result.server.datastore_reads == result.datastore.stats.reads, (
+            "Server's datastore_reads should match external datastore stats"
+        )
+
+
 class TestLatencyTracking:
     """Tests verifying latency tracking."""
 
@@ -363,7 +393,8 @@ class TestLatencyTracking:
             cache_capacity=20,
             cache_read_latency_s=0.0001,
             ingress_latency_s=0.005,
-            datastore_read_latency_s=0.010,
+            db_network_latency_s=0.002,
+            datastore_read_latency_s=0.001,
             cold_start_time_s=None,
             duration_s=10.0,
             seed=42,
@@ -382,7 +413,9 @@ class TestLatencyTracking:
         )
 
         # Maximum latency should be reasonable (not infinite)
-        max_expected = config.ingress_latency_s + config.datastore_read_latency_s + 0.002
+        # Total datastore latency = db network RTT + datastore processing
+        total_datastore_latency = config.db_network_latency_s + config.datastore_read_latency_s
+        max_expected = config.ingress_latency_s + total_datastore_latency + 0.002
         # Allow some variance due to queuing
         assert max_latency < max_expected * 5, (
             f"Max latency {max_latency*1000:.2f}ms is unexpectedly high"

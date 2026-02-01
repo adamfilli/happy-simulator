@@ -63,6 +63,11 @@ from happysimulator.components.datastore.database import (
     Transaction,
     TransactionState,
 )
+from happysimulator.components.datastore.soft_ttl_cache import (
+    SoftTTLCache,
+    SoftTTLCacheStats,
+    CacheEntry,
+)
 
 __all__ = [
     # Key-Value Store
@@ -110,4 +115,8 @@ __all__ = [
     "DatabaseStats",
     "Transaction",
     "TransactionState",
+    # Soft TTL Cache
+    "SoftTTLCache",
+    "SoftTTLCacheStats",
+    "CacheEntry",
 ]

@@ -229,6 +229,9 @@ class TopK(FrequencySketch[T]):
         if other._k != self._k:
             raise ValueError(f"Cannot merge TopK with k={other._k} into k={self._k}")
 
+        # Capture items already tracked BEFORE merging (for correct total calculation)
+        items_already_tracked = set(self._counters.keys())
+
         # Simple merge: add all items from other
         # This isn't optimal but provides correctness
         for counter in other._counters.values():
@@ -245,10 +248,11 @@ class TopK(FrequencySketch[T]):
                 if counter.item in self._counters:
                     self._counters[counter.item].error += counter.error
 
-        # Update total (subtract what add() already added)
+        # Update total: add other's total, subtract what add() already added
+        # (add() increments _total_count for items that weren't already tracked)
         self._total_count += other._total_count - sum(
             c.count for c in other._counters.values()
-            if c.item not in self._counters
+            if c.item not in items_already_tracked
         )
 
     @property

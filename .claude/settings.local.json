@@ -18,7 +18,11 @@
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
       "Bash(mypy:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:adamfillion.com)",
+      "Bash(pip show:*)",
+      "Bash(findstr:*)",
+      "Bash(git log:*)"
     ]
   },
   "hooks": {

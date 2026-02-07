@@ -9,7 +9,7 @@ from happysimulator.components.datastore import (
     CacheEntry,
 )
 from happysimulator.core.clock import Clock
-from happysimulator.core.instant import Duration, Instant
+from happysimulator.core.temporal import Duration, Instant
 
 
 class MockClock(Clock):

@@ -32,7 +32,7 @@ from typing import Any, Generator, Optional
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.instant import Duration, Instant
+from happysimulator.core.temporal import Duration, Instant
 from happysimulator.components.datastore.kv_store import KVStore
 
 

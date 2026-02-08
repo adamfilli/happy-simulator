@@ -6,6 +6,7 @@ resulting events are pushed back for future processing.
 """
 
 import logging
+import time as _time
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -15,6 +16,9 @@ from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
+from happysimulator.instrumentation.summary import (
+    SimulationSummary, EntitySummary, QueueStats,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,31 +57,32 @@ class Simulation:
         self._start_time = start_time
         if self._start_time is None:
             self._start_time = Instant.Epoch
-        
+
         self._end_time = end_time
         if self._end_time is None:
             self._end_time = Instant.Infinity
-            
+
         self._clock = Clock(self._start_time)
-        
+
         self._entities = entities or []
         self._sources = sources or []
         self._probes = probes or []
-        
+
         all_components = self._entities + self._sources + self._probes
         for component in all_components:
             if isinstance(component, Simulatable):
                 component.set_clock(self._clock)
-        
+
         self._trace = trace_recorder or NullTraceRecorder()
         self._event_heap = EventHeap(trace_recorder=self._trace)
-        
+        self._summary: SimulationSummary | None = None
+
         logger.info(
             "Simulation initialized: start=%r, end=%r, sources=%d, entities=%d, probes=%d",
             self._start_time, self._end_time,
             len(self._sources), len(self._entities), len(self._probes),
         )
-        
+
         self._trace.record(
             time=self._start_time,
             kind="simulation.init",
@@ -85,28 +90,33 @@ class Simulation:
             num_entities=len(self._entities),
             num_probes=len(self._probes),
         )
-        
+
         for source in self._sources:
             # The source calculates its first event and returns it
             initial_events = source.start(self._start_time)
             logger.debug("Source '%s' produced %d initial event(s)", source.name, len(initial_events))
-            
+
             # We push it to the heap to prime the simulation
             for event in initial_events:
                 self._event_heap.push(event)
-        
+
         for probe in self._probes:
             initial_events = probe.start(self._start_time)
             logger.debug("Probe '%s' produced %d initial event(s)", probe.name, len(initial_events))
             for event in initial_events:
                 self._event_heap.push(event)
-        
+
         logger.debug("Initialization complete, heap size: %d", self._event_heap.size())
 
     @property
     def trace_recorder(self) -> TraceRecorder:
         """Access the trace recorder for inspection after simulation."""
         return self._trace
+
+    @property
+    def summary(self) -> SimulationSummary | None:
+        """Summary from the most recent run(), or None if not yet run."""
+        return self._summary
 
     def schedule(self, events: Event | list[Event]) -> None:
         """Inject events into the simulation from outside the event loop.
@@ -116,7 +126,7 @@ class Simulation:
         """
         self._event_heap.push(events)
 
-    def run(self) -> None:
+    def run(self) -> SimulationSummary:
         """Execute the simulation until termination.
 
         Implements the core pop-invoke-push loop:
@@ -130,25 +140,29 @@ class Simulation:
         - The event heap is exhausted, or
         - Current time exceeds end_time, or
         - Auto-terminate mode with no primary events remaining
+
+        Returns:
+            SimulationSummary with run statistics.
         """
+        wall_start = _time.monotonic()
         current_time = self._start_time
         self._event_heap.set_current_time(current_time)
-        
+
         logger.info("Simulation starting at %r with %d event(s) in heap", current_time, self._event_heap.size())
-        
+
         if not self._event_heap.has_events():
             logger.warning("Simulation started with empty event heap")
-        
+
         self._trace.record(
             time=current_time,
             kind="simulation.start",
             heap_size=self._event_heap.size(),
         )
-        
+
         events_processed = 0
-        
+
         while self._event_heap.has_events() and self._end_time >= current_time:
-            
+
             # TERMINATION CHECK:
             # If we rely on auto-termination (end_time is Infinity),
             # and we have no primary events left (only probes), STOP.
@@ -163,7 +177,7 @@ class Simulation:
                     reason="no_primary_events",
                 )
                 break
-            
+
             # 1. Pop
             event = self._event_heap.pop()
 
@@ -180,23 +194,23 @@ class Simulation:
             self._clock.update(current_time)
             self._event_heap.set_current_time(current_time)
             events_processed += 1
-            
+
             logger.debug(
                 "Processing event #%d: %r",
                 events_processed, event,
             )
-            
+
             self._trace.record(
                 time=current_time,
                 kind="simulation.dequeue",
                 event_id=event.context.get("id"),
                 event_type=event.event_type,
             )
-            
+
             # 2. Invoke
             # The event itself knows how to run and what to return
             new_events = event.invoke()
-            
+
             # 3. Push
             if new_events:
                 logger.debug(
@@ -216,7 +230,9 @@ class Simulation:
                         scheduled_time=new_event.time,
                     )
                 self._event_heap.push(new_events)
-        
+
+        wall_elapsed = _time.monotonic() - wall_start
+
         # Determine why loop ended
         if not self._event_heap.has_events():
             logger.info("Simulation ended at %r: event heap exhausted", current_time)
@@ -225,20 +241,66 @@ class Simulation:
                 "Simulation ended: current time %r exceeded end_time %r",
                 current_time, self._end_time,
             )
-        
+
         logger.info(
             "Simulation complete: processed %d events, final time %r, %d event(s) remaining in heap",
             events_processed, current_time, self._event_heap.size(),
         )
-        
+
         if self._event_heap.size() > 0:
             logger.debug("Unprocessed events remain in heap (scheduled past end_time)")
-        
+
         self._trace.record(
             time=current_time,
             kind="simulation.end",
             final_heap_size=self._event_heap.size(),
         )
-        
-        return
 
+        # Build summary
+        duration_s = (current_time - self._start_time).to_seconds()
+        eps = events_processed / duration_s if duration_s > 0 else 0.0
+
+        entity_summaries = self._build_entity_summaries()
+
+        self._summary = SimulationSummary(
+            duration_s=duration_s,
+            total_events_processed=events_processed,
+            events_per_second=eps,
+            wall_clock_seconds=wall_elapsed,
+            entities=entity_summaries,
+        )
+
+        return self._summary
+
+    def _build_entity_summaries(self) -> dict[str, EntitySummary]:
+        """Build per-entity summaries from registered entities."""
+        from happysimulator.components.queued_resource import QueuedResource
+
+        summaries: dict[str, EntitySummary] = {}
+        for component in self._entities:
+            if not isinstance(component, Entity):
+                continue
+
+            queue_stats = None
+            if isinstance(component, QueuedResource):
+                queue_stats = QueueStats(
+                    peak_depth=0,  # Not tracked yet; would need probe data
+                    total_accepted=component.stats_accepted,
+                    total_dropped=component.stats_dropped,
+                )
+
+            # Count events handled if entity tracks it
+            events_handled = 0
+            for attr in ("count", "events_received", "stats_processed"):
+                val = getattr(component, attr, None)
+                if isinstance(val, int):
+                    events_handled = val
+                    break
+
+            summaries[component.name] = EntitySummary(
+                name=component.name,
+                entity_type=type(component).__name__,
+                events_handled=events_handled,
+                queue_stats=queue_stats,
+            )
+        return summaries

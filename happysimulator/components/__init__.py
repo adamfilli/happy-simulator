@@ -23,6 +23,8 @@ from happysimulator.components.rate_limiter import (
     RateLimitedEntityStats,
     DistributedRateLimiter,
     DistributedRateLimiterStats,
+    Inductor,
+    InductorStats,
 )
 from happysimulator.components.random_router import RandomRouter
 from happysimulator.components.resilience import (
@@ -145,6 +147,8 @@ __all__ = [
     "RateLimitedEntityStats",
     "DistributedRateLimiter",
     "DistributedRateLimiterStats",
+    "Inductor",
+    "InductorStats",
     # Routing
     "RandomRouter",
     # Resilience

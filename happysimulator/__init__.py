@@ -56,6 +56,8 @@ from happysimulator.components import (
     AdaptivePolicy,
     RateAdjustmentReason,
     RateSnapshot,
+    Inductor,
+    InductorStats,
 )
 
 # Distributions
@@ -155,6 +157,8 @@ __all__ = [
     "AdaptivePolicy",
     "RateAdjustmentReason",
     "RateSnapshot",
+    "Inductor",
+    "InductorStats",
     # Distributions
     "ConstantLatency",
     "ExponentialLatency",

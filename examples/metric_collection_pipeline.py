@@ -66,6 +66,79 @@ Expected results:
 - Each batch of N tasks flows through the two-stage pipeline
 - Batch completion times should be under the deadline (60s by default)
 - Queue depths show backpressure when workers are saturated
+
+## Running the Examples
+
+The LeakyBucketRateLimiter used here **queues and delays** excess
+requests rather than dropping them. When a batch of 100 tasks arrives
+simultaneously, they enter the bucket and leak out at the configured
+rate (requests/second), smoothing the burst into a steady stream. Tasks
+are only dropped if the bucket capacity is exceeded — with a capacity
+equal to the batch size, all tasks are preserved.
+
+Use `--output` to write each scenario to a separate directory so results
+are not overwritten between runs.
+
+### 1. Baseline (no rate limiting)
+
+All 100 tasks arrive at each executor simultaneously, causing sharp bursts
+in queue depth and full worker saturation. All tasks complete successfully:
+
+```bash
+python examples/metric_collection_pipeline.py \
+    --output output/metric_pipeline/baseline
+```
+
+### 2. Rate limit Stage 1 only (smoothing ingestion)
+
+A leaky bucket before Stage 1 queues all 100 tasks and releases them at
+20 req/s, spreading the batch over ~5 seconds. Executor1 sees a steady
+trickle instead of a burst — queue depth stays low and workers sustain
+moderate utilization. All 500 tasks complete (none dropped):
+
+```bash
+python examples/metric_collection_pipeline.py \
+    --rate-limit-stage1 20 \
+    --output output/metric_pipeline/rate_limit_stage1
+```
+
+### 3. Rate limit both stages (cascaded smoothing)
+
+Adding a second leaky bucket between Stage 1 and Stage 2 (15 req/s)
+further smooths traffic. Tasks trickle out of Stage 1 at 20 req/s,
+then into Stage 2 at 15 req/s. Both queue depths show gradual draining
+instead of sharp spikes, and all 500 tasks complete end-to-end:
+
+```bash
+python examples/metric_collection_pipeline.py \
+    --rate-limit-stage1 20 \
+    --rate-limit-stage2 15 \
+    --output output/metric_pipeline/rate_limit_both
+```
+
+### 4. Aggressive rate limiting (slow drain)
+
+Setting the leak rate low (10 req/s) spreads each batch of 100 over
+~10 seconds. All tasks still complete, but batch durations increase
+and may approach or exceed the batch interval deadline:
+
+```bash
+python examples/metric_collection_pipeline.py \
+    --rate-limit-stage1 10 \
+    --output output/metric_pipeline/rate_limit_aggressive
+```
+
+### Comparing results
+
+Run all scenarios above, then compare the `queue_depths.png` and
+`worker_utilization.png` charts across output directories to see how
+rate limiting smooths bursty traffic through the pipeline while
+preserving all tasks. Key things to observe:
+
+- **Baseline**: Executor queue spikes to ~90, workers saturate at 10/10
+- **Stage 1 limited**: Queue drains gradually, workers sustain moderate load
+- **Both limited**: Both stages show smooth, controlled utilization
+- **Aggressive**: Slow draining, longer batch durations, possible deadline overlap
 """
 
 from __future__ import annotations
@@ -93,6 +166,7 @@ from happysimulator import (
     Simulation,
     Source,
 )
+from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter
 from happysimulator.components.rate_limiter import NullRateLimiter
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
@@ -443,13 +517,11 @@ def run_simulation(
 
     # Create rate limiter 2 (between executor 1 and 2)
     if rate_limit_stage2 is not None:
-        from happysimulator.components.rate_limiter import FixedWindowRateLimiter
-
-        rate_limiter2: Entity = FixedWindowRateLimiter(
+        rate_limiter2: Entity = LeakyBucketRateLimiter(
             name="RateLimiter2",
             downstream=executor2,
-            requests_per_window=int(rate_limit_stage2),
-            window_size=1.0,
+            leak_rate=rate_limit_stage2,
+            capacity=tasks_per_batch,
         )
     else:
         rate_limiter2 = NullRateLimiter(name="RateLimiter2", downstream=executor2)
@@ -464,13 +536,11 @@ def run_simulation(
 
     # Create rate limiter 1 (between source and executor 1)
     if rate_limit_stage1 is not None:
-        from happysimulator.components.rate_limiter import FixedWindowRateLimiter
-
-        rate_limiter1: Entity = FixedWindowRateLimiter(
+        rate_limiter1: Entity = LeakyBucketRateLimiter(
             name="RateLimiter1",
             downstream=executor1,
-            requests_per_window=int(rate_limit_stage1),
-            window_size=1.0,
+            leak_rate=rate_limit_stage1,
+            capacity=tasks_per_batch,
         )
     else:
         rate_limiter1 = NullRateLimiter(name="RateLimiter1", downstream=executor1)
@@ -534,12 +604,11 @@ def run_simulation(
         start_time=Instant.Epoch,
     )
 
-    # Collect entities (include rate limiters if not null)
-    entities: list[Entity] = [executor1, executor2, sink]
-    if rate_limit_stage1 is not None:
-        entities.append(rate_limiter1)
-    if rate_limit_stage2 is not None:
-        entities.append(rate_limiter2)
+    # Collect entities — always include rate limiters (LeakyBucket
+    # self-schedules leak events that need entity registration)
+    entities: list[Entity] = [
+        executor1, executor2, sink, rate_limiter1, rate_limiter2,
+    ]
 
     # Run simulation with drain time
     drain_s = batch_interval_s  # Allow time for last batch to complete
@@ -908,6 +977,10 @@ if __name__ == "__main__":
     print(f"  Tasks per batch: {args.tasks_per_batch}")
     print(f"  Executor1: {args.executor1_workers} workers, {args.executor1_latency}s mean ({args.executor1_dist})")
     print(f"  Executor2: {args.executor2_workers} workers, {args.executor2_latency}s mean ({args.executor2_dist})")
+    if args.rate_limit_stage1:
+        print(f"  Rate limit Stage 1: {args.rate_limit_stage1} req/s (leaky bucket, capacity={args.tasks_per_batch})")
+    if args.rate_limit_stage2:
+        print(f"  Rate limit Stage 2: {args.rate_limit_stage2} req/s (leaky bucket, capacity={args.tasks_per_batch})")
 
     result = run_simulation(
         duration_s=args.duration,

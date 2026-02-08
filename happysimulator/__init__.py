@@ -10,10 +10,12 @@ logging.getLogger("happysimulator").addHandler(logging.NullHandler())
 
 # Core simulation types
 from happysimulator.core import (
+    CallbackEntity,
     Clock,
     Entity,
     Event,
     Instant,
+    NullEntity,
     Simulation,
     Simulatable,
     simulatable,
@@ -110,6 +112,8 @@ __all__ = [
     "Simulation",
     "Event",
     "Entity",
+    "CallbackEntity",
+    "NullEntity",
     "Instant",
     "Duration",
     "Clock",

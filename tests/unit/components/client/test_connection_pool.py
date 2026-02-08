@@ -16,7 +16,10 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.distributions.constant import ConstantLatency
+
+_null = NullEntity()
 
 
 @dataclass
@@ -156,10 +159,10 @@ class TestConnectionPoolAcquireRelease:
             result["connection"] = conn
 
         # Create an event that acquires a connection
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="acquire",
-            callback=lambda e: acquire_connection(),
+            fn=lambda e: acquire_connection(),
         )
         sim.schedule(event)
         sim.run()
@@ -193,10 +196,10 @@ class TestConnectionPoolAcquireRelease:
             # Note: not returning idle timeout events to avoid simulation
             # end_time boundary issue (sim processes events past end_time)
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: acquire_and_release(),
+            fn=lambda e: acquire_and_release(),
         )
         sim.schedule(event)
         sim.run()
@@ -236,10 +239,10 @@ class TestConnectionPoolAcquireRelease:
             conn2 = yield from pool.acquire()
             result["second_id"] = conn2.id
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: two_acquisitions(),
+            fn=lambda e: two_acquisitions(),
         )
         sim.schedule(event)
         sim.run()
@@ -277,10 +280,10 @@ class TestConnectionPoolLimits:
                 conn = yield from pool.acquire()
                 connections.append(conn)
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: acquire_many(),
+            fn=lambda e: acquire_many(),
         )
         sim.schedule(event)
         sim.run()
@@ -321,15 +324,15 @@ class TestConnectionPoolLimits:
             result["second_acquired_at"] = pool.now
             pool.release(conn)
 
-        event1 = Event(
+        event1 = Event.once(
             time=Instant.Epoch,
             event_type="holder",
-            callback=lambda e: first_holder(),
+            fn=lambda e: first_holder(),
         )
-        event2 = Event(
+        event2 = Event.once(
             time=Instant.Epoch,
             event_type="requester",
-            callback=lambda e: second_requester(),
+            fn=lambda e: second_requester(),
         )
         sim.schedule(event1)
         sim.schedule(event2)
@@ -378,15 +381,15 @@ class TestConnectionPoolTimeout:
             except TimeoutError:
                 result["timed_out"] = True
 
-        event1 = Event(
+        event1 = Event.once(
             time=Instant.Epoch,
             event_type="holder",
-            callback=lambda e: holder(),
+            fn=lambda e: holder(),
         )
-        event2 = Event(
+        event2 = Event.once(
             time=Instant.Epoch,
             event_type="requester",
-            callback=lambda e: requester(),
+            fn=lambda e: requester(),
         )
         sim.schedule(event1)
         sim.schedule(event2)
@@ -428,15 +431,15 @@ class TestConnectionPoolTimeout:
             except TimeoutError:
                 pass
 
-        event1 = Event(
+        event1 = Event.once(
             time=Instant.Epoch,
             event_type="holder",
-            callback=lambda e: holder(),
+            fn=lambda e: holder(),
         )
-        event2 = Event(
+        event2 = Event.once(
             time=Instant.Epoch,
             event_type="requester",
-            callback=lambda e: requester(),
+            fn=lambda e: requester(),
         )
         sim.schedule(event1)
         sim.schedule(event2)
@@ -472,10 +475,10 @@ class TestConnectionPoolIdleTimeout:
             events = pool.release(conn)
             return events
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: use_and_release(),
+            fn=lambda e: use_and_release(),
         )
         sim.schedule(event)
         sim.run()
@@ -509,10 +512,10 @@ class TestConnectionPoolIdleTimeout:
             events = pool.release(conn)
             return events
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: use_and_release(),
+            fn=lambda e: use_and_release(),
         )
         sim.schedule(event)
         sim.run()
@@ -548,10 +551,10 @@ class TestConnectionPoolCallbacks:
             conn = yield from pool.acquire()
             pool.release(conn)
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: acquire(),
+            fn=lambda e: acquire(),
         )
         sim.schedule(event)
         sim.run()
@@ -582,10 +585,10 @@ class TestConnectionPoolCallbacks:
             conn = yield from pool.acquire()
             pool.release(conn)
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: acquire_release(),
+            fn=lambda e: acquire_release(),
         )
         sim.schedule(event)
         sim.run()
@@ -656,10 +659,10 @@ class TestConnectionPoolConcurrency:
 
         # Start 3 workers concurrently
         for i in range(3):
-            event = Event(
+            event = Event.once(
                 time=Instant.Epoch,
                 event_type=f"worker_{i}",
-                callback=lambda e, wid=i: worker(wid),
+                fn=lambda e, wid=i: worker(wid),
             )
             sim.schedule(event)
 
@@ -703,15 +706,15 @@ class TestConnectionPoolConcurrency:
             result["worker2_conn"] = conn.id
             pool.release(conn)
 
-        event1 = Event(
+        event1 = Event.once(
             time=Instant.Epoch,
             event_type="worker1",
-            callback=lambda e: worker1(),
+            fn=lambda e: worker1(),
         )
-        event2 = Event(
+        event2 = Event.once(
             time=Instant.Epoch,
             event_type="worker2",
-            callback=lambda e: worker2(),
+            fn=lambda e: worker2(),
         )
         sim.schedule(event1)
         sim.schedule(event2)
@@ -752,15 +755,15 @@ class TestConnectionPoolStatistics:
             yield 0.050  # Start after holder
             yield from pool.acquire()
 
-        event1 = Event(
+        event1 = Event.once(
             time=Instant.Epoch,
             event_type="holder",
-            callback=lambda e: holder(),
+            fn=lambda e: holder(),
         )
-        event2 = Event(
+        event2 = Event.once(
             time=Instant.Epoch,
             event_type="waiter",
-            callback=lambda e: waiter(),
+            fn=lambda e: waiter(),
         )
         sim.schedule(event1)
         sim.schedule(event2)
@@ -801,10 +804,10 @@ class TestConnectionPoolCloseAll:
             # Release one
             pool.release(connections[0])
 
-        event = Event(
+        event = Event.once(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: acquire_multiple(),
+            fn=lambda e: acquire_multiple(),
         )
         sim.schedule(event)
         sim.run()

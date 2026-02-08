@@ -14,17 +14,17 @@ def test_simulation_logs_warning_on_time_travel(caplog):
     )
 
     def first_callback(_: Event):
-        return Event(
+        return Event.once(
             time=Instant.from_seconds(5),
             event_type="BackInTime",
-            callback=lambda __: [],
+            fn=lambda __: [],
         )
 
     sim.schedule(
-        Event(
+        Event.once(
             time=Instant.from_seconds(10),
             event_type="First",
-            callback=first_callback,
+            fn=first_callback,
         )
     )
 

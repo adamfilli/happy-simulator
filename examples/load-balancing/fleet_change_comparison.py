@@ -318,10 +318,10 @@ def run_scenario(
     )
 
     # Create fleet change event
-    fleet_change_event = Event(
+    fleet_change_event = Event.once(
         time=Instant.from_seconds(config.fleet_change_time_s),
         event_type="FleetChange",
-        callback=fleet_change_callback,
+        fn=fleet_change_callback,
     )
 
     # Run simulation

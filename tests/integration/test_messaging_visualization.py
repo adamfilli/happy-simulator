@@ -23,9 +23,12 @@ from happysimulator.components.messaging import (
     DeadLetterQueue,
     MessageState,
 )
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 class DummyConsumer(Entity):
@@ -90,7 +93,7 @@ class TestMessageQueueVisualization:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             msg_id = None
@@ -233,7 +236,7 @@ Performance:
                     message = Event(
                         time=Instant.Epoch,
                         event_type=f"msg{i}",
-                        callback=lambda e: None,
+                        target=_null,
                     )
                     gen = queue.publish(message)
                     msg_id = None
@@ -383,7 +386,7 @@ class TestTopicVisualization:
                 message = Event(
                     time=Instant.Epoch,
                     event_type=f"notification{i}",
-                    callback=lambda e: None,
+                    target=_null,
                 )
                 gen = topic.publish(message)
                 try:
@@ -520,7 +523,7 @@ class TestDeadLetterQueueVisualization:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             msg_id = None
@@ -658,7 +661,7 @@ class TestMessagingPatternsComparison:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             msg_id = None
@@ -687,7 +690,7 @@ class TestMessagingPatternsComparison:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"notification{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             topic.publish_sync(message)
 

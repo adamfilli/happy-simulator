@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Generator
 
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.event import Event, ProcessContinuation
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 def test_completion_hooks_run_for_regular_event() -> None:
@@ -11,10 +14,10 @@ def test_completion_hooks_run_for_regular_event() -> None:
 
     def hook(finish_time: Instant) -> Event:
         hook_times.append(finish_time)
-        return Event(time=finish_time, event_type="hook", callback=lambda _: None)
+        return Event(time=finish_time, event_type="hook", target=_null)
 
     event_time = Instant.from_seconds(1.0)
-    event = Event(time=event_time, event_type="regular", callback=lambda _: None)
+    event = Event(time=event_time, event_type="regular", target=_null)
     event.add_completion_hook(hook)
 
     produced = event.invoke()
@@ -32,10 +35,10 @@ def test_completion_hooks_run_when_process_finishes() -> None:
 
     def hook(finish_time: Instant) -> Event:
         hook_times.append(finish_time)
-        return Event(time=finish_time, event_type="hook", callback=lambda _: None)
+        return Event(time=finish_time, event_type="hook", target=_null)
 
     start = Instant.from_seconds(0.0)
-    event = Event(time=start, event_type="proc", callback=lambda _: process())
+    event = Event.once(time=start, event_type="proc", fn=lambda _: process())
     event.add_completion_hook(hook)
 
     first = event.invoke()

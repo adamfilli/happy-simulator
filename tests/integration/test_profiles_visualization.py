@@ -16,14 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable
 
 import pytest
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
@@ -40,20 +38,6 @@ class TimeSeriesCounterEntity(Entity):
     def handle_event(self, event: Event):
         self.handled_times.append(event.time)
         return []
-
-
-class PingEvent(Event):
-    def __init__(self, time: Instant, counter: TimeSeriesCounterEntity):
-        super().__init__(time=time, event_type="Ping", target=counter)
-
-
-class PingProvider(EventProvider):
-    def __init__(self, counter: TimeSeriesCounterEntity):
-        super().__init__()
-        self._counter = counter
-
-    def get_events(self, time: Instant) -> List[Event]:
-        return [PingEvent(time, self._counter)]
 
 
 @dataclass(frozen=True)
@@ -162,10 +146,10 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
     end_time = Instant.from_seconds(duration_s)
 
     counter = TimeSeriesCounterEntity("counter")
-    provider = PingProvider(counter)
-    arrival_time_provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-
-    source = Source(name=f"PingSource_{profile_name}", event_provider=provider, arrival_time_provider=arrival_time_provider)
+    source = Source.with_profile(
+        profile=profile, target=counter, event_type="Ping",
+        poisson=False, name=f"PingSource_{profile_name}",
+    )
 
     sim = Simulation(start_time=Instant.Epoch, end_time=end_time, sources=[source], entities=[counter])
     sim.run()

@@ -33,8 +33,6 @@ from happysimulator.components.rate_limiter import (
     SlidingWindowPolicy,
 )
 from happysimulator.core.event import Event
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
@@ -54,20 +52,6 @@ class TimeSeriesCounterEntity(Entity):
     def handle_event(self, event: Event) -> list[Event]:
         self.handled_times.append(event.time)
         return []
-
-
-# --- Test Events and Providers ---
-
-
-class RequestProvider(EventProvider):
-    """Generates request events targeting the rate limiter."""
-
-    def __init__(self, rate_limiter: RateLimitedEntity):
-        super().__init__()
-        self._rate_limiter = rate_limiter
-
-    def get_events(self, time: Instant) -> List[Event]:
-        return [Event(time=time, event_type="Request", target=self._rate_limiter)]
 
 
 # --- Profile Definitions ---
@@ -196,12 +180,9 @@ def test_rate_limiter_with_profile(
     )
 
     # Create source targeting the rate limiter
-    provider = RequestProvider(rate_limiter)
-    arrival_provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    source = Source(
-        name=f"RequestSource_{test_name}",
-        event_provider=provider,
-        arrival_time_provider=arrival_provider,
+    source = Source.with_profile(
+        profile=profile, target=rate_limiter,
+        poisson=False, name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -397,12 +378,9 @@ def test_leaky_bucket_with_profile(
     )
 
     # Create source targeting the rate limiter
-    provider = RequestProvider(rate_limiter)
-    arrival_provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    source = Source(
-        name=f"RequestSource_{test_name}",
-        event_provider=provider,
-        arrival_time_provider=arrival_provider,
+    source = Source.with_profile(
+        profile=profile, target=rate_limiter,
+        poisson=False, name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -564,12 +542,8 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
     token_limiter = RateLimitedEntity(
         name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
     )
-    token_provider = RequestProvider(token_limiter)
-    token_arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    token_source = Source(
-        name="TokenSource",
-        event_provider=token_provider,
-        arrival_time_provider=token_arrival,
+    token_source = Source.with_profile(
+        profile=profile, target=token_limiter, poisson=False, name="TokenSource",
     )
 
     # --- Leaky Bucket Setup ---
@@ -578,12 +552,8 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
     leaky_limiter = RateLimitedEntity(
         name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
     )
-    leaky_provider = RequestProvider(leaky_limiter)
-    leaky_arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    leaky_source = Source(
-        name="LeakySource",
-        event_provider=leaky_provider,
-        arrival_time_provider=leaky_arrival,
+    leaky_source = Source.with_profile(
+        profile=profile, target=leaky_limiter, poisson=False, name="LeakySource",
     )
 
     # Run simulations
@@ -706,12 +676,9 @@ def test_sliding_window_with_profile(
     effective_rate_limit = max_requests / window_size_seconds
 
     # Create source targeting the rate limiter
-    provider = RequestProvider(rate_limiter)
-    arrival_provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    source = Source(
-        name=f"RequestSource_{test_name}",
-        event_provider=provider,
-        arrival_time_provider=arrival_provider,
+    source = Source.with_profile(
+        profile=profile, target=rate_limiter,
+        poisson=False, name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -854,12 +821,8 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     token_limiter = RateLimitedEntity(
         name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
     )
-    token_provider = RequestProvider(token_limiter)
-    token_arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    token_source = Source(
-        name="TokenSource",
-        event_provider=token_provider,
-        arrival_time_provider=token_arrival,
+    token_source = Source.with_profile(
+        profile=profile, target=token_limiter, poisson=False, name="TokenSource",
     )
 
     # --- Leaky Bucket Setup ---
@@ -868,12 +831,8 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     leaky_limiter = RateLimitedEntity(
         name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
     )
-    leaky_provider = RequestProvider(leaky_limiter)
-    leaky_arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    leaky_source = Source(
-        name="LeakySource",
-        event_provider=leaky_provider,
-        arrival_time_provider=leaky_arrival,
+    leaky_source = Source.with_profile(
+        profile=profile, target=leaky_limiter, poisson=False, name="LeakySource",
     )
 
     # --- Sliding Window Setup ---
@@ -882,12 +841,8 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     sliding_limiter = RateLimitedEntity(
         name="sliding_limiter", downstream=sliding_sink, policy=sliding_policy, queue_capacity=10000,
     )
-    sliding_provider = RequestProvider(sliding_limiter)
-    sliding_arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    sliding_source = Source(
-        name="SlidingSource",
-        event_provider=sliding_provider,
-        arrival_time_provider=sliding_arrival,
+    sliding_source = Source.with_profile(
+        profile=profile, target=sliding_limiter, poisson=False, name="SlidingSource",
     )
 
     # Run simulations

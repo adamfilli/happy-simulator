@@ -16,8 +16,8 @@ collapse occurs at moderate load because:
 
     +-------------+      Request        +---------------------------------+
     |   Source    |-------------------->|         Retrying Client         |
-    |  (Poisson)  |                     |                                 |
-    |  7 req/s    |                     |  Timeout: 200ms                 |
+    | (Constant)  |                     |                                 |
+    |  7 req/s    |                     |  Timeout: 500ms                 |
     +-------------+                     |  Max Retries: 3                 |
                                         |  Retry Delay: 50ms              |
                                         +-----------------+---------------+
@@ -27,10 +27,10 @@ collapse occurs at moderate load because:
                                         |        GC-Aware Server          |
                                         |  +---------+   +-------------+  |
                                         |  |  Queue  |-->|   Worker    |  |
-                                        |  | (FIFO)  |   | (Exp ~100ms)|  |
+                                        |  | (FIFO)  |   | (100ms svc) |  |
                                         |  +---------+   +-------------+  |
                                         |         ^                       |
-                                        |    GC Pause: 500ms every 10s    |
+                                        |    GC Pause: 1.0s at t=30s      |
                                         +-----------------+---------------+
                                                           |
                                                           v
@@ -42,32 +42,31 @@ collapse occurs at moderate load because:
 
 ## Collapse Mechanism
 
-**Before GC** (stable):
-- Arrival: 7 req/s, Service: 10 req/s
-- 30% headroom, queue nearly empty
+**Before GC** (t=0-30s, stable, zero timeouts):
+- Arrival: 7 req/s, Service: 10 req/s (constant 100ms)
+- 30% headroom, queue always empty
+- Timeout 500ms = 5x service time, never triggers under normal load
 
-**During GC** (500ms):
+**Single GC at t=30s** (1.0s pause):
 - Server STOPS (processing = 0)
-- ~3.5 new requests queue up
-- ALL in-flight timeout (500ms > 200ms timeout)
+- ~7 new requests queue up
+- ALL in-flight timeout (1.0s > 500ms timeout)
 - Clients retry timed-out requests
 
-**After GC**:
+**After GC** (t=31s+, unrecoverable):
 - Queue = original arrivals + retry storm
-- Drain rate = 10 - 7 = 3 req/s (slow)
-- Before queue clears, NEXT GC hits
-- Queue compounds -> collapse
+- Retries amplify load ~4x → effective arrival 28 req/s vs 10 req/s capacity
+- Queue grows indefinitely, system never recovers
 
 ## Parameters
 
 | Parameter      | Value  | Rationale                                  |
 |----------------|--------|--------------------------------------------|
 | Arrival rate   | 7 req/s| 70% utilization - clearly below saturation |
-| Service rate   | 10 req/s| Mean service time 100ms                   |
-| Client timeout | 200ms  | 2x mean service - reasonable for normal ops|
-| GC duration    | 500ms  | 2.5x timeout - guarantees all in-flight timeout|
-| GC interval    | 10s    | Short enough to observe multiple GCs       |
-| Max retries    | 3      | Amplifies load but finite                  |
+| Service time   | 100ms  | Constant (deterministic) - no timeouts in steady state |
+| Client timeout | 500ms  | 5x service time - generous, never triggers normally |
+| GC at t=30s    | 1.0s   | Single pause, 2x timeout - guarantees all in-flight timeout |
+| Max retries    | 3      | Amplifies load ~4x, overwhelming 30% headroom |
 | Retry delay    | 50ms   | Fixed, contributes to retry storm          |
 """
 
@@ -80,6 +79,7 @@ from pathlib import Path
 from typing import Generator
 
 from happysimulator import (
+    ConstantArrivalTimeProvider,
     ConstantRateProfile,
     Data,
     Entity,
@@ -87,9 +87,7 @@ from happysimulator import (
     EventProvider,
     FIFOQueue,
     Instant,
-    PoissonArrivalTimeProvider,
     Probe,
-    Profile,
     QueuedResource,
     Simulation,
     Source,
@@ -115,29 +113,33 @@ class GCServer(QueuedResource):
 
     Args:
         name: Entity name
-        mean_service_time_s: Mean exponential service time (default 100ms)
-        gc_interval_s: Time between GC events (default 10s)
-        gc_duration_s: Duration of each GC pause (default 500ms)
-        gc_start_time_s: When the first GC occurs (default 10s)
+        service_time_s: Constant service time per request (default 100ms)
+        gc_interval_s: Time between GC events (default 999 = single GC)
+        gc_duration_s: Duration of each GC pause (default 1.0s)
+        gc_start_time_s: When the GC occurs (default 30s)
         downstream: Entity to forward completed events to
+        concurrency: Number of concurrent workers (default 1)
     """
 
     def __init__(
         self,
         name: str,
         *,
-        mean_service_time_s: float = 0.1,
-        gc_interval_s: float = 10.0,
-        gc_duration_s: float = 0.5,
-        gc_start_time_s: float = 10.0,
+        service_time_s: float = 0.1,
+        gc_interval_s: float = 999.0,
+        gc_duration_s: float = 1.0,
+        gc_start_time_s: float = 30.0,
         downstream: Entity | None = None,
+        concurrency: int = 1,
     ):
         super().__init__(name, policy=FIFOQueue())
-        self.mean_service_time_s = mean_service_time_s
+        self.service_time_s = service_time_s
         self.gc_interval_s = gc_interval_s
         self.gc_duration_s = gc_duration_s
         self.gc_start_time_s = gc_start_time_s
         self.downstream = downstream
+        self.concurrency = concurrency
+        self._in_flight: int = 0
 
         # Stats
         self.stats_processed: int = 0
@@ -178,36 +180,39 @@ class GCServer(QueuedResource):
             self.gc_events.append((gc_start, gc_end))
 
     def has_capacity(self) -> bool:
-        return True
+        return self._in_flight < self.concurrency
 
     def handle_queued_event(
         self, event: Event
     ) -> Generator[float, None, list[Event]]:
         """Process request, pausing for GC if necessary."""
-        # Check if we're in a GC pause
-        gc_remaining = self._get_gc_pause_remaining()
-        if gc_remaining > 0:
-            self.stats_gc_pauses += 1
-            self._record_gc_event()
-            yield gc_remaining, None  # Server completely stops
+        self._in_flight += 1
+        try:
+            # Check if we're in a GC pause
+            gc_remaining = self._get_gc_pause_remaining()
+            if gc_remaining > 0:
+                self.stats_gc_pauses += 1
+                self._record_gc_event()
+                yield gc_remaining, None  # Server completely stops
 
-        # Normal service time (exponential distribution)
-        service_time = random.expovariate(1.0 / self.mean_service_time_s)
-        yield service_time, None
+            # Constant service time (deterministic - no variance-induced timeouts)
+            yield self.service_time_s, None
 
-        self.stats_processed += 1
+            self.stats_processed += 1
 
-        if self.downstream is None:
-            return []
+            if self.downstream is None:
+                return []
 
-        # Forward completion to downstream
-        completed = Event(
-            time=self.now,
-            event_type="Completion",
-            target=self.downstream,
-            context=event.context,
-        )
-        return [completed]
+            # Forward completion to downstream
+            completed = Event(
+                time=self.now,
+                event_type="Completion",
+                target=self.downstream,
+                context=event.context,
+            )
+            return [completed]
+        finally:
+            self._in_flight -= 1
 
 
 # =============================================================================
@@ -234,7 +239,7 @@ class RetryingClientWithStats(Entity):
     Args:
         name: Entity name
         server: Target server entity
-        timeout_s: Client timeout before retry (default 200ms)
+        timeout_s: Client timeout before retry (default 500ms)
         max_retries: Maximum retry attempts per request (default 3)
         retry_delay_s: Delay before sending retry (default 50ms)
         retry_enabled: Whether retries are enabled (default True)
@@ -245,7 +250,7 @@ class RetryingClientWithStats(Entity):
         name: str,
         *,
         server: Entity,
-        timeout_s: float = 0.2,
+        timeout_s: float = 0.5,
         max_retries: int = 3,
         retry_delay_s: float = 0.05,
         retry_enabled: bool = True,
@@ -529,16 +534,16 @@ class ComparisonResult:
 
 def run_gc_collapse_simulation(
     *,
-    duration_s: float = 100.0,
+    duration_s: float = 60.0,
     drain_s: float = 10.0,
     arrival_rate: float = 7.0,
-    mean_service_time_s: float = 0.1,
-    timeout_s: float = 0.2,
+    service_time_s: float = 0.1,
+    timeout_s: float = 0.5,
     max_retries: int = 3,
     retry_delay_s: float = 0.05,
-    gc_interval_s: float = 10.0,
-    gc_duration_s: float = 0.5,
-    gc_start_time_s: float = 10.0,
+    gc_interval_s: float = 999.0,
+    gc_duration_s: float = 1.0,
+    gc_start_time_s: float = 30.0,
     probe_interval_s: float = 0.1,
     retry_enabled: bool = True,
     seed: int | None = 42,
@@ -549,7 +554,7 @@ def run_gc_collapse_simulation(
         duration_s: How long to generate load
         drain_s: Extra time for in-flight requests to complete
         arrival_rate: Requests per second
-        mean_service_time_s: Mean server processing time
+        service_time_s: Constant server processing time per request
         timeout_s: Client timeout before retry
         max_retries: Maximum retry attempts per request
         retry_delay_s: Delay before sending retry
@@ -569,7 +574,7 @@ def run_gc_collapse_simulation(
     # Create server with GC pauses
     server = GCServer(
         name="Server",
-        mean_service_time_s=mean_service_time_s,
+        service_time_s=service_time_s,
         gc_interval_s=gc_interval_s,
         gc_duration_s=gc_duration_s,
         gc_start_time_s=gc_start_time_s,
@@ -599,11 +604,11 @@ def run_gc_collapse_simulation(
         start_time=Instant.Epoch,
     )
 
-    # Create source
+    # Create source (constant arrivals for deterministic pre-GC stability)
     stop_after = Instant.from_seconds(duration_s)
     provider = ClientRequestProvider(client, stop_after=stop_after)
     profile = ConstantRateProfile(rate=arrival_rate)
-    arrival = PoissonArrivalTimeProvider(profile, start_time=Instant.Epoch)
+    arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
     source = Source(name="Source", event_provider=provider, arrival_time_provider=arrival)
 
     # Run simulation
@@ -734,10 +739,12 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     # Add a single legend entry for GC
     if gc_events:
-        ax1.axvspan(0, 0, alpha=0.3, color="red", label="GC Pause (500ms)")
+        gc_dur_ms = with_r.server.gc_duration_s * 1000
+        ax1.axvspan(0, 0, alpha=0.3, color="red", label=f"GC Pause ({gc_dur_ms:.0f}ms)")
 
     ax1.set_ylabel("GC Events")
-    ax1.set_title("GC Pause Timeline (500ms pause every 10s)")
+    gc_dur_ms = with_r.server.gc_duration_s * 1000
+    ax1.set_title(f"GC Pause ({gc_dur_ms:.0f}ms at t={with_r.server.gc_start_time_s:.0f}s)")
     ax1.legend(loc="upper right")
     ax1.set_ylim(0, 1)
     ax1.set_yticks([])
@@ -850,8 +857,9 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
             color="green",
         )
 
+    timeout_ms = with_r.client.timeout_s * 1000
     ax2.axvline(
-        x=200, color="orange", linestyle="--", alpha=0.7, label="Timeout (200ms)"
+        x=timeout_ms, color="orange", linestyle="--", alpha=0.7, label=f"Timeout ({timeout_ms:.0f}ms)"
     )
     ax2.set_xlabel("Latency (ms)")
     ax2.set_ylabel("Count")
@@ -944,14 +952,12 @@ Final Queue Depth:      {final_q_with:>6}            {final_q_without:>6}
 Avg Latency:            {avg_lat_with:>5.0f}ms          {avg_lat_without:>5.0f}ms
 p99 Latency:            {p99_lat_with:>5.0f}ms          {p99_lat_without:>5.0f}ms
 
-GC Configuration:
-  - Interval: {with_r.server.gc_interval_s}s
-  - Duration: {with_r.server.gc_duration_s}s (2.5x timeout)
-  - First GC: {with_r.server.gc_start_time_s}s
+GC: {with_r.server.gc_duration_s}s pause at t={with_r.server.gc_start_time_s}s ({with_r.server.gc_duration_s / with_r.client.timeout_s:.1f}x timeout)
 
 Key Insight:
-  Retries cause {amp_with:.1f}x load amplification, overwhelming
-  the 30% recovery headroom and triggering collapse.
+  A single GC pause causes {amp_with:.1f}x load amplification,
+  overwhelming the 30% recovery headroom. System never
+  recovers.
 """
 
     ax4.text(
@@ -985,12 +991,13 @@ def print_summary(result: ComparisonResult) -> None:
     print("GC-INDUCED METASTABLE COLLAPSE SIMULATION")
     print("=" * 75)
 
+    svc_rate = 1.0 / with_r.server.service_time_s
+    gc_timeout_ratio = with_r.server.gc_duration_s / with_r.client.timeout_s
+
     print("\nConfiguration:")
-    print(f"  Service capacity: 10 req/s (mean service time = 100ms)")
-    print(f"  Arrival rate: 7 req/s (70% utilization)")
+    print(f"  Service capacity: {svc_rate:.0f} req/s (service time = {with_r.server.service_time_s * 1000:.0f}ms)")
     print(f"  Client timeout: {with_r.client.timeout_s * 1000:.0f}ms")
-    print(f"  GC interval: {with_r.server.gc_interval_s}s")
-    print(f"  GC duration: {with_r.server.gc_duration_s}s (2.5x timeout)")
+    print(f"  GC pause: {with_r.server.gc_duration_s}s at t={with_r.server.gc_start_time_s}s ({gc_timeout_ratio:.1f}x timeout)")
     print(f"  Max retries: {with_r.client.max_retries}")
     print(f"  Retry delay: {with_r.client.retry_delay_s * 1000:.0f}ms")
 
@@ -1074,7 +1081,7 @@ if __name__ == "__main__":
         description="GC-induced metastable collapse simulation"
     )
     parser.add_argument(
-        "--duration", type=float, default=100.0, help="Simulation duration (s)"
+        "--duration", type=float, default=60.0, help="Simulation duration (s)"
     )
     parser.add_argument(
         "--drain", type=float, default=10.0, help="Drain time after load stops (s)"
@@ -1083,10 +1090,10 @@ if __name__ == "__main__":
         "--arrival-rate", type=float, default=7.0, help="Arrival rate (req/s)"
     )
     parser.add_argument(
-        "--service-time", type=float, default=0.1, help="Mean service time (s)"
+        "--service-time", type=float, default=0.1, help="Constant service time (s)"
     )
     parser.add_argument(
-        "--timeout", type=float, default=0.2, help="Client timeout (s)"
+        "--timeout", type=float, default=0.5, help="Client timeout (s)"
     )
     parser.add_argument(
         "--max-retries", type=int, default=3, help="Max retries per request"
@@ -1095,13 +1102,13 @@ if __name__ == "__main__":
         "--retry-delay", type=float, default=0.05, help="Retry delay (s)"
     )
     parser.add_argument(
-        "--gc-interval", type=float, default=10.0, help="GC interval (s)"
+        "--gc-interval", type=float, default=999.0, help="GC interval (s, 999=single GC)"
     )
     parser.add_argument(
-        "--gc-duration", type=float, default=0.5, help="GC duration (s)"
+        "--gc-duration", type=float, default=1.0, help="GC duration (s)"
     )
     parser.add_argument(
-        "--gc-start", type=float, default=10.0, help="First GC start time (s)"
+        "--gc-start", type=float, default=30.0, help="GC start time (s)"
     )
     parser.add_argument(
         "--seed", type=int, default=42, help="Random seed (-1 for random)"
@@ -1119,14 +1126,14 @@ if __name__ == "__main__":
     print("Running GC-induced collapse simulation...")
     print(f"  Duration: {args.duration}s + {args.drain}s drain")
     print(f"  Arrival rate: {args.arrival_rate} req/s")
-    print(f"  GC: {args.gc_duration}s pause every {args.gc_interval}s")
+    print(f"  GC: {args.gc_duration}s pause at t={args.gc_start}s")
     print(f"  Random seed: {seed if seed is not None else 'random'}")
 
     result = run_comparison(
         duration_s=args.duration,
         drain_s=args.drain,
         arrival_rate=args.arrival_rate,
-        mean_service_time_s=args.service_time,
+        service_time_s=args.service_time,
         timeout_s=args.timeout,
         max_retries=args.max_retries,
         retry_delay_s=args.retry_delay,

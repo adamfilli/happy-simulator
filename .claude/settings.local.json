@@ -25,7 +25,8 @@
       "Bash(git log:*)",
       "Bash(Select-String:*)",
       "Bash(Measure-Object -Line)",
-      "Bash(cloc:*)"
+      "Bash(cloc:*)",
+      "Bash(gh pr edit:*)"
     ]
   },
   "hooks": {

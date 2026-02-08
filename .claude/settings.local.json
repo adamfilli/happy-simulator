@@ -24,7 +24,8 @@
       "Bash(findstr:*)",
       "Bash(git log:*)",
       "Bash(Select-String:*)",
-      "Bash(Measure-Object -Line)"
+      "Bash(Measure-Object -Line)",
+      "Bash(cloc:*)"
     ]
   },
   "hooks": {

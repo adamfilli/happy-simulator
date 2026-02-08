@@ -1,21 +1,11 @@
-from typing import List
-
+from happysimulator.components.common import Counter
 from happysimulator.core.entity import Entity
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.source import Source
-from happysimulator.core.temporal import Instant
 from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 
-class SideEffectCounterEntity(Entity):
-    def __init__(self):
-        super().__init__("sideeffectcounter")
-        self.counter = 0
-        
-    def handle_event(self, event):
-        self.counter += 1
 
 class PingCounterEntity(Entity):
     def __init__(self, side_effect_counter: Entity):
@@ -23,19 +13,16 @@ class PingCounterEntity(Entity):
         self.side_effect_counter = side_effect_counter
         self.first_counter = 0
         self.second_counter  = 0
-    
+
     def handle_event(self, event: Event):
         self.first_counter += 1
         yield 1, None
         self.second_counter += 1
-        
+
         # Yields a side effect (now) to be handled by the SideEffectCounterEntity
-        yield 1, PingEvent(self.now, self.side_effect_counter)
+        yield 1, Event(time=self.now, event_type="Ping", target=self.side_effect_counter)
         return []
 
-class PingEvent(Event):
-    def __init__(self, time: Instant, counter: Entity):
-        super().__init__(time=time, event_type="Ping", target=counter, callback=None)
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""
@@ -45,13 +32,6 @@ class ConstantOneProfile(Profile):
         else:
             return 0
 
-class PingProvider(EventProvider):
-    def __init__(self, counter: PingCounterEntity):
-        super().__init__()
-        self.counter = counter
-    
-    def get_events(self, time: Instant) -> List[Event]:
-        return [PingEvent(time, self.counter)]
 
 # --- 2. The Test Case ---
 
@@ -61,29 +41,22 @@ def test_basic_constant_simulation():
     runs for exactly 60 seconds and generates roughly 60 events.
     """
     # A. CONFIGURATION
-    
+
     # Setup the counter entities
-    side_effect_counter = SideEffectCounterEntity()
+    side_effect_counter = Counter("sideeffectcounter")
     source_event_counter = PingCounterEntity(side_effect_counter)
-    
-    # Setup the Source components
+
+    # Create the Source using the custom profile that drops rate to 0 after t=60
     profile = ConstantOneProfile()
-    provider = PingProvider(source_event_counter)
-    
-    arrival_time_provider = ConstantArrivalTimeProvider(profile, Instant.Epoch)
-    
-    # Create the Source (Rate=1, Distribution=Constant)
-    # This ensures exactly 1 event every 1.0s (t=1.0, t=2.0, etc.)
-    source = Source(
-        name="PingSource",
-        event_provider=provider,
-        arrival_time_provider=arrival_time_provider
+    source = Source.with_profile(
+        profile=profile, target=source_event_counter, event_type="Ping",
+        poisson=False, name="PingSource",
     )
 
     # B. INITIALIZATION
     sim = Simulation(
         sources=[source],
-        entities=[source_event_counter])
+        entities=[source_event_counter, side_effect_counter])
 
     # C. EXECUTION
     # Run the simulation
@@ -99,5 +72,5 @@ def test_basic_constant_simulation():
     assert source_event_counter.second_counter == 61, \
         f"Expected a count of 61 in the second counter, but there were {source_event_counter.second_counter}"
 
-    assert side_effect_counter.counter == 61, \
-        f"Expected a count of 61 in the side effect counter, but there were {source_event_counter.second_counter}"
+    assert side_effect_counter.total == 61, \
+        f"Expected a count of 61 in the side effect counter, but there were {side_effect_counter.total}"

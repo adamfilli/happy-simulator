@@ -6,9 +6,6 @@ according to the plugged-in policy when run inside a full simulation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
-
 import pytest
 
 from happysimulator.components.rate_limiter.policy import (
@@ -21,51 +18,11 @@ from happysimulator.components.rate_limiter.policy import (
 from happysimulator.components.rate_limiter.rate_limited_entity import (
     RateLimitedEntity,
 )
-from happysimulator.core.entity import Entity
+from happysimulator.components.common import Sink
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-class SinkEntity(Entity):
-    """Collects forwarded events for verification."""
-
-    def __init__(self, name: str = "sink"):
-        super().__init__(name)
-        self.handled_times: list[Instant] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.handled_times.append(event.time)
-        return []
-
-
-class TargetedRequestProvider(EventProvider):
-    """Generates request events targeting a given entity."""
-
-    def __init__(self, target: Entity):
-        super().__init__()
-        self._target = target
-
-    def get_events(self, time: Instant) -> List[Event]:
-        return [
-            Event(time=time, event_type="Request", target=self._target)
-        ]
-
-
-@dataclass(frozen=True)
-class ConstantRate(Profile):
-    rate: float
-
-    def get_rate(self, time: Instant) -> float:  # noqa: ARG002
-        return float(self.rate)
 
 
 # ---------------------------------------------------------------------------
@@ -76,13 +33,11 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_low_load_all_forwarded(self):
         """With load well below the rate limit, all requests are forwarded."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=10.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=5.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=5.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -98,15 +53,13 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_overload_queues_then_drains(self):
         """Excess requests queue and drain at the refill rate."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=5.0, refill_rate=5.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=1000,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=20.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=20.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -123,15 +76,13 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_queue_overflow_drops(self):
         """When queue overflows, excess requests are dropped."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=1.0, refill_rate=1.0, initial_tokens=0.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=5,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=100.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=100.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -152,13 +103,11 @@ class TestRateLimitedEntityLeakyBucket:
 
     def test_strict_output_rate(self):
         """Leaky bucket enforces strict output rate with no bursting."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = LeakyBucketPolicy(leak_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -181,13 +130,11 @@ class TestRateLimitedEntitySlidingWindow:
 
     def test_requests_within_window_limit(self):
         """Sliding window allows up to max_requests per window."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=5)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -210,13 +157,11 @@ class TestRateLimitedEntityFixedWindow:
 
     def test_window_counter_resets(self):
         """Fixed window resets counter at window boundaries."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = FixedWindowPolicy(requests_per_window=5, window_size=1.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -239,16 +184,14 @@ class TestRateLimitedEntityAdaptive:
 
     def test_adaptive_with_feedback(self):
         """Adaptive policy adjusts rate based on success/failure feedback."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = AdaptivePolicy(
             initial_rate=50.0, min_rate=5.0, max_rate=200.0,
             increase_step=5.0, decrease_factor=0.7,
         )
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=10.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=10.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -260,7 +203,7 @@ class TestRateLimitedEntityAdaptive:
 
         assert limiter.stats.forwarded > 0
         # Record some success feedback
-        for t in sink.handled_times[:10]:
+        for t in sink.completion_times[:10]:
             policy.record_success(t)
         assert policy.successes > 0
 
@@ -273,15 +216,13 @@ class TestInvariants:
 
     def test_received_equals_forwarded_plus_queued_plus_dropped(self):
         """received == forwarded + in_queue + dropped always holds."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=3.0, refill_rate=2.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=50,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=15.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=15.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -296,13 +237,11 @@ class TestInvariants:
 
     def test_forwarded_matches_sink(self):
         """Number of forwarded events matches what the sink received."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -313,4 +252,4 @@ class TestInvariants:
         sim.run()
 
         # Sink might miss the last forward event if it fires at end_time boundary
-        assert abs(limiter.stats.forwarded - len(sink.handled_times)) <= 1
+        assert abs(limiter.stats.forwarded - len(sink.completion_times)) <= 1

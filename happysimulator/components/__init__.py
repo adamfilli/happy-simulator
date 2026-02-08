@@ -112,6 +112,7 @@ from happysimulator.components.messaging import (
     DeadLetterQueue,
     DeadLetterStats,
 )
+from happysimulator.components.common import Sink, Counter
 from happysimulator.components.sketching import (
     SketchCollector,
     TopKCollector,
@@ -228,6 +229,9 @@ __all__ = [
     "Subscription",
     "DeadLetterQueue",
     "DeadLetterStats",
+    # Common entities
+    "Sink",
+    "Counter",
     # Sketching
     "SketchCollector",
     "TopKCollector",

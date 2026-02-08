@@ -35,6 +35,7 @@ from happysimulator.load import (
 
 # Components
 from happysimulator.components import (
+    Counter,
     FIFOQueue,
     LIFOQueue,
     PriorityQueue,
@@ -45,6 +46,7 @@ from happysimulator.components import (
     RateLimiterPolicy,
     RateLimitedEntity,
     RateLimitedEntityStats,
+    Sink,
     TokenBucketPolicy,
     LeakyBucketPolicy,
     SlidingWindowPolicy,
@@ -123,6 +125,7 @@ __all__ = [
     "ConstantArrivalTimeProvider",
     "PoissonArrivalTimeProvider",
     # Components
+    "Counter",
     "Queue",
     "QueueDriver",
     "QueuedResource",
@@ -130,6 +133,7 @@ __all__ = [
     "LIFOQueue",
     "PriorityQueue",
     "RandomRouter",
+    "Sink",
     # Rate limiters
     "RateLimiterPolicy",
     "RateLimitedEntity",

@@ -4,19 +4,18 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 import math
 from pathlib import Path
-from typing import Generator, List
+from typing import Generator
 
 import pytest
 
+from happysimulator.components.common import Sink
 from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
-from happysimulator.core.entity import Entity
 from happysimulator.components.queue import Queue
 from happysimulator.components.queue_driver import QueueDriver
 from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue, QueuePolicy
+from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
@@ -38,67 +37,6 @@ class LinearRampProfile(Profile):
             return float(self.end_rate)
         frac = t / self.t_end_s
         return float(self.start_rate + frac * (self.end_rate - self.start_rate))
-
-
-class RequestProvider(EventProvider):
-
-    """Generates request events targeting the queue.
-
-    Optionally stops emitting events after a cutoff time. This lets tests generate
-    load for a bounded window, then let the system drain without injecting more work.
-    """
-
-    def __init__(self, queue: Entity, *, stop_after: Instant | None = None):
-        self._queue = queue
-        self._stop_after = stop_after
-        self.generated_requests: int = 0
-
-    def get_events(self, time: Instant) -> List[Event]:
-        if self._stop_after is not None and time > self._stop_after:
-            return []
-
-        self.generated_requests += 1
-        return [
-            Event(
-                time=time,
-                event_type="Request",
-                target=self._queue,
-                context={
-                    "created_at": time,
-                    "request_id": self.generated_requests,
-                },
-            )
-        ]
-
-
-class LatencyTrackingSink(Entity):
-
-    """Sink that records end-to-end latency using the event context."""
-
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.events_received: int = 0
-        self.completion_times: list[Instant] = []
-        self.latencies_s: list[float] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.events_received += 1
-
-        created_at: Instant = event.context.get("created_at", event.time)
-        latency_s = (event.time - created_at).to_seconds()
-        self.completion_times.append(event.time)
-        self.latencies_s.append(latency_s)
-
-        return []
-
-    def average_latency(self) -> float:
-        if not self.latencies_s:
-            return 0.0
-        return sum(self.latencies_s) / len(self.latencies_s)
-
-    def latency_time_series_seconds(self) -> tuple[list[float], list[float]]:
-        """Return (completion_times_s, latencies_s) for plotting."""
-        return [t.to_seconds() for t in self.completion_times], list(self.latencies_s)
 
 
 @dataclass
@@ -163,7 +101,7 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
 
 @dataclass(frozen=True)
 class QueueLatencyScenarioResult:
-    sink: LatencyTrackingSink
+    sink: Sink
     server: ConcurrencyLimitedServer
     queue_depth_data: Data
     requests_generated: int
@@ -192,7 +130,7 @@ def run_queue_latency_scenario(
     if bucket_size_s <= 0:
         raise ValueError("bucket_size_s must be > 0")
 
-    sink = LatencyTrackingSink(name="Sink")
+    sink = Sink(name="Sink")
     server = ConcurrencyLimitedServer(
         service_time_s=service_time_s,
         concurrency=server_concurrency,
@@ -211,10 +149,10 @@ def run_queue_latency_scenario(
         start_time=Instant.Epoch,
     )
 
-    stop_after = Instant.from_seconds(duration_s)
-    provider = RequestProvider(queue, stop_after=stop_after)
-    arrival = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
-    source = Source(name="RequestSource", event_provider=provider, arrival_time_provider=arrival)
+    source = Source.with_profile(
+        profile=profile, target=queue,
+        poisson=False, name="RequestSource", stop_after=duration_s,
+    )
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -327,7 +265,7 @@ def run_queue_latency_scenario(
         sink=sink,
         server=server,
         queue_depth_data=queue_depth_data,
-        requests_generated=provider.generated_requests,
+        requests_generated=sink.events_received,
     )
 
 

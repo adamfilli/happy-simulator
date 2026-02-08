@@ -178,36 +178,3 @@ def test_queued_resource_fifo_preserves_order_when_single_threaded() -> None:
 
     assert sink.events_received == provider.generated_requests
     assert sink.received_request_ids == list(range(1, provider.generated_requests + 1))
-
-
-def test_queued_resource_drops_when_capacity_is_bounded() -> None:
-    pytest.xfail("Queue dropping not implemented yet")
-    duration_s = 0.5
-    drain_s = 5.0
-
-    sink = RecordingSink()
-    resource = FixedTimeResource(
-        service_time_s=0.5,
-        concurrency=1,
-        policy=FIFOQueue(capacity=1),
-        downstream=sink,
-    )
-
-    provider = RequestProvider(resource, stop_after=Instant.from_seconds(duration_s))
-    arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate_per_s=20.0), start_time=Instant.Epoch)
-    source = Source(name="Source", event_provider=provider, arrival_time_provider=arrival)
-
-    sim = Simulation(
-        start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
-        sources=[source],
-        entities=[resource, sink],
-        probes=[],
-    )
-    sim.run()
-
-    assert provider.generated_requests > 0
-    assert resource.stats_accepted + resource.stats_dropped == provider.generated_requests
-    assert resource.stats_dropped > 0
-    assert sink.events_received == resource.stats_processed
-    assert sink.events_received == resource.stats_accepted

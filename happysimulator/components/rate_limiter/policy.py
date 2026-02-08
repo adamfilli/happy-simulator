@@ -215,8 +215,6 @@ class SlidingWindowPolicy:
         oldest = self._request_log[0]
         expires_at = oldest + self._window_size
         remaining = (expires_at - now).to_seconds()
-        if remaining <= 0:
-            return Duration.ZERO
         wait = Duration.from_seconds(remaining)
         # Guard: if FP truncation yields zero but window is full, ensure progress
         if wait == Duration.ZERO:

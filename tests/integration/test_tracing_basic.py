@@ -5,11 +5,11 @@ Scenario:
 - A Source generates events at 1 per second for 5 seconds.
 - Events flow through a pipeline:
   1. FirstEntity (handles via handle_event, yields a 0.1s delay, passes to next)
-  2. MiddleProcessor (handles via callback, yields a 0.1s delay, passes to sink)
+  2. MiddleEntity (handles via handle_event, yields a 0.1s delay, passes to sink)
   3. SinkEntity (collects events in memory)
 
 The test verifies that each event's trace contains the expected spans
-for both entity-based and callback-based handling.
+for entity-based handling through the pipeline.
 """
 
 from typing import Generator, List
@@ -28,36 +28,36 @@ from happysimulator.core.temporal import Instant
 # --- Entities ---
 
 class FirstEntity(Entity):
-    """First stop in the pipeline. Handles via handle_event, then forwards to callback."""
+    """First stop in the pipeline. Handles via handle_event, then forwards to middle."""
 
-    def __init__(self, next_processor: "MiddleProcessor"):
+    def __init__(self, next_entity: "MiddleEntity"):
         super().__init__("first_entity")
-        self.next_processor = next_processor
+        self.next_entity = next_entity
         self.events_handled = 0
 
     def handle_event(self, event: Event) -> Generator:
         self.events_handled += 1
         yield 0.1  # Simulate 0.1 second processing delay
 
-        # Forward to the middle processor via callback
+        # Forward to the middle entity
         next_event = Event(
             time=event.time + 0.1,
             event_type="MiddleEvent",
-            callback=self.next_processor.process,
+            target=self.next_entity,
             context=event.context,  # Preserve trace context
         )
         return [next_event]
 
 
-class MiddleProcessor:
-    """Middle processor. Handles via callback, then forwards to sink entity."""
+class MiddleEntity(Entity):
+    """Middle processor entity. Forwards to sink after processing."""
 
     def __init__(self, sink: "SinkEntity"):
+        super().__init__("middle_entity")
         self.sink = sink
         self.events_processed = 0
 
-    def process(self, event: Event) -> Generator:
-        """Callback that processes an event and forwards to sink."""
+    def handle_event(self, event: Event) -> Generator:
         self.events_processed += 1
         yield 0.1  # Simulate 0.1 second processing delay
 
@@ -102,7 +102,7 @@ class ConstantOnePerSecondProfile(Profile):
 def test_tracing_spans_through_pipeline():
     """
     Verifies that events accumulate correct trace spans as they flow
-    through a pipeline with both entity-based and callback-based handlers.
+    through a pipeline of entities.
 
     Expected spans per event:
     1. handle.start (entity: first_entity)
@@ -112,7 +112,7 @@ def test_tracing_spans_through_pipeline():
     5. process.resume.end
     6. process.resume.start
     7. process.stop
-    8. handle.start (callback: MiddleProcessor.process)
+    8. handle.start (entity: middle_entity)
     9. handle.end (result_kind: process)
     10. process.resume.start
     11. process.yield (delay_s: 0.1)
@@ -125,9 +125,9 @@ def test_tracing_spans_through_pipeline():
     # A. SETUP
     sim_duration = 5.0
 
-    # Build pipeline: FirstEntity -> MiddleProcessor -> SinkEntity
+    # Build pipeline: FirstEntity -> MiddleEntity -> SinkEntity
     sink = SinkEntity()
-    middle = MiddleProcessor(sink)
+    middle = MiddleEntity(sink)
     first = FirstEntity(middle)
 
     # Setup source
@@ -140,7 +140,7 @@ def test_tracing_spans_through_pipeline():
     # B. RUN SIMULATION
     sim = Simulation(
         sources=[event_source],
-        entities=[first, sink],
+        entities=[first, middle, sink],
         probes=[],
         end_time=Instant.from_seconds(sim_duration + 1)  # Extra time for pipeline to drain
     )
@@ -150,7 +150,7 @@ def test_tracing_spans_through_pipeline():
 
     # Verify events flowed through the entire pipeline
     assert first.events_handled >= 4, f"Expected >= 4 events at first entity, got {first.events_handled}"
-    assert middle.events_processed >= 4, f"Expected >= 4 events at middle processor, got {middle.events_processed}"
+    assert middle.events_processed >= 4, f"Expected >= 4 events at middle entity, got {middle.events_processed}"
     assert len(sink.collected_events) >= 4, f"Expected >= 4 events at sink, got {len(sink.collected_events)}"
 
     # Verify trace spans on collected events
@@ -164,7 +164,6 @@ def test_tracing_spans_through_pipeline():
         actions = [span["action"] for span in spans]
 
         # Verify we have the expected handler lifecycle spans
-        # First entity (handle_event approach)
         assert "handle.start" in actions, f"Event {i} missing handle.start span"
         assert "handle.end" in actions, f"Event {i} missing handle.end span"
 
@@ -173,24 +172,24 @@ def test_tracing_spans_through_pipeline():
         assert "process.yield" in actions, f"Event {i} missing process.yield span"
         assert "process.stop" in actions, f"Event {i} missing process.stop span"
 
-        # Verify we have spans from both entity and callback handlers
+        # Verify we have spans from all three entities
         handle_starts = [s for s in spans if s["action"] == "handle.start"]
         assert len(handle_starts) >= 3, \
-            f"Event {i} should have handle.start spans for first entity, callback, and sink. Got {len(handle_starts)}"
+            f"Event {i} should have handle.start spans for first, middle, and sink. Got {len(handle_starts)}"
 
-        # Check handler types
+        # All handlers should be entity-based
         handler_kinds = [s.get("data", {}).get("handler") for s in handle_starts]
-        assert "entity" in handler_kinds, f"Event {i} should have an entity handler span"
-        assert "callback" in handler_kinds, f"Event {i} should have a callback handler span"
+        assert all(k == "entity" for k in handler_kinds), \
+            f"Event {i} all handlers should be entity-based, got {handler_kinds}"
 
         # Verify handler labels
         handler_labels = [s.get("data", {}).get("handler_label") for s in handle_starts]
         assert any("first_entity" in str(label) for label in handler_labels), \
             f"Event {i} should have first_entity in handler labels: {handler_labels}"
+        assert any("middle_entity" in str(label) for label in handler_labels), \
+            f"Event {i} should have middle_entity in handler labels: {handler_labels}"
         assert any("sink_entity" in str(label) for label in handler_labels), \
             f"Event {i} should have sink_entity in handler labels: {handler_labels}"
-        assert any("process" in str(label).lower() for label in handler_labels), \
-            f"Event {i} should have MiddleProcessor.process in handler labels: {handler_labels}"
 
     # Verify span ordering (handle.start should come before handle.end for each handler)
     for i, event in enumerate(sink.collected_events):
@@ -227,7 +226,7 @@ def test_tracing_preserves_event_identity():
     """
     # A. SETUP
     sink = SinkEntity()
-    middle = MiddleProcessor(sink)
+    middle = MiddleEntity(sink)
     first = FirstEntity(middle)
 
     profile = ConstantOnePerSecondProfile(2.0)
@@ -238,7 +237,7 @@ def test_tracing_preserves_event_identity():
 
     sim = Simulation(
         sources=[event_source],
-        entities=[first, sink],
+        entities=[first, middle, sink],
         probes=[],
         end_time=Instant.from_seconds(3.0)
     )

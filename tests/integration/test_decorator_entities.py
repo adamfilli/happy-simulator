@@ -47,13 +47,13 @@ class EchoServer:
         self.requests_handled += 1
         yield self.processing_delay
 
-        # Send response back via callback
+        # Send response back via Event.once wrapping the client method
         client = event.context.get("metadata", {}).get("client")
         if client:
-            response = Event(
+            response = Event.once(
                 time=self.now,
                 event_type="Response",
-                callback=client.receive_response,
+                fn=client.receive_response,
             )
             return [response]
         return []

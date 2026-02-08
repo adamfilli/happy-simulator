@@ -31,5 +31,4 @@ class SourceEvent(Event):
             time=time,
             event_type="source_event",
             daemon=daemon,
-            target=source_entity,
-            callback=None)
+            target=source_entity)

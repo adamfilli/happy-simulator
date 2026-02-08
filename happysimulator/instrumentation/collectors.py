@@ -19,6 +19,11 @@ class LatencyTracker(Entity):
     Event.__post_init__ sets automatically.
 
     Stores (completion_time_s, latency_s) pairs in self.data.
+
+    Note: Memory usage grows linearly with the number of events
+    processed (~72 bytes per event). For simulations with millions
+    of events, consider using TDigest for approximate percentiles
+    or periodic aggregation to bound memory usage.
     """
 
     def __init__(self, name: str = "LatencyTracker") -> None:

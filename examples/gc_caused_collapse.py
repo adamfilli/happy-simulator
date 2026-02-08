@@ -745,7 +745,8 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax1.set_ylabel("GC Events")
     gc_dur_ms = with_r.server.gc_duration_s * 1000
     ax1.set_title(f"GC Pause ({gc_dur_ms:.0f}ms at t={with_r.server.gc_start_time_s:.0f}s)")
-    ax1.legend(loc="upper right")
+    if ax1.get_legend_handles_labels()[1]:
+        ax1.legend(loc="upper right")
     ax1.set_ylim(0, 1)
     ax1.set_yticks([])
     ax1.grid(True, alpha=0.3)
@@ -895,7 +896,8 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax3.set_xlabel("Time (s)")
     ax3.set_ylabel("Cumulative Timeouts")
     ax3.set_title("Cumulative Client Timeouts Over Time")
-    ax3.legend(loc="upper left")
+    if ax3.get_legend_handles_labels()[1]:
+        ax3.legend(loc="upper left")
     ax3.grid(True, alpha=0.3)
 
     # Plot 4: Summary Statistics Box

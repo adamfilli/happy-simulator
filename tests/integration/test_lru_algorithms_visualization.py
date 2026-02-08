@@ -554,7 +554,7 @@ SampledLRU: Random sample of N keys, evict oldest in sample.
         ax2.set_ylim(0, 100)
 
         plt.suptitle('SLRU Protected Ratio Analysis', fontsize=14)
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.subplots_adjust(top=0.92)
         plt.savefig(test_output_dir / 'slru_ratio_analysis.png', dpi=150)
         plt.close()
 

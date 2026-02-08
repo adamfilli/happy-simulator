@@ -55,6 +55,7 @@ from happysimulator.components.rate_limiter.distributed import (
     DistributedRateLimiter,
     DistributedRateLimiterStats,
 )
+from happysimulator.components.rate_limiter.null import NullRateLimiter
 
 __all__ = [
     # Protocol
@@ -73,4 +74,6 @@ __all__ = [
     # Distributed (unchanged)
     "DistributedRateLimiter",
     "DistributedRateLimiterStats",
+    # Null (pass-through)
+    "NullRateLimiter",
 ]

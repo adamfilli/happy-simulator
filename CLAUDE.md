@@ -15,7 +15,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Key Invariant** | Events always have a `target` (Entity); use `Event.once()` for function-based dispatch |
 | **Time** | Use `Instant.from_seconds(n)`, not raw floats |
 | **Generators** | Yield delays (float seconds); return events on completion |
-| **Testing** | Use `ConstantArrivalTimeProvider` for deterministic timing |
+| **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
+| **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
 ---
 
@@ -262,6 +263,10 @@ All events dispatch through a `target` Entity's `handle_event()` method. For fun
 ### Load Generation (`happysimulator/load/`)
 
 - **`Source`**: Self-perpetuating entity that generates events at intervals
+  - **Factory methods** for common cases (see Common Patterns below):
+    - `Source.constant(rate, target, ...)` - Fixed-rate traffic
+    - `Source.poisson(rate, target, ...)` - Stochastic arrivals
+    - `Source.with_profile(profile, target, ...)` - Custom rate profiles
 - **`EventProvider`**: Creates payload events at each tick
 - **`ArrivalTimeProvider`** implementations:
   - `ConstantArrivalTimeProvider`: Fixed intervals (deterministic)
@@ -347,9 +352,13 @@ happysimulator/
 │       └── distributed_field.py  # Zipf/distribution-based
 │
 ├── components/              # Reusable simulation components
+│   ├── common.py           # Sink (latency tracking), Counter
 │   ├── queue.py            # Queue implementations
 │   ├── queued_resource.py  # Queue + processing
 │   ├── random_router.py    # Load balancing
+│   ├── rate_limiter/       # Rate limiting
+│   │   ├── inductor.py    # Inductor (EWMA burst suppression)
+│   │   └── ...            # Policies + RateLimitedEntity
 │   ├── network/            # Network simulation
 │   ├── server/             # Server models
 │   ├── client/             # Client models
@@ -369,6 +378,7 @@ happysimulator/
 │
 ├── instrumentation/         # Metrics and probing
 │   ├── data.py             # Time-series data collection
+│   ├── collectors.py       # LatencyTracker, ThroughputTracker
 │   └── probe.py            # Periodic metric sampling
 │
 └── utils/                   # Utilities
@@ -385,7 +395,13 @@ tests/
 
 .dev/                       # Design documents
 ├── COMPONENTLIB.md         # Component library plan
-└── zipf-distribution-design.md  # Feature design template
+├── event-dispatch-simplification.md  # Target-only dispatch (implemented)
+├── ergonomic-api-improvements.md     # Source factories, Sink/Counter
+├── logging-design.md       # Logging system design (implemented)
+├── observability-design.md # Observability API design (implemented)
+├── inductor-design.md      # Inductor entity design (implemented)
+├── sketching-algorithms-design.md    # Sketching data structures
+└── zipf-distribution-design.md      # Feature design template
 
 archive/                    # Reference implementations
                            # (not fully integrated, useful for patterns)
@@ -556,7 +572,30 @@ def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
     )]
 ```
 
-### Starting a Source
+### Starting a Source (Factory Methods)
+
+For most use cases, use the factory class methods which auto-generate the `EventProvider`:
+
+```python
+# Fixed-rate traffic (deterministic)
+source = Source.constant(rate=10, target=server, event_type="Request")
+
+# Stochastic arrivals (Poisson process)
+source = Source.poisson(rate=10, target=server, event_type="Request")
+
+# Custom rate profile with stochastic arrivals
+source = Source.with_profile(
+    profile=MetastableLoadProfile(),
+    target=server,
+    event_type="Request",
+    poisson=True,
+)
+
+# All factories accept stop_after (float seconds or Instant)
+source = Source.poisson(rate=10, target=server, stop_after=60.0)
+```
+
+For advanced cases (custom `EventProvider` with field distributions, etc.), use the full constructor:
 
 ```python
 source = Source(
@@ -564,10 +603,28 @@ source = Source(
     event_provider=my_provider,
     arrival_time_provider=ConstantArrivalTimeProvider(
         ConstantRateProfile(rate=100),
-        start_time=Instant.Epoch,
     ),
 )
 # Source.start() is called automatically by Simulation
+```
+
+### Using Sink and Counter
+
+`Sink` and `Counter` eliminate common boilerplate for collecting simulation results:
+
+```python
+from happysimulator import Sink, Counter
+
+# Sink: collects events and tracks latency (from context['created_at'])
+sink = Sink()
+# ... wire as downstream entity ...
+sink.events_received       # total count
+sink.latency_stats()       # dict with count, avg, min, max, p50, p99
+
+# Counter: counts events by type
+counter = Counter()
+counter.total              # total events
+counter.by_type            # dict[str, int]
 ```
 
 ### Using Distributions
@@ -622,6 +679,28 @@ class MyServer(QueuedResource):
 - `handle_queued_event(event)` - Process events from the queue (generator)
 - `has_capacity()` - Controls when queue driver pulls next item
 - `self.depth` - Current queue depth (read-only property)
+
+### Inductor (Burst Suppression)
+
+`Inductor` smooths bursty traffic using EWMA of inter-arrival times. Unlike rate limiters, it has **no throughput cap** — it resists rate *changes*, not absolute rate.
+
+```python
+from happysimulator import Inductor
+
+# Place between source and server to smooth bursts
+inductor = Inductor(
+    name="Smoother",
+    downstream=server,
+    time_constant=1.0,    # higher = more smoothing
+    queue_capacity=10000, # max buffered events
+)
+source = Source.poisson(rate=100, target=inductor)
+
+# Observability
+inductor.stats             # InductorStats: received, forwarded, queued, dropped
+inductor.estimated_rate    # current EWMA-estimated rate
+inductor.queue_depth       # current buffer depth
+```
 
 ---
 

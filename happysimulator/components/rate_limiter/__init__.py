@@ -55,6 +55,10 @@ from happysimulator.components.rate_limiter.distributed import (
     DistributedRateLimiter,
     DistributedRateLimiterStats,
 )
+from happysimulator.components.rate_limiter.inductor import (
+    Inductor,
+    InductorStats,
+)
 from happysimulator.components.rate_limiter.null import NullRateLimiter
 
 __all__ = [
@@ -74,6 +78,9 @@ __all__ = [
     # Distributed (unchanged)
     "DistributedRateLimiter",
     "DistributedRateLimiterStats",
+    # Inductor (burst suppression)
+    "Inductor",
+    "InductorStats",
     # Null (pass-through)
     "NullRateLimiter",
 ]

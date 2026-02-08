@@ -18,7 +18,8 @@
       "Bash(ruff format:*)",
       "Bash(ruff check:*)",
       "Bash(mypy:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(del \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator\\\\happysimulator\\\\components\\\\token_bucket_rate_limiter.py\")"
     ]
   },
   "hooks": {

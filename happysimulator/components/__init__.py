@@ -10,15 +10,17 @@ from happysimulator.components.queue_policy import (
     Prioritized,
 )
 from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.components.token_bucket_rate_limiter import TokenBucketRateLimiter, RateLimiterStats
-from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter, LeakyBucketStats
-from happysimulator.components.sliding_window_rate_limiter import SlidingWindowRateLimiter, SlidingWindowStats
 from happysimulator.components.rate_limiter import (
-    FixedWindowRateLimiter,
-    FixedWindowStats,
-    AdaptiveRateLimiter,
-    AdaptiveRateLimiterStats,
+    RateLimiterPolicy,
+    TokenBucketPolicy,
+    LeakyBucketPolicy,
+    SlidingWindowPolicy,
+    FixedWindowPolicy,
+    AdaptivePolicy,
     RateAdjustmentReason,
+    RateSnapshot,
+    RateLimitedEntity,
+    RateLimitedEntityStats,
     DistributedRateLimiter,
     DistributedRateLimiterStats,
 )
@@ -130,17 +132,16 @@ __all__ = [
     "Prioritized",
     "QueuedResource",
     # Rate limiters
-    "TokenBucketRateLimiter",
-    "RateLimiterStats",
-    "LeakyBucketRateLimiter",
-    "LeakyBucketStats",
-    "SlidingWindowRateLimiter",
-    "SlidingWindowStats",
-    "FixedWindowRateLimiter",
-    "FixedWindowStats",
-    "AdaptiveRateLimiter",
-    "AdaptiveRateLimiterStats",
+    "RateLimiterPolicy",
+    "TokenBucketPolicy",
+    "LeakyBucketPolicy",
+    "SlidingWindowPolicy",
+    "FixedWindowPolicy",
+    "AdaptivePolicy",
     "RateAdjustmentReason",
+    "RateSnapshot",
+    "RateLimitedEntity",
+    "RateLimitedEntityStats",
     "DistributedRateLimiter",
     "DistributedRateLimiterStats",
     # Routing

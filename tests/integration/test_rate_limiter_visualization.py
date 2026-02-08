@@ -18,13 +18,15 @@ from typing import List, Generator, Any
 import pytest
 
 from happysimulator.components.rate_limiter import (
-    FixedWindowRateLimiter,
-    AdaptiveRateLimiter,
+    RateLimitedEntity,
+    FixedWindowPolicy,
+    AdaptivePolicy,
     DistributedRateLimiter,
     RateAdjustmentReason,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
@@ -60,7 +62,7 @@ class MockKVStore(Entity):
 
 
 class TestFixedWindowVisualization:
-    """Visual tests for FixedWindowRateLimiter behavior."""
+    """Visual tests for FixedWindowPolicy behavior."""
 
     def test_fixed_window_boundary_burst(self, test_output_dir):
         """
@@ -77,11 +79,23 @@ class TestFixedWindowVisualization:
         window_size = 1.0
         requests_per_window = 10
         server = DummyServer()
-        limiter = FixedWindowRateLimiter(
-            name="fixed_window",
-            downstream=server,
+        policy = FixedWindowPolicy(
             requests_per_window=requests_per_window,
             window_size=window_size,
+        )
+        limiter = RateLimitedEntity(
+            name="fixed_window",
+            downstream=server,
+            policy=policy,
+            queue_capacity=10000,
+        )
+
+        # Need a simulation for clock
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(10.0),
+            sources=[],
+            entities=[limiter, server],
         )
 
         # Generate requests clustered at window boundary
@@ -93,7 +107,7 @@ class TestFixedWindowVisualization:
             request_times.append(1.0 + i * 0.01)  # 1.0, 1.01, ..., 1.09
 
         forwarded = []
-        dropped = []
+        queued = []
 
         for t in request_times:
             event = Event(
@@ -102,17 +116,21 @@ class TestFixedWindowVisualization:
                 target=limiter,
             )
             result = limiter.handle_event(event)
-            if result:
+            # Check if a forward event was produced (vs just poll events)
+            has_forward = any(
+                e.event_type.startswith("forward::") for e in result
+            )
+            if has_forward:
                 forwarded.append(t)
             else:
-                dropped.append(t)
+                queued.append(t)
 
         # Create visualization
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         # Request timeline
         ax1.scatter(forwarded, [1] * len(forwarded), c='green', marker='o', s=100, label='Forwarded', alpha=0.7)
-        ax1.scatter(dropped, [1] * len(dropped), c='red', marker='x', s=100, label='Dropped', alpha=0.7)
+        ax1.scatter(queued, [1] * len(queued), c='orange', marker='s', s=100, label='Queued', alpha=0.7)
 
         # Window boundaries
         ax1.axvline(x=1.0, color='blue', linestyle='--', linewidth=2, label='Window boundary')
@@ -153,12 +171,12 @@ class TestFixedWindowVisualization:
         plt.savefig(test_output_dir / 'fixed_window_boundary_burst.png', dpi=150)
         plt.close()
 
-        # Verify the boundary burst effect
+        # Verify the boundary burst effect — all 20 forwarded immediately
         assert len(forwarded) == 20  # 10 per window = 20 total in 0.2s span
 
 
 class TestAdaptiveVisualization:
-    """Visual tests for AdaptiveRateLimiter behavior."""
+    """Visual tests for AdaptivePolicy behavior."""
 
     def test_adaptive_rate_convergence(self, test_output_dir):
         """
@@ -175,14 +193,25 @@ class TestAdaptiveVisualization:
         server_capacity = 50.0
         server = DummyServer()
 
-        limiter = AdaptiveRateLimiter(
-            name="adaptive",
-            downstream=server,
+        policy = AdaptivePolicy(
             initial_rate=10.0,
             min_rate=5.0,
             max_rate=200.0,
             increase_step=5.0,
             decrease_factor=0.7,
+        )
+        limiter = RateLimitedEntity(
+            name="adaptive",
+            downstream=server,
+            policy=policy,
+            queue_capacity=10000,
+        )
+
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(20.0),
+            sources=[],
+            entities=[limiter, server],
         )
 
         # Simulate requests over time
@@ -202,21 +231,24 @@ class TestAdaptiveVisualization:
             )
             result = limiter.handle_event(event)
 
-            if result:
+            has_forward = any(
+                e.event_type.startswith("forward::") for e in result
+            )
+
+            if has_forward:
                 # Request was forwarded - simulate success/failure based on load
-                # Higher rate = more likely to fail (server overloaded)
-                failure_probability = max(0, (limiter.current_rate - server_capacity) / server_capacity)
+                failure_probability = max(0, (policy.current_rate - server_capacity) / server_capacity)
                 if random.random() < failure_probability:
-                    limiter.record_failure(Instant.from_seconds(current_time))
+                    policy.record_failure(Instant.from_seconds(current_time))
                     outcomes.append('failure')
                 else:
-                    limiter.record_success(Instant.from_seconds(current_time))
+                    policy.record_success(Instant.from_seconds(current_time))
                     outcomes.append('success')
             else:
-                outcomes.append('dropped')
+                outcomes.append('queued')
 
             times.append(current_time)
-            rates.append(limiter.current_rate)
+            rates.append(policy.current_rate)
             current_time += 0.05  # 20 req/s incoming
 
         # Create visualization
@@ -234,7 +266,7 @@ class TestAdaptiveVisualization:
 
         # Rate history with annotations
         ax2 = axes[0, 1]
-        for snapshot in limiter.rate_history[:50]:  # First 50 changes
+        for snapshot in policy.rate_history[:50]:  # First 50 changes
             color = 'green' if snapshot.reason == RateAdjustmentReason.SUCCESS else 'red'
             marker = '^' if snapshot.reason == RateAdjustmentReason.SUCCESS else 'v'
             ax2.scatter(snapshot.time.to_seconds(), snapshot.rate, c=color, marker=marker, s=50, alpha=0.6)
@@ -250,9 +282,9 @@ class TestAdaptiveVisualization:
         outcome_counts = {
             'success': outcomes.count('success'),
             'failure': outcomes.count('failure'),
-            'dropped': outcomes.count('dropped'),
+            'queued': outcomes.count('queued'),
         }
-        colors = {'success': 'green', 'failure': 'red', 'dropped': 'gray'}
+        colors = {'success': 'green', 'failure': 'red', 'queued': 'orange'}
         bars = ax3.bar(outcome_counts.keys(), outcome_counts.values(),
                       color=[colors[k] for k in outcome_counts.keys()], alpha=0.7)
         ax3.set_ylabel('Count')
@@ -286,7 +318,7 @@ Results:
   - Server capacity: {server_capacity} req/s
   - Successes: {outcome_counts['success']}
   - Failures: {outcome_counts['failure']}
-  - Dropped: {outcome_counts['dropped']}
+  - Queued: {outcome_counts['queued']}
 """
         ax4.text(0.1, 0.9, explanation, transform=ax4.transAxes,
                 fontsize=10, verticalalignment='top', fontfamily='monospace',
@@ -458,7 +490,6 @@ Per-Instance Breakdown:
         plt.close()
 
         # Verify global limit was approximately respected per window
-        # In first window (0-1s), should not exceed global_limit
         first_window_forwarded = sum(
             1 for t in all_forwarded if t[0] < 1.0
         )
@@ -470,7 +501,7 @@ class TestRateLimiterComparison:
 
     def test_algorithm_comparison(self, test_output_dir):
         """
-        Compare fixed window, token bucket style, and adaptive limiters.
+        Compare fixed window and adaptive limiters.
 
         Shows different characteristics of each algorithm.
         """
@@ -484,15 +515,12 @@ class TestRateLimiterComparison:
         request_times = []
         t = 0.0
         for _ in range(200):
-            # Bursty: sometimes many requests, sometimes few
             if np.random.random() < 0.2:
-                # Burst of 5-10 requests
                 burst_size = np.random.randint(5, 11)
                 for _ in range(burst_size):
                     request_times.append(t)
                     t += 0.001
             else:
-                # Normal inter-arrival
                 t += np.random.exponential(0.05)
                 request_times.append(t)
 
@@ -501,41 +529,58 @@ class TestRateLimiterComparison:
 
         # Fixed Window
         server1 = DummyServer()
-        fw_limiter = FixedWindowRateLimiter(
-            name="fixed",
-            downstream=server1,
-            requests_per_window=50,
-            window_size=1.0,
+        fw_policy = FixedWindowPolicy(requests_per_window=50, window_size=1.0)
+        fw_limiter = RateLimitedEntity(
+            name="fixed", downstream=server1, policy=fw_policy, queue_capacity=10000,
         )
+
+        sim1 = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(20.0),
+            sources=[],
+            entities=[fw_limiter, server1],
+        )
+
         fw_forwarded = []
-        fw_dropped = []
+        fw_queued = []
         for t in request_times:
             event = Event(time=Instant.from_seconds(t), event_type="req", target=fw_limiter)
-            if fw_limiter.handle_event(event):
+            result = fw_limiter.handle_event(event)
+            has_forward = any(e.event_type.startswith("forward::") for e in result)
+            if has_forward:
                 fw_forwarded.append(t)
             else:
-                fw_dropped.append(t)
-        results['Fixed Window'] = {'forwarded': fw_forwarded, 'dropped': fw_dropped}
+                fw_queued.append(t)
+        results['Fixed Window'] = {'forwarded': fw_forwarded, 'queued': fw_queued}
 
         # Adaptive (simulating good conditions)
         server2 = DummyServer()
-        adaptive_limiter = AdaptiveRateLimiter(
-            name="adaptive",
-            downstream=server2,
-            initial_rate=50.0,
-            min_rate=10.0,
-            max_rate=100.0,
+        adp_policy = AdaptivePolicy(
+            initial_rate=50.0, min_rate=10.0, max_rate=100.0,
         )
+        adaptive_limiter = RateLimitedEntity(
+            name="adaptive", downstream=server2, policy=adp_policy, queue_capacity=10000,
+        )
+
+        sim2 = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(20.0),
+            sources=[],
+            entities=[adaptive_limiter, server2],
+        )
+
         adp_forwarded = []
-        adp_dropped = []
+        adp_queued = []
         for t in request_times:
             event = Event(time=Instant.from_seconds(t), event_type="req", target=adaptive_limiter)
-            if adaptive_limiter.handle_event(event):
+            result = adaptive_limiter.handle_event(event)
+            has_forward = any(e.event_type.startswith("forward::") for e in result)
+            if has_forward:
                 adp_forwarded.append(t)
-                adaptive_limiter.record_success(Instant.from_seconds(t))
+                adp_policy.record_success(Instant.from_seconds(t))
             else:
-                adp_dropped.append(t)
-        results['Adaptive'] = {'forwarded': adp_forwarded, 'dropped': adp_dropped}
+                adp_queued.append(t)
+        results['Adaptive'] = {'forwarded': adp_forwarded, 'queued': adp_queued}
 
         # Create visualization
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
@@ -553,20 +598,24 @@ class TestRateLimiterComparison:
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
-        # Drop rate comparison
+        # Queue rate comparison
         ax2 = axes[0, 1]
         names = list(results.keys())
-        drop_rates = [
-            len(results[name]['dropped']) / (len(results[name]['forwarded']) + len(results[name]['dropped'])) * 100
+        total_per_algo = [
+            len(results[name]['forwarded']) + len(results[name]['queued'])
             for name in names
         ]
+        queue_rates = [
+            len(results[name]['queued']) / total * 100 if total > 0 else 0
+            for name, total in zip(names, total_per_algo)
+        ]
         colors = ['#3498db', '#e74c3c']
-        bars = ax2.bar(names, drop_rates, color=colors, alpha=0.7)
-        ax2.set_ylabel('Drop Rate (%)')
-        ax2.set_title('Request Drop Rate by Algorithm')
+        bars = ax2.bar(names, queue_rates, color=colors, alpha=0.7)
+        ax2.set_ylabel('Queue Rate (%)')
+        ax2.set_title('Request Queue Rate by Algorithm')
         ax2.grid(True, alpha=0.3, axis='y')
 
-        for bar, rate in zip(bars, drop_rates):
+        for bar, rate in zip(bars, queue_rates):
             ax2.annotate(f'{rate:.1f}%', xy=(bar.get_x() + bar.get_width() / 2, rate + 1),
                         ha='center')
 

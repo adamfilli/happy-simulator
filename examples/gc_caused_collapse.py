@@ -90,8 +90,10 @@ from happysimulator import (
     Probe,
     QueuedResource,
     Simulation,
+    SimulationSummary,
     Source,
 )
+from happysimulator.analysis import analyze, detect_phases
 
 
 # =============================================================================
@@ -446,36 +448,6 @@ class RetryingClientWithStats(Entity):
 
 
 # =============================================================================
-# Latency Tracking Sink
-# =============================================================================
-
-
-class LatencyTrackingSink(Entity):
-    """Sink that records end-to-end latency using event context."""
-
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.events_received: int = 0
-        self.completion_times: list[Instant] = []
-        self.latencies_s: list[float] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.events_received += 1
-
-        created_at: Instant = event.context.get("created_at", event.time)
-        latency_s = (event.time - created_at).to_seconds()
-
-        self.completion_times.append(event.time)
-        self.latencies_s.append(latency_s)
-
-        return []
-
-    def latency_time_series_seconds(self) -> tuple[list[float], list[float]]:
-        """Return (completion_times_s, latencies_s) for plotting."""
-        return [t.to_seconds() for t in self.completion_times], list(self.latencies_s)
-
-
-# =============================================================================
 # Event Provider
 # =============================================================================
 
@@ -517,6 +489,7 @@ class ScenarioResult:
     queue_depth_data: Data
     requests_generated: int
     retry_enabled: bool
+    summary: SimulationSummary | None = None
 
 
 @dataclass
@@ -619,7 +592,7 @@ def run_gc_collapse_simulation(
         entities=[client, server],
         probes=[queue_probe],
     )
-    sim.run()
+    summary = sim.run()
 
     return ScenarioResult(
         client=client,
@@ -627,6 +600,7 @@ def run_gc_collapse_simulation(
         queue_depth_data=queue_depth_data,
         requests_generated=provider._request_id,
         retry_enabled=retry_enabled,
+        summary=summary,
     )
 
 
@@ -667,21 +641,12 @@ def run_comparison(
 # =============================================================================
 
 
-def percentile_sorted(sorted_values: list[float], p: float) -> float:
-    """Calculate percentile from sorted values (p in [0, 1])."""
-    if not sorted_values:
-        return 0.0
-    if p <= 0:
-        return float(sorted_values[0])
-    if p >= 1:
-        return float(sorted_values[-1])
-
-    n = len(sorted_values)
-    pos = p * (n - 1)
-    lo = int(pos)
-    hi = min(lo + 1, n - 1)
-    frac = pos - lo
-    return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
+def _build_latency_data(client: RetryingClientWithStats) -> Data:
+    """Build a Data object from client latency measurements for analysis."""
+    d = Data()
+    for t, lat in zip(client.completion_times, client.latencies_s):
+        d.add_stat(lat, t)
+    return d
 
 
 def get_final_queue_depth(data: Data) -> int:
@@ -925,19 +890,14 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     final_q_with = get_final_queue_depth(with_r.queue_depth_data)
     final_q_without = get_final_queue_depth(without_r.queue_depth_data)
 
-    avg_lat_with = sum(latencies_with) / len(latencies_with) * 1000 if latencies_with else 0
-    avg_lat_without = (
-        sum(latencies_without) / len(latencies_without) * 1000 if latencies_without else 0
-    )
+    lat_data_with = _build_latency_data(with_r.client)
+    lat_data_without = _build_latency_data(without_r.client)
 
-    p99_lat_with = (
-        percentile_sorted(sorted(latencies_with), 0.99) * 1000 if latencies_with else 0
-    )
-    p99_lat_without = (
-        percentile_sorted(sorted(latencies_without), 0.99) * 1000
-        if latencies_without
-        else 0
-    )
+    avg_lat_with = lat_data_with.mean() * 1000 if lat_data_with.count() > 0 else 0
+    avg_lat_without = lat_data_without.mean() * 1000 if lat_data_without.count() > 0 else 0
+
+    p99_lat_with = lat_data_with.percentile(0.99) * 1000 if lat_data_with.count() > 0 else 0
+    p99_lat_without = lat_data_without.percentile(0.99) * 1000 if lat_data_without.count() > 0 else 0
 
     summary = f"""
 Summary Statistics
@@ -982,6 +942,103 @@ Key Insight:
 # =============================================================================
 # Summary Output
 # =============================================================================
+
+
+def analyze_gc_impact(result: ComparisonResult) -> None:
+    """Analyze the GC pause impact using phase detection and time-slicing."""
+    with_r = result.with_retries
+    gc_start = with_r.server.gc_start_time_s
+    gc_end = gc_start + with_r.server.gc_duration_s
+    qd = with_r.queue_depth_data
+    latency_data = _build_latency_data(with_r.client)
+
+    print("\n" + "=" * 75)
+    print("GC IMPACT ANALYSIS (using observability APIs)")
+    print("=" * 75)
+
+    # --- Time-sliced queue depth comparison ---
+    pre_gc = qd.between(0, gc_start)
+    during_gc = qd.between(gc_start, gc_end)
+    post_gc_5s = qd.between(gc_end, gc_end + 5)
+    post_gc_30s = qd.between(gc_end + 20, gc_end + 30)
+
+    print("\n  Queue Depth by Phase (Data.between):")
+    print(f"    Pre-GC    [0, {gc_start:.0f}s):     "
+          f"mean={pre_gc.mean():.1f}, max={pre_gc.max():.0f}")
+    if during_gc.count() > 0:
+        print(f"    During GC [{gc_start:.0f}, {gc_end:.0f}s):  "
+              f"mean={during_gc.mean():.1f}, max={during_gc.max():.0f}")
+    print(f"    Post-GC   [{gc_end:.0f}, {gc_end+5:.0f}s):  "
+          f"mean={post_gc_5s.mean():.1f}, max={post_gc_5s.max():.0f}")
+    if post_gc_30s.count() > 0:
+        print(f"    Late       [{gc_end+20:.0f}, {gc_end+30:.0f}s): "
+              f"mean={post_gc_30s.mean():.1f}, max={post_gc_30s.max():.0f}")
+
+    # --- Time-sliced latency comparison ---
+    lat_pre = latency_data.between(0, gc_start)
+    lat_post_5s = latency_data.between(gc_end, gc_end + 5)
+    lat_post_30s = latency_data.between(gc_end + 20, gc_end + 30)
+
+    print("\n  Latency by Phase (Data.between):")
+    if lat_pre.count() > 0:
+        print(f"    Pre-GC:  p50={lat_pre.percentile(0.50)*1000:.0f}ms, "
+              f"p99={lat_pre.percentile(0.99)*1000:.0f}ms, n={lat_pre.count()}")
+    if lat_post_5s.count() > 0:
+        print(f"    Post-GC (0-5s):  p50={lat_post_5s.percentile(0.50)*1000:.0f}ms, "
+              f"p99={lat_post_5s.percentile(0.99)*1000:.0f}ms, n={lat_post_5s.count()}")
+    if lat_post_30s.count() > 0:
+        print(f"    Post-GC (20-30s): p50={lat_post_30s.percentile(0.50)*1000:.0f}ms, "
+              f"p99={lat_post_30s.percentile(0.99)*1000:.0f}ms, n={lat_post_30s.count()}")
+
+    # --- Phase detection on queue depth ---
+    print("\n  Phase Detection (detect_phases on queue depth):")
+    phases = detect_phases(qd, window_s=5.0)
+    if phases:
+        for p in phases:
+            print(f"    [{p.label:>10}] {p.start_s:.0f}s - {p.end_s:.0f}s  "
+                  f"mean={p.mean:.1f}  std={p.std:.1f}")
+    else:
+        print("    No phases detected.")
+
+    # --- Full analysis pipeline ---
+    if with_r.summary is not None:
+        analysis = analyze(
+            with_r.summary,
+            latency=latency_data,
+            queue_depth=qd,
+        )
+
+        if analysis.anomalies:
+            print(f"\n  Anomalies Detected: {len(analysis.anomalies)}")
+            for a in analysis.anomalies[:5]:
+                print(f"    [{a.severity:>8}] t={a.time_s:.0f}s: {a.description}")
+            if len(analysis.anomalies) > 5:
+                print(f"    ... and {len(analysis.anomalies) - 5} more")
+
+        if analysis.causal_chains:
+            print(f"\n  Causal Chains: {len(analysis.causal_chains)}")
+            for chain in analysis.causal_chains:
+                print(f"    Trigger: {chain.trigger_description}")
+                for effect in chain.effects:
+                    print(f"      -> {effect}")
+
+    # --- Queue depth rate of growth post-GC ---
+    bucketed = qd.bucket(window_s=5.0)
+    means = bucketed.means()
+    times = bucketed.times()
+    if len(means) >= 2:
+        # Find the bucket right after GC and measure growth
+        post_gc_buckets = [(t, m) for t, m in zip(times, means) if t >= gc_end]
+        if len(post_gc_buckets) >= 2:
+            t0, m0 = post_gc_buckets[0]
+            t1, m1 = post_gc_buckets[min(3, len(post_gc_buckets) - 1)]
+            if t1 > t0:
+                growth_rate = (m1 - m0) / (t1 - t0)
+                print(f"\n  Queue Growth Rate (post-GC): {growth_rate:+.1f} items/sec")
+                if growth_rate > 0:
+                    print("    -> Queue growing: system is NOT recovering")
+                else:
+                    print("    -> Queue draining: system is recovering")
 
 
 def print_summary(result: ComparisonResult) -> None:
@@ -1042,12 +1099,16 @@ failures into sustained metastable failure:
         amp_with,
     ))
 
+    # Detailed GC impact analysis using new observability APIs
+    analyze_gc_impact(result)
+
     print("=" * 75)
 
 
 def _print_scenario_stats(scenario: ScenarioResult) -> None:
     """Print statistics for a single scenario."""
     client = scenario.client
+    latency_data = _build_latency_data(client)
 
     success_rate = (
         client.stats_completions / max(1, client.stats_requests_received) * 100
@@ -1055,9 +1116,8 @@ def _print_scenario_stats(scenario: ScenarioResult) -> None:
     amp = client.stats_attempts_sent / max(1, client.stats_requests_received)
     final_q = get_final_queue_depth(scenario.queue_depth_data)
 
-    latencies = client.latencies_s
-    avg_lat = sum(latencies) / len(latencies) * 1000 if latencies else 0
-    p99_lat = percentile_sorted(sorted(latencies), 0.99) * 1000 if latencies else 0
+    avg_lat = latency_data.mean() * 1000 if latency_data.count() > 0 else 0
+    p99_lat = latency_data.percentile(0.99) * 1000 if latency_data.count() > 0 else 0
 
     print(f"  Requests generated:     {scenario.requests_generated}")
     print(f"  Successful completions: {client.stats_completions}")

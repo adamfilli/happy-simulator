@@ -5,8 +5,10 @@ Demonstrates the full pipeline:
 2. Analyze results with detect_phases(), anomaly detection, causal chains
 3. Generate structured output for LLM consumption via to_prompt_context()
 
-This example runs a simple M/M/1 queue with a load spike to create
-interesting behavior for analysis.
+This example runs an M/M/1 queue at 30% utilization, hits it with a
+sustained 200% overload spike to build up a queue, then returns to 30%
+to observe the drain behavior. The spike is long enough (~15s) to
+create significant queue buildup and latency degradation.
 """
 
 from __future__ import annotations
@@ -40,11 +42,16 @@ from happysimulator.analysis import analyze, detect_phases
 
 @dataclass(frozen=True)
 class SpikeLoadProfile(Profile):
-    """Simple profile: steady state -> spike -> steady state."""
-    base_rate: float = 5.0
-    spike_rate: float = 20.0
-    spike_start: float = 30.0
-    spike_end: float = 40.0
+    """30% steady state -> 200% overload spike -> 30% steady state.
+
+    Server capacity is 10 req/s (mean service time 0.1s).
+    Base rate of 3 req/s = 30% utilization.
+    Spike rate of 20 req/s = 200% utilization (guaranteed queue buildup).
+    """
+    base_rate: float = 3.0    # 30% of 10 req/s capacity
+    spike_rate: float = 20.0  # 200% of capacity
+    spike_start: float = 60.0
+    spike_end: float = 75.0   # 15s sustained overload
 
     def get_rate(self, time: Instant) -> float:
         t = time.to_seconds()
@@ -54,16 +61,27 @@ class SpikeLoadProfile(Profile):
 
 
 class SimpleServer(QueuedResource):
-    """M/M/1 server with exponential service times."""
+    """M/M/1 server with exponential service times.
+
+    Tracks in-flight work to enforce single-server concurrency.
+    When the server is busy, incoming requests queue up, creating
+    realistic queuing delays under load.
+    """
 
     def __init__(self, name: str, downstream: Entity):
         super().__init__(name, policy=FIFOQueue())
         self.downstream = downstream
         self.stats_processed: int = 0
+        self._busy: bool = False
+
+    def has_capacity(self) -> bool:
+        return not self._busy
 
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
-        service_time = random.expovariate(10.0)  # mean 0.1s
+        self._busy = True
+        service_time = random.expovariate(10.0)  # mean 0.1s, capacity = 10 req/s
         yield service_time, None
+        self._busy = False
         self.stats_processed += 1
         return [Event(
             time=self.now,
@@ -101,7 +119,7 @@ def main() -> None:
     queue_data = Data()
     queue_probe = Probe(
         target=server, metric="depth", data=queue_data,
-        interval=0.5, start_time=Instant.Epoch,
+        interval=0.1, start_time=Instant.Epoch,
     )
 
     profile = SpikeLoadProfile()
@@ -111,7 +129,7 @@ def main() -> None:
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(80.0),
+        end_time=Instant.from_seconds(145.0),
         sources=[source],
         entities=[server, sink],
         probes=[queue_probe],

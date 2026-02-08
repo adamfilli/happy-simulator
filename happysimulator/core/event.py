@@ -1,9 +1,9 @@
 """Event types that form the fundamental units of simulation work.
 
 Events drive the simulation forward. Each event represents something that happens
-at a specific point in simulation time. When invoked, an event either calls its
-target entity's handle_event() method (model-style) or executes a callback function
-(scripting-style).
+at a specific point in simulation time. When invoked, an event calls its target
+entity's handle_event() method. For function-based dispatch, use Event.once()
+which wraps a function in a CallbackEntity.
 
 This module also provides ProcessContinuation for generator-based multi-step
 processes, enabling entities to yield delays and resume execution later.
@@ -24,9 +24,6 @@ logger = logging.getLogger(__name__)
 
 _global_event_counter = count()
 
-EventCallback = Callable[['Event'], Any]
-"""Signature for callback-style event handlers."""
-
 CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
 """Signature for hooks that run when an event or process finishes."""
 
@@ -36,10 +33,10 @@ class Event:
     """The fundamental unit of simulation work.
 
     Events are scheduled onto the EventHeap and processed in chronological order.
-    Each event must specify exactly one invocation method:
+    Each event targets an Entity whose handle_event() method processes it.
 
-    - **Model-style** (target): The event is passed to an Entity's handle_event()
-    - **Callback-style** (callback): A function is called directly with the event
+    For function-based dispatch without a full Entity, use the ``Event.once()``
+    static constructor which wraps a function in a CallbackEntity.
 
     Events support two additional mechanisms:
 
@@ -58,22 +55,14 @@ class Event:
         time: When this event should be processed.
         event_type: Human-readable label for debugging and tracing.
         daemon: If True, this event won't block auto-termination.
-        target: Entity to receive this event (model-style).
-        callback: Function to invoke (scripting-style).
+        target: Entity to receive this event.
         on_complete: Hooks to run when processing finishes.
         context: Arbitrary metadata for tracing and debugging.
     """
     time: Instant
     event_type: str
     daemon: bool = field(default=False, repr=False)
-    
-    # Option A: The "Model" way (Send to Entity or any Simulatable)
     target: Optional['Simulatable'] = None
-    
-    # Option B: The "Scripting" way (Call specific function)
-    callback: Optional[EventCallback] = field(default=None, repr=False)
-    
-    # New Field: Events to schedule automatically when this event's processing finishes.
     on_complete: List[CompletionHook] = field(default_factory=list, repr=False, compare=False)
     
     # Context & Tracing
@@ -84,13 +73,9 @@ class Event:
     _id: uuid.UUID = field(default_factory=uuid.uuid4, init=False, repr=False)
 
     def __post_init__(self):
-        # Validation: Ensure mutually exclusive but at least one exists
-        if self.target is None and self.callback is None:
-            raise ValueError(f"Event {self} must have EITHER a 'target' OR a 'callback'.")
-        
-        if self.target is not None and self.callback is not None:
-            raise ValueError(f"Event {self} cannot have BOTH 'target' and 'callback'.")
-        
+        if self.target is None:
+            raise ValueError(f"Event '{self.event_type}' must have a 'target'.")
+
         # Always ensure trace context exists (even if caller passed partial context)
         self.context.setdefault("id", str(self._id))
         self.context.setdefault("created_at", self.time)
@@ -99,13 +84,9 @@ class Event:
         self.context.setdefault("trace", {"spans": []})
 
     def __repr__(self) -> str:
-        """Return a concise representation showing time, type, and target/callback."""
-        if self.target is not None:
-            target_name = getattr(self.target, "name", None) or type(self.target).__name__
-            return f"Event({self.time!r}, {self.event_type!r}, target={target_name})"
-        else:
-            callback_name = getattr(self.callback, "__qualname__", None) or repr(self.callback)
-            return f"Event({self.time!r}, {self.event_type!r}, callback={callback_name})"
+        """Return a concise representation showing time, type, and target."""
+        target_name = getattr(self.target, "name", None) or type(self.target).__name__
+        return f"Event({self.time!r}, {self.event_type!r}, target={target_name})"
 
     def trace(self, action: str, **data: Any) -> None:
         """Append a structured span to this event's application-level trace.
@@ -139,48 +120,28 @@ class Event:
     def invoke(self) -> List['Event']:
         """Execute this event and return any resulting events.
 
-        Dispatches to either the callback function or the target entity's
-        handle_event() method. If the handler returns a generator, it's
-        automatically wrapped as a ProcessContinuation for multi-step execution.
+        Dispatches to the target entity's handle_event() method. If the handler
+        returns a generator, it's automatically wrapped as a ProcessContinuation
+        for multi-step execution.
 
         Returns:
             New events to schedule, including any from completion hooks.
-
-        Raises:
-            ValueError: If neither target nor callback is set.
         """
-        handler_kind = "callback" if self.callback else "entity"
-        handler_label = (
-            getattr(self.callback, "__qualname__", repr(self.callback))
-            if self.callback
-            else getattr(self.target, "name", type(self.target).__name__)
-        )
-        self.trace("handle.start", handler=handler_kind, handler_label=handler_label)
+        handler_label = getattr(self.target, "name", type(self.target).__name__)
+        self.trace("handle.start", handler="entity", handler_label=handler_label)
 
         try:
-            raw_result = None
+            raw_result = self.target.handle_event(self)
 
-            # Path 1: Callback (High Priority / Explicit)
-            if self.callback:
-                raw_result = self.callback(self)
-
-            # Path 2: Target Entity (Standard Model Flow)
-            elif self.target:
-                raw_result = self.target.handle_event(self)
-            else:
-                raise ValueError(f"Event {self} must have EITHER a 'target' OR a 'callback'.")
-            
-            # Normalize Result: Did the handler return a Generator? (Start of a Process)
             if isinstance(raw_result, Generator):
                 self.trace("handle.end", result_kind="process")
                 return self._start_process(raw_result)
-            
+
             normalized = self._normalize_return(raw_result)
             self.trace("handle.end", result_kind="immediate", produced=len(normalized))
-            
-            
+
             completion_events = self._run_completion_hooks(self.time)
-            
+
             return normalized + completion_events
 
         except Exception as exc:
@@ -216,7 +177,6 @@ class Event:
                 event_type=self.event_type,
                 daemon=self.daemon,
                 target=self.target,
-                callback=self.callback,
                 process=gen,
                 on_complete=self.on_complete,
                 context=self.context)
@@ -256,7 +216,39 @@ class Event:
 
     def get_context(self, key: str) -> Any:
         return self.context.get("metadata", {}).get(key)
-    
+
+    @staticmethod
+    def once(
+        time: Instant,
+        event_type: str,
+        fn: Callable[['Event'], Any],
+        *,
+        daemon: bool = False,
+        context: Dict[str, Any] | None = None,
+    ) -> 'Event':
+        """Create a one-shot event that invokes a function.
+
+        Wraps the function in a CallbackEntity so that all events
+        use target-based dispatch uniformly.
+
+        Args:
+            time: When this event should fire.
+            event_type: Human-readable label for debugging.
+            fn: Function called with the event.
+            daemon: If True, won't block auto-termination.
+            context: Optional metadata dict.
+        """
+        from happysimulator.core.callback_entity import CallbackEntity
+
+        entity = CallbackEntity(name=f"once:{event_type}", fn=fn)
+        return Event(
+            time=time,
+            event_type=event_type,
+            target=entity,
+            daemon=daemon,
+            context=context or {},
+        )
+
 @dataclass
 class ProcessContinuation(Event):
     """Internal event that resumes a paused generator-based process.
@@ -302,7 +294,6 @@ class ProcessContinuation(Event):
                 event_type=self.event_type,
                 daemon=self.daemon,
                 target=self.target,     # Keep targeting the same entity
-                callback=self.callback,
                 on_complete=self.on_complete,
                 process=self.process,   # Pass the SAME generator forward
                 context=self.context    # Preserve trace context

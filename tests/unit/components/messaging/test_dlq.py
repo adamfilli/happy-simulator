@@ -8,9 +8,12 @@ from happysimulator.components.messaging import (
     Message,
     MessageState,
 )
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 def create_test_message(msg_id: str, delivery_count: int = 1) -> Message:
@@ -20,7 +23,7 @@ def create_test_message(msg_id: str, delivery_count: int = 1) -> Message:
         payload=Event(
             time=Instant.Epoch,
             event_type="test",
-            callback=lambda e: None,
+            target=_null,
         ),
         created_at=Instant.Epoch,
         state=MessageState.REJECTED,

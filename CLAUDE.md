@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 |--------|---------|
 | **What** | Discrete-event simulation library for Python 3.13+ |
 | **Core Loop** | `EventHeap` pop → `Entity.handle_event()` → schedule returned `Event`s |
-| **Key Invariant** | Events have EITHER `target` (Entity) OR `callback` (function) - never both, never neither |
+| **Key Invariant** | Events always have a `target` (Entity); use `Event.once()` for function-based dispatch |
 | **Time** | Use `Instant.from_seconds(n)`, not raw floats |
 | **Generators** | Yield delays (float seconds); return events on completion |
 | **Testing** | Use `ConstantArrivalTimeProvider` for deterministic timing |
@@ -129,12 +129,12 @@ if t < t2:
 
 Events are the fundamental unit of work in the simulation. They carry information about *when* something happens and *what* should happen.
 
-**Key Invariant**: An Event must have EITHER a `target` (Entity) OR a `callback` (function) - never both, never neither.
+**Key Invariant**: Every Event must have a `target` (Entity). For function-based dispatch, use `Event.once()` which wraps a function in a `CallbackEntity`.
 
 ```python
 from happysimulator import Event, Instant
 
-# Model-style: target an Entity
+# Standard: target an Entity
 request_event = Event(
     time=Instant.from_seconds(1.0),
     event_type="Request",
@@ -142,11 +142,11 @@ request_event = Event(
     context={"customer_id": 42},
 )
 
-# Callback-style: invoke a function
-ping_event = Event(
+# Function-based: use Event.once() for one-shot callbacks
+ping_event = Event.once(
     time=Instant.from_seconds(1.0),
     event_type="Ping",
-    callback=lambda e: print("pong"),
+    fn=lambda e: print("pong"),
 )
 ```
 
@@ -235,18 +235,15 @@ The `Simulation` class:
 │   │ (min-heap │          └──────┬──────┘                │
 │   │  by time) │                 │                        │
 │   └─────────┘                   ▼                        │
-│       ▲                  ┌─────────────┐                │
-│       │                  │ Has target? │                │
+│       ▲                         │                        │
+│       │                         ▼                        │
+│       │                  ┌─────────────┐                │
+│       │                  │   Entity    │                │
+│       │                  │ handle_     │                │
+│       │                  │  event()   │                │
 │       │                  └──────┬──────┘                │
-│       │                    yes/   \no                    │
-│       │              ┌────────┐  ┌────────┐             │
-│       │              │ Entity │  │Callback│             │
-│       │              │handle_ │  │invoke  │             │
-│       │              │ event()│  └───┬────┘             │
-│       │              └───┬────┘      │                   │
-│       │                  │           │                   │
-│       │                  └─────┬─────┘                   │
-│       │                        ▼                         │
+│       │                         │                        │
+│       │                         ▼                        │
 │       │         ┌──────────────────────────┐            │
 │       │         │ Result: None | Event |   │            │
 │       │         │ list[Event] | Generator │            │
@@ -258,10 +255,9 @@ The `Simulation` class:
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Two Event Handling Styles
+### Event Dispatch
 
-1. **Model-style**: Event has a `target` Entity; the Entity's `handle_event()` method processes it
-2. **Callback-style**: Event has a `callback` function that is invoked directly
+All events dispatch through a `target` Entity's `handle_event()` method. For function-based dispatch, `Event.once()` wraps a function in a `CallbackEntity`. This uniform target-based model simplifies the dispatch path and debugging.
 
 ### Load Generation (`happysimulator/load/`)
 
@@ -337,6 +333,7 @@ happysimulator/
 ├── core/                    # Core simulation engine
 │   ├── instant.py          # Time representation
 │   ├── event.py            # Event structure
+│   ├── callback_entity.py  # CallbackEntity, NullEntity
 │   ├── entity.py           # Entity base class
 │   ├── simulation.py       # Main simulation loop
 │   ├── clock.py            # Clock abstraction
@@ -533,13 +530,13 @@ if __name__ == "__main__":
 
 ## Common Patterns
 
-### Creating an Event with Callback
+### Creating a One-Shot Function Event
 
 ```python
-Event(
+Event.once(
     time=Instant.from_seconds(1),
     event_type="Ping",
-    callback=lambda e: print("pong"),
+    fn=lambda e: print("pong"),
 )
 ```
 
@@ -632,8 +629,8 @@ class MyServer(QueuedResource):
 
 ### Common Issues
 
-**"Event must have either target or callback"**
-- Ensure every `Event` has exactly one of `target=` or `callback=` set
+**"Event must have a 'target'"**
+- Every `Event` must have a `target=` entity. Use `Event.once()` for function-based dispatch.
 
 **Generator not progressing**
 - Check that you're yielding `float` values (seconds), not `Instant`

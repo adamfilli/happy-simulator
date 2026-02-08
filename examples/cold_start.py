@@ -456,10 +456,10 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
             server.reset_cache()
             return []
 
-        reset_event = Event(
+        reset_event = Event.once(
             time=Instant.from_seconds(config.cold_start_time_s),
             event_type="CacheReset",
-            callback=reset_callback,
+            fn=reset_callback,
         )
         extra_events.append(reset_event)
 

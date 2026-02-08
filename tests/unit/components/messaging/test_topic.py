@@ -3,9 +3,12 @@
 import pytest
 
 from happysimulator.components.messaging import Topic
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 class DummySubscriber(Entity):
@@ -116,7 +119,7 @@ class TestTopicPublish:
         message = Event(
             time=Instant.Epoch,
             event_type="notification",
-            callback=lambda e: None,
+            target=_null,
         )
 
         gen = topic.publish(message)
@@ -138,7 +141,7 @@ class TestTopicPublish:
         message = Event(
             time=Instant.Epoch,
             event_type="notification",
-            callback=lambda e: None,
+            target=_null,
         )
 
         gen = topic.publish(message)
@@ -163,7 +166,7 @@ class TestTopicPublish:
         message = Event(
             time=Instant.Epoch,
             event_type="notification",
-            callback=lambda e: None,
+            target=_null,
         )
 
         events = topic.publish_sync(message)
@@ -184,7 +187,7 @@ class TestTopicPublish:
         message = Event(
             time=Instant.Epoch,
             event_type="notification",
-            callback=lambda e: None,
+            target=_null,
         )
 
         gen = topic.publish(message)
@@ -213,7 +216,7 @@ class TestTopicMessageRetention:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"notification{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             topic.publish_sync(message)
 
@@ -233,7 +236,7 @@ class TestTopicMessageRetention:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"notification{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             topic.publish_sync(message)
 
@@ -271,7 +274,7 @@ class TestTopicSubscriptionDetails:
             message = Event(
                 time=Instant.Epoch,
                 event_type="notification",
-                callback=lambda e: None,
+                target=_null,
             )
             topic.publish_sync(message)
 
@@ -316,7 +319,7 @@ class TestTopicStatistics:
             message = Event(
                 time=Instant.Epoch,
                 event_type="notification",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = topic.publish(message)
             try:

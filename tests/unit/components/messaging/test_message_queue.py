@@ -7,9 +7,12 @@ from happysimulator.components.messaging import (
     MessageState,
     DeadLetterQueue,
 )
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 class DummyConsumer(Entity):
@@ -115,7 +118,7 @@ class TestMessageQueuePublish:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         gen = queue.publish(message)
@@ -138,7 +141,7 @@ class TestMessageQueuePublish:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             try:
@@ -158,7 +161,7 @@ class TestMessageQueuePublish:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             try:
@@ -173,7 +176,7 @@ class TestMessageQueuePublish:
         message = Event(
             time=Instant.Epoch,
             event_type="order3",
-            callback=lambda e: None,
+            target=_null,
         )
         with pytest.raises(RuntimeError):
             gen = queue.publish(message)
@@ -192,7 +195,7 @@ class TestMessageQueueDelivery:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         # Publish
@@ -240,7 +243,7 @@ class TestMessageQueueDelivery:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         gen = queue.publish(message)
@@ -273,7 +276,7 @@ class TestMessageQueueDelivery:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             try:
@@ -313,7 +316,7 @@ class TestMessageQueueAcknowledgment:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         # Publish and deliver
@@ -348,7 +351,7 @@ class TestMessageQueueAcknowledgment:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         # Publish and deliver
@@ -383,7 +386,7 @@ class TestMessageQueueAcknowledgment:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         # Publish
@@ -430,7 +433,7 @@ class TestMessageQueueDeadLetter:
         message = Event(
             time=Instant.Epoch,
             event_type="order",
-            callback=lambda e: None,
+            target=_null,
         )
 
         # Publish
@@ -473,7 +476,7 @@ class TestMessageQueueStatistics:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             try:
@@ -503,7 +506,7 @@ class TestMessageQueueStatistics:
             message = Event(
                 time=Instant.Epoch,
                 event_type=f"order{i}",
-                callback=lambda e: None,
+                target=_null,
             )
             gen = queue.publish(message)
             message_id = None

@@ -20,24 +20,11 @@ from typing import Iterable
 
 import pytest
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+from happysimulator.components.common import Sink
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-
-
-class TimeSeriesCounterEntity(Entity):
-    """Entity that records when it handled events."""
-
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.handled_times: list[Instant] = []
-
-    def handle_event(self, event: Event):
-        self.handled_times.append(event.time)
-        return []
 
 
 @dataclass(frozen=True)
@@ -145,7 +132,7 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
     duration_s = 60.0
     end_time = Instant.from_seconds(duration_s)
 
-    counter = TimeSeriesCounterEntity("counter")
+    counter = Sink("counter")
     source = Source.with_profile(
         profile=profile, target=counter, event_type="Ping",
         poisson=False, name=f"PingSource_{profile_name}",
@@ -154,7 +141,7 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
     sim = Simulation(start_time=Instant.Epoch, end_time=end_time, sources=[source], entities=[counter])
     sim.run()
 
-    times_s = [t.to_seconds() for t in counter.handled_times]
+    times_s = [t.to_seconds() for t in counter.completion_times]
 
     # Basic sanity checks (test should pass deterministically)
     assert times_s == sorted(times_s)

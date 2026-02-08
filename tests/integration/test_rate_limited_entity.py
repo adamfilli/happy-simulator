@@ -18,27 +18,11 @@ from happysimulator.components.rate_limiter.policy import (
 from happysimulator.components.rate_limiter.rate_limited_entity import (
     RateLimitedEntity,
 )
-from happysimulator.core.entity import Entity
+from happysimulator.components.common import Sink
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-class SinkEntity(Entity):
-    """Collects forwarded events for verification."""
-
-    def __init__(self, name: str = "sink"):
-        super().__init__(name)
-        self.handled_times: list[Instant] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.handled_times.append(event.time)
-        return []
 
 
 # ---------------------------------------------------------------------------
@@ -49,7 +33,7 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_low_load_all_forwarded(self):
         """With load well below the rate limit, all requests are forwarded."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=10.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -69,7 +53,7 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_overload_queues_then_drains(self):
         """Excess requests queue and drain at the refill rate."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=5.0, refill_rate=5.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=1000,
@@ -92,7 +76,7 @@ class TestRateLimitedEntityTokenBucket:
 
     def test_queue_overflow_drops(self):
         """When queue overflows, excess requests are dropped."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=1.0, refill_rate=1.0, initial_tokens=0.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=5,
@@ -119,7 +103,7 @@ class TestRateLimitedEntityLeakyBucket:
 
     def test_strict_output_rate(self):
         """Leaky bucket enforces strict output rate with no bursting."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = LeakyBucketPolicy(leak_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -146,7 +130,7 @@ class TestRateLimitedEntitySlidingWindow:
 
     def test_requests_within_window_limit(self):
         """Sliding window allows up to max_requests per window."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=5)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -173,7 +157,7 @@ class TestRateLimitedEntityFixedWindow:
 
     def test_window_counter_resets(self):
         """Fixed window resets counter at window boundaries."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = FixedWindowPolicy(requests_per_window=5, window_size=1.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -200,7 +184,7 @@ class TestRateLimitedEntityAdaptive:
 
     def test_adaptive_with_feedback(self):
         """Adaptive policy adjusts rate based on success/failure feedback."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = AdaptivePolicy(
             initial_rate=50.0, min_rate=5.0, max_rate=200.0,
             increase_step=5.0, decrease_factor=0.7,
@@ -219,7 +203,7 @@ class TestRateLimitedEntityAdaptive:
 
         assert limiter.stats.forwarded > 0
         # Record some success feedback
-        for t in sink.handled_times[:10]:
+        for t in sink.completion_times[:10]:
             policy.record_success(t)
         assert policy.successes > 0
 
@@ -232,7 +216,7 @@ class TestInvariants:
 
     def test_received_equals_forwarded_plus_queued_plus_dropped(self):
         """received == forwarded + in_queue + dropped always holds."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=3.0, refill_rate=2.0)
         limiter = RateLimitedEntity(
             "limiter", downstream=sink, policy=policy, queue_capacity=50,
@@ -253,7 +237,7 @@ class TestInvariants:
 
     def test_forwarded_matches_sink(self):
         """Number of forwarded events matches what the sink received."""
-        sink = SinkEntity()
+        sink = Sink()
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -268,4 +252,4 @@ class TestInvariants:
         sim.run()
 
         # Sink might miss the last forward event if it fires at end_time boundary
-        assert abs(limiter.stats.forwarded - len(sink.handled_times)) <= 1
+        assert abs(limiter.stats.forwarded - len(sink.completion_times)) <= 1

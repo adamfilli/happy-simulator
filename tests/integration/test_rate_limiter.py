@@ -25,7 +25,7 @@ from typing import Iterable, List
 
 import pytest
 
-from happysimulator.core.entity import Entity
+from happysimulator.components.common import Sink
 from happysimulator.components.rate_limiter import (
     RateLimitedEntity,
     TokenBucketPolicy,
@@ -37,21 +37,6 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-
-
-# --- Test Entities ---
-
-
-class TimeSeriesCounterEntity(Entity):
-    """Entity that records when it handled events (acts as a sink)."""
-
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.handled_times: list[Instant] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.handled_times.append(event.time)
-        return []
 
 
 # --- Profile Definitions ---
@@ -167,7 +152,7 @@ def test_rate_limiter_with_profile(
     end_time = Instant.from_seconds(duration_s)
 
     # Create sink and rate limiter
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = TokenBucketPolicy(
         capacity=bucket_capacity,
         refill_rate=refill_rate,
@@ -277,7 +262,7 @@ def test_rate_limiter_with_profile(
 
 def test_rate_limiter_basic_functionality():
     """Basic test for TokenBucketPolicy + RateLimitedEntity without simulation."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = TokenBucketPolicy(capacity=5.0, refill_rate=2.0, initial_tokens=5.0)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -306,12 +291,12 @@ def test_rate_limiter_basic_functionality():
 
     assert rate_limiter.stats.forwarded == 5
     assert rate_limiter.stats.dropped == 0
-    assert len(sink.handled_times) == 5
+    assert len(sink.completion_times) == 5
 
 
 def test_rate_limiter_empty_bucket():
     """Test that requests are queued (not dropped) when bucket is empty."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = TokenBucketPolicy(capacity=5.0, refill_rate=1.0, initial_tokens=0.0)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -334,7 +319,7 @@ def test_rate_limiter_empty_bucket():
     # Should return a poll event (not a forward)
     assert rate_limiter.stats.queued == 1
     assert rate_limiter.stats.dropped == 0
-    assert len(sink.handled_times) == 0
+    assert len(sink.completion_times) == 0
 
 
 # =============================================================================
@@ -368,7 +353,7 @@ def test_leaky_bucket_with_profile(
     end_time = Instant.from_seconds(duration_s)
 
     # Create sink and rate limiter
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = LeakyBucketPolicy(leak_rate=leak_rate)
     rate_limiter = RateLimitedEntity(
         name="leaky_rate_limiter",
@@ -454,7 +439,7 @@ def test_leaky_bucket_with_profile(
 
 def test_leaky_bucket_basic_functionality():
     """Basic test for LeakyBucketPolicy + RateLimitedEntity."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = LeakyBucketPolicy(leak_rate=2.0)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -487,7 +472,7 @@ def test_leaky_bucket_basic_functionality():
 
 def test_leaky_bucket_full_queue():
     """Test that requests are dropped when queue is full."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = LeakyBucketPolicy(leak_rate=1.0)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -537,7 +522,7 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
     rate_limit = 5.0
 
     # --- Token Bucket Setup ---
-    token_sink = TimeSeriesCounterEntity("token_sink")
+    token_sink = Sink("token_sink")
     token_policy = TokenBucketPolicy(capacity=10.0, refill_rate=rate_limit)
     token_limiter = RateLimitedEntity(
         name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
@@ -547,7 +532,7 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
     )
 
     # --- Leaky Bucket Setup ---
-    leaky_sink = TimeSeriesCounterEntity("leaky_sink")
+    leaky_sink = Sink("leaky_sink")
     leaky_policy = LeakyBucketPolicy(leak_rate=rate_limit)
     leaky_limiter = RateLimitedEntity(
         name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
@@ -661,7 +646,7 @@ def test_sliding_window_with_profile(
     end_time = Instant.from_seconds(duration_s)
 
     # Create sink and rate limiter
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = SlidingWindowPolicy(
         window_size_seconds=window_size_seconds,
         max_requests=max_requests,
@@ -742,7 +727,7 @@ def test_sliding_window_with_profile(
 
 def test_sliding_window_basic_functionality():
     """Basic test for SlidingWindowPolicy + RateLimitedEntity."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=3)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -768,7 +753,7 @@ def test_sliding_window_basic_functionality():
 
     assert rate_limiter.stats.forwarded == 3
     assert rate_limiter.stats.dropped == 0
-    assert len(sink.handled_times) == 3
+    assert len(sink.completion_times) == 3
 
     # 4th request at same time should be queued (window full)
     event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
@@ -778,7 +763,7 @@ def test_sliding_window_basic_functionality():
 
 def test_sliding_window_empty():
     """Test that requests are allowed when window is empty."""
-    sink = TimeSeriesCounterEntity("sink")
+    sink = Sink("sink")
     policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=5)
     rate_limiter = RateLimitedEntity(
         name="limiter",
@@ -816,7 +801,7 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     rate_limit = 5.0
 
     # --- Token Bucket Setup ---
-    token_sink = TimeSeriesCounterEntity("token_sink")
+    token_sink = Sink("token_sink")
     token_policy = TokenBucketPolicy(capacity=10.0, refill_rate=rate_limit)
     token_limiter = RateLimitedEntity(
         name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
@@ -826,7 +811,7 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     )
 
     # --- Leaky Bucket Setup ---
-    leaky_sink = TimeSeriesCounterEntity("leaky_sink")
+    leaky_sink = Sink("leaky_sink")
     leaky_policy = LeakyBucketPolicy(leak_rate=rate_limit)
     leaky_limiter = RateLimitedEntity(
         name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
@@ -836,7 +821,7 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     )
 
     # --- Sliding Window Setup ---
-    sliding_sink = TimeSeriesCounterEntity("sliding_sink")
+    sliding_sink = Sink("sliding_sink")
     sliding_policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=int(rate_limit))
     sliding_limiter = RateLimitedEntity(
         name="sliding_limiter", downstream=sliding_sink, policy=sliding_policy, queue_capacity=10000,

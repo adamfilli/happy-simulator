@@ -1,18 +1,10 @@
+from happysimulator.components.common import Counter
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
-
-
-class SideEffectCounterEntity(Entity):
-    def __init__(self):
-        super().__init__("sideeffectcounter")
-        self.counter = 0
-
-    def handle_event(self, event):
-        self.counter += 1
 
 
 class PingCounterEntity(Entity):
@@ -51,7 +43,7 @@ def test_basic_constant_simulation():
     # A. CONFIGURATION
 
     # Setup the counter entities
-    side_effect_counter = SideEffectCounterEntity()
+    side_effect_counter = Counter("sideeffectcounter")
     source_event_counter = PingCounterEntity(side_effect_counter)
 
     # Create the Source using the custom profile that drops rate to 0 after t=60
@@ -64,7 +56,7 @@ def test_basic_constant_simulation():
     # B. INITIALIZATION
     sim = Simulation(
         sources=[source],
-        entities=[source_event_counter])
+        entities=[source_event_counter, side_effect_counter])
 
     # C. EXECUTION
     # Run the simulation
@@ -80,5 +72,5 @@ def test_basic_constant_simulation():
     assert source_event_counter.second_counter == 61, \
         f"Expected a count of 61 in the second counter, but there were {source_event_counter.second_counter}"
 
-    assert side_effect_counter.counter == 61, \
-        f"Expected a count of 61 in the side effect counter, but there were {source_event_counter.second_counter}"
+    assert side_effect_counter.total == 61, \
+        f"Expected a count of 61 in the side effect counter, but there were {side_effect_counter.total}"

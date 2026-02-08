@@ -11,46 +11,9 @@ from happysimulator.core.entity import Entity
 from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.event import Event
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-
-
-@dataclass(frozen=True)
-class ConstantRateProfile(Profile):
-    rate_per_s: float
-
-    def get_rate(self, time: Instant) -> float:  # noqa: ARG002 - profile is constant
-        return float(self.rate_per_s)
-
-
-class RequestProvider(EventProvider):
-    """Generates request events targeting a queued resource."""
-
-    def __init__(self, target: Entity, *, stop_after: Instant | None = None):
-        self._target = target
-        self._stop_after = stop_after
-        self.generated_requests = 0
-
-    def get_events(self, time: Instant) -> List[Event]:
-        if self._stop_after is not None and time > self._stop_after:
-            return []
-
-        self.generated_requests += 1
-        return [
-            Event(
-                time=time,
-                event_type="Request",
-                target=self._target,
-                context={
-                    "created_at": time,
-                    "request_id": self.generated_requests,
-                },
-            )
-        ]
 
 
 class RecordingSink(Entity):
@@ -128,9 +91,7 @@ def test_queued_resource_processes_work_end_to_end() -> None:
         start_time=Instant.Epoch,
     )
 
-    provider = RequestProvider(resource, stop_after=Instant.from_seconds(duration_s))
-    arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate_per_s=5.0), start_time=Instant.Epoch)
-    source = Source(name="Source", event_provider=provider, arrival_time_provider=arrival)
+    source = Source.constant(rate=5.0, target=resource, stop_after=duration_s)
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -141,11 +102,10 @@ def test_queued_resource_processes_work_end_to_end() -> None:
     )
     sim.run()
 
-    assert provider.generated_requests > 0
-    assert sink.events_received == provider.generated_requests
-    assert resource.stats_processed == sink.events_received
+    assert sink.events_received > 0
+    assert sink.events_received == resource.stats_processed
     assert resource.stats_dropped == 0
-    assert resource.stats_accepted == provider.generated_requests
+    assert resource.stats_accepted == sink.events_received
 
     assert depth_data.values
     assert depth_data.values[-1][1] == 0  # drained
@@ -163,9 +123,7 @@ def test_queued_resource_fifo_preserves_order_when_single_threaded() -> None:
         downstream=sink,
     )
 
-    provider = RequestProvider(resource, stop_after=Instant.from_seconds(duration_s))
-    arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate_per_s=20.0), start_time=Instant.Epoch)
-    source = Source(name="Source", event_provider=provider, arrival_time_provider=arrival)
+    source = Source.constant(rate=20.0, target=resource, stop_after=duration_s)
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -176,5 +134,5 @@ def test_queued_resource_fifo_preserves_order_when_single_threaded() -> None:
     )
     sim.run()
 
-    assert sink.events_received == provider.generated_requests
-    assert sink.received_request_ids == list(range(1, provider.generated_requests + 1))
+    assert sink.events_received == resource.stats_processed
+    assert sink.received_request_ids == list(range(1, sink.events_received + 1))

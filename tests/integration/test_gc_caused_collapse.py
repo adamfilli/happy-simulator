@@ -43,7 +43,7 @@ class TestGCCausedCollapse:
         # Create a minimal GCServer
         server = GCServer(
             name="TestServer",
-            mean_service_time_s=0.01,  # Fast for testing
+            service_time_s=0.01,  # Fast for testing
             gc_interval_s=1.0,
             gc_duration_s=0.1,
             gc_start_time_s=0.5,
@@ -139,7 +139,7 @@ class TestGCCausedCollapse:
             duration_s=60.0,  # Shorter for faster test
             drain_s=5.0,
             arrival_rate=7.0,
-            mean_service_time_s=0.1,
+            service_time_s=0.1,
             timeout_s=0.2,
             max_retries=3,
             retry_delay_s=0.05,
@@ -185,7 +185,7 @@ class TestGCCausedCollapse:
             duration_s=60.0,
             drain_s=5.0,
             arrival_rate=7.0,
-            mean_service_time_s=0.1,
+            service_time_s=0.1,
             timeout_s=0.2,
             max_retries=3,
             retry_delay_s=0.05,
@@ -238,7 +238,7 @@ class TestGCCausedCollapse:
             duration_s=60.0,
             drain_s=5.0,
             arrival_rate=7.0,
-            mean_service_time_s=0.1,
+            service_time_s=0.1,
             timeout_s=0.2,
             max_retries=3,
             gc_interval_s=10.0,

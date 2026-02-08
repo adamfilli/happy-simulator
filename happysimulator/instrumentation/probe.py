@@ -75,13 +75,13 @@ class _ProbeEventProvider(EventProvider):
     def get_events(self, time: Instant) -> List[Event]:
         callback = self._create_measurement_callback()
         return [
-            Event(
+            Event.once(
                 time=time,
-                daemon=True,
                 event_type="probe_event",
-                target=None,
-                callback=callback)
-            ]
+                fn=callback,
+                daemon=True,
+            )
+        ]
 
 
 class Probe(Source):

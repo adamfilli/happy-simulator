@@ -20,9 +20,12 @@ from happysimulator.components.load_balancer.strategies import (
     ConsistentHash,
     PowerOfTwoChoices,
 )
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+_null = NullEntity()
 
 
 @dataclass
@@ -43,7 +46,7 @@ def create_request(client_id: str | None = None, **metadata) -> Event:
     return Event(
         time=Instant.Epoch,
         event_type="request",
-        callback=lambda e: None,
+        target=_null,
         context=ctx,
     )
 

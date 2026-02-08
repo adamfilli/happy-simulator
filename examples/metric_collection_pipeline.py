@@ -166,8 +166,11 @@ from happysimulator import (
     Simulation,
     Source,
 )
-from happysimulator.components.leaky_bucket_rate_limiter import LeakyBucketRateLimiter
-from happysimulator.components.rate_limiter import NullRateLimiter
+from happysimulator.components.rate_limiter import (
+    LeakyBucketPolicy,
+    NullRateLimiter,
+    RateLimitedEntity,
+)
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 
@@ -517,11 +520,10 @@ def run_simulation(
 
     # Create rate limiter 2 (between executor 1 and 2)
     if rate_limit_stage2 is not None:
-        rate_limiter2: Entity = LeakyBucketRateLimiter(
+        rate_limiter2: Entity = RateLimitedEntity(
             name="RateLimiter2",
             downstream=executor2,
-            leak_rate=rate_limit_stage2,
-            capacity=tasks_per_batch,
+            policy=LeakyBucketPolicy(leak_rate=rate_limit_stage2),
         )
     else:
         rate_limiter2 = NullRateLimiter(name="RateLimiter2", downstream=executor2)
@@ -536,11 +538,10 @@ def run_simulation(
 
     # Create rate limiter 1 (between source and executor 1)
     if rate_limit_stage1 is not None:
-        rate_limiter1: Entity = LeakyBucketRateLimiter(
+        rate_limiter1: Entity = RateLimitedEntity(
             name="RateLimiter1",
             downstream=executor1,
-            leak_rate=rate_limit_stage1,
-            capacity=tasks_per_batch,
+            policy=LeakyBucketPolicy(leak_rate=rate_limit_stage1),
         )
     else:
         rate_limiter1 = NullRateLimiter(name="RateLimiter1", downstream=executor1)

@@ -1,10 +1,11 @@
-"""Tests for FixedWindowRateLimiter."""
+"""Tests for FixedWindowPolicy + RateLimitedEntity."""
 
 import pytest
 
-from happysimulator.components.rate_limiter import FixedWindowRateLimiter
+from happysimulator.components.rate_limiter import FixedWindowPolicy, RateLimitedEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
@@ -20,56 +21,50 @@ class DummyDownstream(Entity):
         return []
 
 
+def _make_limiter(
+    requests_per_window: int = 10,
+    window_size: float = 1.0,
+    queue_capacity: int = 10000,
+) -> tuple[RateLimitedEntity, DummyDownstream, FixedWindowPolicy]:
+    downstream = DummyDownstream()
+    policy = FixedWindowPolicy(
+        requests_per_window=requests_per_window,
+        window_size=window_size,
+    )
+    limiter = RateLimitedEntity(
+        name="test",
+        downstream=downstream,
+        policy=policy,
+        queue_capacity=queue_capacity,
+    )
+    # Create simulation for clock injection
+    Simulation(
+        start_time=Instant.Epoch,
+        end_time=Instant.from_seconds(100.0),
+        sources=[],
+        entities=[limiter, downstream],
+    )
+    return limiter, downstream, policy
+
+
 class TestFixedWindowCreation:
-    """Tests for FixedWindowRateLimiter creation."""
+    """Tests for FixedWindowPolicy creation."""
 
     def test_creates_with_parameters(self):
-        """Rate limiter is created with specified parameters."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=100,
-            window_size=1.0,
-        )
-
-        assert limiter.name == "test"
-        assert limiter.downstream is downstream
-        assert limiter.requests_per_window == 100
-        assert limiter.window_size == 1.0
+        """Policy is created with specified parameters."""
+        policy = FixedWindowPolicy(requests_per_window=100, window_size=1.0)
+        assert policy.requests_per_window == 100
+        assert policy.window_size == 1.0
 
     def test_rejects_zero_requests(self):
         """Rejects requests_per_window < 1."""
-        downstream = DummyDownstream()
         with pytest.raises(ValueError):
-            FixedWindowRateLimiter(
-                name="test",
-                downstream=downstream,
-                requests_per_window=0,
-            )
+            FixedWindowPolicy(requests_per_window=0)
 
     def test_rejects_negative_window_size(self):
         """Rejects window_size <= 0."""
-        downstream = DummyDownstream()
         with pytest.raises(ValueError):
-            FixedWindowRateLimiter(
-                name="test",
-                downstream=downstream,
-                requests_per_window=10,
-                window_size=0,
-            )
-
-    def test_starts_with_zero_count(self):
-        """Rate limiter starts with zero request count."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=10,
-        )
-
-        assert limiter.current_window_count == 0
-        assert limiter.stats.requests_received == 0
+            FixedWindowPolicy(requests_per_window=10, window_size=0)
 
 
 class TestFixedWindowForwarding:
@@ -77,13 +72,7 @@ class TestFixedWindowForwarding:
 
     def test_forwards_under_limit(self):
         """Requests under the limit are forwarded."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=5,
-            window_size=1.0,
-        )
+        limiter, downstream, policy = _make_limiter(requests_per_window=5)
 
         for i in range(5):
             event = Event(
@@ -92,22 +81,15 @@ class TestFixedWindowForwarding:
                 target=limiter,
             )
             result = limiter.handle_event(event)
-            assert len(result) == 1
+            assert any(e.event_type.startswith("forward::") for e in result)
 
-        assert limiter.stats.requests_forwarded == 5
-        assert limiter.stats.requests_dropped == 0
+        assert limiter.stats.forwarded == 5
+        assert limiter.stats.dropped == 0
 
-    def test_drops_over_limit(self):
-        """Requests over the limit are dropped."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=3,
-            window_size=1.0,
-        )
+    def test_queues_over_limit(self):
+        """Requests over the limit are queued (not dropped)."""
+        limiter, downstream, policy = _make_limiter(requests_per_window=3)
 
-        # Send 5 requests
         for i in range(5):
             event = Event(
                 time=Instant.from_seconds(0.1 * i),
@@ -116,17 +98,13 @@ class TestFixedWindowForwarding:
             )
             limiter.handle_event(event)
 
-        assert limiter.stats.requests_forwarded == 3
-        assert limiter.stats.requests_dropped == 2
+        assert limiter.stats.forwarded == 3
+        assert limiter.stats.queued == 2
+        assert limiter.stats.dropped == 0
 
     def test_forward_event_targets_downstream(self):
         """Forwarded events target the downstream entity."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=10,
-        )
+        limiter, downstream, policy = _make_limiter()
 
         event = Event(
             time=Instant.from_seconds(0),
@@ -135,17 +113,13 @@ class TestFixedWindowForwarding:
         )
         result = limiter.handle_event(event)
 
-        assert len(result) == 1
-        assert result[0].target is downstream
+        forward_events = [e for e in result if e.event_type.startswith("forward::")]
+        assert len(forward_events) == 1
+        assert forward_events[0].target is downstream
 
     def test_forward_event_copies_context(self):
         """Forwarded events copy the original context."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=10,
-        )
+        limiter, downstream, policy = _make_limiter()
 
         event = Event(
             time=Instant.from_seconds(0),
@@ -155,8 +129,9 @@ class TestFixedWindowForwarding:
         )
         result = limiter.handle_event(event)
 
-        assert result[0].context["user"] == "alice"
-        assert result[0].context["data"] == [1, 2, 3]
+        forward_events = [e for e in result if e.event_type.startswith("forward::")]
+        assert forward_events[0].context["user"] == "alice"
+        assert forward_events[0].context["data"] == [1, 2, 3]
 
 
 class TestFixedWindowReset:
@@ -164,13 +139,7 @@ class TestFixedWindowReset:
 
     def test_resets_on_new_window(self):
         """Counter resets when moving to a new window."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=2,
-            window_size=1.0,
-        )
+        limiter, downstream, policy = _make_limiter(requests_per_window=2)
 
         # Fill first window
         for i in range(2):
@@ -181,16 +150,16 @@ class TestFixedWindowReset:
             )
             limiter.handle_event(event)
 
-        assert limiter.current_window_count == 2
+        assert limiter.stats.forwarded == 2
 
-        # Third request in first window - dropped
+        # Third request in first window - queued
         event = Event(
             time=Instant.from_seconds(0.5),
             event_type="request",
             target=limiter,
         )
         result = limiter.handle_event(event)
-        assert len(result) == 0
+        assert limiter.stats.queued == 1
 
         # First request in second window - allowed
         event = Event(
@@ -199,32 +168,8 @@ class TestFixedWindowReset:
             target=limiter,
         )
         result = limiter.handle_event(event)
-        assert len(result) == 1
-        assert limiter.current_window_count == 1
-
-    def test_tracks_windows_completed(self):
-        """Statistics track completed windows."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=10,
-            window_size=1.0,
-        )
-
-        # Request in window 0
-        event = Event(time=Instant.from_seconds(0.5), event_type="request", target=limiter)
-        limiter.handle_event(event)
-
-        # Request in window 1
-        event = Event(time=Instant.from_seconds(1.5), event_type="request", target=limiter)
-        limiter.handle_event(event)
-
-        # Request in window 2
-        event = Event(time=Instant.from_seconds(2.5), event_type="request", target=limiter)
-        limiter.handle_event(event)
-
-        assert limiter.stats.windows_completed == 2
+        forward_events = [e for e in result if e.event_type.startswith("forward::")]
+        assert len(forward_events) == 1
 
 
 class TestFixedWindowStatistics:
@@ -232,13 +177,7 @@ class TestFixedWindowStatistics:
 
     def test_tracks_all_stats(self):
         """Statistics track all request outcomes."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=2,
-            window_size=1.0,
-        )
+        limiter, downstream, policy = _make_limiter(requests_per_window=2)
 
         for i in range(4):
             event = Event(
@@ -248,19 +187,14 @@ class TestFixedWindowStatistics:
             )
             limiter.handle_event(event)
 
-        assert limiter.stats.requests_received == 4
-        assert limiter.stats.requests_forwarded == 2
-        assert limiter.stats.requests_dropped == 2
+        assert limiter.stats.received == 4
+        assert limiter.stats.forwarded == 2
+        assert limiter.stats.queued == 2
+        assert limiter.stats.dropped == 0
 
     def test_tracks_time_series(self):
         """Time series data is recorded."""
-        downstream = DummyDownstream()
-        limiter = FixedWindowRateLimiter(
-            name="test",
-            downstream=downstream,
-            requests_per_window=2,
-            window_size=1.0,
-        )
+        limiter, downstream, policy = _make_limiter(requests_per_window=2)
 
         for i in range(3):
             event = Event(
@@ -272,4 +206,3 @@ class TestFixedWindowStatistics:
 
         assert len(limiter.received_times) == 3
         assert len(limiter.forwarded_times) == 2
-        assert len(limiter.dropped_times) == 1

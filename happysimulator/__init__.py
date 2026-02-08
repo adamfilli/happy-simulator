@@ -42,6 +42,16 @@ from happysimulator.components import (
     QueueDriver,
     QueuedResource,
     RandomRouter,
+    RateLimiterPolicy,
+    RateLimitedEntity,
+    RateLimitedEntityStats,
+    TokenBucketPolicy,
+    LeakyBucketPolicy,
+    SlidingWindowPolicy,
+    FixedWindowPolicy,
+    AdaptivePolicy,
+    RateAdjustmentReason,
+    RateSnapshot,
 )
 
 # Distributions
@@ -120,6 +130,17 @@ __all__ = [
     "LIFOQueue",
     "PriorityQueue",
     "RandomRouter",
+    # Rate limiters
+    "RateLimiterPolicy",
+    "RateLimitedEntity",
+    "RateLimitedEntityStats",
+    "TokenBucketPolicy",
+    "LeakyBucketPolicy",
+    "SlidingWindowPolicy",
+    "FixedWindowPolicy",
+    "AdaptivePolicy",
+    "RateAdjustmentReason",
+    "RateSnapshot",
     # Distributions
     "ConstantLatency",
     "ExponentialLatency",

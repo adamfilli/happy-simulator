@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last Updated:** 2026-01-31
+> **Last Updated:** 2026-02-08
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -622,6 +622,115 @@ class MyServer(QueuedResource):
 - `handle_queued_event(event)` - Process events from the queue (generator)
 - `has_capacity()` - Controls when queue driver pulls next item
 - `self.depth` - Current queue depth (read-only property)
+
+---
+
+## Observability & Analysis API
+
+### Data Class (Enriched)
+
+The `Data` class now supports slicing, aggregation, and bucketing:
+
+```python
+from happysimulator import Data, Probe
+
+# Existing: collect samples via Probe or manually
+data = Data()
+data.add_stat(value, time)
+
+# Slicing
+subset = data.between(30.0, 60.0)  # samples in [30s, 60s)
+
+# Aggregations
+data.mean()           # mean of all values
+data.min() / data.max()
+data.percentile(0.99) # p99
+data.count()
+data.sum()
+data.std()            # population std dev
+
+# Time-windowed bucketing
+buckets = data.bucket(window_s=1.0)  # BucketedData
+buckets.times()   # bucket start times
+buckets.means()   # per-bucket means
+buckets.p50s()    # per-bucket medians
+buckets.p99s()    # per-bucket p99
+buckets.counts()  # samples per bucket
+buckets.to_dict() # {"time_s": [...], "mean": [...], ...}
+
+# Chaining
+avg_depth = queue_data.between(30, 60).mean()
+p99_lat = latency_data.between(55, 65).percentile(0.99)
+
+# Convenience
+data.times()       # just timestamps
+data.raw_values()  # just values
+data.rate(window_s=1.0)  # count/sec per window
+```
+
+### Built-in Collectors
+
+`LatencyTracker` and `ThroughputTracker` replace custom boilerplate sinks:
+
+```python
+from happysimulator import LatencyTracker, ThroughputTracker
+
+# LatencyTracker: records end-to-end latency from event context['created_at']
+sink = LatencyTracker("Sink")
+# ... wire as downstream entity ...
+sink.p50()          # 50th percentile latency
+sink.p99()          # 99th percentile latency
+sink.mean_latency()
+sink.data           # underlying Data for custom analysis
+sink.summary(window_s=1.0)  # BucketedData
+
+# ThroughputTracker: counts events per time window
+tp = ThroughputTracker("Throughput")
+tp.throughput(window_s=1.0)  # BucketedData with counts
+```
+
+### SimulationSummary
+
+`Simulation.run()` now returns a `SimulationSummary`:
+
+```python
+summary = sim.run()
+print(summary)                    # human-readable
+summary.duration_s                # simulation time
+summary.total_events_processed
+summary.events_per_second
+summary.wall_clock_seconds        # real elapsed time
+summary.entities                  # dict[str, EntitySummary]
+summary.to_dict()                 # JSON-serializable
+```
+
+### Analysis Package
+
+For reasoning about simulation behavior:
+
+```python
+from happysimulator.analysis import analyze, detect_phases
+
+# Phase detection on any Data time series
+phases = detect_phases(latency_data, window_s=5.0, threshold=2.0)
+for p in phases:
+    print(f"[{p.label}] {p.start_s}s-{p.end_s}s: mean={p.mean:.4f}")
+
+# Full analysis pipeline
+analysis = analyze(
+    sim.summary,
+    latency=tracker.data,
+    queue_depth=probe_data,
+)
+analysis.phases      # per-metric phase detection
+analysis.metrics     # MetricSummary with per-phase breakdown
+analysis.anomalies   # detected anomalies
+analysis.causal_chains  # correlated degradation patterns
+
+# LLM-optimized output
+prompt = analysis.to_prompt_context(max_tokens=2000)
+json_data = analysis.to_dict()
+```
 
 ---
 

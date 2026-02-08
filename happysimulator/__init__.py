@@ -70,8 +70,14 @@ from happysimulator.distributions import (
 
 # Instrumentation
 from happysimulator.instrumentation import (
+    BucketedData,
     Data,
+    EntitySummary,
+    LatencyTracker,
     Probe,
+    QueueStats,
+    SimulationSummary,
+    ThroughputTracker,
 )
 
 # Sketching algorithms
@@ -159,8 +165,14 @@ __all__ = [
     # Load providers
     "DistributedFieldProvider",
     # Instrumentation
+    "BucketedData",
     "Data",
+    "EntitySummary",
+    "LatencyTracker",
     "Probe",
+    "QueueStats",
+    "SimulationSummary",
+    "ThroughputTracker",
     # Sketching algorithms
     "TopK",
     "CountMinSketch",

@@ -6,9 +6,6 @@ according to the plugged-in policy when run inside a full simulation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
-
 import pytest
 
 from happysimulator.components.rate_limiter.policy import (
@@ -25,9 +22,6 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
 
@@ -47,27 +41,6 @@ class SinkEntity(Entity):
         return []
 
 
-class TargetedRequestProvider(EventProvider):
-    """Generates request events targeting a given entity."""
-
-    def __init__(self, target: Entity):
-        super().__init__()
-        self._target = target
-
-    def get_events(self, time: Instant) -> List[Event]:
-        return [
-            Event(time=time, event_type="Request", target=self._target)
-        ]
-
-
-@dataclass(frozen=True)
-class ConstantRate(Profile):
-    rate: float
-
-    def get_rate(self, time: Instant) -> float:  # noqa: ARG002
-        return float(self.rate)
-
-
 # ---------------------------------------------------------------------------
 # Token Bucket
 # ---------------------------------------------------------------------------
@@ -80,9 +53,7 @@ class TestRateLimitedEntityTokenBucket:
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=10.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=5.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=5.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -104,9 +75,7 @@ class TestRateLimitedEntityTokenBucket:
             "limiter", downstream=sink, policy=policy, queue_capacity=1000,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=20.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=20.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -129,9 +98,7 @@ class TestRateLimitedEntityTokenBucket:
             "limiter", downstream=sink, policy=policy, queue_capacity=5,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=100.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=100.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -156,9 +123,7 @@ class TestRateLimitedEntityLeakyBucket:
         policy = LeakyBucketPolicy(leak_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -185,9 +150,7 @@ class TestRateLimitedEntitySlidingWindow:
         policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=5)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -214,9 +177,7 @@ class TestRateLimitedEntityFixedWindow:
         policy = FixedWindowPolicy(requests_per_window=5, window_size=1.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -246,9 +207,7 @@ class TestRateLimitedEntityAdaptive:
         )
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=10.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=10.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -279,9 +238,7 @@ class TestInvariants:
             "limiter", downstream=sink, policy=policy, queue_capacity=50,
         )
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=15.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=15.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -300,9 +257,7 @@ class TestInvariants:
         policy = TokenBucketPolicy(capacity=10.0, refill_rate=5.0)
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
-        provider = TargetedRequestProvider(limiter)
-        arrival = ConstantArrivalTimeProvider(ConstantRate(rate=3.0), start_time=Instant.Epoch)
-        source = Source(name="src", event_provider=provider, arrival_time_provider=arrival)
+        source = Source.constant(rate=3.0, target=limiter, name="src")
 
         sim = Simulation(
             start_time=Instant.Epoch,

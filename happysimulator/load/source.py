@@ -8,6 +8,8 @@ Sources bootstrap themselves by scheduling a SourceEvent, which triggers
 payload generation and schedules the next SourceEvent.
 """
 
+from __future__ import annotations
+
 import logging
 from typing import List
 
@@ -17,9 +19,47 @@ from happysimulator.core.temporal import Instant
 from happysimulator.load.source_event import SourceEvent
 from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
+from happysimulator.load.profile import ConstantRateProfile, Profile
 
 
 logger = logging.getLogger(__name__)
+
+
+class _SimpleEventProvider(EventProvider):
+    """Internal event provider that creates targeted events with metadata.
+
+    Generates events with auto-incrementing request IDs and ``created_at``
+    timestamps in context. Used by Source factory methods to eliminate the
+    need for custom EventProvider subclasses in common cases.
+    """
+
+    def __init__(
+        self,
+        target: Entity,
+        event_type: str = "Request",
+        stop_after: Instant | None = None,
+    ):
+        self._target = target
+        self._event_type = event_type
+        self._stop_after = stop_after
+        self._generated: int = 0
+
+    def get_events(self, time: Instant) -> list[Event]:
+        if self._stop_after is not None and time > self._stop_after:
+            return []
+
+        self._generated += 1
+        return [
+            Event(
+                time=time,
+                event_type=self._event_type,
+                target=self._target,
+                context={
+                    "created_at": time,
+                    "request_id": self._generated,
+                },
+            )
+        ]
 
 
 class Source(Entity):
@@ -107,5 +147,124 @@ class Source(Entity):
             logger.info("[%s] Source exhausted after %d events. Stopping.", self.name, self._nmb_generated)
             return payload_events
             
+    @classmethod
+    def constant(
+        cls,
+        rate: float,
+        target: Entity,
+        event_type: str = "Request",
+        *,
+        name: str = "Source",
+        stop_after: float | Instant | None = None,
+    ) -> Source:
+        """Create a Source with constant (deterministic) arrival rate.
+
+        Args:
+            rate: Events per second.
+            target: Entity to receive generated events.
+            event_type: Type string for generated events.
+            name: Source identifier for logging.
+            stop_after: Stop generating events after this time.
+                        Accepts seconds (float) or Instant.
+
+        Returns:
+            A fully-wired Source ready for use in a Simulation.
+        """
+        from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
+
+        stop_instant = cls._resolve_stop_after(stop_after)
+        return cls(
+            name=name,
+            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            arrival_time_provider=ConstantArrivalTimeProvider(
+                ConstantRateProfile(rate=rate),
+                start_time=Instant.Epoch,
+            ),
+        )
+
+    @classmethod
+    def poisson(
+        cls,
+        rate: float,
+        target: Entity,
+        event_type: str = "Request",
+        *,
+        name: str = "Source",
+        stop_after: float | Instant | None = None,
+    ) -> Source:
+        """Create a Source with Poisson (stochastic) arrival rate.
+
+        Args:
+            rate: Mean events per second.
+            target: Entity to receive generated events.
+            event_type: Type string for generated events.
+            name: Source identifier for logging.
+            stop_after: Stop generating events after this time.
+                        Accepts seconds (float) or Instant.
+
+        Returns:
+            A fully-wired Source ready for use in a Simulation.
+        """
+        from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
+
+        stop_instant = cls._resolve_stop_after(stop_after)
+        return cls(
+            name=name,
+            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            arrival_time_provider=PoissonArrivalTimeProvider(
+                ConstantRateProfile(rate=rate),
+                start_time=Instant.Epoch,
+            ),
+        )
+
+    @classmethod
+    def with_profile(
+        cls,
+        profile: Profile,
+        target: Entity,
+        event_type: str = "Request",
+        *,
+        poisson: bool = True,
+        name: str = "Source",
+        stop_after: float | Instant | None = None,
+    ) -> Source:
+        """Create a Source with a custom rate profile.
+
+        Args:
+            profile: Rate profile defining how arrival rate varies over time.
+            target: Entity to receive generated events.
+            event_type: Type string for generated events.
+            poisson: If True (default), use stochastic Poisson arrivals.
+                     If False, use deterministic constant arrivals.
+            name: Source identifier for logging.
+            stop_after: Stop generating events after this time.
+                        Accepts seconds (float) or Instant.
+
+        Returns:
+            A fully-wired Source ready for use in a Simulation.
+        """
+        from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
+        from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
+
+        stop_instant = cls._resolve_stop_after(stop_after)
+        provider_cls = PoissonArrivalTimeProvider if poisson else ConstantArrivalTimeProvider
+        return cls(
+            name=name,
+            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            arrival_time_provider=provider_cls(
+                profile,
+                start_time=Instant.Epoch,
+            ),
+        )
+
+    @staticmethod
+    def _resolve_stop_after(stop_after: float | Instant | None) -> Instant | None:
+        """Convert a stop_after value to an Instant."""
+        if stop_after is None:
+            return None
+        if isinstance(stop_after, Instant):
+            return stop_after
+        return Instant.from_seconds(stop_after)
+
     def __repr__(self):
         return f"<Source {self.name}>"

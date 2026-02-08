@@ -547,7 +547,7 @@ class TestAsyncServerExplained:
         │ Completed: {async_server.stats.requests_completed}                    │
         │ Avg Latency: {async_avg:.0f}ms               │
         │ Max Latency: {async_max:.0f}ms               │
-        │ ⚠️  Queue buildup under load!    │
+        │ [!] Queue buildup under load!    │
         └─────────────────────────────────┘
 
         THREAD POOL (4 Workers):
@@ -556,7 +556,7 @@ class TestAsyncServerExplained:
         │ Completed: {threaded_server.stats.requests_completed}                    │
         │ Avg Latency: {threaded_avg:.0f}ms               │
         │ Max Latency: {threaded_max:.0f}ms               │
-        │ ✓  Handles load easily          │
+        │ [OK] Handles load easily        │
         └─────────────────────────────────┘
 
         KEY TAKEAWAY:
@@ -711,7 +711,7 @@ class TestAsyncServerExplained:
            │                                │
            │ Result: Requests REJECTED      │
            │ Rejected: {low_conn_server.stats.requests_rejected} requests          │
-           │ ⚠️  Connection limit hit!       │
+           │ [!] Connection limit hit!       │
            └────────────────────────────────┘
 
         2. CPU-LIMITED (Right plots):
@@ -723,7 +723,7 @@ class TestAsyncServerExplained:
            │                                │
            │ Result: QUEUE builds up        │
            │ Peak Queue: {max(slow_cpu_collector.async_cpu_queue_depth)}                  │
-           │ ⚠️  CPU is bottleneck!          │
+           │ [!] CPU is bottleneck!          │
            └────────────────────────────────┘
 
         KEY INSIGHT:
@@ -934,19 +934,19 @@ class TestAsyncServerExplained:
 
         REAL-WORLD EXAMPLES:
         ────────────────────
-        ❌ Synchronous file I/O
-        ❌ Complex regex on user input
-        ❌ JSON parsing large payloads
-        ❌ Image processing in request handler
-        ❌ Synchronous crypto operations
+        [X] Synchronous file I/O
+        [X] Complex regex on user input
+        [X] JSON parsing large payloads
+        [X] Image processing in request handler
+        [X] Synchronous crypto operations
 
         SOLUTIONS:
         ──────────
-        ✓ Use async/await for I/O
-        ✓ Offload CPU work to worker threads
-        ✓ Use streaming for large data
-        ✓ Set timeouts on operations
-        ✓ Use worker pools for CPU tasks
+        [OK] Use async/await for I/O
+        [OK] Offload CPU work to worker threads
+        [OK] Use streaming for large data
+        [OK] Set timeouts on operations
+        [OK] Use worker pools for CPU tasks
         """
         ax.text(0.02, 0.98, explanation, transform=ax.transAxes, fontsize=9,
                verticalalignment='top', fontfamily='monospace',

@@ -22,7 +22,9 @@
       "WebFetch(domain:adamfillion.com)",
       "Bash(pip show:*)",
       "Bash(findstr:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(Select-String:*)",
+      "Bash(Measure-Object -Line)"
     ]
   },
   "hooks": {

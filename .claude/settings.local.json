@@ -19,7 +19,10 @@
       "Bash(ruff check:*)",
       "Bash(mypy:*)",
       "Bash(python:*)",
-      "Bash(del \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator\\\\happysimulator\\\\components\\\\token_bucket_rate_limiter.py\")"
+      "WebFetch(domain:adamfillion.com)",
+      "Bash(pip show:*)",
+      "Bash(findstr:*)",
+      "Bash(git log:*)"
     ]
   },
   "hooks": {

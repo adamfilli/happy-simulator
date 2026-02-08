@@ -1,48 +1,55 @@
 """Rate limiter components for controlling request throughput.
 
-This module provides various rate limiting algorithms:
-- FixedWindowRateLimiter: Simple fixed time window limiting
-- AdaptiveRateLimiter: AIMD-based self-tuning rate limiter
-- DistributedRateLimiter: Coordinated limiting across multiple instances
+This module provides:
 
-For basic rate limiting, see also:
-- TokenBucketRateLimiter: Classic token bucket (allows bursting)
-- LeakyBucketRateLimiter: Strict output rate (no bursting)
-- SlidingWindowRateLimiter: Sliding window log algorithm
+**Policies** (pure algorithms, not Entities):
+- TokenBucketPolicy: Classic token bucket (allows bursting)
+- LeakyBucketPolicy: Strict output rate (no bursting)
+- SlidingWindowPolicy: Sliding window log algorithm
+- FixedWindowPolicy: Fixed time window counter
+- AdaptivePolicy: AIMD-based self-tuning rate limiter
+
+**Entity** (simulation actor):
+- RateLimitedEntity: Generic Entity that wraps any policy with a FIFO queue
+
+**Distributed** (unchanged, uses generator yields for I/O):
+- DistributedRateLimiter: Coordinated limiting across multiple instances
 
 Example:
     from happysimulator.components.rate_limiter import (
-        FixedWindowRateLimiter,
-        AdaptiveRateLimiter,
+        RateLimitedEntity,
+        TokenBucketPolicy,
+        FixedWindowPolicy,
     )
 
-    # Simple fixed window: 100 requests per second
-    limiter = FixedWindowRateLimiter(
+    # Token bucket with queuing
+    limiter = RateLimitedEntity(
         name="api_limit",
         downstream=server,
-        requests_per_window=100,
-        window_size=1.0,
+        policy=TokenBucketPolicy(capacity=10.0, refill_rate=5.0),
     )
 
-    # Self-tuning adaptive limiter
-    adaptive = AdaptiveRateLimiter(
-        name="adaptive",
+    # Fixed window with queuing
+    limiter = RateLimitedEntity(
+        name="api_limit",
         downstream=server,
-        initial_rate=100.0,
-        min_rate=10.0,
-        max_rate=1000.0,
+        policy=FixedWindowPolicy(requests_per_window=100, window_size=1.0),
     )
 """
 
-from happysimulator.components.rate_limiter.fixed_window import (
-    FixedWindowRateLimiter,
-    FixedWindowStats,
-)
-from happysimulator.components.rate_limiter.adaptive import (
-    AdaptiveRateLimiter,
-    AdaptiveRateLimiterStats,
+from happysimulator.components.rate_limiter.policy import (
+    AdaptivePolicy,
+    FixedWindowPolicy,
+    LeakyBucketPolicy,
     RateAdjustmentReason,
+    RateLimiterPolicy,
     RateSnapshot,
+    SlidingWindowPolicy,
+    TokenBucketPolicy,
+)
+from happysimulator.components.rate_limiter.rate_limited_entity import (
+    RateLimitedEntity,
+    RateLimitedEntityStats,
 )
 from happysimulator.components.rate_limiter.distributed import (
     DistributedRateLimiter,
@@ -50,15 +57,20 @@ from happysimulator.components.rate_limiter.distributed import (
 )
 
 __all__ = [
-    # Fixed Window
-    "FixedWindowRateLimiter",
-    "FixedWindowStats",
-    # Adaptive
-    "AdaptiveRateLimiter",
-    "AdaptiveRateLimiterStats",
+    # Protocol
+    "RateLimiterPolicy",
+    # Policies
+    "TokenBucketPolicy",
+    "LeakyBucketPolicy",
+    "SlidingWindowPolicy",
+    "FixedWindowPolicy",
+    "AdaptivePolicy",
     "RateAdjustmentReason",
     "RateSnapshot",
-    # Distributed
+    # Entity
+    "RateLimitedEntity",
+    "RateLimitedEntityStats",
+    # Distributed (unchanged)
     "DistributedRateLimiter",
     "DistributedRateLimiterStats",
 ]

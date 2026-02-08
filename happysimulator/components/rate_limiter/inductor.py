@@ -19,10 +19,6 @@ a low α (heavy smoothing), long gaps get a high α (fast adaptation).
 Events are forwarded when enough time has elapsed according to the smoothed
 interval.  Excess arrivals are buffered in a bounded FIFO queue and drained
 via self-scheduling poll events.
-
-See Also
---------
-``.dev/inductor-design.md`` for the full design document.
 """
 
 from __future__ import annotations

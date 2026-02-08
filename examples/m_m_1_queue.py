@@ -8,24 +8,24 @@ This example demonstrates metastable failure behavior in a queuing system:
 ## Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                       METASTABLE FAILURE SIMULATION                          │
-└─────────────────────────────────────────────────────────────────────────────┘
++-----------------------------------------------------------------------------+
+|                       METASTABLE FAILURE SIMULATION                          |
++-----------------------------------------------------------------------------+
 
     LOAD PROFILE (120 seconds total)
-    ─────────────────────────────────────────────────────────────────────────
+    ---------------------------------------------------------------------------
 
     Rate (req/s)
-    15 │                    ╭───╮              ╭───╮
-       │                    │   │              │   │
-    10 │────────────────────┤   │──────────────┤   ├──────────────
-       │  Service capacity  │   │              │   │     ↓ step-down
-     9 │                    │   │    ╭─────────┤   ├─────────────────
-       │                    │   │    │         │   │   7   6   5
-     5 │   ╭────────────────┤   ├────╯         │   │
-       │   │  Low load      │   │  Vulnerable  │   │  Recovery search
-       │   │  (stable)      │   │  (near sat.) │   │
-     0 └───┴────────────────┴───┴──────────────┴───┴─────────────────→ Time(s)
+    15 |                    +---+              +---+
+       |                    |   |              |   |
+    10 |--------------------+   |--------------+   +----------
+       |  Service capacity  |   |              |   |     : step-down
+     9 |                    |   |    +---------+   +-----------
+       |                    |   |    |         |   |   7   6   5
+     5 |   +----------------+   +----+         |   |
+       |   |  Low load      |   |  Vulnerable  |   |  Recovery search
+       |   |  (stable)      |   |  (near sat.) |   |
+     0 +---+----------------+---+--------------+---+------------> Time(s)
        0   10          25  30 35          55  60 65    80  90 100 110 120
 
     Phase 1 (0-10s):   Low load, 5 req/s (50% utilization) - stable baseline
@@ -38,42 +38,40 @@ This example demonstrates metastable failure behavior in a queuing system:
     Phase 8 (65-120s): Step down load: 7, 6, 5, 4, 3 req/s to find recovery
 
                           QUEUED SERVER (M/M/1)
-    ┌─────────────────────────────────────────────────────────────────────┐
-    │                                                                     │
-    │   ┌─────────┐      ┌───────────────────┐      ┌─────────┐          │
-    │   │ Source  │─────►│      Queue        │─────►│ Server  │──────►   │
-    │   │(Poisson)│      │      (FIFO)       │      │(Exp~0.1s)│   Sink  │
-    │   └─────────┘      └───────────────────┘      └─────────┘          │
-    │       ▲                    ▲                                       │
-    │       │                    │                                       │
-    │   Rate varies          Queue depth                                 │
-    │   per profile          monitored                                   │
-    │                                                                    │
-    └────────────────────────────────────────────────────────────────────┘
+    +---------------------------------------------------------------------+
+    |                                                                     |
+    |   +---------+      +-------------------+      +---------+          |
+    |   | Source  |----->|      Queue        |----->| Server  |------>   |
+    |   |(Poisson)|      |      (FIFO)       |      |(Exp~0.1s)|   Sink  |
+    |   +---------+      +-------------------+      +---------+          |
+    |       ^                    ^                                       |
+    |       |                    |                                       |
+    |   Rate varies          Queue depth                                 |
+    |   per profile          monitored                                   |
+    |                                                                    |
+    +--------------------------------------------------------------------+
 
 ```
 
 ## M/M/1 Queue Theory
 
-With mean service time = 100ms, service rate μ = 10 req/s.
-For stability, arrival rate λ < μ.
-Utilization ρ = λ/μ.
+With mean service time = 100ms, service rate mu = 10 req/s.
+For stability, arrival rate lambda < mu.
+Utilization rho = lambda/mu.
 
-Expected queue length = ρ²/(1-ρ)
+Expected queue length = rho^2/(1-rho)
 At 50% utilization: E[queue] = 0.5 (very short)
 At 90% utilization: E[queue] = 8.1 (significant)
 At 95% utilization: E[queue] = 18.05 (very long)
 
-When a spike pushes λ > μ temporarily, the queue grows linearly.
+When a spike pushes lambda > mu temporarily, the queue grows linearly.
 In the vulnerable state, even a brief spike creates a large queue
-that takes a long time to drain (drain rate = μ - λ).
+that takes a long time to drain (drain rate = mu - lambda).
 """
 
 from __future__ import annotations
 
-import math
 import random
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generator
@@ -85,11 +83,13 @@ from happysimulator import (
     EventProvider,
     FIFOQueue,
     Instant,
+    LatencyTracker,
     PoissonArrivalTimeProvider,
     Probe,
     Profile,
     QueuedResource,
     Simulation,
+    SimulationSummary,
     Source,
 )
 
@@ -207,36 +207,6 @@ class RequestProvider(EventProvider):
 
 
 # =============================================================================
-# Latency Tracking Sink
-# =============================================================================
-
-
-class LatencyTrackingSink(Entity):
-    """Sink that records end-to-end latency using event context."""
-
-    def __init__(self, name: str):
-        super().__init__(name)
-        self.events_received: int = 0
-        self.completion_times: list[Instant] = []
-        self.latencies_s: list[float] = []
-
-    def handle_event(self, event: Event) -> list[Event]:
-        self.events_received += 1
-
-        created_at: Instant = event.context.get("created_at", event.time)
-        latency_s = (event.time - created_at).to_seconds()
-
-        self.completion_times.append(event.time)
-        self.latencies_s.append(latency_s)
-
-        return []
-
-    def latency_time_series_seconds(self) -> tuple[list[float], list[float]]:
-        """Return (completion_times_s, latencies_s) for plotting."""
-        return [t.to_seconds() for t in self.completion_times], list(self.latencies_s)
-
-
-# =============================================================================
 # M/M/1 Server with Exponential Service Times
 # =============================================================================
 
@@ -285,62 +255,6 @@ class MM1Server(QueuedResource):
 
 
 # =============================================================================
-# Helper Functions
-# =============================================================================
-
-
-def percentile_sorted(sorted_values: list[float], p: float) -> float:
-    """Calculate percentile from sorted values (p in [0, 1])."""
-    if not sorted_values:
-        return 0.0
-    if p <= 0:
-        return float(sorted_values[0])
-    if p >= 1:
-        return float(sorted_values[-1])
-
-    n = len(sorted_values)
-    pos = p * (n - 1)
-    lo = int(pos)
-    hi = min(lo + 1, n - 1)
-    frac = pos - lo
-    return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
-
-
-def bucket_latencies(
-    times_s: list[float],
-    latencies_s: list[float],
-    bucket_size_s: float = 1.0,
-) -> dict[str, list[float]]:
-    """Bucket latencies by time and compute statistics."""
-    buckets: dict[int, list[float]] = defaultdict(list)
-    for t_s, latency_s in zip(times_s, latencies_s, strict=False):
-        bucket = int(math.floor(t_s / bucket_size_s))
-        buckets[bucket].append(latency_s)
-
-    result: dict[str, list[float]] = {
-        "time_s": [],
-        "avg": [],
-        "p50": [],
-        "p99": [],
-        "p100": [],
-        "count": [],
-    }
-
-    for bucket in sorted(buckets.keys()):
-        vals_sorted = sorted(buckets[bucket])
-        bucket_start = bucket * bucket_size_s
-
-        result["time_s"].append(bucket_start)
-        result["avg"].append(sum(vals_sorted) / len(vals_sorted))
-        result["p50"].append(percentile_sorted(vals_sorted, 0.50))
-        result["p99"].append(percentile_sorted(vals_sorted, 0.99))
-        result["p100"].append(percentile_sorted(vals_sorted, 1.0))
-        result["count"].append(float(len(vals_sorted)))
-
-    return result
-
-
-# =============================================================================
 # Main Simulation
 # =============================================================================
 
@@ -348,11 +262,12 @@ def bucket_latencies(
 @dataclass
 class SimulationResult:
     """Results from the metastable failure simulation."""
-    sink: LatencyTrackingSink
+    sink: LatencyTracker
     server: MM1Server
     queue_depth_data: Data
     source_generated: int
     profile: MetastableLoadProfile
+    summary: SimulationSummary
 
 
 def run_metastable_simulation(
@@ -379,7 +294,8 @@ def run_metastable_simulation(
         random.seed(seed)
 
     # Create pipeline: Source -> Server -> Sink
-    sink = LatencyTrackingSink(name="Sink")
+    # Using built-in LatencyTracker instead of custom LatencyTrackingSink
+    sink = LatencyTracker(name="Sink")
     server = MM1Server(
         name="Server",
         mean_service_time_s=mean_service_time_s,
@@ -412,7 +328,7 @@ def run_metastable_simulation(
         entities=[server, sink],
         probes=[queue_probe],
     )
-    sim.run()
+    summary = sim.run()
 
     return SimulationResult(
         sink=sink,
@@ -420,6 +336,7 @@ def run_metastable_simulation(
         queue_depth_data=queue_depth_data,
         source_generated=provider.generated_requests,
         profile=profile,
+        summary=summary,
     )
 
 
@@ -429,12 +346,11 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get data
-    times_s, latencies_s = result.sink.latency_time_series_seconds()
-    latency_buckets = bucket_latencies(times_s, latencies_s, bucket_size_s=1.0)
+    # Use built-in bucketing instead of manual bucket_latencies()
+    latency_buckets = result.sink.summary(window_s=1.0).to_dict()
 
-    q_times = [t for (t, _) in result.queue_depth_data.values]
-    q_depths = [v for (_, v) in result.queue_depth_data.values]
+    q_times = result.queue_depth_data.times()
+    q_depths = result.queue_depth_data.raw_values()
 
     # Profile parameters for vertical lines
     profile = result.profile
@@ -483,9 +399,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax2.legend(loc='upper right')
     ax2.grid(True, alpha=0.3)
 
-    # Bottom: Latency
+    # Bottom: Latency (using built-in bucketed data)
     ax3 = axes[2]
-    ax3.plot(latency_buckets["time_s"], latency_buckets["avg"], 'b-', linewidth=2, label='Avg')
+    ax3.plot(latency_buckets["time_s"], latency_buckets["mean"], 'b-', linewidth=2, label='Avg')
     ax3.plot(latency_buckets["time_s"], latency_buckets["p99"], 'r-', linewidth=1.5, label='p99')
     ax3.fill_between([spike1_start, spike1_end], 0, max(latency_buckets["p99"]) if latency_buckets["p99"] else 1,
                      alpha=0.2, color='orange')
@@ -504,19 +420,19 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     plt.close(fig)
     print(f"Saved: {output_dir / 'metastable_overview.png'}")
 
-    # Figure 2: Detailed latency comparison (before/after each spike)
+    # Figure 2: Detailed analysis
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-    # Spike 1 analysis
-    pre_spike1 = [(t, lat) for t, lat in zip(times_s, latencies_s) if 15 <= t < spike1_start]
-    during_spike1 = [(t, lat) for t, lat in zip(times_s, latencies_s) if spike1_start <= t < spike1_end]
-    post_spike1 = [(t, lat) for t, lat in zip(times_s, latencies_s) if spike1_end <= t < vulnerable_start]
+    # Spike 1 analysis - using Data.between() instead of manual filtering
+    latency_data = result.sink.data
+    pre_spike1 = latency_data.between(15, spike1_start)
+    post_spike1 = latency_data.between(spike1_end, vulnerable_start)
 
     ax = axes[0, 0]
     if pre_spike1:
-        ax.hist([lat for _, lat in pre_spike1], bins=30, alpha=0.5, label='Before spike', color='blue')
+        ax.hist(pre_spike1.raw_values(), bins=30, alpha=0.5, label='Before spike', color='blue')
     if post_spike1:
-        ax.hist([lat for _, lat in post_spike1], bins=30, alpha=0.5, label='After spike', color='green')
+        ax.hist(post_spike1.raw_values(), bins=30, alpha=0.5, label='After spike', color='green')
     ax.set_xlabel('Latency (s)')
     ax.set_ylabel('Count')
     ax.set_title('Spike 1 (Stable State): Latency Distribution')
@@ -524,15 +440,14 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax.grid(True, alpha=0.3)
 
     # Spike 2 analysis
-    pre_spike2 = [(t, lat) for t, lat in zip(times_s, latencies_s) if 45 <= t < spike2_start]
-    during_spike2 = [(t, lat) for t, lat in zip(times_s, latencies_s) if spike2_start <= t < spike2_end]
-    post_spike2 = [(t, lat) for t, lat in zip(times_s, latencies_s) if spike2_end <= t < step_down_start]
+    pre_spike2 = latency_data.between(45, spike2_start)
+    post_spike2 = latency_data.between(spike2_end, step_down_start)
 
     ax = axes[0, 1]
     if pre_spike2:
-        ax.hist([lat for _, lat in pre_spike2], bins=30, alpha=0.5, label='Before spike', color='blue')
+        ax.hist(pre_spike2.raw_values(), bins=30, alpha=0.5, label='Before spike', color='blue')
     if post_spike2:
-        ax.hist([lat for _, lat in post_spike2], bins=30, alpha=0.5, label='After spike', color='red')
+        ax.hist(post_spike2.raw_values(), bins=30, alpha=0.5, label='After spike', color='red')
     ax.set_xlabel('Latency (s)')
     ax.set_ylabel('Count')
     ax.set_title('Spike 2 (Vulnerable State): Latency Distribution')
@@ -545,10 +460,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[1, 0]
     for i, (start_t, rate) in enumerate(zip(step_times, profile.step_down_rates)):
         end_t = start_t + profile.step_down_duration
-        step_latencies = [lat for t, lat in zip(times_s, latencies_s) if start_t <= t < end_t]
-        if step_latencies:
+        step_data = latency_data.between(start_t, end_t)
+        if step_data:
             positions = [i + 1]
-            ax.boxplot([step_latencies], positions=positions, widths=0.6)
+            ax.boxplot([step_data.raw_values()], positions=positions, widths=0.6)
 
     ax.set_xticks(range(1, len(profile.step_down_rates) + 1))
     ax.set_xticklabels([f"{r} req/s" for r in profile.step_down_rates])
@@ -557,21 +472,17 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax.set_title('Recovery Search: Latency at Each Step-Down Level')
     ax.grid(True, alpha=0.3, axis='y')
 
-    # Throughput over time
-    completion_buckets: dict[int, int] = defaultdict(int)
-    for t in times_s:
-        bucket = int(math.floor(t))
-        completion_buckets[bucket] += 1
-
-    throughput_times = sorted(completion_buckets.keys())
-    throughput_values = [completion_buckets[t] for t in throughput_times]
+    # Throughput over time - derive from sink data (one event = one completion)
+    tp_buckets = result.sink.data.bucket(window_s=1.0)
+    tp_times = tp_buckets.times()
+    tp_values = tp_buckets.counts()  # completions per window
 
     ax = axes[1, 1]
-    ax.bar(throughput_times, throughput_values, width=0.8, alpha=0.7)
+    ax.bar(tp_times, tp_values, width=0.8, alpha=0.7)
     ax.axhline(y=10, color='r', linestyle='--', label='Capacity')
-    ax.fill_between([spike1_start, spike1_end], 0, max(throughput_values) if throughput_values else 15,
+    ax.fill_between([spike1_start, spike1_end], 0, max(tp_values) if tp_values else 15,
                     alpha=0.2, color='orange')
-    ax.fill_between([spike2_start, spike2_end], 0, max(throughput_values) if throughput_values else 15,
+    ax.fill_between([spike2_start, spike2_end], 0, max(tp_values) if tp_values else 15,
                     alpha=0.2, color='red')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Completions/second')
@@ -592,7 +503,6 @@ def print_summary(result: SimulationResult) -> None:
     print("=" * 70)
 
     profile = result.profile
-    times_s, latencies_s = result.sink.latency_time_series_seconds()
 
     print(f"\nConfiguration:")
     print(f"  Service capacity: 10 req/s (mean service time = 100ms)")
@@ -602,43 +512,28 @@ def print_summary(result: SimulationResult) -> None:
 
     print(f"\nRequests:")
     print(f"  Generated: {result.source_generated}")
-    print(f"  Completed: {result.sink.events_received}")
+    print(f"  Completed: {result.sink.count}")
     print(f"  Processed by server: {result.server.stats_processed}")
 
-    # Analyze queue depth at different phases
-    q_times = [t for (t, _) in result.queue_depth_data.values]
-    q_depths = [v for (_, v) in result.queue_depth_data.values]
-
-    def avg_depth_in_range(start: float, end: float) -> float:
-        depths = [d for t, d in zip(q_times, q_depths) if start <= t < end]
-        return sum(depths) / len(depths) if depths else 0.0
-
-    def max_depth_in_range(start: float, end: float) -> float:
-        depths = [d for t, d in zip(q_times, q_depths) if start <= t < end]
-        return max(depths) if depths else 0.0
+    # Queue depth analysis using Data.between().mean() / .max()
+    qd = result.queue_depth_data
 
     print(f"\nQueue Depth Analysis:")
-    print(f"  Stable period (10-25s):     avg={avg_depth_in_range(10, 25):.1f}, max={max_depth_in_range(10, 25):.0f}")
-    print(f"  During spike 1 (25-30s):    avg={avg_depth_in_range(25, 30):.1f}, max={max_depth_in_range(25, 30):.0f}")
-    print(f"  Post-spike 1 (30-35s):      avg={avg_depth_in_range(30, 35):.1f}, max={max_depth_in_range(30, 35):.0f}")
-    print(f"  Vulnerable period (45-55s): avg={avg_depth_in_range(45, 55):.1f}, max={max_depth_in_range(45, 55):.0f}")
-    print(f"  During spike 2 (55-60s):    avg={avg_depth_in_range(55, 60):.1f}, max={max_depth_in_range(55, 60):.0f}")
-    print(f"  Post-spike 2 (60-65s):      avg={avg_depth_in_range(60, 65):.1f}, max={max_depth_in_range(60, 65):.0f}")
+    print(f"  Stable period (10-25s):     avg={qd.between(10, 25).mean():.1f}, max={qd.between(10, 25).max():.0f}")
+    print(f"  During spike 1 (25-30s):    avg={qd.between(25, 30).mean():.1f}, max={qd.between(25, 30).max():.0f}")
+    print(f"  Post-spike 1 (30-35s):      avg={qd.between(30, 35).mean():.1f}, max={qd.between(30, 35).max():.0f}")
+    print(f"  Vulnerable period (45-55s): avg={qd.between(45, 55).mean():.1f}, max={qd.between(45, 55).max():.0f}")
+    print(f"  During spike 2 (55-60s):    avg={qd.between(55, 60).mean():.1f}, max={qd.between(55, 60).max():.0f}")
+    print(f"  Post-spike 2 (60-65s):      avg={qd.between(60, 65).mean():.1f}, max={qd.between(60, 65).max():.0f}")
 
-    # Latency analysis
-    def avg_latency_in_range(start: float, end: float) -> float:
-        lats = [lat for t, lat in zip(times_s, latencies_s) if start <= t < end]
-        return sum(lats) / len(lats) if lats else 0.0
-
-    def p99_latency_in_range(start: float, end: float) -> float:
-        lats = sorted([lat for t, lat in zip(times_s, latencies_s) if start <= t < end])
-        return percentile_sorted(lats, 0.99)
+    # Latency analysis using Data.between() methods
+    lat = result.sink.data
 
     print(f"\nLatency Analysis (average / p99):")
-    print(f"  Stable period (10-25s):     {avg_latency_in_range(10, 25)*1000:.1f}ms / {p99_latency_in_range(10, 25)*1000:.1f}ms")
-    print(f"  Post-spike 1 (30-35s):      {avg_latency_in_range(30, 35)*1000:.1f}ms / {p99_latency_in_range(30, 35)*1000:.1f}ms")
-    print(f"  Vulnerable period (45-55s): {avg_latency_in_range(45, 55)*1000:.1f}ms / {p99_latency_in_range(45, 55)*1000:.1f}ms")
-    print(f"  Post-spike 2 (60-65s):      {avg_latency_in_range(60, 65)*1000:.1f}ms / {p99_latency_in_range(60, 65)*1000:.1f}ms")
+    print(f"  Stable period (10-25s):     {lat.between(10, 25).mean()*1000:.1f}ms / {lat.between(10, 25).percentile(0.99)*1000:.1f}ms")
+    print(f"  Post-spike 1 (30-35s):      {lat.between(30, 35).mean()*1000:.1f}ms / {lat.between(30, 35).percentile(0.99)*1000:.1f}ms")
+    print(f"  Vulnerable period (45-55s): {lat.between(45, 55).mean()*1000:.1f}ms / {lat.between(45, 55).percentile(0.99)*1000:.1f}ms")
+    print(f"  Post-spike 2 (60-65s):      {lat.between(60, 65).mean()*1000:.1f}ms / {lat.between(60, 65).percentile(0.99)*1000:.1f}ms")
 
     # Recovery search analysis
     print(f"\nRecovery Search (step-down phases):")
@@ -646,8 +541,8 @@ def print_summary(result: SimulationResult) -> None:
     for i, rate in enumerate(profile.step_down_rates):
         start_t = step_start + i * profile.step_down_duration
         end_t = start_t + profile.step_down_duration
-        avg_lat = avg_latency_in_range(start_t, end_t)
-        avg_q = avg_depth_in_range(start_t, end_t)
+        avg_lat = lat.between(start_t, end_t).mean()
+        avg_q = qd.between(start_t, end_t).mean()
         print(f"  {rate} req/s ({rate/10*100:.0f}%): avg_latency={avg_lat*1000:.1f}ms, avg_queue={avg_q:.1f}")
 
     print("\n" + "=" * 70)
@@ -655,8 +550,8 @@ def print_summary(result: SimulationResult) -> None:
     print("-" * 70)
 
     # Compare recovery behavior
-    post_spike1_q = avg_depth_in_range(30, 35)
-    post_spike2_q = avg_depth_in_range(60, 65)
+    post_spike1_q = qd.between(30, 35).mean()
+    post_spike2_q = qd.between(60, 65).mean()
 
     print(f"\n1. SPIKE IN STABLE STATE (50% utilization):")
     print(f"   Queue recovers quickly after spike ends.")
@@ -666,9 +561,12 @@ def print_summary(result: SimulationResult) -> None:
     print(f"   Queue buildup persists after spike ends - METASTABLE FAILURE.")
     print(f"   Post-spike queue depth: {post_spike2_q:.1f}")
 
-    if post_spike2_q > post_spike1_q * 2:
+    if post_spike1_q > 0 and post_spike2_q > post_spike1_q * 2:
         print(f"\n   The {post_spike2_q/post_spike1_q:.1f}x higher queue depth after spike 2 demonstrates")
         print(f"   why systems near saturation are vulnerable to metastable failure.")
+
+    # Print auto-generated simulation summary
+    print(f"\n{result.summary}")
 
     print("\n" + "=" * 70)
 

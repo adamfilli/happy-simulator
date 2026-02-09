@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last Updated:** 2026-02-08
+> **Last Updated:** 2026-02-09
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Time** | Use `Instant.from_seconds(n)`, not raw floats |
 | **Generators** | Yield delays (float seconds); return events on completion |
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
+| **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
 ---
@@ -32,18 +33,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 5. **`happysimulator/core/entity.py`** - Actor pattern, `handle_event()` method
 6. **`happysimulator/core/simulation.py`** - Main loop, event scheduling
 
-### Phase 3: Patterns
-7. **`happysimulator/load/source.py`** - Self-perpetuating event generation
-8. **`happysimulator/components/queue.py`** - Queue/Driver pattern
-9. **`happysimulator/components/queued_resource.py`** - Resource abstraction
+### Phase 3: Interactive Control
+7. **`happysimulator/core/control/control.py`** - Pause/resume, stepping, breakpoints
+8. **`happysimulator/core/control/breakpoints.py`** - Breakpoint protocol and implementations
 
-### Phase 4: Examples
-10. **`examples/m_m_1_queue.py`** - Full M/M/1 queue workflow with visualization
-11. Corresponding integration tests in `tests/integration/`
+### Phase 4: Patterns
+9. **`happysimulator/load/source.py`** - Self-perpetuating event generation
+10. **`happysimulator/components/queue.py`** - Queue/Driver pattern
+11. **`happysimulator/components/queued_resource.py`** - Resource abstraction
 
-### Phase 5: Design Context
-12. **`.dev/COMPONENTLIB.md`** - Component library design philosophy
-13. **`.dev/zipf-distribution-design.md`** - Feature design document template
+### Phase 5: Examples
+12. **`examples/m_m_1_queue.py`** - Full M/M/1 queue workflow with visualization
+13. Corresponding integration tests in `tests/integration/`
+
+### Phase 6: Design Context
+14. **`.dev/COMPONENTLIB.md`** - Component library design philosophy
+15. **`.dev/zipf-distribution-design.md`** - Feature design document template
 
 ---
 
@@ -340,9 +345,13 @@ happysimulator/
 │   ├── event.py            # Event structure
 │   ├── callback_entity.py  # CallbackEntity, NullEntity
 │   ├── entity.py           # Entity base class
-│   ├── simulation.py       # Main simulation loop
+│   ├── simulation.py       # Main simulation loop (re-entrant)
 │   ├── clock.py            # Clock abstraction
-│   └── protocols.py        # Simulatable protocol
+│   ├── protocols.py        # Simulatable protocol
+│   └── control/            # Interactive simulation control
+│       ├── control.py      # SimulationControl (pause/resume/step/breakpoints)
+│       ├── state.py        # SimulationState, BreakpointContext
+│       └── breakpoints.py  # Breakpoint protocol + 5 implementations
 │
 ├── load/                    # Load generation
 │   ├── source.py           # Self-perpetuating source
@@ -400,6 +409,7 @@ tests/
 ├── logging-design.md       # Logging system design (implemented)
 ├── observability-design.md # Observability API design (implemented)
 ├── inductor-design.md      # Inductor entity design (implemented)
+├── simulation-control-design.md     # Simulation control design (implemented)
 ├── sketching-algorithms-design.md    # Sketching data structures
 └── zipf-distribution-design.md      # Feature design template
 
@@ -476,6 +486,7 @@ def test_visualization(test_output_dir):
 | `test_visualization_example.py` | Saving plots, CSV, JSON artifacts |
 | `test_zipf_distribution_visualization.py` | Distribution verification |
 | `test_compare_lifo_fifo.py` | Comparing queue policies |
+| `test_simulation_control.py` | Pause/resume, breakpoints, stepping |
 
 ---
 
@@ -813,6 +824,130 @@ json_data = analysis.to_dict()
 
 ---
 
+## Simulation Control (Interactive Debugging)
+
+The `sim.control` property provides interactive debugging for simulations. It is **lazy-created** on first access — when never used, the run loop incurs zero overhead (a single `if self._control is not None` guard per event).
+
+### Basic Usage
+
+```python
+from happysimulator import Simulation, Source, Counter, Instant
+
+counter = Counter("sink")
+source = Source.constant(rate=10, target=counter, event_type="Ping")
+sim = Simulation(
+    end_time=Instant.from_seconds(60.0),
+    sources=[source],
+    entities=[counter],
+)
+
+# Pause before running
+sim.control.pause()
+summary = sim.run()  # Returns immediately with 0 events processed
+
+# Step through events one at a time
+summary = sim.control.step(5)  # Process 5 events, then pause
+
+# Inspect state while paused
+state = sim.control.get_state()
+state.current_time        # Instant
+state.events_processed    # int
+state.heap_size           # int
+state.is_paused           # True
+state.last_event          # Event
+
+# Peek at upcoming events (only while paused)
+upcoming = sim.control.peek_next(3)
+matches = sim.control.find_events(lambda e: e.event_type == "Ping")
+
+# Resume to completion
+final_summary = sim.control.resume()
+```
+
+### Breakpoints
+
+Five breakpoint types pause the simulation when conditions are met:
+
+```python
+from happysimulator import (
+    TimeBreakpoint,
+    EventCountBreakpoint,
+    ConditionBreakpoint,
+    MetricBreakpoint,
+    EventTypeBreakpoint,
+)
+
+# Pause at simulation time t=30s (one-shot by default)
+sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(30.0)))
+
+# Pause after 1000 events processed
+sim.control.add_breakpoint(EventCountBreakpoint(count=1000))
+
+# Pause when a custom condition is met (repeatable by default)
+sim.control.add_breakpoint(ConditionBreakpoint(
+    fn=lambda ctx: ctx.last_event.event_type == "Error",
+    description="error occurred",
+))
+
+# Pause when an entity attribute crosses a threshold
+sim.control.add_breakpoint(MetricBreakpoint(
+    entity_name="Server",
+    attribute="depth",
+    operator="gt",     # gt, ge, lt, le, eq, ne
+    threshold=100,
+))
+
+# Pause when a specific event type is processed
+sim.control.add_breakpoint(EventTypeBreakpoint(event_type="Timeout"))
+```
+
+**One-shot vs repeatable**: `TimeBreakpoint` and `EventCountBreakpoint` default to `one_shot=True` (auto-removed after triggering). Others default to `one_shot=False` (persist and can trigger again after resume).
+
+**Management**:
+```python
+bp_id = sim.control.add_breakpoint(...)
+sim.control.remove_breakpoint(bp_id)
+sim.control.list_breakpoints()  # [(id, breakpoint), ...]
+sim.control.clear_breakpoints()
+```
+
+### Event Hooks
+
+Hooks fire on every event without pausing — useful for logging, metrics, or custom tracing:
+
+```python
+# Called after each event is processed
+hook_id = sim.control.on_event(lambda event: print(event.event_type))
+
+# Called when simulation time advances
+hook_id = sim.control.on_time_advance(lambda t: print(f"Time: {t}"))
+
+# Remove a hook
+sim.control.remove_hook(hook_id)
+```
+
+### Reset
+
+Reset clears the heap, resets counters, and re-primes sources/probes. Entity internal state is **not** reset (entities own their state).
+
+```python
+sim.run()               # Run to completion
+sim.control.reset()     # Clear heap, reset clock, re-prime sources
+sim.run()               # Run again from scratch
+```
+
+### Architecture Notes
+
+- `SimulationControl` is a separate class accessed via `sim.control` (composition pattern)
+- `Simulation.run()` is re-entrant: calling it on a paused sim resumes from the pause point
+- Both `resume()` and `step()` return `SimulationSummary` (partial if paused again, final if complete)
+- Three control check points in the loop, all guarded by `if self._control is not None`:
+  1. **Before pop**: checks pause requests and step counting
+  2. **After time advance**: fires time hooks
+  3. **After invoke+push**: fires event hooks and evaluates breakpoints
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -866,6 +1001,16 @@ json_data = analysis.to_dict()
 3. **File logging with rotation** (prevents disk space issues):
    ```python
    happysimulator.enable_file_logging("simulation.log", max_bytes=10_000_000)
+   ```
+
+4. **Use simulation control** to pause and inspect mid-run:
+   ```python
+   sim.control.add_breakpoint(MetricBreakpoint(
+       entity_name="Server", attribute="depth", operator="gt", threshold=50,
+   ))
+   sim.run()  # Pauses when queue depth > 50
+   state = sim.control.get_state()
+   upcoming = sim.control.peek_next(10)
    ```
 
 ---

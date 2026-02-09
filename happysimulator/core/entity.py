@@ -14,8 +14,8 @@ from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
-SimYield = Union[float, Tuple[float, list[Event], Event]]
-"""Type alias for generator yield values: delay or (delay, side_effects)."""
+SimYield = Union[float, Tuple[float, list[Event], Event], "SimFuture"]
+"""Type alias for generator yield values: delay, (delay, side_effects), or SimFuture."""
 
 SimReturn = Optional[Union[list[Event], Event]]
 """Type alias for generator return values: events to schedule on completion."""

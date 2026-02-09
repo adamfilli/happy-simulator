@@ -16,6 +16,9 @@ from happysimulator.core import (
     Event,
     Instant,
     NullEntity,
+    SimFuture,
+    any_of,
+    all_of,
     Simulation,
     Simulatable,
     simulatable,
@@ -135,6 +138,10 @@ __all__ = [
     "Clock",
     "Simulatable",
     "simulatable",
+    # SimFuture
+    "SimFuture",
+    "any_of",
+    "all_of",
     # Simulation control
     "SimulationControl",
     "SimulationState",

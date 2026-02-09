@@ -9,6 +9,7 @@ from happysimulator.core.temporal import Instant, Duration
 from happysimulator.core.protocols import Simulatable, HasCapacity
 from happysimulator.core.decorators import simulatable
 from happysimulator.core.callback_entity import CallbackEntity, NullEntity
+from happysimulator.core.sim_future import SimFuture, any_of, all_of
 from happysimulator.core.control import (
     SimulationControl,
     SimulationState,
@@ -36,6 +37,9 @@ __all__ = [
     "Duration",
     "CallbackEntity",
     "NullEntity",
+    "SimFuture",
+    "any_of",
+    "all_of",
     "SimulationControl",
     "SimulationState",
     "BreakpointContext",

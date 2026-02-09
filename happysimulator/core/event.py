@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 
 _global_event_counter = count()
 
+# Parent tracking — set by Simulation._run_loop() around event.invoke()
+_current_processing_event_id: str | None = None
+
+
+def _set_current_event(event_id: str) -> None:
+    """Set the currently-processing event ID for parent tracking."""
+    global _current_processing_event_id
+    _current_processing_event_id = event_id
+
+
+def _clear_current_event() -> None:
+    """Clear the currently-processing event ID."""
+    global _current_processing_event_id
+    _current_processing_event_id = None
+
 CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
 """Signature for hooks that run when an event or process finishes."""
 
@@ -92,6 +107,7 @@ class Event:
         # Always ensure trace context exists (even if caller passed partial context)
         self.context.setdefault("id", str(self._id))
         self.context.setdefault("created_at", self.time)
+        self.context.setdefault("parent_id", _current_processing_event_id)
         self.context.setdefault("stack", [])
         self.context.setdefault("metadata", {})
         self.context.setdefault("trace", {"spans": []})

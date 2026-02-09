@@ -16,6 +16,11 @@ from happysimulator.analysis.report import (
     SimulationAnalysis,
     analyze,
 )
+from happysimulator.analysis.causal_graph import (
+    CausalGraph,
+    CausalNode,
+    build_causal_graph,
+)
 
 __all__ = [
     "Phase",
@@ -27,4 +32,7 @@ __all__ = [
     "MetricSummary",
     "SimulationAnalysis",
     "analyze",
+    "CausalGraph",
+    "CausalNode",
+    "build_causal_graph",
 ]

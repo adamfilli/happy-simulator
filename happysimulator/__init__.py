@@ -117,6 +117,13 @@ from happysimulator.instrumentation import (
     ThroughputTracker,
 )
 
+# Analysis
+from happysimulator.analysis import (
+    CausalGraph,
+    CausalNode,
+    build_causal_graph,
+)
+
 # Sketching algorithms
 from happysimulator.sketching import (
     TopK,
@@ -253,6 +260,10 @@ __all__ = [
     "QueueStats",
     "SimulationSummary",
     "ThroughputTracker",
+    # Analysis
+    "CausalGraph",
+    "CausalNode",
+    "build_causal_graph",
     # Sketching algorithms
     "TopK",
     "CountMinSketch",

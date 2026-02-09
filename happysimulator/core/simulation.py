@@ -9,7 +9,7 @@ import logging
 import time as _time
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+from happysimulator.core.event import Event, _set_current_event, _clear_current_event
 from happysimulator.core.protocols import Simulatable
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
@@ -154,6 +154,25 @@ class Simulation:
         """
         self._event_heap.push(events)
 
+    def causal_graph(self, **kwargs):
+        """Build a CausalGraph from this simulation's trace recorder.
+
+        Requires an InMemoryTraceRecorder. Passes kwargs through to
+        build_causal_graph().
+
+        Raises:
+            TypeError: If the trace recorder is not an InMemoryTraceRecorder.
+        """
+        from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
+        from happysimulator.analysis.causal_graph import build_causal_graph
+
+        if not isinstance(self._trace, InMemoryTraceRecorder):
+            raise TypeError(
+                "causal_graph() requires an InMemoryTraceRecorder. "
+                f"Got {type(self._trace).__name__}."
+            )
+        return build_causal_graph(self._trace, **kwargs)
+
     def run(self) -> SimulationSummary:
         """Execute the simulation until termination or pause.
 
@@ -289,7 +308,11 @@ class Simulation:
 
             # 2. Invoke
             # The event itself knows how to run and what to return
-            new_events = event.invoke()
+            _set_current_event(event.context.get("id"))
+            try:
+                new_events = event.invoke()
+            finally:
+                _clear_current_event()
 
             # 3. Push
             if new_events:
@@ -308,6 +331,7 @@ class Simulation:
                         event_id=new_event.context.get("id"),
                         event_type=new_event.event_type,
                         scheduled_time=new_event.time,
+                        parent_id=new_event.context.get("parent_id"),
                     )
                 self._event_heap.push(new_events)
 

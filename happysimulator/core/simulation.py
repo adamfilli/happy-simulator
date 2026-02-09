@@ -88,6 +88,7 @@ class Simulation:
         self._is_paused: bool = False
         self._wall_start: float | None = None
         self._last_event: Event | None = None
+        self._events_cancelled: int = 0
 
         # Control surface — lazy-created on first access
         self._control = None
@@ -230,6 +231,18 @@ class Simulation:
             # 1. Pop
             event = self._event_heap.pop()
 
+            # Skip cancelled events (lazy deletion)
+            if event.cancelled:
+                self._events_cancelled += 1
+                logger.debug("Skipping cancelled event: %r", event)
+                self._trace.record(
+                    time=event.time,
+                    kind="simulation.skip_cancelled",
+                    event_id=event.context.get("id"),
+                    event_type=event.event_type,
+                )
+                continue
+
             if event.time < self._current_time:
                 logger.warning(
                     "Time travel detected: next event scheduled at %r, but current simulation time is %r. "
@@ -339,6 +352,7 @@ class Simulation:
         return SimulationSummary(
             duration_s=duration_s,
             total_events_processed=self._events_processed,
+            events_cancelled=self._events_cancelled,
             events_per_second=eps,
             wall_clock_seconds=wall_elapsed,
             entities=entity_summaries,

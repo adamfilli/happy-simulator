@@ -19,6 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Resources** | `Resource("cpu", capacity=8)` + `yield resource.acquire(2)` for shared contended capacity |
 | **Node Clocks** | `NodeClock(FixedSkew(...))` for per-node clock skew/drift in distributed protocols |
 | **Network** | `Network` topology + `partition()`/`.heal()` for network failures; `traffic_matrix()` for stats |
+| **Logical Clocks** | `LamportClock`, `VectorClock`, `HybridLogicalClock` for causal ordering in distributed protocols |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
@@ -406,6 +407,7 @@ happysimulator/
 │   ├── callback_entity.py  # CallbackEntity, NullEntity
 │   ├── sim_future.py       # SimFuture, any_of, all_of
 │   ├── node_clock.py       # NodeClock, ClockModel, FixedSkew, LinearDrift
+│   ├── logical_clocks.py   # LamportClock, VectorClock, HybridLogicalClock
 │   ├── entity.py           # Entity base class
 │   ├── simulation.py       # Main simulation loop (re-entrant)
 │   ├── clock.py            # Clock abstraction
@@ -910,6 +912,41 @@ for stats in network.traffic_matrix():
 - `internet_network()`, `satellite_network()`
 - `lossy_network(loss_rate)`, `slow_network(latency_seconds)`
 - `mobile_3g_network()`, `mobile_4g_network()`
+
+### Logical Clocks (Distributed Ordering)
+
+Pure algorithm classes for causal ordering in distributed protocol simulations. Not Entities — stored as entity fields, like `NodeClock`.
+
+```python
+from happysimulator import LamportClock, VectorClock, HybridLogicalClock, HLCTimestamp
+
+# Lamport: monotonic counter for total ordering
+clock = LamportClock()
+clock.tick()           # Local event
+ts = clock.send()      # Increment + return timestamp for message
+clock.receive(ts)      # max(local, remote) + 1
+
+# Vector clock: per-node counters for causal ordering
+vc = VectorClock("node-1", ["node-1", "node-2", "node-3"])
+vc.tick()
+snapshot = vc.send()           # dict[str, int] for message
+vc.receive(snapshot)           # Element-wise max + increment own
+vc.happened_before(other_vc)   # True if causally precedes
+vc.is_concurrent(other_vc)     # True if neither happened-before
+
+# HLC: physical + logical (CockroachDB/Spanner-style)
+hlc = HybridLogicalClock("node-1", physical_clock=node_clock)
+ts = hlc.now()                 # HLCTimestamp(physical_ns, logical, node_id)
+hlc.send()                     # Same as now(), returns sendable timestamp
+hlc.receive(remote_ts)         # Update from remote HLCTimestamp
+ts.to_dict() / HLCTimestamp.from_dict(d)  # Serialization for event contexts
+```
+
+**Key behaviors**:
+- `LamportClock`: Simple counter, `receive()` ensures causal ordering
+- `VectorClock`: `happened_before()` / `is_concurrent()` for conflict detection
+- `HybridLogicalClock`: Stays close to physical time while preserving causality. Uses `NodeClock` (for skew modeling) or `Callable[[], Instant]`
+- `HLCTimestamp`: Frozen dataclass, total order by `(physical_ns, logical, node_id)`
 
 ---
 

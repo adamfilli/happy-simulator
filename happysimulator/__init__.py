@@ -69,6 +69,9 @@ from happysimulator.components import (
     RateSnapshot,
     Inductor,
     InductorStats,
+    Resource,
+    Grant,
+    ResourceStats,
 )
 
 # Distributions
@@ -183,6 +186,10 @@ __all__ = [
     "RateSnapshot",
     "Inductor",
     "InductorStats",
+    # Shared resources
+    "Resource",
+    "Grant",
+    "ResourceStats",
     # Distributions
     "ConstantLatency",
     "ExponentialLatency",

@@ -2,8 +2,7 @@
 
 SimFuture enables generators to pause until an external condition is met,
 rather than only pausing for fixed time delays. When a generator yields a
-SimFuture, the process parks until another entity calls future.resolve(value)
-or future.fail(exception).
+SimFuture, the process parks until another entity calls future.resolve(value).
 
 This unlocks natural request-response modeling, resource acquisition, lock
 waiting, timeout races (any_of), and quorum waits (all_of).
@@ -39,7 +38,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Active simulation context — set by Simulation.run(), used by resolve/fail
+# Active simulation context — set by Simulation.run(), used by resolve()
 _active_heap: EventHeap | None = None
 _active_clock: Clock | None = None
 
@@ -63,20 +62,20 @@ class SimFuture:
 
     When a generator yields a SimFuture, the ProcessContinuation parks
     instead of scheduling a time-based resume. The generator stays suspended
-    until some other entity calls resolve(value) or fail(exception), at which
-    point a new continuation is scheduled to resume the generator with the
-    resolved value via gen.send(value).
+    until some other entity calls resolve(value), at which point a new
+    continuation is scheduled to resume the generator with the resolved
+    value via gen.send(value).
 
     Each SimFuture can only be yielded by one generator. For broadcast
     patterns, create separate futures per consumer.
 
     Attributes:
-        is_settled: True if the future has been resolved or failed.
+        is_resolved: True if the future has been resolved.
         value: The resolved value (raises RuntimeError if not yet resolved).
     """
 
     __slots__ = (
-        "_resolved", "_failed", "_value", "_exception",
+        "_resolved", "_value",
         "_parked_process", "_parked_event_type", "_parked_daemon",
         "_parked_target", "_parked_on_complete", "_parked_context",
         "_settle_callbacks",
@@ -84,9 +83,7 @@ class SimFuture:
 
     def __init__(self) -> None:
         self._resolved: bool = False
-        self._failed: bool = False
         self._value: Any = None
-        self._exception: BaseException | None = None
 
         # Parked continuation state (set by ProcessContinuation when it yields this)
         self._parked_process = None
@@ -96,13 +93,13 @@ class SimFuture:
         self._parked_on_complete = None
         self._parked_context = None
 
-        # Callbacks fired when the future settles
+        # Callbacks fired when the future resolves
         self._settle_callbacks: list[Callable[[SimFuture], None]] = []
 
     @property
-    def is_settled(self) -> bool:
-        """Whether this future has been resolved or failed."""
-        return self._resolved or self._failed
+    def is_resolved(self) -> bool:
+        """Whether this future has been resolved."""
+        return self._resolved
 
     @property
     def value(self) -> Any:
@@ -119,7 +116,7 @@ class SimFuture:
         """Store continuation state so we can resume when resolved.
 
         Called by ProcessContinuation.invoke() when the generator yields
-        a SimFuture. If the future is already settled, resumes immediately.
+        a SimFuture. If the future is already resolved, resumes immediately.
 
         Args:
             continuation: The ProcessContinuation that yielded this future.
@@ -127,7 +124,7 @@ class SimFuture:
         Raises:
             RuntimeError: If another generator is already parked on this future.
         """
-        if self._parked_process is not None and not self.is_settled:
+        if self._parked_process is not None and not self._resolved:
             raise RuntimeError(
                 "SimFuture already has a parked process. "
                 "Each SimFuture can only be yielded by one generator."
@@ -140,7 +137,7 @@ class SimFuture:
         self._parked_on_complete = continuation.on_complete
         self._parked_context = continuation.context
 
-        if self.is_settled:
+        if self._resolved:
             self._resume()
 
     def resolve(self, value: Any = None) -> None:
@@ -151,12 +148,12 @@ class SimFuture:
         yet, the value is stored and the generator will resume immediately
         when it yields this future.
 
-        Resolving an already-settled future is a no-op.
+        Resolving an already-resolved future is a no-op.
 
         Args:
             value: The value to send into the generator.
         """
-        if self.is_settled:
+        if self._resolved:
             return
         self._resolved = True
         self._value = value
@@ -164,34 +161,13 @@ class SimFuture:
             self._resume()
         self._fire_callbacks()
 
-    def fail(self, exception: BaseException) -> None:
-        """Fail the future, throwing an exception into the parked generator.
-
-        The parked generator will be resumed at the current simulation time
-        with the exception thrown via gen.throw(). If no generator is parked
-        yet, the exception is stored and will be thrown when a generator
-        yields this future.
-
-        Failing an already-settled future is a no-op.
-
-        Args:
-            exception: The exception to throw into the generator.
-        """
-        if self.is_settled:
-            return
-        self._failed = True
-        self._exception = exception
-        if self._parked_process is not None:
-            self._resume()
-        self._fire_callbacks()
-
     def _add_settle_callback(self, fn: Callable[[SimFuture], None]) -> None:
-        """Register a callback to fire when this future settles.
+        """Register a callback to fire when this future resolves.
 
-        If the future is already settled, the callback fires immediately.
+        If the future is already resolved, the callback fires immediately.
         Used internally by any_of/all_of combinators.
         """
-        if self.is_settled:
+        if self._resolved:
             fn(self)
         else:
             self._settle_callbacks.append(fn)
@@ -211,8 +187,8 @@ class SimFuture:
         clock = _active_clock
         if heap is None or clock is None:
             raise RuntimeError(
-                "SimFuture.resolve()/fail() called outside a running simulation. "
-                "Futures can only be settled during Simulation.run()."
+                "SimFuture.resolve() called outside a running simulation. "
+                "Futures can only be resolved during Simulation.run()."
             )
 
         continuation = ProcessContinuation(
@@ -224,11 +200,7 @@ class SimFuture:
             on_complete=self._parked_on_complete,
             context=self._parked_context,
         )
-
-        if self._resolved:
-            continuation._send_value = self._value
-        else:
-            continuation._throw_exception = self._exception
+        continuation._send_value = self._value
 
         heap.push(continuation)
 
@@ -238,8 +210,6 @@ class SimFuture:
     def __repr__(self) -> str:
         if self._resolved:
             return f"SimFuture(resolved={self._value!r})"
-        elif self._failed:
-            return f"SimFuture(failed={self._exception!r})"
         elif self._parked_process is not None:
             return "SimFuture(parked)"
         else:
@@ -247,13 +217,11 @@ class SimFuture:
 
 
 def any_of(*futures: SimFuture) -> SimFuture:
-    """Return a future that resolves when ANY input future settles.
+    """Return a future that resolves when ANY input future resolves.
 
     The composite future resolves with a tuple ``(index, value)`` where
-    ``index`` is the position of the first future to settle and ``value``
+    ``index`` is the position of the first future to resolve and ``value``
     is its resolved value.
-
-    If the first future to settle fails, the composite future also fails.
 
     This enables timeout races and first-to-complete patterns::
 
@@ -277,23 +245,17 @@ def any_of(*futures: SimFuture) -> SimFuture:
         *futures: Two or more SimFuture instances to race.
 
     Returns:
-        A new SimFuture that settles when any input settles.
+        A new SimFuture that resolves when any input resolves.
     """
     if len(futures) < 2:
         raise ValueError("any_of() requires at least 2 futures")
 
     composite = SimFuture()
 
-    def on_settle(settled: SimFuture, idx: int = 0) -> None:
-        if composite.is_settled:
-            return
-        if settled._resolved:
-            composite.resolve((idx, settled._value))
-        else:
-            composite.fail(settled._exception)
-
     for i, f in enumerate(futures):
-        f._add_settle_callback(lambda sf, i=i: on_settle(sf, i))
+        f._add_settle_callback(
+            lambda sf, idx=i: composite.resolve((idx, sf._value))
+        )
 
     return composite
 
@@ -302,8 +264,7 @@ def all_of(*futures: SimFuture) -> SimFuture:
     """Return a future that resolves when ALL input futures resolve.
 
     The composite future resolves with a list of values in the same
-    order as the input futures. If any input future fails, the composite
-    future fails immediately with that exception.
+    order as the input futures.
 
     This enables quorum waits and barrier patterns::
 
@@ -324,7 +285,7 @@ def all_of(*futures: SimFuture) -> SimFuture:
         *futures: Two or more SimFuture instances to wait on.
 
     Returns:
-        A new SimFuture that settles when all inputs settle.
+        A new SimFuture that resolves when all inputs resolve.
     """
     if len(futures) < 2:
         raise ValueError("all_of() requires at least 2 futures")
@@ -335,10 +296,7 @@ def all_of(*futures: SimFuture) -> SimFuture:
 
     def on_settle(settled: SimFuture, idx: int = 0) -> None:
         nonlocal remaining
-        if composite.is_settled:
-            return
-        if settled._failed:
-            composite.fail(settled._exception)
+        if composite._resolved:
             return
         results[idx] = settled._value
         remaining -= 1

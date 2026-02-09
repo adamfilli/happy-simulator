@@ -268,21 +268,14 @@ yield 0.0, [
 ]
 results = yield all_of(f1, f2, f3)  # [value1, value2, value3]
 
-# Error handling
-future = SimFuture()
-try:
-    yield future  # Server calls future.fail(RuntimeError("oops"))
-except RuntimeError as e:
-    print(f"Request failed: {e}")
 ```
 
 **Key behaviors**:
 - `resolve(value)` resumes the parked generator with `value` via `gen.send(value)`
-- `fail(exception)` throws the exception into the generator via `gen.throw(exception)`
 - Pre-resolved futures work: yielding an already-resolved future resumes immediately
 - Each `SimFuture` can only be yielded by one generator
-- `any_of(*futures)` resolves with `(index, value)` when the first input settles
-- `all_of(*futures)` resolves with `[values]` when all inputs settle; fails immediately if any input fails
+- `any_of(*futures)` resolves with `(index, value)` when the first input resolves
+- `all_of(*futures)` resolves with `[values]` when all inputs resolve
 
 ---
 

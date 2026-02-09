@@ -291,7 +291,6 @@ class ProcessContinuation(Event):
 
     # Set by SimFuture._resume() when resuming from a future
     _send_value: Any = field(default=None, init=False, repr=False)
-    _throw_exception: BaseException | None = field(default=None, init=False, repr=False)
 
     def invoke(self) -> List["Event"]:
         """Advance the generator to its next yield and schedule the continuation."""
@@ -301,10 +300,7 @@ class ProcessContinuation(Event):
 
         try:
             # 1. Wake up the process
-            if self._throw_exception is not None:
-                yielded_val = self.process.throw(self._throw_exception)
-            else:
-                yielded_val = self.process.send(self._send_value)
+            yielded_val = self.process.send(self._send_value)
 
             # 2. Check for SimFuture yield (park instead of scheduling)
             if isinstance(yielded_val, SimFuture):

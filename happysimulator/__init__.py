@@ -26,6 +26,10 @@ from happysimulator.core import (
     FixedSkew,
     LinearDrift,
     NodeClock,
+    LamportClock,
+    VectorClock,
+    HLCTimestamp,
+    HybridLogicalClock,
     SimulationControl,
     SimulationState,
     BreakpointContext,
@@ -167,6 +171,11 @@ __all__ = [
     "FixedSkew",
     "LinearDrift",
     "NodeClock",
+    # Logical clocks
+    "LamportClock",
+    "VectorClock",
+    "HLCTimestamp",
+    "HybridLogicalClock",
     # Simulation control
     "SimulationControl",
     "SimulationState",

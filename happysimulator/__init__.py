@@ -131,6 +131,9 @@ from happysimulator.components.sketching import (
     QuantileEstimator,
 )
 
+# Fault injection
+from happysimulator.faults import FaultSchedule
+
 # Logging configuration utilities
 from happysimulator.logging_config import (
     configure_from_env,
@@ -256,6 +259,8 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Fault injection
+    "FaultSchedule",
     # Logging configuration
     "configure_from_env",
     "disable_logging",

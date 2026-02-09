@@ -140,6 +140,9 @@ class Event:
         Returns:
             New events to schedule, including any from completion hooks.
         """
+        if getattr(self.target, '_crashed', False):
+            return []
+
         handler_label = getattr(self.target, "name", type(self.target).__name__)
         self.trace("handle.start", handler="entity", handler_label=handler_label)
 

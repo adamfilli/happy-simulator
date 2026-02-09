@@ -22,6 +22,10 @@ from happysimulator.core import (
     Simulation,
     Simulatable,
     simulatable,
+    ClockModel,
+    FixedSkew,
+    LinearDrift,
+    NodeClock,
     SimulationControl,
     SimulationState,
     BreakpointContext,
@@ -145,6 +149,11 @@ __all__ = [
     "SimFuture",
     "any_of",
     "all_of",
+    # Node clocks
+    "ClockModel",
+    "FixedSkew",
+    "LinearDrift",
+    "NodeClock",
     # Simulation control
     "SimulationControl",
     "SimulationState",

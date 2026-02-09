@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Time** | Use `Instant.from_seconds(n)`, not raw floats |
 | **Generators** | Yield delays (float seconds) or `SimFuture`; return events on completion |
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
+| **Resources** | `Resource("cpu", capacity=8)` + `yield resource.acquire(2)` for shared contended capacity |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
@@ -770,6 +771,40 @@ inductor.stats             # InductorStats: received, forwarded, queued, dropped
 inductor.estimated_rate    # current EWMA-estimated rate
 inductor.queue_depth       # current buffer depth
 ```
+
+### Shared Resource (Contended Capacity)
+
+`Resource` models shared, contended capacity (CPU cores, memory, bandwidth). Unlike sync primitives, Resource is a plain class — no need to register with `Simulation(entities=[...])`. It uses `SimFuture` for blocking acquires.
+
+```python
+from happysimulator import Resource
+
+# Create a shared resource
+cpu = Resource("cpu_cores", capacity=8)
+
+class Worker(Entity):
+    def handle_event(self, event):
+        grant = yield cpu.acquire(amount=2)  # Blocks via SimFuture if unavailable
+        yield 0.1  # Do work
+        grant.release()  # Return capacity, wake waiters
+        return []
+
+# Non-blocking attempt
+grant = cpu.try_acquire(amount=2)  # Returns Grant or None
+
+# Observability
+cpu.available          # currently available capacity
+cpu.utilization        # fraction in use (0.0 to 1.0)
+cpu.waiters            # number of queued acquirers
+cpu.stats              # frozen ResourceStats snapshot
+```
+
+**Key behaviors**:
+- `acquire(amount)` returns a `SimFuture` that resolves with a `Grant`; pre-resolved if capacity is available
+- `try_acquire(amount)` is non-blocking: returns `Grant | None`
+- `Grant.release()` is idempotent — safe to call multiple times
+- Waiter satisfaction is strict FIFO (prevents starvation of large requests)
+- `ResourceStats` includes `acquisitions`, `releases`, `contentions`, `peak_utilization`, `peak_waiters`, `total_wait_time_ns`
 
 ---
 

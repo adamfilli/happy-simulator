@@ -115,6 +115,7 @@ from happysimulator.components.messaging import (
     DeadLetterStats,
 )
 from happysimulator.components.common import Sink, Counter
+from happysimulator.components.resource import Resource, Grant, ResourceStats
 from happysimulator.components.sketching import (
     SketchCollector,
     TopKCollector,
@@ -236,6 +237,10 @@ __all__ = [
     # Common entities
     "Sink",
     "Counter",
+    # Shared resources
+    "Resource",
+    "Grant",
+    "ResourceStats",
     # Sketching
     "SketchCollector",
     "TopKCollector",

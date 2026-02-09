@@ -312,8 +312,8 @@ I'd recommend this sequence, where each phase unlocks the next:
 
 | Phase | Item | Unlocks |
 |-------|------|---------|
-| 1 | Event Cancellation | Clean timeout/timer patterns everywhere |
-| 2 | SimFuture | Natural request-response, resource acquire, lock acquire, quorum waits |
+| 1 | Event Cancellation ✅ | Clean timeout/timer patterns everywhere |
+| 2 | SimFuture ✅ | Natural request-response, resource acquire, lock acquire, quorum waits |
 | 3 | Logical Clocks | Pure algorithms, no engine changes needed |
 | 4 | Per-Node Clocks | Clock-sensitive protocol modeling |
 | 5 | Shared Resources | CPU/memory/disk contention (uses SimFuture) |

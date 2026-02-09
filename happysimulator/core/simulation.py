@@ -14,6 +14,7 @@ from happysimulator.core.protocols import Simulatable
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Instant
+from happysimulator.core.sim_future import _set_active_context, _clear_active_context
 from happysimulator.load.source import Source
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
 from happysimulator.instrumentation.summary import (
@@ -205,6 +206,16 @@ class Simulation:
                 self._current_time, self._event_heap.size(),
             )
 
+        # Set active context so SimFuture.resolve()/fail() can schedule events
+        _set_active_context(self._event_heap, self._clock)
+
+        try:
+            return self._run_loop()
+        finally:
+            _clear_active_context()
+
+    def _run_loop(self) -> SimulationSummary:
+        """Inner loop extracted for clean active-context scoping."""
         while self._event_heap.has_events() and self._end_time >= self._current_time:
 
             # CONTROL CHECK: should we pause before popping?

@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Core Loop** | `EventHeap` pop → `Entity.handle_event()` → schedule returned `Event`s |
 | **Key Invariant** | Events always have a `target` (Entity); use `Event.once()` for function-based dispatch |
 | **Time** | Use `Instant.from_seconds(n)`, not raw floats |
-| **Generators** | Yield delays (float seconds); return events on completion |
+| **Generators** | Yield delays (float seconds) or `SimFuture`; return events on completion |
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
@@ -32,6 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 4. **`happysimulator/core/event.py`** - Event structure and lifecycle
 5. **`happysimulator/core/entity.py`** - Actor pattern, `handle_event()` method
 6. **`happysimulator/core/simulation.py`** - Main loop, event scheduling
+7. **`happysimulator/core/sim_future.py`** - SimFuture, any_of, all_of
 
 ### Phase 3: Interactive Control
 7. **`happysimulator/core/control/control.py`** - Pause/resume, stepping, breakpoints
@@ -217,8 +218,64 @@ def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
 - `yield delay, None` - Same as above (explicit)
 - `yield delay, event` - Pause AND schedule a side-effect event immediately
 - `yield delay, [events]` - Pause AND schedule multiple side-effect events
+- `yield future` - Park until `future.resolve(value)` is called (see SimFuture below)
 
-**Under the hood**: The runtime wraps generators as `ProcessContinuation` events that reschedule after each yield.
+**Under the hood**: The runtime wraps generators as `ProcessContinuation` events that reschedule after each yield. For `SimFuture` yields, the process parks instead of scheduling a time-based continuation.
+
+### SimFuture (Yield on Events, Not Just Delays)
+
+`SimFuture` enables generators to pause until an external condition is met, rather than only pausing for fixed time delays. This unlocks natural request-response modeling, resource acquisition, timeout races, and quorum waits.
+
+```python
+from happysimulator import SimFuture, any_of, all_of
+
+# Basic: request-response pattern
+class Client(Entity):
+    def handle_event(self, event):
+        future = SimFuture()
+        # Send request with the future so server can resolve it
+        yield 0.0, [Event(
+            time=self.now, event_type="Request", target=self.server,
+            context={"reply_future": future},
+        )]
+        response = yield future  # Park until server resolves
+        # response is the value passed to future.resolve(value)
+
+class Server(Entity):
+    def handle_event(self, event):
+        yield 0.1  # Processing time
+        event.context["reply_future"].resolve({"status": "ok"})
+
+# Timeout race with any_of
+response_future = SimFuture()
+timeout_future = SimFuture()
+yield 0.0, [
+    Event(time=self.now, event_type="Req", target=server,
+          context={"future": response_future}),
+    Event.once(time=Instant.from_seconds(self.now.to_seconds() + 5.0),
+               event_type="Timeout",
+               fn=lambda e: timeout_future.resolve("timeout")),
+]
+idx, value = yield any_of(response_future, timeout_future)
+# idx=0 → response won; idx=1 → timeout won
+
+# Quorum wait with all_of
+f1, f2, f3 = SimFuture(), SimFuture(), SimFuture()
+yield 0.0, [
+    Event(time=self.now, event_type="Write", target=r1, context={"ack": f1}),
+    Event(time=self.now, event_type="Write", target=r2, context={"ack": f2}),
+    Event(time=self.now, event_type="Write", target=r3, context={"ack": f3}),
+]
+results = yield all_of(f1, f2, f3)  # [value1, value2, value3]
+
+```
+
+**Key behaviors**:
+- `resolve(value)` resumes the parked generator with `value` via `gen.send(value)`
+- Pre-resolved futures work: yielding an already-resolved future resumes immediately
+- Each `SimFuture` can only be yielded by one generator
+- `any_of(*futures)` resolves with `(index, value)` when the first input resolves
+- `all_of(*futures)` resolves with `[values]` when all inputs resolve
 
 ---
 
@@ -344,6 +401,7 @@ happysimulator/
 │   ├── instant.py          # Time representation
 │   ├── event.py            # Event structure
 │   ├── callback_entity.py  # CallbackEntity, NullEntity
+│   ├── sim_future.py       # SimFuture, any_of, all_of
 │   ├── entity.py           # Entity base class
 │   ├── simulation.py       # Main simulation loop (re-entrant)
 │   ├── clock.py            # Clock abstraction

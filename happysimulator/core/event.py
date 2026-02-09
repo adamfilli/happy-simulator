@@ -282,25 +282,37 @@ class ProcessContinuation(Event):
     Yields are interpreted as:
     - ``yield delay`` - Wait for delay seconds before resuming
     - ``yield (delay, events)`` - Wait and also schedule side-effect events
+    - ``yield SimFuture()`` - Park until the future is resolved
 
     Attributes:
         process: The Python generator being executed incrementally.
     """
     process: Generator = field(default=None, repr=False)
 
+    # Set by SimFuture._resume() when resuming from a future
+    _send_value: Any = field(default=None, init=False, repr=False)
+
     def invoke(self) -> List["Event"]:
         """Advance the generator to its next yield and schedule the continuation."""
+        from happysimulator.core.sim_future import SimFuture
+
         self.trace("process.resume.start")
 
         try:
             # 1. Wake up the process
-            yielded_val = next(self.process)
-            
-            # 2. Parse the yield
+            yielded_val = self.process.send(self._send_value)
+
+            # 2. Check for SimFuture yield (park instead of scheduling)
+            if isinstance(yielded_val, SimFuture):
+                yielded_val._park(self)
+                self.trace("process.park", future="SimFuture")
+                return []
+
+            # 3. Parse the yield (delay or delay+side_effects)
             delay, side_effects = self._normalize_yield(yielded_val)
             self.trace("process.yield", delay_s=delay)
 
-            # 3. Schedule the next Resume (Recursive Continuation)
+            # 4. Schedule the next Resume (Recursive Continuation)
             resume_time = self.time + delay
             next_continuation = ProcessContinuation(
                 time=resume_time,
@@ -311,12 +323,12 @@ class ProcessContinuation(Event):
                 process=self.process,   # Pass the SAME generator forward
                 context=self.context    # Preserve trace context
             )
-            
+
             if side_effects is None:
                 side_effects = []
             elif isinstance(side_effects, Event):
                 side_effects = [side_effects]
-                
+
             result = list(side_effects)
             result.append(next_continuation)
 

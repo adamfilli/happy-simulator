@@ -17,6 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Generators** | Yield delays (float seconds) or `SimFuture`; return events on completion |
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
 | **Resources** | `Resource("cpu", capacity=8)` + `yield resource.acquire(2)` for shared contended capacity |
+| **Node Clocks** | `NodeClock(FixedSkew(...))` for per-node clock skew/drift in distributed protocols |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
@@ -403,6 +404,7 @@ happysimulator/
 │   ├── event.py            # Event structure
 │   ├── callback_entity.py  # CallbackEntity, NullEntity
 │   ├── sim_future.py       # SimFuture, any_of, all_of
+│   ├── node_clock.py       # NodeClock, ClockModel, FixedSkew, LinearDrift
 │   ├── entity.py           # Entity base class
 │   ├── simulation.py       # Main simulation loop (re-entrant)
 │   ├── clock.py            # Clock abstraction
@@ -808,6 +810,51 @@ cpu.stats              # frozen ResourceStats snapshot
 - `Grant.release()` is idempotent — safe to call multiple times
 - Waiter satisfaction is strict FIFO (prevents starvation of large requests)
 - `ResourceStats` includes `acquisitions`, `releases`, `contentions`, `peak_utilization`, `peak_waiters`, `total_wait_time_ns`
+
+### Per-Node Clocks (Clock Skew & Drift)
+
+`NodeClock` transforms true simulation time into perceived local time, enabling modeling of clock-sensitive distributed protocols (leader election, lease expiry, cache TTLs, distributed tracing).
+
+**Key insight:** Events are still ordered by true simulation time (the global Clock). NodeClock only transforms the *read* side — what an entity perceives as "now". No changes to the event loop or Simulation class.
+
+```python
+from happysimulator import NodeClock, FixedSkew, LinearDrift, Duration
+
+# Fixed offset: node clock is 50ms ahead of true time
+slow_clock = NodeClock(FixedSkew(Duration.from_seconds(-0.05)))
+fast_clock = NodeClock(FixedSkew(Duration.from_seconds(+0.05)))
+
+# Drifting clock: 1000 ppm = 1ms drift per second (accumulates over time)
+drifty_clock = NodeClock(LinearDrift(rate_ppm=1000))
+
+# No model = identity (returns true time)
+perfect_clock = NodeClock()
+
+# In an entity: forward clock injection, use local_now for decisions
+class RaftNode(Entity):
+    def __init__(self, name, node_clock):
+        super().__init__(name)
+        self._node_clock = node_clock
+
+    def set_clock(self, clock):
+        super().set_clock(clock)
+        self._node_clock.set_clock(clock)
+
+    @property
+    def local_now(self) -> Instant:
+        return self._node_clock.now
+
+    def handle_event(self, event):
+        # Use self.now for scheduling events (true time, correct ordering)
+        # Use self.local_now for decision-making (perceived time, may be wrong)
+        if self.local_now > self.lease_expires:
+            ...  # Node thinks lease expired (but maybe it hasn't in true time!)
+```
+
+**Clock models:**
+- `FixedSkew(offset: Duration)` — constant offset. Positive = ahead, negative = behind
+- `LinearDrift(rate_ppm: float)` — accumulating drift. 1000 ppm = 1ms/s. Positive = fast
+- `ClockModel` protocol — implement `read(true_time: Instant) -> Instant` for custom models
 
 ---
 

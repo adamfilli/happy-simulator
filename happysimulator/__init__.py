@@ -19,6 +19,14 @@ from happysimulator.core import (
     Simulation,
     Simulatable,
     simulatable,
+    SimulationControl,
+    SimulationState,
+    BreakpointContext,
+    TimeBreakpoint,
+    EventCountBreakpoint,
+    ConditionBreakpoint,
+    MetricBreakpoint,
+    EventTypeBreakpoint,
 )
 from happysimulator.core.temporal import Duration
 
@@ -127,6 +135,15 @@ __all__ = [
     "Clock",
     "Simulatable",
     "simulatable",
+    # Simulation control
+    "SimulationControl",
+    "SimulationState",
+    "BreakpointContext",
+    "TimeBreakpoint",
+    "EventCountBreakpoint",
+    "ConditionBreakpoint",
+    "MetricBreakpoint",
+    "EventTypeBreakpoint",
     # Load
     "Source",
     "EventProvider",

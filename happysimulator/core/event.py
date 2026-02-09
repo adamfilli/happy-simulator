@@ -71,6 +71,19 @@ class Event:
     # Sorting Internals
     _sort_index: int = field(default_factory=_global_event_counter.__next__, init=False, repr=False)
     _id: uuid.UUID = field(default_factory=uuid.uuid4, init=False, repr=False)
+    _cancelled: bool = field(default=False, init=False, repr=False, compare=False)
+
+    @property
+    def cancelled(self) -> bool:
+        """Whether this event has been cancelled."""
+        return self._cancelled
+
+    def cancel(self) -> None:
+        """Mark this event as cancelled. The simulation loop will skip it on pop.
+
+        Cancelling an already-cancelled or already-processed event is a no-op.
+        """
+        self._cancelled = True
 
     def __post_init__(self):
         if self.target is None:

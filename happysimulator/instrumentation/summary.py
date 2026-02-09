@@ -50,8 +50,9 @@ class SimulationSummary:
     """
     duration_s: float
     total_events_processed: int
-    events_per_second: float
-    wall_clock_seconds: float
+    events_cancelled: int = 0
+    events_per_second: float = 0.0
+    wall_clock_seconds: float = 0.0
     entities: dict[str, EntitySummary] = field(default_factory=dict)
 
     def __str__(self) -> str:
@@ -59,6 +60,7 @@ class SimulationSummary:
             "Simulation Summary",
             f"  Duration: {self.duration_s:.2f}s (sim) / {self.wall_clock_seconds:.3f}s (wall)",
             f"  Events processed: {self.total_events_processed}",
+            f"  Events cancelled: {self.events_cancelled}",
             f"  Events/sec (sim): {self.events_per_second:.1f}",
         ]
         if self.entities:
@@ -75,6 +77,7 @@ class SimulationSummary:
         return {
             "duration_s": self.duration_s,
             "total_events_processed": self.total_events_processed,
+            "events_cancelled": self.events_cancelled,
             "events_per_second": self.events_per_second,
             "wall_clock_seconds": self.wall_clock_seconds,
             "entities": {

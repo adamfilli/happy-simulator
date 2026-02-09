@@ -1,16 +1,22 @@
 """Integration tests for Resource with full simulation execution.
 
 Tests cover: basic contention, grant release waking waiters, multiple
-resources, utilization tracking, concurrent workers, and try_acquire.
+resources, utilization tracking, concurrent workers, try_acquire,
+and a visualization test with 2N workers contending for N capacity.
 """
 
+import json
+from pathlib import Path
 from typing import Generator
+
+import pytest
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.components.resource import Resource
+from happysimulator.instrumentation.data import Data
 
 
 # ---------------------------------------------------------------------------
@@ -289,3 +295,231 @@ class TestWaitTimeTracking:
         sim.run()
 
         assert resource.stats.total_wait_time_ns > 0
+
+
+# ---------------------------------------------------------------------------
+# Visualization test: 2N workers contending for N-capacity resource
+# ---------------------------------------------------------------------------
+
+class RepeatingWorker(Entity):
+    """Worker that repeatedly acquires a resource, works, and releases.
+
+    Each incoming event triggers one acquire-work-release cycle.
+    Records acquire and release timestamps for analysis.
+    """
+
+    def __init__(self, name: str, resource: Resource, amount: int = 1,
+                 work_time: float = 0.1):
+        super().__init__(name)
+        self.resource = resource
+        self.amount = amount
+        self.work_time = work_time
+        self.completed = 0
+        self.acquired_at: list[float] = []
+        self.released_at: list[float] = []
+        self.waited: list[float] = []
+
+    def handle_event(self, event: Event) -> Generator:
+        request_time = self.now.to_seconds()
+        grant = yield self.resource.acquire(self.amount)
+        acquire_time = self.now.to_seconds()
+        self.acquired_at.append(acquire_time)
+        self.waited.append(acquire_time - request_time)
+        yield self.work_time
+        grant.release()
+        release_time = self.now.to_seconds()
+        self.released_at.append(release_time)
+        self.completed += 1
+        return []
+
+
+class ResourceSampler(Entity):
+    """Periodically samples resource utilization and waiter count.
+
+    Self-schedules at a fixed interval to record snapshots of a Resource.
+    Runs as a daemon-like entity — triggered by its own events.
+    """
+
+    def __init__(self, name: str, resource: Resource,
+                 utilization_data: Data, waiters_data: Data,
+                 interval: float = 0.1, duration: float = 10.0):
+        super().__init__(name)
+        self.resource = resource
+        self.utilization_data = utilization_data
+        self.waiters_data = waiters_data
+        self.interval = interval
+        self.duration = duration
+
+    def handle_event(self, event: Event) -> list[Event] | None:
+        t = self.now
+        self.utilization_data.add_stat(self.resource.utilization, t)
+        self.waiters_data.add_stat(self.resource.waiters, t)
+
+        # Schedule next sample if within duration
+        next_t = self.now.to_seconds() + self.interval
+        if next_t <= self.duration:
+            return [Event(
+                time=Instant.from_seconds(next_t),
+                event_type="Sample",
+                target=self,
+                daemon=True,
+            )]
+        return []
+
+
+class TestResourceContentionVisualization:
+    """2N workers contend for a resource with capacity N.
+
+    Generates plots showing utilization and waiter count over time.
+    """
+
+    def test_contention_visualization(self, test_output_dir: Path):
+        matplotlib = pytest.importorskip("matplotlib")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        # ── Configuration ──
+        N = 4              # resource capacity
+        NUM_WORKERS = 2 * N  # 2N = 8 workers
+        WORK_TIME = 0.3    # each worker holds the resource for 300ms
+        RATE = 2.0         # each worker gets a new job every 0.5s
+        DURATION = 10.0    # simulation duration
+        SAMPLE_INTERVAL = 0.05
+
+        # ── Setup ──
+        resource = Resource("shared_cpu", capacity=N)
+
+        utilization_data = Data()
+        waiters_data = Data()
+        sampler = ResourceSampler(
+            "sampler", resource, utilization_data, waiters_data,
+            interval=SAMPLE_INTERVAL, duration=DURATION,
+        )
+
+        # Create 2N workers
+        workers = [
+            RepeatingWorker(f"worker_{i}", resource, amount=1, work_time=WORK_TIME)
+            for i in range(NUM_WORKERS)
+        ]
+
+        sim = Simulation(
+            end_time=Instant.from_seconds(DURATION),
+            entities=[sampler, *workers],
+        )
+
+        # Kick off the sampler
+        sim.schedule(Event(
+            time=Instant.Epoch,
+            event_type="Sample",
+            target=sampler,
+            daemon=True,
+        ))
+
+        # Each worker gets jobs at a constant rate, staggered slightly
+        for i, w in enumerate(workers):
+            offset = i * (1.0 / RATE / NUM_WORKERS)  # stagger starts
+            t = offset
+            while t < DURATION:
+                sim.schedule(Event(
+                    time=Instant.from_seconds(t),
+                    event_type="Job",
+                    target=w,
+                ))
+                t += 1.0 / RATE
+
+        summary = sim.run()
+
+        # ── Assertions ──
+        total_completed = sum(w.completed for w in workers)
+        assert total_completed > 0, "No workers completed"
+        assert resource.stats.contentions > 0, "Expected contention with 2N workers"
+        assert resource.stats.peak_utilization > 0.5, "Expected significant utilization"
+
+        # ── Collect per-worker wait times ──
+        all_waits = []
+        for w in workers:
+            all_waits.extend(w.waited)
+        avg_wait = sum(all_waits) / len(all_waits) if all_waits else 0
+
+        # ── Plot 1: Utilization & Waiters over time ──
+        fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+        # Utilization
+        util_times = utilization_data.times()
+        util_values = utilization_data.raw_values()
+        axes[0].plot(util_times, util_values, "b-", linewidth=0.8)
+        axes[0].axhline(y=1.0, color="r", linestyle="--", alpha=0.5, label="100%")
+        axes[0].set_ylabel("Utilization")
+        axes[0].set_title(
+            f"Resource Contention: {NUM_WORKERS} workers, "
+            f"capacity={N}, work_time={WORK_TIME}s"
+        )
+        axes[0].set_ylim(-0.05, 1.15)
+        axes[0].legend(loc="upper right")
+        axes[0].grid(True, alpha=0.3)
+
+        # Waiters
+        wait_times = waiters_data.times()
+        wait_values = waiters_data.raw_values()
+        axes[1].plot(wait_times, wait_values, "r-", linewidth=0.8)
+        axes[1].set_ylabel("Queued Waiters")
+        axes[1].grid(True, alpha=0.3)
+
+        # Per-worker Gantt chart showing acquire/release intervals
+        colors = plt.cm.tab10.colors
+        for i, w in enumerate(workers):
+            for acq, rel in zip(w.acquired_at, w.released_at):
+                axes[2].barh(
+                    i, rel - acq, left=acq, height=0.6,
+                    color=colors[i % len(colors)], alpha=0.7,
+                )
+        axes[2].set_ylabel("Worker")
+        axes[2].set_xlabel("Simulation Time (s)")
+        axes[2].set_yticks(range(NUM_WORKERS))
+        axes[2].set_yticklabels([f"w{i}" for i in range(NUM_WORKERS)])
+        axes[2].grid(True, alpha=0.3, axis="x")
+
+        plt.tight_layout()
+        plot_path = test_output_dir / "resource_contention.png"
+        fig.savefig(plot_path, dpi=150)
+        plt.close(fig)
+
+        assert plot_path.exists()
+        assert plot_path.stat().st_size > 1000
+
+        # ── Save summary JSON ──
+        stats = resource.stats
+        summary_data = {
+            "config": {
+                "capacity": N,
+                "num_workers": NUM_WORKERS,
+                "work_time_s": WORK_TIME,
+                "job_rate_per_worker": RATE,
+                "duration_s": DURATION,
+            },
+            "results": {
+                "total_completed": total_completed,
+                "acquisitions": stats.acquisitions,
+                "releases": stats.releases,
+                "contentions": stats.contentions,
+                "peak_utilization": round(stats.peak_utilization, 4),
+                "peak_waiters": stats.peak_waiters,
+                "avg_wait_time_s": round(avg_wait, 6),
+                "total_wait_time_ns": stats.total_wait_time_ns,
+            },
+            "per_worker": [
+                {
+                    "name": w.name,
+                    "completed": w.completed,
+                    "avg_wait_s": round(
+                        sum(w.waited) / len(w.waited), 6
+                    ) if w.waited else 0,
+                }
+                for w in workers
+            ],
+        }
+        json_path = test_output_dir / "resource_contention_summary.json"
+        with open(json_path, "w") as f:
+            json.dump(summary_data, f, indent=2)
+
+        assert json_path.exists()

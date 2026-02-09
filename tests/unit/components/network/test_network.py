@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from happysimulator.components.network.link import NetworkLink
-from happysimulator.components.network.network import Network
+from happysimulator.components.network.network import LinkStats, Network, Partition
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
@@ -481,3 +481,329 @@ class TestNetworkMultipleLinks:
         assert network.events_routed == 2
         assert fast_link.packets_sent == 1
         assert slow_link.packets_sent == 1
+
+
+class TestPartitionHandle:
+    """Tests for Partition handle and selective healing."""
+
+    def test_partition_returns_handle(self):
+        """partition() returns a Partition handle."""
+        entity_a = CollectorEntity(name="EntityA")
+        entity_b = CollectorEntity(name="EntityB")
+
+        network = Network(name="TestNetwork")
+        link = NetworkLink(name="Link", latency=ConstantLatency(0.005))
+        network.add_bidirectional_link(entity_a, entity_b, link)
+
+        handle = network.partition([entity_a], [entity_b])
+
+        assert isinstance(handle, Partition)
+        assert handle.is_active
+
+    def test_selective_heal_removes_only_target_partition(self):
+        """Healing a partition handle only removes that partition's pairs."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+        c = CollectorEntity(name="C")
+
+        network = Network(name="TestNetwork")
+        link_ab = NetworkLink(name="LinkAB", latency=ConstantLatency(0.005))
+        link_ac = NetworkLink(name="LinkAC", latency=ConstantLatency(0.005))
+        link_bc = NetworkLink(name="LinkBC", latency=ConstantLatency(0.005))
+        network.add_bidirectional_link(a, b, link_ab)
+        network.add_bidirectional_link(a, c, link_ac)
+        network.add_bidirectional_link(b, c, link_bc)
+
+        # Create two separate partitions
+        p1 = network.partition([a], [b])
+        p2 = network.partition([a], [c])
+
+        assert p1.is_active
+        assert p2.is_active
+        assert network.is_partitioned("A", "B")
+        assert network.is_partitioned("A", "C")
+
+        # Heal only partition 1 (A <-> B)
+        p1.heal()
+
+        assert not p1.is_active
+        assert p2.is_active
+        assert not network.is_partitioned("A", "B")
+        assert network.is_partitioned("A", "C")
+
+    def test_heal_partition_clears_all(self):
+        """heal_partition() still clears all partitions for backward compat."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+        c = CollectorEntity(name="C")
+
+        network = Network(name="TestNetwork")
+        p1 = network.partition([a], [b])
+        p2 = network.partition([a], [c])
+
+        network.heal_partition()
+
+        assert not p1.is_active
+        assert not p2.is_active
+        assert not network.is_partitioned("A", "B")
+        assert not network.is_partitioned("A", "C")
+
+    def test_partition_is_active_after_heal_all(self):
+        """is_active returns False after heal_partition()."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+
+        network = Network(name="TestNetwork")
+        handle = network.partition([a], [b])
+
+        assert handle.is_active
+        network.heal_partition()
+        assert not handle.is_active
+
+    def test_selective_heal_works_in_simulation(self):
+        """Selective heal restores connectivity during simulation."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+        c = CollectorEntity(name="C")
+
+        network = Network(name="TestNetwork")
+        link_ab = NetworkLink(name="LinkAB", latency=ConstantLatency(0.005))
+        link_ac = NetworkLink(name="LinkAC", latency=ConstantLatency(0.005))
+        network.add_bidirectional_link(a, b, link_ab)
+        network.add_bidirectional_link(a, c, link_ac)
+
+        p_ab = network.partition([a], [b])
+        p_ac = network.partition([a], [c])
+
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(1.0),
+            sources=[],
+            entities=[network, a, b, c],
+        )
+
+        # Heal only A <-> B
+        p_ab.heal()
+
+        # A -> B should work now
+        event1 = Event(time=Instant.Epoch, event_type="Msg", target=network)
+        event1.context["metadata"]["source"] = "A"
+        event1.context["metadata"]["destination"] = "B"
+        sim.schedule(event1)
+
+        # A -> C should still be blocked
+        event2 = Event(
+            time=Instant.from_seconds(0.1), event_type="Msg", target=network
+        )
+        event2.context["metadata"]["source"] = "A"
+        event2.context["metadata"]["destination"] = "C"
+        sim.schedule(event2)
+
+        sim.run()
+
+        assert len(b.received) == 1
+        assert len(c.received) == 0
+        assert network.events_routed == 1
+        assert network.events_dropped_partition == 1
+
+
+class TestAsymmetricPartitions:
+    """Tests for asymmetric (directed) partition functionality."""
+
+    def test_asymmetric_partition_blocks_one_direction(self):
+        """Asymmetric partition blocks A->B but allows B->A."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+
+        network = Network(name="TestNetwork")
+        link = NetworkLink(name="Link", latency=ConstantLatency(0.005))
+        network.add_bidirectional_link(a, b, link)
+
+        network.partition([a], [b], asymmetric=True)
+
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(1.0),
+            sources=[],
+            entities=[network, a, b],
+        )
+
+        # A -> B should be blocked
+        event1 = Event(time=Instant.Epoch, event_type="Msg", target=network)
+        event1.context["metadata"]["source"] = "A"
+        event1.context["metadata"]["destination"] = "B"
+        sim.schedule(event1)
+
+        # B -> A should work
+        event2 = Event(
+            time=Instant.from_seconds(0.1), event_type="Msg", target=network
+        )
+        event2.context["metadata"]["source"] = "B"
+        event2.context["metadata"]["destination"] = "A"
+        sim.schedule(event2)
+
+        sim.run()
+
+        assert len(b.received) == 0  # A -> B blocked
+        assert len(a.received) == 1  # B -> A allowed
+        assert network.events_dropped_partition == 1
+        assert network.events_routed == 1
+
+    def test_asymmetric_partition_handle_heal(self):
+        """Asymmetric partition handle heal removes only directed pairs."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+
+        network = Network(name="TestNetwork")
+        handle = network.partition([a], [b], asymmetric=True)
+
+        assert handle.is_active
+        assert network.is_partitioned("A", "B")
+        assert not network.is_partitioned("B", "A")
+
+        handle.heal()
+
+        assert not handle.is_active
+        assert not network.is_partitioned("A", "B")
+
+    def test_heal_partition_clears_asymmetric(self):
+        """heal_partition() clears asymmetric partitions too."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+
+        network = Network(name="TestNetwork")
+        network.partition([a], [b], asymmetric=True)
+
+        assert network.is_partitioned("A", "B")
+
+        network.heal_partition()
+
+        assert not network.is_partitioned("A", "B")
+
+    def test_mixed_symmetric_asymmetric_partitions(self):
+        """Symmetric and asymmetric partitions can coexist."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+        c = CollectorEntity(name="C")
+
+        network = Network(name="TestNetwork")
+        link_ab = NetworkLink(name="LinkAB", latency=ConstantLatency(0.005))
+        link_ac = NetworkLink(name="LinkAC", latency=ConstantLatency(0.005))
+        network.add_bidirectional_link(a, b, link_ab)
+        network.add_bidirectional_link(a, c, link_ac)
+
+        # Symmetric partition between A and B
+        p_sym = network.partition([a], [b])
+        # Asymmetric partition: A -X-> C (A cannot send to C)
+        p_asym = network.partition([a], [c], asymmetric=True)
+
+        # A <-> B: both directions blocked
+        assert network.is_partitioned("A", "B")
+        assert network.is_partitioned("B", "A")
+
+        # A -> C: blocked (asymmetric)
+        assert network.is_partitioned("A", "C")
+        # C -> A: NOT blocked (asymmetric, only A->C is blocked)
+        assert not network.is_partitioned("C", "A")
+
+        # Heal only asymmetric
+        p_asym.heal()
+        assert not network.is_partitioned("A", "C")
+        assert network.is_partitioned("A", "B")  # symmetric still active
+
+
+class TestTrafficMatrix:
+    """Tests for traffic_matrix() method."""
+
+    def test_empty_network_returns_empty_matrix(self):
+        """Empty network returns empty traffic matrix."""
+        network = Network(name="TestNetwork")
+        assert network.traffic_matrix() == []
+
+    def test_traffic_matrix_reflects_link_stats(self):
+        """traffic_matrix() reflects actual link statistics."""
+        sender = SenderEntity(name="Sender")
+        receiver = CollectorEntity(name="Receiver")
+
+        link = NetworkLink(name="Link", latency=ConstantLatency(0.005))
+        network = Network(name="TestNetwork")
+        network.add_link(sender, receiver, link)
+
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(1.0),
+            sources=[],
+            entities=[network, sender, receiver],
+        )
+
+        # Send 3 events
+        for i in range(3):
+            event = Event(
+                time=Instant.from_seconds(i * 0.1),
+                event_type="Msg",
+                target=network,
+            )
+            event.context["metadata"]["source"] = "Sender"
+            event.context["metadata"]["destination"] = "Receiver"
+            sim.schedule(event)
+
+        sim.run()
+
+        matrix = network.traffic_matrix()
+        assert len(matrix) == 1
+
+        stats = matrix[0]
+        assert isinstance(stats, LinkStats)
+        assert stats.source == "Sender"
+        assert stats.destination == "Receiver"
+        assert stats.packets_sent == 3
+        assert stats.packets_dropped == 0
+
+    def test_bidirectional_link_has_two_entries(self):
+        """Bidirectional links produce two traffic matrix entries."""
+        a = CollectorEntity(name="A")
+        b = CollectorEntity(name="B")
+
+        link = NetworkLink(name="Link", latency=ConstantLatency(0.005))
+        network = Network(name="TestNetwork")
+        network.add_bidirectional_link(a, b, link)
+
+        matrix = network.traffic_matrix()
+        assert len(matrix) == 2
+
+        sources = {s.source for s in matrix}
+        dests = {s.destination for s in matrix}
+        assert sources == {"A", "B"}
+        assert dests == {"A", "B"}
+
+    def test_traffic_matrix_tracks_bytes(self):
+        """traffic_matrix() includes bytes_transmitted from link stats."""
+        sender = SenderEntity(name="Sender")
+        receiver = CollectorEntity(name="Receiver")
+
+        link = NetworkLink(
+            name="Link",
+            latency=ConstantLatency(0.005),
+            bandwidth_bps=1_000_000_000,
+        )
+        network = Network(name="TestNetwork")
+        network.add_link(sender, receiver, link)
+
+        sim = Simulation(
+            start_time=Instant.Epoch,
+            end_time=Instant.from_seconds(1.0),
+            sources=[],
+            entities=[network, sender, receiver],
+        )
+
+        event = Event(time=Instant.Epoch, event_type="Msg", target=network)
+        event.context["metadata"]["source"] = "Sender"
+        event.context["metadata"]["destination"] = "Receiver"
+        event.context["metadata"]["payload_size"] = 1024
+        sim.schedule(event)
+
+        sim.run()
+
+        matrix = network.traffic_matrix()
+        assert len(matrix) == 1
+        assert matrix[0].bytes_transmitted == 1024

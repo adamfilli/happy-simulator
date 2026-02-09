@@ -116,6 +116,21 @@ from happysimulator.components.messaging import (
 )
 from happysimulator.components.common import Sink, Counter
 from happysimulator.components.resource import Resource, Grant, ResourceStats
+from happysimulator.components.network import (
+    Network,
+    NetworkLink,
+    Partition,
+    LinkStats,
+    local_network,
+    datacenter_network,
+    cross_region_network,
+    internet_network,
+    satellite_network,
+    lossy_network,
+    slow_network,
+    mobile_3g_network,
+    mobile_4g_network,
+)
 from happysimulator.components.sketching import (
     SketchCollector,
     TopKCollector,
@@ -241,6 +256,20 @@ __all__ = [
     "Resource",
     "Grant",
     "ResourceStats",
+    # Network
+    "Network",
+    "NetworkLink",
+    "Partition",
+    "LinkStats",
+    "local_network",
+    "datacenter_network",
+    "cross_region_network",
+    "internet_network",
+    "satellite_network",
+    "lossy_network",
+    "slow_network",
+    "mobile_3g_network",
+    "mobile_4g_network",
     # Sketching
     "SketchCollector",
     "TopKCollector",

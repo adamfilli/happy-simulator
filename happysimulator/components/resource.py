@@ -5,10 +5,8 @@ CPU cores, memory bandwidth, disk I/O, or network bandwidth. Multiple entities
 can acquire portions of a resource's capacity, blocking via ``SimFuture`` when
 capacity is exhausted.
 
-Unlike the sync primitives (Mutex, Semaphore) which inherit from Entity,
-Resource is a plain class that piggybacks on SimFuture's module-level active
-context for time access and scheduling. This means resources don't need to be
-registered with ``Simulation(entities=[...])``.
+Like other simulation primitives (Mutex, Semaphore), Resource is an Entity
+and must be registered with ``Simulation(entities=[...])``.
 
 Example::
 
@@ -20,6 +18,8 @@ Example::
             yield 0.1  # do work
             grant.release()  # return capacity, wake waiters
             return []
+
+    sim = Simulation(entities=[resource, worker], ...)
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ from __future__ import annotations
 import logging
 from collections import deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-from happysimulator.core import sim_future as _sim_future_mod
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
 
 logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ class _Waiter:
     enqueue_time_ns: int
 
 
-class Resource:
+class Resource(Entity):
     """Shared capacity pool that multiple entities can acquire from.
 
     Resource models shared, contended capacity such as CPU cores, memory,
@@ -135,9 +135,8 @@ class Resource:
     via ``yield resource.acquire(amount)`` which returns a ``SimFuture``
     that resolves with a ``Grant`` object.
 
-    Resource is a plain class (not an Entity) — it does not need to be
-    registered with ``Simulation(entities=[...])``. It uses SimFuture's
-    module-level active context for time access.
+    Like other simulation primitives (Mutex, Semaphore), Resource is an
+    Entity and must be registered with ``Simulation(entities=[...])``.
 
     Waiter satisfaction is strict FIFO: when capacity is released, only
     the head-of-line waiter is checked. If it needs more capacity than
@@ -156,7 +155,7 @@ class Resource:
         if capacity <= 0:
             raise ValueError(f"capacity must be > 0, got {capacity}")
 
-        self._name = name
+        super().__init__(name)
         self._capacity = capacity
         self._available = capacity
         self._waiters: deque[_Waiter] = deque()
@@ -168,11 +167,6 @@ class Resource:
         self._total_wait_time_ns = 0
         self._peak_utilization = 0.0
         self._peak_waiters = 0
-
-    @property
-    def name(self) -> str:
-        """Resource name."""
-        return self._name
 
     @property
     def capacity(self) -> int | float:
@@ -198,7 +192,7 @@ class Resource:
     def stats(self) -> ResourceStats:
         """Frozen snapshot of current resource statistics."""
         return ResourceStats(
-            name=self._name,
+            name=self.name,
             capacity=self._capacity,
             available=self._available,
             utilization=self.utilization,
@@ -232,7 +226,7 @@ class Resource:
             raise ValueError(f"amount must be > 0, got {amount}")
         if amount > self._capacity:
             raise ValueError(
-                f"cannot acquire {amount} from resource '{self._name}' "
+                f"cannot acquire {amount} from resource '{self.name}' "
                 f"with capacity {self._capacity}"
             )
 
@@ -247,7 +241,7 @@ class Resource:
             future.resolve(grant)
             logger.debug(
                 "[%s] Immediate acquire(%s), available=%s",
-                self._name, amount, self._available,
+                self.name, amount, self._available,
             )
         else:
             # Must wait — enqueue
@@ -261,7 +255,7 @@ class Resource:
 
             logger.debug(
                 "[%s] Queued acquire(%s), waiters=%d, available=%s",
-                self._name, amount, len(self._waiters), self._available,
+                self.name, amount, len(self._waiters), self._available,
             )
 
         return future
@@ -282,7 +276,7 @@ class Resource:
             raise ValueError(f"amount must be > 0, got {amount}")
         if amount > self._capacity:
             raise ValueError(
-                f"cannot acquire {amount} from resource '{self._name}' "
+                f"cannot acquire {amount} from resource '{self.name}' "
                 f"with capacity {self._capacity}"
             )
 
@@ -311,7 +305,7 @@ class Resource:
 
         logger.debug(
             "[%s] Released %s, available=%s",
-            self._name, amount, self._available,
+            self.name, amount, self._available,
         )
 
         self._wake_waiters()
@@ -343,7 +337,7 @@ class Resource:
 
                 logger.debug(
                     "[%s] Woke waiter for %s, available=%s",
-                    self._name, waiter.amount, self._available,
+                    self.name, waiter.amount, self._available,
                 )
             else:
                 # Not enough capacity for head-of-line waiter — stop
@@ -355,15 +349,18 @@ class Resource:
         if util > self._peak_utilization:
             self._peak_utilization = util
 
+    def handle_event(self, event: Event) -> None:
+        """Resource does not process events directly."""
+        pass
+
     def _current_time_ns(self) -> int:
         """Get current simulation time in nanoseconds, or -1 if unavailable."""
-        clock = _sim_future_mod._active_clock
-        if clock is not None:
-            return clock.now.nanoseconds
+        if self._clock is not None:
+            return self._clock.now.nanoseconds
         return -1
 
     def __repr__(self) -> str:
         return (
-            f"Resource('{self._name}', capacity={self._capacity}, "
+            f"Resource('{self.name}', capacity={self._capacity}, "
             f"available={self._available}, waiters={len(self._waiters)})"
         )

@@ -774,7 +774,7 @@ inductor.queue_depth       # current buffer depth
 
 ### Shared Resource (Contended Capacity)
 
-`Resource` models shared, contended capacity (CPU cores, memory, bandwidth). Unlike sync primitives, Resource is a plain class — no need to register with `Simulation(entities=[...])`. It uses `SimFuture` for blocking acquires.
+`Resource` models shared, contended capacity (CPU cores, memory, bandwidth). Like other simulation primitives (Mutex, Semaphore), Resource is an Entity and must be registered with `Simulation(entities=[...])`. It uses `SimFuture` for blocking acquires.
 
 ```python
 from happysimulator import Resource
@@ -788,6 +788,9 @@ class Worker(Entity):
         yield 0.1  # Do work
         grant.release()  # Return capacity, wake waiters
         return []
+
+# Register resource with the simulation (like any Entity)
+sim = Simulation(entities=[cpu, worker], ...)
 
 # Non-blocking attempt
 grant = cpu.try_acquire(amount=2)  # Returns Grant or None

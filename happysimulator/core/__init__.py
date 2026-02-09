@@ -11,6 +11,12 @@ from happysimulator.core.decorators import simulatable
 from happysimulator.core.callback_entity import CallbackEntity, NullEntity
 from happysimulator.core.sim_future import SimFuture, any_of, all_of
 from happysimulator.core.node_clock import ClockModel, FixedSkew, LinearDrift, NodeClock
+from happysimulator.core.logical_clocks import (
+    HLCTimestamp,
+    HybridLogicalClock,
+    LamportClock,
+    VectorClock,
+)
 from happysimulator.core.control import (
     SimulationControl,
     SimulationState,
@@ -45,6 +51,10 @@ __all__ = [
     "FixedSkew",
     "LinearDrift",
     "NodeClock",
+    "LamportClock",
+    "VectorClock",
+    "HLCTimestamp",
+    "HybridLogicalClock",
     "SimulationControl",
     "SimulationState",
     "BreakpointContext",

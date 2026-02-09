@@ -5,7 +5,7 @@ latency, bandwidth constraints, packet loss, and network topologies.
 """
 
 from happysimulator.components.network.link import NetworkLink
-from happysimulator.components.network.network import Network
+from happysimulator.components.network.network import Network, Partition, LinkStats
 from happysimulator.components.network.conditions import (
     local_network,
     datacenter_network,
@@ -21,6 +21,8 @@ from happysimulator.components.network.conditions import (
 __all__ = [
     "NetworkLink",
     "Network",
+    "Partition",
+    "LinkStats",
     "local_network",
     "datacenter_network",
     "cross_region_network",

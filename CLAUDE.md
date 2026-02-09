@@ -18,6 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup; full constructor for advanced cases |
 | **Resources** | `Resource("cpu", capacity=8)` + `yield resource.acquire(2)` for shared contended capacity |
 | **Node Clocks** | `NodeClock(FixedSkew(...))` for per-node clock skew/drift in distributed protocols |
+| **Network** | `Network` topology + `partition()`/`.heal()` for network failures; `traffic_matrix()` for stats |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` for interactive debugging |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
 
@@ -548,6 +549,7 @@ def test_visualization(test_output_dir):
 | `test_zipf_distribution_visualization.py` | Distribution verification |
 | `test_compare_lifo_fifo.py` | Comparing queue policies |
 | `test_simulation_control.py` | Pause/resume, breakpoints, stepping |
+| `test_network_cluster.py` | 5-node gossip cluster with partition/heal |
 
 ---
 
@@ -855,6 +857,59 @@ class RaftNode(Entity):
 - `FixedSkew(offset: Duration)` — constant offset. Positive = ahead, negative = behind
 - `LinearDrift(rate_ppm: float)` — accumulating drift. 1000 ppm = 1ms/s. Positive = fast
 - `ClockModel` protocol — implement `read(true_time: Instant) -> Instant` for custom models
+
+### Network Topology and Partitions
+
+`Network` manages a topology of `NetworkLink` entities, routing events between nodes and supporting both symmetric and asymmetric network partitions with selective healing.
+
+```python
+from happysimulator import (
+    Network, NetworkLink, Partition, LinkStats,
+    datacenter_network, cross_region_network,
+)
+
+# Build topology
+network = Network(name="cluster")
+network.add_bidirectional_link(node_a, node_b, datacenter_network("link_ab"))
+network.add_bidirectional_link(node_b, node_c, cross_region_network("link_bc"))
+
+# Send events through the network (auto-routes via source/destination metadata)
+event = network.send(node_a, node_c, "Request", payload={"data": "hello"})
+sim.schedule(event)
+
+# Create a partition (returns a handle for selective healing)
+partition = network.partition([node_a, node_b], [node_c], asymmetric=False)
+partition.is_active   # True
+
+# Heal only this partition (others remain)
+partition.heal()
+
+# Or heal ALL partitions at once (backward-compatible)
+network.heal_partition()
+
+# Asymmetric partition: A->B blocked, B->A allowed
+asym = network.partition([node_a], [node_b], asymmetric=True)
+
+# Per-connection-pair traffic statistics
+for stats in network.traffic_matrix():
+    print(f"{stats.source} -> {stats.destination}: "
+          f"{stats.packets_sent} pkts, {stats.bytes_transmitted} bytes")
+```
+
+**Partition handles:**
+- `partition()` returns a `Partition` with `.heal()` and `.is_active`
+- Selective heal removes only that partition's pairs
+- `heal_partition()` clears ALL partitions (both symmetric and asymmetric)
+
+**Asymmetric partitions:**
+- `partition([A], [B], asymmetric=True)` blocks A->B but allows B->A
+- Stored as directed `(source, dest)` tuples alongside bidirectional `frozenset` pairs
+
+**Condition factories** create `NetworkLink` with realistic profiles:
+- `local_network()`, `datacenter_network()`, `cross_region_network()`
+- `internet_network()`, `satellite_network()`
+- `lossy_network(loss_rate)`, `slow_network(latency_seconds)`
+- `mobile_3g_network()`, `mobile_4g_network()`
 
 ---
 

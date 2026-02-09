@@ -9,6 +9,16 @@ from happysimulator.core.temporal import Instant, Duration
 from happysimulator.core.protocols import Simulatable, HasCapacity
 from happysimulator.core.decorators import simulatable
 from happysimulator.core.callback_entity import CallbackEntity, NullEntity
+from happysimulator.core.control import (
+    SimulationControl,
+    SimulationState,
+    BreakpointContext,
+    TimeBreakpoint,
+    EventCountBreakpoint,
+    ConditionBreakpoint,
+    MetricBreakpoint,
+    EventTypeBreakpoint,
+)
 
 __all__ = [
     "Simulation",
@@ -26,4 +36,12 @@ __all__ = [
     "Duration",
     "CallbackEntity",
     "NullEntity",
+    "SimulationControl",
+    "SimulationState",
+    "BreakpointContext",
+    "TimeBreakpoint",
+    "EventCountBreakpoint",
+    "ConditionBreakpoint",
+    "MetricBreakpoint",
+    "EventTypeBreakpoint",
 ]

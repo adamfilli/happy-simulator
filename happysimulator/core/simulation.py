@@ -37,6 +37,10 @@ class Simulation:
     across the simulation. Sources and probes are bootstrapped during initialization,
     priming the heap with their first events.
 
+    Interactive control (pause/resume, stepping, breakpoints) is available via
+    the ``control`` property, which lazily creates a ``SimulationControl`` instance.
+    When ``control`` is never accessed, the run loop incurs zero overhead.
+
     Args:
         start_time: When the simulation begins. Defaults to Instant.Epoch (t=0).
         end_time: When to stop processing. Defaults to Instant.Infinity (auto-terminate).
@@ -77,6 +81,17 @@ class Simulation:
         self._event_heap = EventHeap(trace_recorder=self._trace)
         self._summary: SimulationSummary | None = None
 
+        # Run state — promoted from run() locals for re-entrancy
+        self._current_time: Instant = self._start_time
+        self._events_processed: int = 0
+        self._is_running: bool = False
+        self._is_paused: bool = False
+        self._wall_start: float | None = None
+        self._last_event: Event | None = None
+
+        # Control surface — lazy-created on first access
+        self._control = None
+
         logger.info(
             "Simulation initialized: start=%r, end=%r, sources=%d, entities=%d, probes=%d",
             self._start_time, self._end_time,
@@ -109,6 +124,17 @@ class Simulation:
         logger.debug("Initialization complete, heap size: %d", self._event_heap.size())
 
     @property
+    def control(self):
+        """Access the simulation control surface for interactive debugging.
+
+        Lazily creates a SimulationControl instance on first access.
+        """
+        if self._control is None:
+            from happysimulator.core.control import SimulationControl
+            self._control = SimulationControl(self)
+        return self._control
+
+    @property
     def trace_recorder(self) -> TraceRecorder:
         """Access the trace recorder for inspection after simulation."""
         return self._trace
@@ -127,7 +153,7 @@ class Simulation:
         self._event_heap.push(events)
 
     def run(self) -> SimulationSummary:
-        """Execute the simulation until termination.
+        """Execute the simulation until termination or pause.
 
         Implements the core pop-invoke-push loop:
         1. Pop the earliest event from the heap
@@ -136,32 +162,55 @@ class Simulation:
         4. Push any resulting events back onto the heap
         5. Repeat until termination condition is met
 
+        The method is re-entrant: calling run() on a paused simulation
+        resumes from where it left off. When the simulation is paused
+        (via control.pause(), control.step(), or a breakpoint), a partial
+        SimulationSummary is returned.
+
         Termination occurs when:
         - The event heap is exhausted, or
         - Current time exceeds end_time, or
-        - Auto-terminate mode with no primary events remaining
+        - Auto-terminate mode with no primary events remaining, or
+        - The simulation is paused (returns partial summary)
 
         Returns:
-            SimulationSummary with run statistics.
+            SimulationSummary with run statistics (partial if paused).
         """
-        wall_start = _time.monotonic()
-        current_time = self._start_time
-        self._event_heap.set_current_time(current_time)
+        # First call: initialize wall clock and mark as running
+        if not self._is_running:
+            self._wall_start = _time.monotonic()
+            self._current_time = self._start_time
+            self._events_processed = 0
+            self._is_running = True
+            self._event_heap.set_current_time(self._current_time)
 
-        logger.info("Simulation starting at %r with %d event(s) in heap", current_time, self._event_heap.size())
+            logger.info(
+                "Simulation starting at %r with %d event(s) in heap",
+                self._current_time, self._event_heap.size(),
+            )
 
-        if not self._event_heap.has_events():
-            logger.warning("Simulation started with empty event heap")
+            if not self._event_heap.has_events():
+                logger.warning("Simulation started with empty event heap")
 
-        self._trace.record(
-            time=current_time,
-            kind="simulation.start",
-            heap_size=self._event_heap.size(),
-        )
+            self._trace.record(
+                time=self._current_time,
+                kind="simulation.start",
+                heap_size=self._event_heap.size(),
+            )
+        else:
+            # Resuming from pause
+            logger.info(
+                "Simulation resuming at %r with %d event(s) in heap",
+                self._current_time, self._event_heap.size(),
+            )
 
-        events_processed = 0
+        while self._event_heap.has_events() and self._end_time >= self._current_time:
 
-        while self._event_heap.has_events() and self._end_time >= current_time:
+            # CONTROL CHECK: should we pause before popping?
+            if self._control is not None and self._control._should_pause():
+                self._is_paused = True
+                logger.info("Simulation paused at %r after %d events", self._current_time, self._events_processed)
+                return self._build_summary()
 
             # TERMINATION CHECK:
             # If we rely on auto-termination (end_time is Infinity),
@@ -169,10 +218,10 @@ class Simulation:
             if self._end_time == Instant.Infinity and not self._event_heap.has_primary_events():
                 logger.info(
                     "Auto-terminating at %r: no primary events remaining (only daemon/probe events)",
-                    current_time,
+                    self._current_time,
                 )
                 self._trace.record(
-                    time=current_time,
+                    time=self._current_time,
                     kind="simulation.auto_terminate",
                     reason="no_primary_events",
                 )
@@ -181,27 +230,34 @@ class Simulation:
             # 1. Pop
             event = self._event_heap.pop()
 
-            if event.time < current_time:
+            if event.time < self._current_time:
                 logger.warning(
                     "Time travel detected: next event scheduled at %r, but current simulation time is %r. "
                     "event_type=%s event_id=%s",
                     event.time,
-                    current_time,
+                    self._current_time,
                     event.event_type,
                     event.context.get("id"),
                 )
-            current_time = event.time  # Advance clock
-            self._clock.update(current_time)
-            self._event_heap.set_current_time(current_time)
-            events_processed += 1
+
+            prev_time = self._current_time
+            self._current_time = event.time  # Advance clock
+            self._clock.update(self._current_time)
+            self._event_heap.set_current_time(self._current_time)
+            self._events_processed += 1
+            self._last_event = event
+
+            # CONTROL CHECK: notify time advance
+            if self._control is not None and self._current_time != prev_time:
+                self._control._notify_time_advance(self._current_time)
 
             logger.debug(
                 "Processing event #%d: %r",
-                events_processed, event,
+                self._events_processed, event,
             )
 
             self._trace.record(
-                time=current_time,
+                time=self._current_time,
                 kind="simulation.dequeue",
                 event_id=event.context.get("id"),
                 event_type=event.event_type,
@@ -223,7 +279,7 @@ class Simulation:
                         new_event.event_type, new_event.time,
                     )
                     self._trace.record(
-                        time=current_time,
+                        time=self._current_time,
                         kind="simulation.schedule",
                         event_id=new_event.context.get("id"),
                         event_type=new_event.event_type,
@@ -231,46 +287,62 @@ class Simulation:
                     )
                 self._event_heap.push(new_events)
 
-        wall_elapsed = _time.monotonic() - wall_start
+            # CONTROL CHECK: notify event processed + check breakpoints
+            if self._control is not None:
+                self._control._notify_event_processed(event)
+                if self._control._check_breakpoints():
+                    self._is_paused = True
+                    logger.info(
+                        "Simulation paused by breakpoint at %r after %d events",
+                        self._current_time, self._events_processed,
+                    )
+                    return self._build_summary()
+
+        # Simulation complete
+        self._is_running = False
+        self._is_paused = False
 
         # Determine why loop ended
         if not self._event_heap.has_events():
-            logger.info("Simulation ended at %r: event heap exhausted", current_time)
-        elif self._end_time < current_time:
+            logger.info("Simulation ended at %r: event heap exhausted", self._current_time)
+        elif self._end_time < self._current_time:
             logger.info(
                 "Simulation ended: current time %r exceeded end_time %r",
-                current_time, self._end_time,
+                self._current_time, self._end_time,
             )
 
         logger.info(
             "Simulation complete: processed %d events, final time %r, %d event(s) remaining in heap",
-            events_processed, current_time, self._event_heap.size(),
+            self._events_processed, self._current_time, self._event_heap.size(),
         )
 
         if self._event_heap.size() > 0:
             logger.debug("Unprocessed events remain in heap (scheduled past end_time)")
 
         self._trace.record(
-            time=current_time,
+            time=self._current_time,
             kind="simulation.end",
             final_heap_size=self._event_heap.size(),
         )
 
-        # Build summary
-        duration_s = (current_time - self._start_time).to_seconds()
-        eps = events_processed / duration_s if duration_s > 0 else 0.0
+        self._summary = self._build_summary()
+        return self._summary
+
+    def _build_summary(self) -> SimulationSummary:
+        """Build a SimulationSummary from current state."""
+        wall_elapsed = _time.monotonic() - self._wall_start if self._wall_start else 0.0
+        duration_s = (self._current_time - self._start_time).to_seconds()
+        eps = self._events_processed / duration_s if duration_s > 0 else 0.0
 
         entity_summaries = self._build_entity_summaries()
 
-        self._summary = SimulationSummary(
+        return SimulationSummary(
             duration_s=duration_s,
-            total_events_processed=events_processed,
+            total_events_processed=self._events_processed,
             events_per_second=eps,
             wall_clock_seconds=wall_elapsed,
             entities=entity_summaries,
         )
-
-        return self._summary
 
     def _build_entity_summaries(self) -> dict[str, EntitySummary]:
         """Build per-entity summaries from registered entities."""

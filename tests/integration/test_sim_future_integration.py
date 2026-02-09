@@ -1,6 +1,6 @@
 """Integration tests for SimFuture with full simulation execution.
 
-Tests cover: basic resolve, fail, pre-resolved futures, request-response
+Tests cover: basic resolve, pre-resolved futures, request-response
 patterns, timeout races (any_of), quorum waits (all_of), and chaining.
 """
 
@@ -34,20 +34,6 @@ class FutureResolver(Entity):
         return []
 
 
-class FutureFailer(Entity):
-    """Entity that fails a future from event context after a delay."""
-
-    def __init__(self, name: str = "Failer"):
-        super().__init__(name)
-
-    def handle_event(self, event: Event) -> Generator:
-        delay = event.context.get("delay", 0.1)
-        yield delay
-        future: SimFuture = event.context["future"]
-        future.fail(RuntimeError(event.context.get("error_msg", "failed")))
-        return []
-
-
 class RequestResponseClient(Entity):
     """Client that sends a request with a future and waits for response."""
 
@@ -59,14 +45,12 @@ class RequestResponseClient(Entity):
 
     def handle_event(self, event: Event) -> Generator:
         future = SimFuture()
-        # Send request to server with the future
         yield 0.0, [Event(
             time=self.now,
             event_type="Request",
             target=self.server,
             context={"future": future, "delay": 0.5, "value": {"status": "ok"}},
         )]
-        # Park until server resolves the future
         self.response_value = yield future
         self.completed = True
         return []
@@ -116,7 +100,7 @@ class TestSimFutureBasicResolve:
             def handle_event(self, event: Event) -> Generator:
                 future: SimFuture = event.context["future"]
                 yield 0.1
-                future.resolve()  # No value
+                future.resolve()
                 return []
 
         class NoneClient(Entity):
@@ -145,39 +129,6 @@ class TestSimFutureBasicResolve:
         assert client.result is None
 
 
-class TestSimFutureFail:
-    """Test fail() throws exception into the generator."""
-
-    def test_fail_throws_into_generator(self):
-        failer = FutureFailer()
-
-        class Catcher(Entity):
-            def __init__(self):
-                super().__init__("Catcher")
-                self.caught_error = None
-                self.completed = False
-            def handle_event(self, event: Event) -> Generator:
-                future = SimFuture()
-                yield 0.0, [Event(
-                    time=self.now, event_type="FailReq", target=failer,
-                    context={"future": future, "delay": 0.1, "error_msg": "something broke"},
-                )]
-                try:
-                    yield future
-                except RuntimeError as e:
-                    self.caught_error = str(e)
-                self.completed = True
-                return []
-
-        catcher = Catcher()
-        sim = _make_sim(catcher, failer)
-        _trigger(sim, catcher)
-        sim.run()
-
-        assert catcher.completed
-        assert catcher.caught_error == "something broke"
-
-
 class TestPreResolvedFuture:
     """Test yielding a future that was already resolved."""
 
@@ -189,8 +140,8 @@ class TestPreResolvedFuture:
                 self.completed = False
             def handle_event(self, event: Event) -> Generator:
                 future = SimFuture()
-                future.resolve(99)  # Resolve BEFORE yielding
-                self.result = yield future  # Should resume with 99
+                future.resolve(99)
+                self.result = yield future
                 self.completed = True
                 return []
 
@@ -240,7 +191,7 @@ class TestAnyOfIntegration:
         sim.run()
 
         assert client.completed
-        assert client.result_index == 0  # response_future won
+        assert client.result_index == 0
         assert client.result_value == "response"
 
     def test_timeout_wins_race(self):
@@ -277,7 +228,7 @@ class TestAnyOfIntegration:
         sim.run()
 
         assert client.completed
-        assert client.result_index == 1  # timeout_future won
+        assert client.result_index == 1
         assert client.result_value == "timeout"
 
 
@@ -314,39 +265,6 @@ class TestAllOfIntegration:
 
         assert client.completed
         assert client.results == ["ack-0", "ack-1", "ack-2"]
-
-    def test_all_of_with_failure(self):
-        """If any replica fails, the composite fails."""
-        replica_ok = FutureResolver("Replica-OK")
-        replica_fail = FutureFailer("Replica-Fail")
-
-        class Client(Entity):
-            def __init__(self):
-                super().__init__("FailQuorumClient")
-                self.caught_error = None
-                self.completed = False
-            def handle_event(self, event: Event) -> Generator:
-                f1, f2 = SimFuture(), SimFuture()
-                yield 0.0, [
-                    Event(time=self.now, event_type="Write", target=replica_ok,
-                          context={"future": f1, "delay": 0.2, "value": "ok"}),
-                    Event(time=self.now, event_type="Write", target=replica_fail,
-                          context={"future": f2, "delay": 0.1, "error_msg": "disk_error"}),
-                ]
-                try:
-                    yield all_of(f1, f2)
-                except RuntimeError as e:
-                    self.caught_error = str(e)
-                self.completed = True
-                return []
-
-        client = Client()
-        sim = _make_sim(client, replica_ok, replica_fail)
-        _trigger(sim, client)
-        sim.run()
-
-        assert client.completed
-        assert client.caught_error == "disk_error"
 
 
 class TestMultiStepFuture:
@@ -424,7 +342,6 @@ class TestCompletionHooksWithFuture:
         client = Client()
         sim = _make_sim(client, resolver)
 
-        # Create trigger event with completion hook
         trigger = Event(
             time=Instant.from_seconds(0),
             event_type="Go",

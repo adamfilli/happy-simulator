@@ -120,7 +120,7 @@ class TestBasicContention:
         resource = Resource("cpu", capacity=1)
         w1 = Worker("w1", resource, amount=1, work_time=0.1)
         w2 = Worker("w2", resource, amount=1, work_time=0.1)
-        sim = _make_sim(w1, w2)
+        sim = _make_sim(resource, w1, w2)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         sim.run()
@@ -139,7 +139,7 @@ class TestBasicContention:
         w1 = Worker("w1", resource, amount=2, work_time=0.1)
         w2 = Worker("w2", resource, amount=2, work_time=0.1)
         w3 = Worker("w3", resource, amount=2, work_time=0.1)
-        sim = _make_sim(w1, w2, w3)
+        sim = _make_sim(resource, w1, w2, w3)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         _trigger(sim, w3, time_s=0.0)
@@ -163,7 +163,7 @@ class TestGrantReleaseWakesWaiters:
         resource = Resource("cpu", capacity=1)
         w1 = Worker("w1", resource, amount=1, work_time=0.1)
         w2 = Worker("w2", resource, amount=1, work_time=0.1)
-        sim = _make_sim(w1, w2)
+        sim = _make_sim(resource, w1, w2)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         sim.run()
@@ -179,7 +179,7 @@ class TestMultipleResources:
         cpu = Resource("cpu", capacity=4)
         memory = Resource("memory", capacity=1024)
         worker = MultiResourceWorker("w1", cpu, memory, cpu_amount=2, mem_amount=512)
-        sim = _make_sim(worker)
+        sim = _make_sim(cpu, memory, worker)
         _trigger(sim, worker, time_s=0.0)
         sim.run()
 
@@ -194,7 +194,7 @@ class TestMultipleResources:
         memory = Resource("memory", capacity=512)
         w1 = MultiResourceWorker("w1", cpu, memory, cpu_amount=1, mem_amount=512)
         w2 = MultiResourceWorker("w2", cpu, memory, cpu_amount=1, mem_amount=512)
-        sim = _make_sim(w1, w2)
+        sim = _make_sim(cpu, memory, w1, w2)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         sim.run()
@@ -210,7 +210,7 @@ class TestUtilizationTracking:
     def test_utilization_returns_to_zero(self):
         resource = Resource("cpu", capacity=4)
         w = Worker("w1", resource, amount=4, work_time=0.1)
-        sim = _make_sim(w)
+        sim = _make_sim(resource, w)
         _trigger(sim, w, time_s=0.0)
         sim.run()
 
@@ -222,7 +222,7 @@ class TestUtilizationTracking:
         resource = Resource("cpu", capacity=1)
         w1 = Worker("w1", resource, amount=1, work_time=0.1)
         w2 = Worker("w2", resource, amount=1, work_time=0.1)
-        sim = _make_sim(w1, w2)
+        sim = _make_sim(resource, w1, w2)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         sim.run()
@@ -241,7 +241,7 @@ class TestConcurrentWorkers:
         so 3rd worker must wait until one finishes."""
         resource = Resource("cpu", capacity=2)
         workers = [Worker(f"w{i}", resource, amount=1, work_time=0.2) for i in range(3)]
-        sim = _make_sim(*workers)
+        sim = _make_sim(resource, *workers)
         _trigger(sim, workers[0], time_s=0.0)
         _trigger(sim, workers[1], time_s=0.0)
         _trigger(sim, workers[2], time_s=0.05)  # Arrives while first two are working
@@ -260,7 +260,7 @@ class TestTryAcquireInSimulation:
     def test_try_acquire_succeeds(self):
         resource = Resource("cpu", capacity=2)
         w = TryAcquireWorker("w", resource, amount=1)
-        sim = _make_sim(w)
+        sim = _make_sim(resource, w)
         _trigger(sim, w, time_s=0.0)
         sim.run()
 
@@ -272,7 +272,7 @@ class TestTryAcquireInSimulation:
         resource = Resource("cpu", capacity=1)
         holder = Worker("holder", resource, amount=1, work_time=1.0)
         trier = TryAcquireWorker("trier", resource, amount=1)
-        sim = _make_sim(holder, trier)
+        sim = _make_sim(resource, holder, trier)
         _trigger(sim, holder, time_s=0.0)
         _trigger(sim, trier, time_s=0.05)  # While holder is working
         sim.run()
@@ -289,7 +289,7 @@ class TestWaitTimeTracking:
         resource = Resource("cpu", capacity=1)
         w1 = Worker("w1", resource, amount=1, work_time=0.5)
         w2 = Worker("w2", resource, amount=1, work_time=0.1)
-        sim = _make_sim(w1, w2)
+        sim = _make_sim(resource, w1, w2)
         _trigger(sim, w1, time_s=0.0)
         _trigger(sim, w2, time_s=0.0)
         sim.run()
@@ -404,7 +404,7 @@ class TestResourceContentionVisualization:
 
         sim = Simulation(
             end_time=Instant.from_seconds(DURATION),
-            entities=[sampler, *workers],
+            entities=[resource, sampler, *workers],
         )
 
         # Kick off the sampler

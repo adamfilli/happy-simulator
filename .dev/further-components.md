@@ -31,9 +31,12 @@ The happysimulator component library currently has ~54 components across primiti
 | **MembershipProtocol** | Entity | SWIM-style gossip with probe, suspicion, and dissemination. Uses `Network` + `PhiAccrualDetector` |
 | **LeaderElection** | Entity | Pluggable election strategies: `Bully`, `Ring`, `Randomized`. Uses `Network` + `MembershipProtocol` |
 | **RaftNode** | Entity | Full Raft: leader election, log replication, snapshotting. Uses `Network` + `WAL` + `SimFuture` for election timeouts. Pluggable state machine |
-| **DistributedLock** | Entity | Lock service with fencing tokens and lease-based expiry. Built on `RaftNode` or standalone |
+| **PaxosNode** | Entity | Single-decree Paxos with proposer/acceptor/learner roles. Two-phase protocol (Prepare/Promise, Accept/Accepted). Uses `Network` + `SimFuture` for ballot contention |
+| **MultiPaxosNode** | Entity | Multi-decree Paxos with stable leader optimization — skips Phase 1 when leader is established. Log-based with slot indexing. Uses `Network` + `WAL` |
+| **FlexiblePaxosNode** | Entity | Paxos with asymmetric quorums (`Q1 + Q2 > N` instead of both being majorities). Configurable Phase 1 / Phase 2 quorum sizes for write-latency vs recovery-speed tradeoff |
+| **DistributedLock** | Entity | Lock service with fencing tokens and lease-based expiry. Built on `RaftNode`, `MultiPaxosNode`, or standalone |
 
-**Simulation scenarios enabled:** Split-brain under network partitions, election storms, consensus latency under load, fencing token correctness, failure detection tuning.
+**Simulation scenarios enabled:** Split-brain under network partitions, election storms, consensus latency under load, fencing token correctness, failure detection tuning, Raft vs Multi-Paxos leader stability comparison, Flexible Paxos quorum tuning (write latency vs recovery time), ballot contention under competing proposers.
 
 ---
 
@@ -135,7 +138,7 @@ PhiAccrualDetector, MerkleTree, GCounter, PNCounter, LWWRegister, ORSet, Conflic
 WAL -> SSTable -> Memtable -> LSMTree -> BTree -> TransactionManager
 
 ### Milestone C: Consensus + Replication (Phases 2-3)
-MembershipProtocol -> LeaderElection -> RaftNode -> DistributedLock -> PrimaryBackup -> ChainReplication -> MultiLeader
+MembershipProtocol -> LeaderElection -> PaxosNode -> MultiPaxosNode -> FlexiblePaxosNode -> RaftNode -> DistributedLock -> PrimaryBackup -> ChainReplication -> MultiLeader
 
 ### Milestone D: CRDTs + Streaming (Phases 4-5)
 CRDTStore -> EventLog -> ConsumerGroup -> StreamProcessor
@@ -148,10 +151,10 @@ AutoScaler, RollingDeployer, CanaryDeployer, GarbageCollector, DiskIO, TCPConnec
 
 ---
 
-## Total: 40 new components (8 pure algorithms + 32 entities)
+## Total: 43 new components (8 pure algorithms + 35 entities)
 
 ## Verification
 - Each component gets unit tests in `tests/unit/components/`
 - Integration tests composing multiple components in `tests/integration/`
-- At least one example per phase in `examples/`
+- **Every component gets a dedicated example in `examples/` that demonstrates its fundamental property** — e.g. LSMTree example shows write amplification during compaction, RaftNode example shows leader election and log convergence under partition, FlexiblePaxosNode example shows latency difference with asymmetric quorums. The example should make the "why does this component exist?" obvious to someone running it for the first time.
 - Run `pytest -q` after each milestone to ensure no regressions

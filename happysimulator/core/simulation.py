@@ -16,6 +16,7 @@ from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Instant
 from happysimulator.core.sim_future import _set_active_context, _clear_active_context
 from happysimulator.load.source import Source
+from happysimulator.faults.schedule import FaultSchedule
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
 from happysimulator.instrumentation.summary import (
     SimulationSummary, EntitySummary, QueueStats,
@@ -49,6 +50,7 @@ class Simulation:
         entities: Simulation actors that respond to events.
         probes: Measurement sources that run as daemons (won't block termination).
         trace_recorder: Optional recorder for debugging/visualization.
+        fault_schedule: Optional fault injection schedule.
     """
     def __init__(
         self,
@@ -58,6 +60,7 @@ class Simulation:
         entities: list[Simulatable] = None,
         probes: list[Source] = None,
         trace_recorder: TraceRecorder | None = None,
+        fault_schedule: 'FaultSchedule | None' = None,
     ):
         self._start_time = start_time
         if self._start_time is None:
@@ -121,6 +124,17 @@ class Simulation:
             initial_events = probe.start(self._start_time)
             logger.debug("Probe '%s' produced %d initial event(s)", probe.name, len(initial_events))
             for event in initial_events:
+                self._event_heap.push(event)
+
+        # Bootstrap fault schedule (if provided)
+        self._fault_schedule = fault_schedule
+        if self._fault_schedule is not None:
+            self._fault_schedule.set_clock(self._clock)
+            fault_events = self._fault_schedule.start(self._start_time, self)
+            logger.debug(
+                "FaultSchedule produced %d event(s)", len(fault_events)
+            )
+            for event in fault_events:
                 self._event_heap.push(event)
 
         logger.debug("Initialization complete, heap size: %d", self._event_heap.size())

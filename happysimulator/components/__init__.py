@@ -136,6 +136,24 @@ from happysimulator.components.sketching import (
     TopKCollector,
     QuantileEstimator,
 )
+from happysimulator.components.replication import (
+    ConflictResolver,
+    CustomResolver,
+    LastWriterWins,
+    VectorClockMerge,
+    VersionedValue,
+    PrimaryNode,
+    BackupNode,
+    ReplicationMode,
+    PrimaryBackupStats,
+    BackupStats,
+    ChainNode,
+    ChainNodeRole,
+    ChainReplicationStats,
+    build_chain,
+    LeaderNode,
+    MultiLeaderStats,
+)
 
 __all__ = [
     # Queue components
@@ -274,4 +292,21 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Replication
+    "ConflictResolver",
+    "CustomResolver",
+    "LastWriterWins",
+    "VectorClockMerge",
+    "VersionedValue",
+    "PrimaryNode",
+    "BackupNode",
+    "ReplicationMode",
+    "PrimaryBackupStats",
+    "BackupStats",
+    "ChainNode",
+    "ChainNodeRole",
+    "ChainReplicationStats",
+    "build_chain",
+    "LeaderNode",
+    "MultiLeaderStats",
 ]

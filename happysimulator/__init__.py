@@ -126,6 +126,8 @@ from happysimulator.sketching import (
     BloomFilter,
     ReservoirSampler,
     FrequencyEstimate,
+    MerkleTree,
+    KeyRange,
 )
 
 # Sketching entity wrappers
@@ -264,6 +266,8 @@ __all__ = [
     "BloomFilter",
     "ReservoirSampler",
     "FrequencyEstimate",
+    "MerkleTree",
+    "KeyRange",
     # Sketching entity wrappers
     "SketchCollector",
     "TopKCollector",

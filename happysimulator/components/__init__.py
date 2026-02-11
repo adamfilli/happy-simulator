@@ -161,6 +161,16 @@ from happysimulator.components.storage import (
     TransactionStats,
     IsolationLevel,
     StorageEngine,
+)
+from happysimulator.components.crdt import (
+    CRDT,
+    GCounter,
+    PNCounter,
+    LWWRegister,
+    ORSet,
+    CRDTStore,
+    CRDTStoreStats,
+)
 from happysimulator.components.replication import (
     ConflictResolver,
     CustomResolver,
@@ -359,4 +369,12 @@ __all__ = [
     "build_chain",
     "LeaderNode",
     "MultiLeaderStats",
+    # CRDTs
+    "CRDT",
+    "GCounter",
+    "PNCounter",
+    "LWWRegister",
+    "ORSet",
+    "CRDTStore",
+    "CRDTStoreStats",
 ]

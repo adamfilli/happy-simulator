@@ -130,6 +130,28 @@ from happysimulator.sketching import (
     KeyRange,
 )
 
+# Consensus & Coordination
+from happysimulator.components.consensus import (
+    Log,
+    LogEntry,
+    PhiAccrualDetector,
+    KVStateMachine,
+    MembershipProtocol,
+    MemberState,
+    BullyStrategy,
+    RingStrategy,
+    RandomizedStrategy,
+    LeaderElection,
+    PaxosNode,
+    Ballot,
+    MultiPaxosNode,
+    FlexiblePaxosNode,
+    RaftNode,
+    RaftState,
+    DistributedLock,
+    LockGrant,
+)
+
 # Sketching entity wrappers
 from happysimulator.components.sketching import (
     SketchCollector,
@@ -289,6 +311,25 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Consensus & Coordination
+    "Log",
+    "LogEntry",
+    "PhiAccrualDetector",
+    "KVStateMachine",
+    "MembershipProtocol",
+    "MemberState",
+    "BullyStrategy",
+    "RingStrategy",
+    "RandomizedStrategy",
+    "LeaderElection",
+    "PaxosNode",
+    "Ballot",
+    "MultiPaxosNode",
+    "FlexiblePaxosNode",
+    "RaftNode",
+    "RaftState",
+    "DistributedLock",
+    "LockGrant",
     # Storage Engine Internals
     "SSTable",
     "WriteAheadLog",

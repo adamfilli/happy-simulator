@@ -93,6 +93,22 @@ from happysimulator.components import (
     slow_network,
     mobile_3g_network,
     mobile_4g_network,
+    EventLog,
+    EventLogStats,
+    Record,
+    TimeRetention,
+    SizeRetention,
+    ConsumerGroup,
+    ConsumerGroupStats,
+    RangeAssignment,
+    RoundRobinAssignment,
+    StickyAssignment,
+    StreamProcessor,
+    StreamProcessorStats,
+    TumblingWindow,
+    SlidingWindow,
+    SessionWindow,
+    LateEventPolicy,
 )
 
 # Distributions
@@ -128,6 +144,28 @@ from happysimulator.sketching import (
     FrequencyEstimate,
     MerkleTree,
     KeyRange,
+)
+
+# Consensus & Coordination
+from happysimulator.components.consensus import (
+    Log,
+    LogEntry,
+    PhiAccrualDetector,
+    KVStateMachine,
+    MembershipProtocol,
+    MemberState,
+    BullyStrategy,
+    RingStrategy,
+    RandomizedStrategy,
+    LeaderElection,
+    PaxosNode,
+    Ballot,
+    MultiPaxosNode,
+    FlexiblePaxosNode,
+    RaftNode,
+    RaftState,
+    DistributedLock,
+    LockGrant,
 )
 
 # Sketching entity wrappers
@@ -184,6 +222,15 @@ from happysimulator.components.deployment import (
     MetricEvaluator,
     ErrorRateEvaluator,
     LatencyEvaluator,
+# CRDTs
+from happysimulator.components.crdt import (
+    CRDT,
+    GCounter,
+    PNCounter,
+    LWWRegister,
+    ORSet,
+    CRDTStore,
+    CRDTStoreStats,
 )
 
 # Fault injection
@@ -289,6 +336,23 @@ __all__ = [
     "slow_network",
     "mobile_3g_network",
     "mobile_4g_network",
+    # Streaming
+    "EventLog",
+    "EventLogStats",
+    "Record",
+    "TimeRetention",
+    "SizeRetention",
+    "ConsumerGroup",
+    "ConsumerGroupStats",
+    "RangeAssignment",
+    "RoundRobinAssignment",
+    "StickyAssignment",
+    "StreamProcessor",
+    "StreamProcessorStats",
+    "TumblingWindow",
+    "SlidingWindow",
+    "SessionWindow",
+    "LateEventPolicy",
     # Distributions
     "ConstantLatency",
     "ExponentialLatency",
@@ -321,6 +385,25 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Consensus & Coordination
+    "Log",
+    "LogEntry",
+    "PhiAccrualDetector",
+    "KVStateMachine",
+    "MembershipProtocol",
+    "MemberState",
+    "BullyStrategy",
+    "RingStrategy",
+    "RandomizedStrategy",
+    "LeaderElection",
+    "PaxosNode",
+    "Ballot",
+    "MultiPaxosNode",
+    "FlexiblePaxosNode",
+    "RaftNode",
+    "RaftState",
+    "DistributedLock",
+    "LockGrant",
     # Storage Engine Internals
     "SSTable",
     "WriteAheadLog",
@@ -361,6 +444,14 @@ __all__ = [
     "MetricEvaluator",
     "ErrorRateEvaluator",
     "LatencyEvaluator",
+    # CRDTs
+    "CRDT",
+    "GCounter",
+    "PNCounter",
+    "LWWRegister",
+    "ORSet",
+    "CRDTStore",
+    "CRDTStoreStats",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

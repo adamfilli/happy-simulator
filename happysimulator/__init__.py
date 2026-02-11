@@ -146,11 +146,61 @@ from happysimulator.sketching import (
     KeyRange,
 )
 
+# Consensus & Coordination
+from happysimulator.components.consensus import (
+    Log,
+    LogEntry,
+    PhiAccrualDetector,
+    KVStateMachine,
+    MembershipProtocol,
+    MemberState,
+    BullyStrategy,
+    RingStrategy,
+    RandomizedStrategy,
+    LeaderElection,
+    PaxosNode,
+    Ballot,
+    MultiPaxosNode,
+    FlexiblePaxosNode,
+    RaftNode,
+    RaftState,
+    DistributedLock,
+    LockGrant,
+)
+
 # Sketching entity wrappers
 from happysimulator.components.sketching import (
     SketchCollector,
     TopKCollector,
     QuantileEstimator,
+)
+
+# Storage Engine Internals
+from happysimulator.components.storage import (
+    SSTable,
+    WriteAheadLog,
+    Memtable,
+    LSMTree,
+    BTree,
+    TransactionManager,
+    IsolationLevel,
+    SizeTieredCompaction,
+    LeveledCompaction,
+    FIFOCompaction,
+    SyncEveryWrite,
+    SyncPeriodic,
+    SyncOnBatch,
+)
+
+# CRDTs
+from happysimulator.components.crdt import (
+    CRDT,
+    GCounter,
+    PNCounter,
+    LWWRegister,
+    ORSet,
+    CRDTStore,
+    CRDTStoreStats,
 )
 
 # Fault injection
@@ -305,6 +355,47 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Consensus & Coordination
+    "Log",
+    "LogEntry",
+    "PhiAccrualDetector",
+    "KVStateMachine",
+    "MembershipProtocol",
+    "MemberState",
+    "BullyStrategy",
+    "RingStrategy",
+    "RandomizedStrategy",
+    "LeaderElection",
+    "PaxosNode",
+    "Ballot",
+    "MultiPaxosNode",
+    "FlexiblePaxosNode",
+    "RaftNode",
+    "RaftState",
+    "DistributedLock",
+    "LockGrant",
+    # Storage Engine Internals
+    "SSTable",
+    "WriteAheadLog",
+    "Memtable",
+    "LSMTree",
+    "BTree",
+    "TransactionManager",
+    "IsolationLevel",
+    "SizeTieredCompaction",
+    "LeveledCompaction",
+    "FIFOCompaction",
+    "SyncEveryWrite",
+    "SyncPeriodic",
+    "SyncOnBatch",
+    # CRDTs
+    "CRDT",
+    "GCounter",
+    "PNCounter",
+    "LWWRegister",
+    "ORSet",
+    "CRDTStore",
+    "CRDTStoreStats",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

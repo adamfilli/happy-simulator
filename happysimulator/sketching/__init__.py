@@ -75,6 +75,9 @@ from happysimulator.sketching.bloom_filter import BloomFilter
 # Sampling
 from happysimulator.sketching.reservoir import ReservoirSampler
 
+# Hash trees
+from happysimulator.sketching.merkle_tree import MerkleTree, MerkleNode, KeyRange
+
 __all__ = [
     # Protocols
     "Sketch",
@@ -95,4 +98,8 @@ __all__ = [
     "BloomFilter",
     # Sampling
     "ReservoirSampler",
+    # Hash trees
+    "MerkleTree",
+    "MerkleNode",
+    "KeyRange",
 ]

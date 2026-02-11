@@ -126,6 +126,8 @@ from happysimulator.sketching import (
     BloomFilter,
     ReservoirSampler,
     FrequencyEstimate,
+    MerkleTree,
+    KeyRange,
 )
 
 # Consensus & Coordination
@@ -156,6 +158,9 @@ from happysimulator.components.sketching import (
     TopKCollector,
     QuantileEstimator,
 )
+
+# Fault injection
+from happysimulator.faults import FaultSchedule
 
 # Logging configuration utilities
 from happysimulator.logging_config import (
@@ -283,6 +288,8 @@ __all__ = [
     "BloomFilter",
     "ReservoirSampler",
     "FrequencyEstimate",
+    "MerkleTree",
+    "KeyRange",
     # Sketching entity wrappers
     "SketchCollector",
     "TopKCollector",
@@ -306,6 +313,8 @@ __all__ = [
     "RaftState",
     "DistributedLock",
     "LockGrant",
+    # Fault injection
+    "FaultSchedule",
     # Logging configuration
     "configure_from_env",
     "disable_logging",

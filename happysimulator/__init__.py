@@ -176,6 +176,17 @@ from happysimulator.components.storage import (
     SyncOnBatch,
 )
 
+# CRDTs
+from happysimulator.components.crdt import (
+    CRDT,
+    GCounter,
+    PNCounter,
+    LWWRegister,
+    ORSet,
+    CRDTStore,
+    CRDTStoreStats,
+)
+
 # Fault injection
 from happysimulator.faults import FaultSchedule
 
@@ -344,6 +355,14 @@ __all__ = [
     "SyncEveryWrite",
     "SyncPeriodic",
     "SyncOnBatch",
+    # CRDTs
+    "CRDT",
+    "GCounter",
+    "PNCounter",
+    "LWWRegister",
+    "ORSet",
+    "CRDTStore",
+    "CRDTStoreStats",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

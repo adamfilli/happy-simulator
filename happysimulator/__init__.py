@@ -137,6 +137,23 @@ from happysimulator.components.sketching import (
     QuantileEstimator,
 )
 
+# Storage Engine Internals
+from happysimulator.components.storage import (
+    SSTable,
+    WriteAheadLog,
+    Memtable,
+    LSMTree,
+    BTree,
+    TransactionManager,
+    IsolationLevel,
+    SizeTieredCompaction,
+    LeveledCompaction,
+    FIFOCompaction,
+    SyncEveryWrite,
+    SyncPeriodic,
+    SyncOnBatch,
+)
+
 # Fault injection
 from happysimulator.faults import FaultSchedule
 
@@ -272,6 +289,20 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Storage Engine Internals
+    "SSTable",
+    "WriteAheadLog",
+    "Memtable",
+    "LSMTree",
+    "BTree",
+    "TransactionManager",
+    "IsolationLevel",
+    "SizeTieredCompaction",
+    "LeveledCompaction",
+    "FIFOCompaction",
+    "SyncEveryWrite",
+    "SyncPeriodic",
+    "SyncOnBatch",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

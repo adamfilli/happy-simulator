@@ -26,7 +26,13 @@
       "Bash(Select-String:*)",
       "Bash(Measure-Object -Line)",
       "Bash(cloc:*)",
-      "Bash(gh pr edit:*)"
+      "Bash(gh pr edit:*)",
+      "Bash(ls -la \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\3\\\\happy-simulator\\\\happysimulator\\\\components\"\" | grep -E \"sidecar)",
+      "Bash(api)",
+      "Bash(saga)",
+      "Bash(outbox:*)",
+      "Bash(idempotency \")",
+      "Bash(pip install:*)"
     ]
   },
   "hooks": {

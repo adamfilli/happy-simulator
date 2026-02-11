@@ -161,6 +161,7 @@ from happysimulator.components.storage import (
     TransactionStats,
     IsolationLevel,
     StorageEngine,
+)
 from happysimulator.components.replication import (
     ConflictResolver,
     CustomResolver,
@@ -178,6 +179,34 @@ from happysimulator.components.replication import (
     build_chain,
     LeaderNode,
     MultiLeaderStats,
+)
+from happysimulator.components.scheduling import (
+    JobDefinition,
+    JobScheduler,
+    JobSchedulerStats,
+    JobState,
+    WorkerStats,
+    WorkStealingPool,
+    WorkStealingPoolStats,
+)
+from happysimulator.components.deployment import (
+    AutoScaler,
+    AutoScalerStats,
+    ScalingPolicy,
+    TargetUtilization,
+    StepScaling,
+    QueueDepthScaling,
+    ScalingEvent,
+    RollingDeployer,
+    RollingDeployerStats,
+    DeploymentState,
+    CanaryDeployer,
+    CanaryDeployerStats,
+    CanaryStage,
+    CanaryState,
+    MetricEvaluator,
+    ErrorRateEvaluator,
+    LatencyEvaluator,
 )
 
 __all__ = [
@@ -359,4 +388,30 @@ __all__ = [
     "build_chain",
     "LeaderNode",
     "MultiLeaderStats",
+    # Scheduling
+    "JobDefinition",
+    "JobScheduler",
+    "JobSchedulerStats",
+    "JobState",
+    "WorkerStats",
+    "WorkStealingPool",
+    "WorkStealingPoolStats",
+    # Deployment
+    "AutoScaler",
+    "AutoScalerStats",
+    "ScalingPolicy",
+    "TargetUtilization",
+    "StepScaling",
+    "QueueDepthScaling",
+    "ScalingEvent",
+    "RollingDeployer",
+    "RollingDeployerStats",
+    "DeploymentState",
+    "CanaryDeployer",
+    "CanaryDeployerStats",
+    "CanaryStage",
+    "CanaryState",
+    "MetricEvaluator",
+    "ErrorRateEvaluator",
+    "LatencyEvaluator",
 ]

@@ -154,6 +154,38 @@ from happysimulator.components.storage import (
     SyncOnBatch,
 )
 
+# Scheduling
+from happysimulator.components.scheduling import (
+    JobDefinition,
+    JobScheduler,
+    JobSchedulerStats,
+    JobState,
+    WorkerStats,
+    WorkStealingPool,
+    WorkStealingPoolStats,
+)
+
+# Deployment
+from happysimulator.components.deployment import (
+    AutoScaler,
+    AutoScalerStats,
+    ScalingPolicy,
+    TargetUtilization,
+    StepScaling,
+    QueueDepthScaling,
+    ScalingEvent,
+    RollingDeployer,
+    RollingDeployerStats,
+    DeploymentState,
+    CanaryDeployer,
+    CanaryDeployerStats,
+    CanaryStage,
+    CanaryState,
+    MetricEvaluator,
+    ErrorRateEvaluator,
+    LatencyEvaluator,
+)
+
 # Fault injection
 from happysimulator.faults import FaultSchedule
 
@@ -303,6 +335,32 @@ __all__ = [
     "SyncEveryWrite",
     "SyncPeriodic",
     "SyncOnBatch",
+    # Scheduling
+    "JobDefinition",
+    "JobScheduler",
+    "JobSchedulerStats",
+    "JobState",
+    "WorkerStats",
+    "WorkStealingPool",
+    "WorkStealingPoolStats",
+    # Deployment
+    "AutoScaler",
+    "AutoScalerStats",
+    "ScalingPolicy",
+    "TargetUtilization",
+    "StepScaling",
+    "QueueDepthScaling",
+    "ScalingEvent",
+    "RollingDeployer",
+    "RollingDeployerStats",
+    "DeploymentState",
+    "CanaryDeployer",
+    "CanaryDeployerStats",
+    "CanaryStage",
+    "CanaryState",
+    "MetricEvaluator",
+    "ErrorRateEvaluator",
+    "LatencyEvaluator",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

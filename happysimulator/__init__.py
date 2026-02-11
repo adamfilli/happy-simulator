@@ -154,6 +154,35 @@ from happysimulator.components.storage import (
     SyncOnBatch,
 )
 
+# Infrastructure Primitives
+from happysimulator.components.infrastructure import (
+    DiskIO,
+    DiskIOStats,
+    DiskProfile,
+    HDD,
+    SSD,
+    NVMe,
+    PageCache,
+    PageCacheStats,
+    CPUScheduler,
+    CPUSchedulerStats,
+    FairShare,
+    PriorityPreemptive,
+    GarbageCollector,
+    GCStats,
+    StopTheWorld,
+    ConcurrentGC,
+    GenerationalGC,
+    TCPConnection,
+    TCPStats,
+    AIMD,
+    Cubic,
+    BBR,
+    DNSResolver,
+    DNSRecord,
+    DNSStats,
+)
+
 # Fault injection
 from happysimulator.faults import FaultSchedule
 
@@ -303,6 +332,32 @@ __all__ = [
     "SyncEveryWrite",
     "SyncPeriodic",
     "SyncOnBatch",
+    # Infrastructure Primitives
+    "DiskIO",
+    "DiskIOStats",
+    "DiskProfile",
+    "HDD",
+    "SSD",
+    "NVMe",
+    "PageCache",
+    "PageCacheStats",
+    "CPUScheduler",
+    "CPUSchedulerStats",
+    "FairShare",
+    "PriorityPreemptive",
+    "GarbageCollector",
+    "GCStats",
+    "StopTheWorld",
+    "ConcurrentGC",
+    "GenerationalGC",
+    "TCPConnection",
+    "TCPStats",
+    "AIMD",
+    "Cubic",
+    "BBR",
+    "DNSResolver",
+    "DNSRecord",
+    "DNSStats",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

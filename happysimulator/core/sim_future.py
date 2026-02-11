@@ -57,6 +57,11 @@ def _clear_active_context() -> None:
     _active_clock = None
 
 
+def _get_active_heap() -> EventHeap | None:
+    """Return the active event heap, or None if no simulation is running."""
+    return _active_heap
+
+
 class SimFuture:
     """A future that generators can yield to park until resolved.
 

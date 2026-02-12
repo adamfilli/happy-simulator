@@ -27,7 +27,7 @@ class RecordedEvent:
     event_type: str
     target_name: str
     source_name: str | None
-    event_id: str
+    event_id: int
     is_internal: bool
 
     def to_dict(self) -> dict[str, Any]:
@@ -108,6 +108,7 @@ class SimulationBridge:
         self._new_edges_buffer: list[dict[str, str]] = []
         self._log_buffer: deque[RecordedLog] = deque(maxlen=self.MAX_LOG_BUFFER)
         self._new_logs_buffer: list[RecordedLog] = []
+        self._event_counter: int = 0
         self._lock = threading.Lock()
 
         # Install event hook
@@ -123,6 +124,7 @@ class SimulationBridge:
 
     def _on_event(self, event: Event) -> None:
         """Hook called after each event is processed."""
+        self._event_counter += 1
         target_name = getattr(event.target, "name", type(event.target).__name__)
 
         recorded = RecordedEvent(
@@ -130,7 +132,7 @@ class SimulationBridge:
             event_type=event.event_type,
             target_name=target_name,
             source_name=self._last_handler_name,
-            event_id=str(event._id),
+            event_id=self._event_counter,
             is_internal=is_internal_event(event.event_type),
         )
 
@@ -228,11 +230,43 @@ class SimulationBridge:
             "new_logs": new_logs,
         }
 
+    def run_to_event(self, event_number: int) -> dict[str, Any]:
+        """Run the simulation until the given event number, then return state."""
+        from happysimulator.core.control.breakpoints import EventCountBreakpoint
+
+        with self._lock:
+            self._new_events_buffer.clear()
+            self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
+
+        self._sim.control.add_breakpoint(
+            EventCountBreakpoint(count=event_number, one_shot=True)
+        )
+        self._sim.control.resume()
+
+        state = self.get_state()
+
+        with self._lock:
+            new_events = [e.to_dict() for e in self._new_events_buffer]
+            new_edges = list(self._new_edges_buffer)
+            new_logs = [l.to_dict() for l in self._new_logs_buffer]
+            self._new_events_buffer.clear()
+            self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
+
+        return {
+            "state": state,
+            "new_events": new_events,
+            "new_edges": new_edges,
+            "new_logs": new_logs,
+        }
+
     def reset(self) -> dict[str, Any]:
         """Reset the simulation and return the initial state."""
         self._sim.control.reset()
         self._event_log.clear()
         self._log_buffer.clear()
+        self._event_counter = 0
         self._last_handler_name = None
         self._topology = discover(self._sim)
 

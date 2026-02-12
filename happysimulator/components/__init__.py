@@ -250,6 +250,7 @@ from happysimulator.components.infrastructure import (
     DNSResolver,
     DNSRecord,
     DNSStats,
+)
 from happysimulator.components.scheduling import (
     JobDefinition,
     JobScheduler,
@@ -277,6 +278,7 @@ from happysimulator.components.deployment import (
     MetricEvaluator,
     ErrorRateEvaluator,
     LatencyEvaluator,
+)
 from happysimulator.components.streaming import (
     EventLog,
     EventLogStats,

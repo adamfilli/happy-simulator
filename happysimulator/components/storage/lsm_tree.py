@@ -642,6 +642,65 @@ class LSMTree(Entity):
 
         self._total_compactions += 1
 
+    def crash(self) -> dict:
+        """Simulate power loss: lose memtable and unsynced WAL entries.
+
+        SSTables survive (already flushed to disk). The memtable and any
+        immutable memtables awaiting flush are lost (volatile memory).
+        WAL entries beyond the last sync point are also lost.
+
+        Returns:
+            Summary with counts of lost entries.
+        """
+        memtable_lost = self._memtable.size
+        immutable_lost = sum(m.size for m in self._immutable_memtables)
+
+        # Clear volatile state
+        self._memtable = Memtable(
+            f"{self.name}_memtable",
+            size_threshold=self._memtable._size_threshold,
+        )
+        if self._clock is not None:
+            self._memtable.set_clock(self._clock)
+        self._immutable_memtables.clear()
+
+        # Crash WAL — discard unsynced entries
+        wal_lost = 0
+        if self._wal is not None:
+            wal_lost = self._wal.crash()
+
+        return {
+            "memtable_entries_lost": memtable_lost,
+            "immutable_memtable_entries_lost": immutable_lost,
+            "wal_entries_lost": wal_lost,
+        }
+
+    def recover_from_crash(self) -> dict:
+        """Recover durable state after a crash.
+
+        Replays surviving WAL entries into a fresh memtable. SSTables
+        are already intact on disk and need no recovery.
+
+        Returns:
+            Summary with counts of recovered data.
+        """
+        wal_recovered = 0
+        if self._wal is not None:
+            entries = self._wal.recover()
+            for entry in entries:
+                self._memtable.put_sync(entry.key, entry.value)
+            wal_recovered = len(entries)
+
+        sstable_keys = sum(
+            s.key_count for level in self._levels for s in level
+        )
+
+        return {
+            "wal_entries_replayed": wal_recovered,
+            "sstable_keys": sstable_keys,
+            "total_keys_recovered": self._memtable.size + sstable_keys,
+        }
+
     def handle_event(self, event: Event) -> Generator[float, None, None] | None:
         """Handle CompactionTrigger events."""
         if event.event_type == "CompactionTrigger":

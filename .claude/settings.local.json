@@ -32,7 +32,8 @@
       "Bash(saga)",
       "Bash(outbox:*)",
       "Bash(idempotency \")",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(set \"PYTHONPATH=C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\1\\\\happy-simulator\")"
     ]
   },
   "hooks": {

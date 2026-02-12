@@ -85,6 +85,20 @@ def serialize_entity(entity: object) -> dict[str, Any]:
             "utilization": round(entity.utilization, 4),
             "waiters": entity.waiters,
         }
+    try:
+        from happysimulator.instrumentation.probe import Probe
+    except ImportError:
+        Probe = type(None)
+
+    if isinstance(entity, Probe):
+        count = len(entity.data_sink.values)
+        last_val = entity.data_sink.values[-1][1] if count > 0 else None
+        return {
+            "metric": entity.metric,
+            "target": entity.target.name,
+            "samples": count,
+            "latest": last_val,
+        }
     if isinstance(entity, Source):
         ep = getattr(entity, "_event_provider", None)
         generated = getattr(ep, "_generated", None)

@@ -39,6 +39,13 @@ export default function App() {
     send("pause");
   };
 
+  const handleRunTo = async (time_s: number) => {
+    const res = await fetch(`/api/run_to?time_s=${time_s}`, { method: "POST" });
+    const data: StepResult = await res.json();
+    setState(data.state);
+    if (data.new_events?.length) addEvents(data.new_events);
+  };
+
   const handleReset = async () => {
     useSimStore.getState().reset();
     const res = await fetch("/api/reset", { method: "POST" });
@@ -57,6 +64,7 @@ export default function App() {
         onPlay={handlePlay}
         onPause={handlePause}
         onReset={handleReset}
+        onRunTo={handleRunTo}
       />
       <div className="flex-1 flex overflow-hidden">
         {/* Graph area */}

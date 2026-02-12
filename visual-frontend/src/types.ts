@@ -7,6 +7,7 @@ export interface TopologyNode {
 export interface TopologyEdge {
   source: string;
   target: string;
+  kind?: "data" | "probe";
 }
 
 export interface Topology {

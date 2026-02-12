@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useSimStore } from "../hooks/useSimState";
 
 const SPEEDS = [1, 5, 10, 50, 100];
@@ -7,16 +8,25 @@ interface Props {
   onPlay: (speed: number) => void;
   onPause: () => void;
   onReset: () => void;
+  onRunTo: (time_s: number) => void;
 }
 
-export default function ControlBar({ onStep, onPlay, onPause, onReset }: Props) {
+export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
+  const [runToInput, setRunToInput] = useState("");
 
   const timeStr = state ? state.time_s.toFixed(4) : "0.0000";
   const eventsStr = state ? state.events_processed.toLocaleString() : "0";
   const heapStr = state ? state.heap_size.toLocaleString() : "0";
+
+  const handleRunTo = () => {
+    const t = parseFloat(runToInput);
+    if (!isNaN(t) && t > (state?.time_s ?? 0)) {
+      onRunTo(t);
+    }
+  };
 
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-gray-900 border-b border-gray-800 text-sm">
@@ -96,6 +106,30 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset }: Props) 
           ))}
         </select>
 
+        <span className="text-gray-700">|</span>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={runToInput}
+            onChange={(e) => setRunToInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRunTo()}
+            placeholder="time (s)"
+            disabled={isPlaying || state?.is_complete}
+            className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs font-mono text-white placeholder-gray-600 disabled:opacity-40"
+          />
+          <button
+            onClick={handleRunTo}
+            disabled={isPlaying || state?.is_complete || !runToInput}
+            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded text-xs font-medium"
+            title="Run simulation to specified time"
+          >
+            Run To
+          </button>
+        </div>
+
+        <span className="text-gray-700">|</span>
+
         <button
           onClick={() => {
             setPlaying(false);
@@ -103,7 +137,7 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset }: Props) 
           }}
           className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs font-medium"
         >
-          Reset
+          Restart
         </button>
       </div>
     </div>

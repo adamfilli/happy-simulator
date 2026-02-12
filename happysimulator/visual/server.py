@@ -47,9 +47,22 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
         state = bridge.reset()
         return JSONResponse(state)
 
+    @app.post("/api/run_to")
+    def post_run_to(time_s: float) -> JSONResponse:
+        result = bridge.run_to(time_s)
+        return JSONResponse(result)
+
     @app.get("/api/events")
     def get_events(last_n: int = 100) -> JSONResponse:
         return JSONResponse(bridge.get_event_log(last_n))
+
+    @app.get("/api/probes")
+    def get_probes() -> JSONResponse:
+        return JSONResponse(bridge.list_probes())
+
+    @app.get("/api/timeseries")
+    def get_timeseries(probe: str) -> JSONResponse:
+        return JSONResponse(bridge.get_timeseries(probe))
 
     # --- WebSocket for play mode ---
 
@@ -100,6 +113,14 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                 elif action == "step":
                     count = msg.get("count", 1)
                     result = await asyncio.to_thread(bridge.step, count)
+                    await ws.send_json({"type": "state_update", **result})
+
+                elif action == "run_to":
+                    if play_task and not play_task.done():
+                        stop_event.set()
+                        await play_task
+                    time_s = msg.get("time_s", 0)
+                    result = await asyncio.to_thread(bridge.run_to, time_s)
                     await ws.send_json({"type": "state_update", **result})
 
                 elif action == "reset":

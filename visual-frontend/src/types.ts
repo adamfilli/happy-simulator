@@ -60,4 +60,5 @@ export interface StepResult {
 
 export type WSMessage =
   | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[] }
-  | { type: "simulation_complete" };
+  | { type: "simulation_complete" }
+  | { type: "breakpoint_hit" };

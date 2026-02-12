@@ -21,6 +21,8 @@ export function useWebSocket() {
         if (msg.new_logs?.length) addLogs(msg.new_logs);
       } else if (msg.type === "simulation_complete") {
         setPlaying(false);
+      } else if (msg.type === "breakpoint_hit") {
+        setPlaying(false);
       }
     };
 

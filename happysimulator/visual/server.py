@@ -89,6 +89,25 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                 # Small delay to avoid flooding the browser
                 await asyncio.sleep(0.05)
 
+        async def debug_loop(speed: int) -> None:
+            """Like play_loop but stops when a breakpoint fires."""
+            while not stop_event.is_set():
+                result = await asyncio.to_thread(bridge.step, speed)
+                try:
+                    await ws.send_json({"type": "state_update", **result})
+                except Exception:
+                    break
+
+                if result["state"].get("is_complete"):
+                    await ws.send_json({"type": "simulation_complete"})
+                    break
+
+                if result["state"].get("is_paused"):
+                    await ws.send_json({"type": "breakpoint_hit"})
+                    break
+
+                await asyncio.sleep(0.05)
+
         try:
             while True:
                 raw = await ws.receive_text()
@@ -102,6 +121,14 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                     stop_event.clear()
                     speed = msg.get("speed", 10)
                     play_task = asyncio.create_task(play_loop(speed))
+
+                elif action == "debug":
+                    if play_task and not play_task.done():
+                        stop_event.set()
+                        await play_task
+                    stop_event.clear()
+                    speed = msg.get("speed", 10)
+                    play_task = asyncio.create_task(debug_loop(speed))
 
                 elif action == "pause":
                     if play_task and not play_task.done():

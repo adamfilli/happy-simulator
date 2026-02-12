@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 
 const SPEEDS = [1, 5, 10, 50, 100];
@@ -6,16 +6,19 @@ const SPEEDS = [1, 5, 10, 50, 100];
 interface Props {
   onStep: (count: number) => void;
   onPlay: (speed: number) => void;
+  onDebug: (speed: number) => void;
   onPause: () => void;
   onReset: () => void;
   onRunTo: (time_s: number) => void;
   onRunToEvent: (n: number) => void;
 }
 
-export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo, onRunToEvent }: Props) {
+export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
+  const [speed, setSpeed] = useState(10);
+  const debugModeRef = useRef(false);
   const [runToInput, setRunToInput] = useState("");
   const [runToEventInput, setRunToEventInput] = useState("");
 
@@ -75,16 +78,31 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo, 
         </button>
 
         {!isPlaying ? (
-          <button
-            onClick={() => {
-              setPlaying(true);
-              onPlay(10);
-            }}
-            disabled={state?.is_complete}
-            className="px-3 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded text-xs font-medium"
-          >
-            Play
-          </button>
+          <>
+            <button
+              onClick={() => {
+                debugModeRef.current = false;
+                setPlaying(true);
+                onPlay(speed);
+              }}
+              disabled={state?.is_complete}
+              className="px-3 py-1 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-40 rounded text-xs font-medium"
+            >
+              Play
+            </button>
+            <button
+              onClick={() => {
+                debugModeRef.current = true;
+                setPlaying(true);
+                onDebug(speed);
+              }}
+              disabled={state?.is_complete}
+              className="px-3 py-1 bg-purple-700 hover:bg-purple-600 disabled:opacity-40 rounded text-xs font-medium"
+              title="Play until a breakpoint fires"
+            >
+              Debug
+            </button>
+          </>
         ) : (
           <button
             onClick={() => {
@@ -99,12 +117,17 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo, 
 
         <select
           onChange={(e) => {
-            const speed = Number(e.target.value);
+            const s = Number(e.target.value);
+            setSpeed(s);
             if (isPlaying) {
-              onPlay(speed);
+              if (debugModeRef.current) {
+                onDebug(s);
+              } else {
+                onPlay(s);
+              }
             }
           }}
-          defaultValue={10}
+          value={speed}
           className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs"
           title="Events per batch"
         >

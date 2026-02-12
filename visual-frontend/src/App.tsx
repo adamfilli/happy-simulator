@@ -62,6 +62,10 @@ export default function App() {
     send("play", { speed });
   };
 
+  const handleDebug = (speed: number) => {
+    send("debug", { speed });
+  };
+
   const handlePause = () => {
     send("pause");
   };
@@ -94,6 +98,7 @@ export default function App() {
       <ControlBar
         onStep={handleStep}
         onPlay={handlePlay}
+        onDebug={handleDebug}
         onPause={handlePause}
         onReset={handleReset}
         onRunTo={handleRunTo}

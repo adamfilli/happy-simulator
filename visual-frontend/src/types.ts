@@ -28,7 +28,7 @@ export interface RecordedEvent {
   event_type: string;
   target_name: string;
   source_name: string | null;
-  event_id: string;
+  event_id: number;
   is_internal: boolean;
 }
 

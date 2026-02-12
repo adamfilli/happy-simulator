@@ -74,6 +74,10 @@ export default function App() {
     if (data.new_logs?.length) addLogs(data.new_logs);
   };
 
+  const handleRunToEvent = (eventNumber: number) => {
+    send("run_to_event", { event_number: eventNumber });
+  };
+
   const handleReset = async () => {
     useSimStore.getState().reset();
     const res = await fetch("/api/reset", { method: "POST" });
@@ -93,6 +97,7 @@ export default function App() {
         onPause={handlePause}
         onReset={handleReset}
         onRunTo={handleRunTo}
+        onRunToEvent={handleRunToEvent}
       />
       <div className="flex-1 flex overflow-hidden">
         {/* Graph area */}

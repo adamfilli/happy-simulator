@@ -9,13 +9,15 @@ interface Props {
   onPause: () => void;
   onReset: () => void;
   onRunTo: (time_s: number) => void;
+  onRunToEvent: (n: number) => void;
 }
 
-export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo }: Props) {
+export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo, onRunToEvent }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
   const [runToInput, setRunToInput] = useState("");
+  const [runToEventInput, setRunToEventInput] = useState("");
 
   const timeStr = state ? state.time_s.toFixed(4) : "0.0000";
   const eventsStr = state ? state.events_processed.toLocaleString() : "0";
@@ -25,6 +27,13 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo }
     const t = parseFloat(runToInput);
     if (!isNaN(t) && t > (state?.time_s ?? 0)) {
       onRunTo(t);
+    }
+  };
+
+  const handleRunToEvent = () => {
+    const n = parseInt(runToEventInput, 10);
+    if (!isNaN(n) && n > (state?.events_processed ?? 0)) {
+      onRunToEvent(n);
     }
   };
 
@@ -125,6 +134,26 @@ export default function ControlBar({ onStep, onPlay, onPause, onReset, onRunTo }
             title="Run simulation to specified time"
           >
             Run To
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={runToEventInput}
+            onChange={(e) => setRunToEventInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleRunToEvent()}
+            placeholder="event #"
+            disabled={isPlaying || state?.is_complete}
+            className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs font-mono text-white placeholder-gray-600 disabled:opacity-40"
+          />
+          <button
+            onClick={handleRunToEvent}
+            disabled={isPlaying || state?.is_complete || !runToEventInput}
+            className="px-3 py-1 bg-blue-700 hover:bg-blue-600 disabled:opacity-40 rounded text-xs font-medium"
+            title="Run simulation to specified event number"
+          >
+            Run To #
           </button>
         </div>
 

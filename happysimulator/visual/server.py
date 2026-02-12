@@ -123,6 +123,14 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                     result = await asyncio.to_thread(bridge.run_to, time_s)
                     await ws.send_json({"type": "state_update", **result})
 
+                elif action == "run_to_event":
+                    if play_task and not play_task.done():
+                        stop_event.set()
+                        await play_task
+                    event_number = msg.get("event_number", 0)
+                    result = await asyncio.to_thread(bridge.run_to_event, event_number)
+                    await ws.send_json({"type": "state_update", **result})
+
                 elif action == "reset":
                     if play_task and not play_task.done():
                         stop_event.set()

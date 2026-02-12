@@ -15,6 +15,7 @@ from happysimulator.components.common import Sink
 from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
+from happysimulator.core.control.breakpoints import MetricBreakpoint
 from happysimulator.visual import serve
 
 
@@ -48,5 +49,12 @@ sim = Simulation(
     entities=[server, sink],
     probes=[depth_probe],
 )
+
+sim.control.add_breakpoint(MetricBreakpoint(
+    entity_name="Sink",
+    attribute="events_received",
+    operator="ge",
+    threshold=100,
+))
 
 serve(sim)

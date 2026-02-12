@@ -32,6 +32,14 @@ export interface RecordedEvent {
   is_internal: boolean;
 }
 
+export interface RecordedLog {
+  time_s: number | null;
+  wall_time: string;
+  level: string;
+  logger_name: string;
+  message: string;
+}
+
 export interface SimState {
   time_s: number;
   events_processed: number;
@@ -47,8 +55,9 @@ export interface StepResult {
   state: SimState;
   new_events: RecordedEvent[];
   new_edges: TopologyEdge[];
+  new_logs: RecordedLog[];
 }
 
 export type WSMessage =
-  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[] }
+  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[] }
   | { type: "simulation_complete" };

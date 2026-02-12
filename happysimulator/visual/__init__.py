@@ -60,4 +60,7 @@ def serve(
     if open_browser:
         webbrowser.open(url)
 
-    uvicorn.run(app, host=host, port=port, log_level="warning")
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    finally:
+        bridge.close()

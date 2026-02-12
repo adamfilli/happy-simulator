@@ -6,9 +6,11 @@ state snapshots, event recording, and topology tracking.
 
 from __future__ import annotations
 
+import logging
 import threading
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from happysimulator.core.event import Event
@@ -39,10 +41,63 @@ class RecordedEvent:
         }
 
 
+@dataclass
+class RecordedLog:
+    time_s: float | None
+    wall_time: str
+    level: str
+    logger_name: str
+    message: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "time_s": self.time_s,
+            "wall_time": self.wall_time,
+            "level": self.level,
+            "logger_name": self.logger_name,
+            "message": self.message,
+        }
+
+
+class _BridgeLogHandler(logging.Handler):
+    """Captures log records from the happysimulator logger hierarchy."""
+
+    def __init__(self, bridge: "SimulationBridge") -> None:
+        super().__init__(level=logging.DEBUG)
+        self._bridge = bridge
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            time_s: float | None = None
+            try:
+                time_s = self._bridge._sim._current_time.to_seconds()
+            except Exception:
+                pass
+
+            logger_name = record.name
+            if logger_name.startswith("happysimulator."):
+                logger_name = logger_name[len("happysimulator."):]
+
+            entry = RecordedLog(
+                time_s=time_s,
+                wall_time=datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3],
+                level=record.levelname,
+                logger_name=logger_name,
+                message=self.format(record),
+            )
+
+            with self._bridge._lock:
+                self._bridge._log_buffer.append(entry)
+                self._bridge._new_logs_buffer.append(entry)
+        except Exception:
+            self.handleError(record)
+
+
 class SimulationBridge:
     """Wraps a Simulation for the visual debugger API."""
 
     MAX_EVENT_LOG = 5000
+    MAX_LOG_BUFFER = 5000
 
     def __init__(self, sim: "Simulation") -> None:
         self._sim = sim
@@ -51,10 +106,20 @@ class SimulationBridge:
         self._last_handler_name: str | None = None
         self._new_events_buffer: list[RecordedEvent] = []
         self._new_edges_buffer: list[dict[str, str]] = []
+        self._log_buffer: deque[RecordedLog] = deque(maxlen=self.MAX_LOG_BUFFER)
+        self._new_logs_buffer: list[RecordedLog] = []
         self._lock = threading.Lock()
 
         # Install event hook
         sim.control.on_event(self._on_event)
+
+        # Install log handler on the happysimulator root logger
+        self._hs_logger = logging.getLogger("happysimulator")
+        self._prev_log_level = self._hs_logger.level
+        if self._hs_logger.level > logging.DEBUG or self._hs_logger.level == logging.NOTSET:
+            self._hs_logger.setLevel(logging.DEBUG)
+        self._log_handler = _BridgeLogHandler(self)
+        self._hs_logger.addHandler(self._log_handler)
 
     def _on_event(self, event: Event) -> None:
         """Hook called after each event is processed."""
@@ -112,6 +177,7 @@ class SimulationBridge:
         with self._lock:
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
 
         self._sim.control.step(count)
         state = self.get_state()
@@ -119,13 +185,16 @@ class SimulationBridge:
         with self._lock:
             new_events = [e.to_dict() for e in self._new_events_buffer]
             new_edges = list(self._new_edges_buffer)
+            new_logs = [l.to_dict() for l in self._new_logs_buffer]
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
 
         return {
             "state": state,
             "new_events": new_events,
             "new_edges": new_edges,
+            "new_logs": new_logs,
         }
 
     def run_to(self, time_s: float) -> dict[str, Any]:
@@ -136,6 +205,7 @@ class SimulationBridge:
         with self._lock:
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
 
         target = Instant.from_seconds(time_s)
         self._sim.control.add_breakpoint(TimeBreakpoint(time=target, one_shot=True))
@@ -146,19 +216,23 @@ class SimulationBridge:
         with self._lock:
             new_events = [e.to_dict() for e in self._new_events_buffer]
             new_edges = list(self._new_edges_buffer)
+            new_logs = [l.to_dict() for l in self._new_logs_buffer]
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
+            self._new_logs_buffer.clear()
 
         return {
             "state": state,
             "new_events": new_events,
             "new_edges": new_edges,
+            "new_logs": new_logs,
         }
 
     def reset(self) -> dict[str, Any]:
         """Reset the simulation and return the initial state."""
         self._sim.control.reset()
         self._event_log.clear()
+        self._log_buffer.clear()
         self._last_handler_name = None
         self._topology = discover(self._sim)
 
@@ -167,6 +241,11 @@ class SimulationBridge:
         self._sim.run()
 
         return self.get_state()
+
+    def close(self) -> None:
+        """Remove the log handler and restore logger level."""
+        self._hs_logger.removeHandler(self._log_handler)
+        self._hs_logger.setLevel(self._prev_log_level)
 
     def get_event_log(self, last_n: int = 100) -> list[dict]:
         """Return the last N recorded events."""

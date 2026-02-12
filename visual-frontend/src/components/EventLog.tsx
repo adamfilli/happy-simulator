@@ -50,6 +50,7 @@ export default function EventLog() {
               </>
             )}
             <span className="text-emerald-400 truncate">{e.target_name}</span>
+            <span className="text-gray-600 ml-auto shrink-0">#{e.event_id}</span>
           </div>
         ))}
         <div ref={endRef} />

@@ -4,7 +4,7 @@ import type { WSMessage } from "../types";
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
-  const { setState, addEvents, addEdges, setPlaying } = useSimStore();
+  const { setState, addEvents, addEdges, addLogs, setPlaying } = useSimStore();
 
   useEffect(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -18,6 +18,7 @@ export function useWebSocket() {
         setState(msg.state);
         if (msg.new_events?.length) addEvents(msg.new_events);
         if (msg.new_edges?.length) addEdges(msg.new_edges);
+        if (msg.new_logs?.length) addLogs(msg.new_logs);
       } else if (msg.type === "simulation_complete") {
         setPlaying(false);
       }
@@ -30,7 +31,7 @@ export function useWebSocket() {
     return () => {
       ws.close();
     };
-  }, [setState, addEvents, addEdges, setPlaying]);
+  }, [setState, addEvents, addEdges, addLogs, setPlaying]);
 
   const send = useCallback((action: string, extra?: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

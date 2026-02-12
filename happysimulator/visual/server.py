@@ -108,7 +108,7 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     state = bridge.get_state()
-                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": []})
+                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": [], "new_logs": []})
 
                 elif action == "step":
                     count = msg.get("count", 1)
@@ -128,7 +128,7 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     state = await asyncio.to_thread(bridge.reset)
-                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": []})
+                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": [], "new_logs": []})
 
         except WebSocketDisconnect:
             if play_task and not play_task.done():

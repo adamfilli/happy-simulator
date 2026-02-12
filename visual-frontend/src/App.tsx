@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useSimStore } from "./hooks/useSimState";
 import { useWebSocket } from "./hooks/useWebSocket";
@@ -6,12 +6,38 @@ import GraphView from "./components/GraphView";
 import ControlBar from "./components/ControlBar";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
+import SimulationLog from "./components/SimulationLog";
 import type { SimState, Topology, StepResult } from "./types";
 
 export default function App() {
-  const { setTopology, setState, addEvents } = useSimStore();
+  const { setTopology, setState, addEvents, addLogs } = useSimStore();
   const { send } = useWebSocket();
-  const [activeTab, setActiveTab] = useState<"inspector" | "events">("inspector");
+  const [activeTab, setActiveTab] = useState<"inspector" | "events" | "logs">("inspector");
+  const [panelWidth, setPanelWidth] = useState(320);
+  const dragging = useRef(false);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = true;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const newWidth = window.innerWidth - ev.clientX;
+      setPanelWidth(Math.max(240, Math.min(newWidth, window.innerWidth * 0.7)));
+    };
+    const onUp = () => {
+      dragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
 
   // Fetch initial topology + state
   useEffect(() => {
@@ -29,6 +55,7 @@ export default function App() {
     const data: StepResult = await res.json();
     setState(data.state);
     if (data.new_events?.length) addEvents(data.new_events);
+    if (data.new_logs?.length) addLogs(data.new_logs);
   };
 
   const handlePlay = (speed: number) => {
@@ -44,6 +71,7 @@ export default function App() {
     const data: StepResult = await res.json();
     setState(data.state);
     if (data.new_events?.length) addEvents(data.new_events);
+    if (data.new_logs?.length) addLogs(data.new_logs);
   };
 
   const handleReset = async () => {
@@ -74,8 +102,14 @@ export default function App() {
           </ReactFlowProvider>
         </div>
 
+        {/* Resize handle */}
+        <div
+          onMouseDown={onDragStart}
+          className="w-1 cursor-col-resize bg-gray-800 hover:bg-blue-500 active:bg-blue-500 transition-colors shrink-0"
+        />
+
         {/* Right panel */}
-        <div className="w-80 border-l border-gray-800 flex flex-col bg-gray-900">
+        <div style={{ width: panelWidth }} className="flex flex-col bg-gray-900 shrink-0">
           <div className="flex border-b border-gray-800">
             <button
               onClick={() => setActiveTab("inspector")}
@@ -97,9 +131,19 @@ export default function App() {
             >
               Event Log
             </button>
+            <button
+              onClick={() => setActiveTab("logs")}
+              className={`flex-1 px-3 py-2 text-xs font-medium ${
+                activeTab === "logs"
+                  ? "text-white border-b-2 border-blue-500"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Sim Log
+            </button>
           </div>
           <div className="flex-1 overflow-hidden">
-            {activeTab === "inspector" ? <InspectorPanel /> : <EventLog />}
+            {activeTab === "inspector" ? <InspectorPanel /> : activeTab === "events" ? <EventLog /> : <SimulationLog />}
           </div>
         </div>
       </div>

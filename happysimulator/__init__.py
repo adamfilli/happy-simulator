@@ -219,6 +219,8 @@ from happysimulator.components.infrastructure import (
     DNSResolver,
     DNSRecord,
     DNSStats,
+)
+
 # Scheduling
 from happysimulator.components.scheduling import (
     JobDefinition,
@@ -249,6 +251,8 @@ from happysimulator.components.deployment import (
     MetricEvaluator,
     ErrorRateEvaluator,
     LatencyEvaluator,
+)
+
 # CRDTs
 from happysimulator.components.crdt import (
     CRDT,

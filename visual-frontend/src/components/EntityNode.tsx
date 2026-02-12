@@ -20,7 +20,8 @@ function EntityNode({ data }: NodeProps<EntityNodeType>) {
 
   return (
     <>
-      <Handle type="target" position={Position.Left} className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="target" position={Position.Left} id="left" className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} id="top" className="!bg-cyan-700 !w-2 !h-2" />
       <div
         className="rounded-lg px-3 py-2 min-w-[140px] border-2 transition-all"
         style={{
@@ -50,7 +51,8 @@ function EntityNode({ data }: NodeProps<EntityNodeType>) {
           </div>
         )}
       </div>
-      <Handle type="source" position={Position.Right} className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="source" position={Position.Right} id="right" className="!bg-gray-600 !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} id="bottom" className="!bg-cyan-700 !w-2 !h-2" />
     </>
   );
 }

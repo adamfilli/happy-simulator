@@ -348,3 +348,4 @@ Create design docs for major features/architecture decisions. Template: Overview
 | `/line-count` | Count lines of code (source, tests, examples) |
 | `/update-claudemd` | Review changes and update CLAUDE.md |
 | `/update-pypi` | Bump version for PyPI release |
+| `/visual-debugger` | Launch the browser-based simulation debugger |

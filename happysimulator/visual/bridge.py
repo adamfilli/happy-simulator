@@ -73,16 +73,6 @@ class SimulationBridge:
             self._event_log.append(recorded)
             self._new_events_buffer.append(recorded)
 
-        # Dynamic edge discovery
-        if self._last_handler_name and self._last_handler_name != target_name:
-            added = self._topology.add_edge_if_new(self._last_handler_name, target_name)
-            if added:
-                with self._lock:
-                    self._new_edges_buffer.append({
-                        "source": self._last_handler_name,
-                        "target": target_name,
-                    })
-
         self._last_handler_name = target_name
 
     def get_topology(self) -> dict:
@@ -94,7 +84,7 @@ class SimulationBridge:
         state = self._sim.control.get_state()
         entity_states: dict[str, Any] = {}
 
-        for entity in list(self._sim._sources) + list(self._sim._entities):
+        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
             name = getattr(entity, "name", type(entity).__name__)
             entity_states[name] = serialize_entity(entity)
 
@@ -138,6 +128,33 @@ class SimulationBridge:
             "new_edges": new_edges,
         }
 
+    def run_to(self, time_s: float) -> dict[str, Any]:
+        """Run the simulation until the given time, then return state."""
+        from happysimulator.core.control.breakpoints import TimeBreakpoint
+        from happysimulator.core.temporal import Instant
+
+        with self._lock:
+            self._new_events_buffer.clear()
+            self._new_edges_buffer.clear()
+
+        target = Instant.from_seconds(time_s)
+        self._sim.control.add_breakpoint(TimeBreakpoint(time=target, one_shot=True))
+        self._sim.control.resume()
+
+        state = self.get_state()
+
+        with self._lock:
+            new_events = [e.to_dict() for e in self._new_events_buffer]
+            new_edges = list(self._new_edges_buffer)
+            self._new_events_buffer.clear()
+            self._new_edges_buffer.clear()
+
+        return {
+            "state": state,
+            "new_events": new_events,
+            "new_edges": new_edges,
+        }
+
     def reset(self) -> dict[str, Any]:
         """Reset the simulation and return the initial state."""
         self._sim.control.reset()
@@ -156,3 +173,33 @@ class SimulationBridge:
         with self._lock:
             events = list(self._event_log)
         return [e.to_dict() for e in events[-last_n:]]
+
+    def get_timeseries(self, probe_name: str) -> dict[str, Any]:
+        """Return time series data for a named probe."""
+        from happysimulator.instrumentation.probe import Probe
+
+        for probe in self._sim._probes:
+            if isinstance(probe, Probe) and probe.name == probe_name:
+                samples = probe.data_sink.values
+                return {
+                    "name": probe.name,
+                    "metric": probe.metric,
+                    "target": probe.target.name,
+                    "times": [t for t, _ in samples],
+                    "values": [v for _, v in samples],
+                }
+        return {"name": probe_name, "metric": "", "target": "", "times": [], "values": []}
+
+    def list_probes(self) -> list[dict[str, str]]:
+        """Return metadata for all registered probes."""
+        from happysimulator.instrumentation.probe import Probe
+
+        result = []
+        for probe in self._sim._probes:
+            if isinstance(probe, Probe):
+                result.append({
+                    "name": probe.name,
+                    "metric": probe.metric,
+                    "target": probe.target.name,
+                })
+        return result

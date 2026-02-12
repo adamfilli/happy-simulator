@@ -26,6 +26,7 @@ class Node:
 class Edge:
     source: str
     target: str
+    kind: str = "data"  # "data" or "probe"
 
 
 @dataclass
@@ -36,15 +37,15 @@ class Topology:
     def to_dict(self) -> dict:
         return {
             "nodes": [{"id": n.id, "type": n.type, "category": n.category} for n in self.nodes],
-            "edges": [{"source": e.source, "target": e.target} for e in self.edges],
+            "edges": [{"source": e.source, "target": e.target, "kind": e.kind} for e in self.edges],
         }
 
-    def add_edge_if_new(self, source: str, target: str) -> bool:
+    def add_edge_if_new(self, source: str, target: str, kind: str = "data") -> bool:
         """Add an edge if it doesn't already exist. Returns True if added."""
         for e in self.edges:
             if e.source == source and e.target == target:
                 return False
-        self.edges.append(Edge(source=source, target=target))
+        self.edges.append(Edge(source=source, target=target, kind=kind))
         return True
 
 
@@ -69,6 +70,13 @@ def classify(entity: object) -> str:
         LatencyTracker = type(None)
         ThroughputTracker = type(None)
 
+    try:
+        from happysimulator.instrumentation.probe import Probe
+    except ImportError:
+        Probe = type(None)
+
+    if isinstance(entity, Probe):
+        return "probe"
     if isinstance(entity, Source):
         return "source"
     if isinstance(entity, (Sink, Counter, LatencyTracker, ThroughputTracker)):
@@ -88,7 +96,19 @@ _DOWNSTREAM_ATTRS = ["downstream", "targets", "target", "_downstream", "_target"
 
 
 def _find_downstream(entity: object) -> list[Entity]:
-    """Find downstream entities by scanning known attribute patterns."""
+    """Find downstream entities by scanning known attribute patterns.
+
+    Probes are excluded — their ``target`` is a monitoring relationship,
+    not a data-flow edge.
+    """
+    try:
+        from happysimulator.instrumentation.probe import Probe
+    except ImportError:
+        Probe = type(None)
+
+    if isinstance(entity, Probe):
+        return []  # handled separately with kind="probe"
+
     found: list[Entity] = []
     for attr_name in _DOWNSTREAM_ATTRS:
         val = getattr(entity, attr_name, None)
@@ -106,7 +126,7 @@ def discover(sim: "Simulation") -> Topology:
     topology = Topology()
     seen_names: set[str] = set()
 
-    all_entities = list(sim._sources) + list(sim._entities)
+    all_entities = list(sim._sources) + list(sim._entities) + list(sim._probes)
 
     for entity in all_entities:
         name = getattr(entity, "name", type(entity).__name__)
@@ -146,5 +166,16 @@ def discover(sim: "Simulation") -> Topology:
                     category=classify(target),
                 ))
             topology.add_edge_if_new(source.name, t_name)
+
+    # Probe -> target (monitoring edges)
+    try:
+        from happysimulator.instrumentation.probe import Probe
+    except ImportError:
+        Probe = type(None)
+
+    for probe in sim._probes:
+        if isinstance(probe, Probe):
+            t_name = getattr(probe.target, "name", type(probe.target).__name__)
+            topology.add_edge_if_new(probe.name, t_name, kind="probe")
 
     return topology

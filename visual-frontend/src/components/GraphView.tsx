@@ -23,6 +23,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   rate_limiter: "#f97316",
   router: "#a855f7",
   resource: "#a16207",
+  probe: "#06b6d4",
   other: "#6b7280",
 };
 
@@ -40,19 +41,40 @@ export default function GraphView() {
   // Build edges from topology
   const flowEdges: Edge[] = useMemo(() => {
     if (!topology) return [];
-    return topology.edges.map((e, i) => ({
-      id: `e-${e.source}-${e.target}-${i}`,
-      source: e.source,
-      target: e.target,
-      animated: false,
-      style: { stroke: "#4b5563", strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#4b5563", width: 16, height: 16 },
-    }));
+    return topology.edges.map((e, i) => {
+      const isProbe = e.kind === "probe";
+      return {
+        id: `e-${e.source}-${e.target}-${i}`,
+        source: e.source,
+        target: e.target,
+        sourceHandle: isProbe ? "bottom" : "right",
+        targetHandle: isProbe ? "top" : "left",
+        animated: false,
+        style: {
+          stroke: isProbe ? "#06b6d4" : "#4b5563",
+          strokeWidth: isProbe ? 1.5 : 2,
+          strokeDasharray: isProbe ? "6 4" : undefined,
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isProbe ? "#06b6d4" : "#4b5563",
+          width: 16,
+          height: 16,
+        },
+      };
+    });
   }, [topology]);
 
   // Run elkjs layout when topology changes
   useEffect(() => {
     if (!topology || topology.nodes.length === 0) return;
+
+    // Separate probe nodes/edges from the main data-flow graph
+    const probeNodeIds = new Set(
+      topology.nodes.filter((n) => n.category === "probe").map((n) => n.id)
+    );
+    const dataNodes = topology.nodes.filter((n) => !probeNodeIds.has(n.id));
+    const dataEdges = topology.edges.filter((e) => e.kind !== "probe" && !probeNodeIds.has(e.source));
 
     const graph = {
       id: "root",
@@ -62,12 +84,12 @@ export default function GraphView() {
         "elk.spacing.nodeNode": "60",
         "elk.layered.spacing.nodeNodeBetweenLayers": "100",
       },
-      children: topology.nodes.map((n) => ({
+      children: dataNodes.map((n) => ({
         id: n.id,
         width: 180,
         height: 80,
       })),
-      edges: topology.edges.map((e, i) => ({
+      edges: dataEdges.map((e, i) => ({
         id: `elk-${i}`,
         sources: [e.source],
         targets: [e.target],
@@ -75,14 +97,36 @@ export default function GraphView() {
     };
 
     elk.layout(graph).then((laid) => {
-      const rfNodes: Node[] = (laid.children ?? []).map((child) => {
-        const topoNode = topology.nodes.find((n) => n.id === child.id)!;
+      // Build position map from laid-out data nodes
+      const posMap = new Map<string, { x: number; y: number }>();
+      for (const child of laid.children ?? []) {
+        posMap.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
+      }
+
+      // Position probes below their target
+      const PROBE_Y_OFFSET = 130;
+      for (const probeId of probeNodeIds) {
+        const probeEdge = topology.edges.find((e) => e.source === probeId && e.kind === "probe");
+        if (probeEdge) {
+          const targetPos = posMap.get(probeEdge.target);
+          if (targetPos) {
+            posMap.set(probeId, { x: targetPos.x, y: targetPos.y + PROBE_Y_OFFSET });
+          } else {
+            posMap.set(probeId, { x: 0, y: PROBE_Y_OFFSET });
+          }
+        } else {
+          posMap.set(probeId, { x: 0, y: PROBE_Y_OFFSET });
+        }
+      }
+
+      const rfNodes: Node[] = topology.nodes.map((topoNode) => {
+        const pos = posMap.get(topoNode.id) ?? { x: 0, y: 0 };
         return {
-          id: child.id,
+          id: topoNode.id,
           type: "entity",
-          position: { x: child.x ?? 0, y: child.y ?? 0 },
+          position: { x: pos.x, y: pos.y },
           data: {
-            label: child.id,
+            label: topoNode.id,
             entityType: topoNode.type,
             category: topoNode.category,
             color: CATEGORY_COLORS[topoNode.category] || CATEGORY_COLORS.other,

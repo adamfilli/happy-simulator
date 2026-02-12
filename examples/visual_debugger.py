@@ -13,6 +13,8 @@ from happysimulator.core.event import Event
 from happysimulator.load.source import Source
 from happysimulator.components.common import Sink
 from happysimulator.components.queued_resource import QueuedResource
+from happysimulator.instrumentation.data import Data
+from happysimulator.instrumentation.probe import Probe
 from happysimulator.visual import serve
 
 
@@ -38,9 +40,13 @@ sink = Sink("Sink")
 server = Server("Server", downstream=sink, service_time=0.08)
 source = Source.constant(rate=10, target=server, event_type="Request")
 
+depth_data = Data()
+depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+
 sim = Simulation(
     sources=[source],
     entities=[server, sink],
+    probes=[depth_probe],
 )
 
 serve(sim)

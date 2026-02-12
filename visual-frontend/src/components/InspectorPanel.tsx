@@ -1,18 +1,55 @@
+import { useEffect, useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
+import TimeSeriesChart from "./TimeSeriesChart";
+
+interface TimeSeriesData {
+  name: string;
+  metric: string;
+  target: string;
+  times: number[];
+  values: number[];
+}
 
 export default function InspectorPanel() {
   const state = useSimStore((s) => s.state);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
   const topology = useSimStore((s) => s.topology);
+  const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
+  const lastFetchedRef = useRef<{ name: string; events: number } | null>(null);
+
+  const entityName = selectedEntity;
+  const entityData = entityName ? state?.entities[entityName] : null;
+  const nodeInfo = topology?.nodes.find((n) => n.id === entityName);
+  const isProbe = nodeInfo?.category === "probe";
+
+  // Fetch time series when a probe is selected or state updates
+  useEffect(() => {
+    if (!isProbe || !entityName || !state) {
+      setTsData(null);
+      lastFetchedRef.current = null;
+      return;
+    }
+
+    // Avoid redundant fetches if nothing changed
+    const key = { name: entityName, events: state.events_processed };
+    if (
+      lastFetchedRef.current &&
+      lastFetchedRef.current.name === key.name &&
+      lastFetchedRef.current.events === key.events
+    ) {
+      return;
+    }
+
+    lastFetchedRef.current = key;
+    fetch(`/api/timeseries?probe=${encodeURIComponent(entityName)}`)
+      .then((r) => r.json())
+      .then((data: TimeSeriesData) => setTsData(data));
+  }, [isProbe, entityName, state?.events_processed, state]);
 
   if (!state) return null;
 
-  const entityName = selectedEntity;
-  const entityData = entityName ? state.entities[entityName] : null;
-  const nodeInfo = topology?.nodes.find((n) => n.id === entityName);
-
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-y-auto">
       <div className="px-3 py-2 border-b border-gray-800">
         <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
           Inspector
@@ -37,6 +74,18 @@ export default function InspectorPanel() {
               </div>
             ))}
           </div>
+
+          {/* Time series chart for probes */}
+          {isProbe && tsData && tsData.times.length > 0 && (
+            <div className="border-t border-gray-800 pt-3">
+              <TimeSeriesChart
+                times={tsData.times}
+                values={tsData.values}
+                label={`${tsData.target}.${tsData.metric}`}
+                color="#3b82f6"
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="p-3 text-xs text-gray-500">

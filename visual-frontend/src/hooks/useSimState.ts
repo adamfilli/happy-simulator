@@ -5,6 +5,7 @@ import type {
   RecordedEvent,
   RecordedLog,
   TopologyEdge,
+  DashboardPanelConfig,
 } from "../types";
 
 interface SimStore {
@@ -16,6 +17,8 @@ interface SimStore {
   isPlaying: boolean;
   showInternal: boolean;
   selectedEntity: string | null;
+  dashboardPanels: DashboardPanelConfig[];
+  activeView: "graph" | "dashboard";
 
   setTopology: (t: Topology) => void;
   setState: (s: SimState) => void;
@@ -26,6 +29,10 @@ interface SimStore {
   setPlaying: (p: boolean) => void;
   toggleInternal: () => void;
   selectEntity: (name: string | null) => void;
+  addDashboardPanel: (panel: DashboardPanelConfig) => void;
+  removeDashboardPanel: (id: string) => void;
+  moveDashboardPanel: (id: string, x: number, y: number) => void;
+  setActiveView: (view: "graph" | "dashboard") => void;
   reset: () => void;
 }
 
@@ -41,6 +48,8 @@ export const useSimStore = create<SimStore>((set) => ({
   isPlaying: false,
   showInternal: false,
   selectedEntity: null,
+  dashboardPanels: [],
+  activeView: "graph",
 
   setTopology: (t) => set({ topology: t }),
   setState: (s) => set({ state: s }),
@@ -68,5 +77,16 @@ export const useSimStore = create<SimStore>((set) => ({
   setPlaying: (p) => set({ isPlaying: p }),
   toggleInternal: () => set((prev) => ({ showInternal: !prev.showInternal })),
   selectEntity: (name) => set({ selectedEntity: name }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null }),
+  addDashboardPanel: (panel) =>
+    set((prev) => ({ dashboardPanels: [...prev.dashboardPanels, panel] })),
+  removeDashboardPanel: (id) =>
+    set((prev) => ({ dashboardPanels: prev.dashboardPanels.filter((p) => p.id !== id) })),
+  moveDashboardPanel: (id, x, y) =>
+    set((prev) => ({
+      dashboardPanels: prev.dashboardPanels.map((p) =>
+        p.id === id ? { ...p, x, y } : p
+      ),
+    })),
+  setActiveView: (view) => set({ activeView: view }),
+  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [] }),
 }));

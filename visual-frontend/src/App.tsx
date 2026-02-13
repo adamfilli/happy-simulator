@@ -3,6 +3,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useSimStore } from "./hooks/useSimState";
 import { useWebSocket } from "./hooks/useWebSocket";
 import GraphView from "./components/GraphView";
+import DashboardView from "./components/DashboardView";
 import ControlBar from "./components/ControlBar";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
@@ -11,6 +12,8 @@ import type { SimState, Topology, StepResult } from "./types";
 
 export default function App() {
   const { setTopology, setState, addEvents, addLogs } = useSimStore();
+  const activeView = useSimStore((s) => s.activeView);
+  const setActiveView = useSimStore((s) => s.setActiveView);
   const { send } = useWebSocket();
   const [activeTab, setActiveTab] = useState<"inspector" | "events" | "logs">("inspector");
   const [panelWidth, setPanelWidth] = useState(320);
@@ -105,11 +108,41 @@ export default function App() {
         onRunToEvent={handleRunToEvent}
       />
       <div className="flex-1 flex overflow-hidden">
-        {/* Graph area */}
-        <div className="flex-1 relative">
-          <ReactFlowProvider>
-            <GraphView />
-          </ReactFlowProvider>
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          {/* View toggle tabs */}
+          <div className="flex border-b border-gray-800 bg-gray-900 shrink-0">
+            <button
+              onClick={() => setActiveView("graph")}
+              className={`px-4 py-1.5 text-xs font-medium ${
+                activeView === "graph"
+                  ? "text-white border-b-2 border-blue-500"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Graph
+            </button>
+            <button
+              onClick={() => setActiveView("dashboard")}
+              className={`px-4 py-1.5 text-xs font-medium ${
+                activeView === "dashboard"
+                  ? "text-white border-b-2 border-blue-500"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Dashboard
+            </button>
+          </div>
+          {/* View content */}
+          <div className="flex-1 relative overflow-hidden">
+            {activeView === "graph" ? (
+              <ReactFlowProvider>
+                <GraphView />
+              </ReactFlowProvider>
+            ) : (
+              <DashboardView />
+            )}
+          </div>
         </div>
 
         {/* Resize handle */}

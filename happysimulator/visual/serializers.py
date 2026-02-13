@@ -40,11 +40,19 @@ def serialize_entity(entity: object) -> dict[str, Any]:
         Resource = type(None)
 
     if isinstance(entity, QueuedResource):
-        return {
+        result = {
             "depth": entity.depth,
             "accepted": entity.stats_accepted,
             "dropped": entity.stats_dropped,
         }
+        # Merge subclass-specific attributes (e.g. _in_flight, service_time)
+        for key, val in getattr(entity, "__dict__", {}).items():
+            if key.startswith("__") or key in ("name", "_queue", "_driver", "_worker"):
+                continue
+            label = key.lstrip("_")
+            if label not in result and isinstance(val, (int, float, str, bool)):
+                result[label] = val
+        return result
     if isinstance(entity, Sink):
         stats = entity.latency_stats()
         return {

@@ -61,16 +61,16 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
         return JSONResponse(bridge.list_probes())
 
     @app.get("/api/timeseries")
-    def get_timeseries(probe: str) -> JSONResponse:
-        return JSONResponse(bridge.get_timeseries(probe))
+    def get_timeseries(probe: str, start_s: float | None = None, end_s: float | None = None) -> JSONResponse:
+        return JSONResponse(bridge.get_timeseries(probe, start_s=start_s, end_s=end_s))
 
     @app.get("/api/charts")
     def get_charts() -> JSONResponse:
         return JSONResponse(bridge.get_chart_configs())
 
     @app.get("/api/chart_data")
-    def get_chart_data(chart_id: str) -> JSONResponse:
-        return JSONResponse(bridge.get_chart_data(chart_id))
+    def get_chart_data(chart_id: str, start_s: float | None = None, end_s: float | None = None) -> JSONResponse:
+        return JSONResponse(bridge.get_chart_data(chart_id, start_s=start_s, end_s=end_s))
 
     # --- WebSocket for play mode ---
 

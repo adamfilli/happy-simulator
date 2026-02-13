@@ -19,6 +19,7 @@ interface SimStore {
   selectedEntity: string | null;
   dashboardPanels: DashboardPanelConfig[];
   activeView: "graph" | "dashboard";
+  dashboardTimeRange: { start: number | null; end: number | null };
 
   setTopology: (t: Topology) => void;
   setState: (s: SimState) => void;
@@ -33,6 +34,7 @@ interface SimStore {
   removeDashboardPanel: (id: string) => void;
   updateDashboardLayout: (layout: Array<{ i: string; x: number; y: number; w: number; h: number }>) => void;
   setActiveView: (view: "graph" | "dashboard") => void;
+  setDashboardTimeRange: (range: { start: number | null; end: number | null }) => void;
   reset: () => void;
 }
 
@@ -50,6 +52,7 @@ export const useSimStore = create<SimStore>((set) => ({
   selectedEntity: null,
   dashboardPanels: [],
   activeView: "graph",
+  dashboardTimeRange: { start: null, end: null },
 
   setTopology: (t) => set({ topology: t }),
   setState: (s) => set({ state: s }),
@@ -89,5 +92,6 @@ export const useSimStore = create<SimStore>((set) => ({
       }),
     })),
   setActiveView: (view) => set({ activeView: view }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [] }),
+  setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
+  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [], dashboardTimeRange: { start: null, end: null } }),
 }));

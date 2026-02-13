@@ -289,19 +289,23 @@ class SimulationBridge:
             events = list(self._event_log)
         return [e.to_dict() for e in events[-last_n:]]
 
-    def get_timeseries(self, probe_name: str) -> dict[str, Any]:
+    def get_timeseries(self, probe_name: str, start_s: float | None = None, end_s: float | None = None) -> dict[str, Any]:
         """Return time series data for a named probe."""
         from happysimulator.instrumentation.probe import Probe
 
         for probe in self._sim._probes:
             if isinstance(probe, Probe) and probe.name == probe_name:
-                samples = probe.data_sink.values
+                data = probe.data_sink
+                if start_s is not None or end_s is not None:
+                    s = start_s if start_s is not None else 0.0
+                    e = end_s if end_s is not None else float("inf")
+                    data = data.between(s, e)
                 return {
                     "name": probe.name,
                     "metric": probe.metric,
                     "target": probe.target.name,
-                    "times": [t for t, _ in samples],
-                    "values": [v for _, v in samples],
+                    "times": data.times(),
+                    "values": data.raw_values(),
                 }
         return {"name": probe_name, "metric": "", "target": "", "times": [], "values": []}
 
@@ -323,11 +327,11 @@ class SimulationBridge:
         """Return display config for all predefined charts."""
         return [chart.to_config() for chart in self._charts]
 
-    def get_chart_data(self, chart_id: str) -> dict[str, Any]:
+    def get_chart_data(self, chart_id: str, start_s: float | None = None, end_s: float | None = None) -> dict[str, Any]:
         """Return time series data for a predefined chart by ID."""
         for chart in self._charts:
             if chart.chart_id == chart_id:
-                result = chart.get_data()
+                result = chart.get_data(start_s=start_s, end_s=end_s)
                 result["chart_id"] = chart_id
                 result["config"] = chart.to_config()
                 return result

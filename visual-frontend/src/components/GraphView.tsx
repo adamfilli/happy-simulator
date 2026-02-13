@@ -103,19 +103,19 @@ export default function GraphView() {
         posMap.set(child.id, { x: child.x ?? 0, y: child.y ?? 0 });
       }
 
-      // Position probes below their target
+      // Position probes above their target so the bottom→top arrow flows downward
       const PROBE_Y_OFFSET = 130;
       for (const probeId of probeNodeIds) {
         const probeEdge = topology.edges.find((e) => e.source === probeId && e.kind === "probe");
         if (probeEdge) {
           const targetPos = posMap.get(probeEdge.target);
           if (targetPos) {
-            posMap.set(probeId, { x: targetPos.x, y: targetPos.y + PROBE_Y_OFFSET });
+            posMap.set(probeId, { x: targetPos.x, y: targetPos.y - PROBE_Y_OFFSET });
           } else {
-            posMap.set(probeId, { x: 0, y: PROBE_Y_OFFSET });
+            posMap.set(probeId, { x: 0, y: -PROBE_Y_OFFSET });
           }
         } else {
-          posMap.set(probeId, { x: 0, y: PROBE_Y_OFFSET });
+          posMap.set(probeId, { x: 0, y: -PROBE_Y_OFFSET });
         }
       }
 

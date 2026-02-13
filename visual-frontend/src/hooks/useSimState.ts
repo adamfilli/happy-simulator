@@ -31,7 +31,7 @@ interface SimStore {
   selectEntity: (name: string | null) => void;
   addDashboardPanel: (panel: DashboardPanelConfig) => void;
   removeDashboardPanel: (id: string) => void;
-  moveDashboardPanel: (id: string, x: number, y: number) => void;
+  updateDashboardLayout: (layout: Array<{ i: string; x: number; y: number; w: number; h: number }>) => void;
   setActiveView: (view: "graph" | "dashboard") => void;
   reset: () => void;
 }
@@ -81,11 +81,12 @@ export const useSimStore = create<SimStore>((set) => ({
     set((prev) => ({ dashboardPanels: [...prev.dashboardPanels, panel] })),
   removeDashboardPanel: (id) =>
     set((prev) => ({ dashboardPanels: prev.dashboardPanels.filter((p) => p.id !== id) })),
-  moveDashboardPanel: (id, x, y) =>
+  updateDashboardLayout: (layout) =>
     set((prev) => ({
-      dashboardPanels: prev.dashboardPanels.map((p) =>
-        p.id === id ? { ...p, x, y } : p
-      ),
+      dashboardPanels: prev.dashboardPanels.map((p) => {
+        const item = layout.find((l) => l.i === p.id);
+        return item ? { ...p, x: item.x, y: item.y, w: item.w, h: item.h } : p;
+      }),
     })),
   setActiveView: (view) => set({ activeView: view }),
   reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [] }),

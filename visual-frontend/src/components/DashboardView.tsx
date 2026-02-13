@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { GridLayout, useContainerWidth, verticalCompactor, type Layout } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
 import { useSimStore } from "../hooks/useSimState";
 import DashboardPanel from "./DashboardPanel";
 
@@ -11,8 +13,11 @@ interface ProbeInfo {
 export default function DashboardView() {
   const panels = useSimStore((s) => s.dashboardPanels);
   const addDashboardPanel = useSimStore((s) => s.addDashboardPanel);
+  const updateDashboardLayout = useSimStore((s) => s.updateDashboardLayout);
+  const removeDashboardPanel = useSimStore((s) => s.removeDashboardPanel);
   const [showDropdown, setShowDropdown] = useState(false);
   const [probes, setProbes] = useState<ProbeInfo[]>([]);
+  const { width, containerRef, mounted } = useContainerWidth();
 
   useEffect(() => {
     if (!showDropdown) return;
@@ -23,47 +28,77 @@ export default function DashboardView() {
   }, [showDropdown]);
 
   const handleAddProbe = (probe: ProbeInfo) => {
-    // Avoid duplicates
     if (panels.some((p) => p.probeName === probe.name)) {
       setShowDropdown(false);
       return;
     }
-    const stagger = panels.length * 30;
+    const col = panels.length % 3;
+    const row = Math.floor(panels.length / 3);
     addDashboardPanel({
       id: crypto.randomUUID(),
       probeName: probe.name,
       label: `${probe.target}.${probe.metric}`,
-      x: 20 + stagger,
-      y: 20 + stagger,
+      x: col * 4,
+      y: row * 4,
+      w: 4,
+      h: 4,
     });
     setShowDropdown(false);
   };
 
-  return (
-    <div className="w-full h-full relative overflow-auto bg-gray-950">
-      {/* Panels */}
-      {panels.map((panel) => (
-        <DashboardPanel
-          key={panel.id}
-          id={panel.id}
-          probeName={panel.probeName}
-          label={panel.label}
-          x={panel.x}
-          y={panel.y}
-        />
-      ))}
+  const layout: Layout = panels.map((p) => ({
+    i: p.id,
+    x: p.x,
+    y: p.y,
+    w: p.w,
+    h: p.h,
+    minW: 2,
+    minH: 2,
+  }));
 
-      {/* Empty state */}
-      {panels.length === 0 && (
+  const onLayoutChange = (newLayout: Layout) => {
+    updateDashboardLayout(newLayout.map((item) => ({
+      i: item.i,
+      x: item.x,
+      y: item.y,
+      w: item.w,
+      h: item.h,
+    })));
+  };
+
+  return (
+    <div ref={containerRef} className="w-full h-full relative overflow-auto bg-gray-950">
+      {panels.length > 0 && mounted ? (
+        <GridLayout
+          width={width}
+          layout={layout}
+          gridConfig={{ cols: 12, rowHeight: 50, margin: [12, 12] as const }}
+          dragConfig={{ handle: ".drag-handle" }}
+          compactor={verticalCompactor}
+          onLayoutChange={onLayoutChange}
+          autoSize
+        >
+          {panels.map((panel) => (
+            <div key={panel.id}>
+              <DashboardPanel
+                id={panel.id}
+                probeName={panel.probeName}
+                label={panel.label}
+                onClose={() => removeDashboardPanel(panel.id)}
+              />
+            </div>
+          ))}
+        </GridLayout>
+      ) : panels.length === 0 ? (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-sm text-gray-600">
             Add charts from the button below, or pin probes from the Inspector.
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* Add Chart button */}
-      <div className="absolute bottom-4 right-4">
+      <div className="absolute bottom-4 right-4 z-50">
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}

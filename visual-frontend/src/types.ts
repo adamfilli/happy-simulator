@@ -62,8 +62,11 @@ export interface DashboardPanelConfig {
   id: string;
   probeName: string;
   label: string;
+  // react-grid-layout grid units
   x: number;
   y: number;
+  w: number;
+  h: number;
 }
 
 export type WSMessage =

@@ -264,6 +264,21 @@ from happysimulator.components.crdt import (
     CRDTStoreStats,
 )
 
+# Industrial simulation components
+from happysimulator.components.industrial import (
+    BalkingQueue,
+    RenegingQueuedResource,
+    ConveyorBelt,
+    InspectionStation,
+    BatchProcessor,
+    Shift,
+    ShiftSchedule,
+    ShiftedServer,
+    BreakdownScheduler,
+    InventoryBuffer,
+    AppointmentScheduler,
+)
+
 # Fault injection
 from happysimulator.faults import FaultSchedule
 
@@ -509,6 +524,18 @@ __all__ = [
     "ORSet",
     "CRDTStore",
     "CRDTStoreStats",
+    # Industrial simulation components
+    "BalkingQueue",
+    "RenegingQueuedResource",
+    "ConveyorBelt",
+    "InspectionStation",
+    "BatchProcessor",
+    "Shift",
+    "ShiftSchedule",
+    "ShiftedServer",
+    "BreakdownScheduler",
+    "InventoryBuffer",
+    "AppointmentScheduler",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

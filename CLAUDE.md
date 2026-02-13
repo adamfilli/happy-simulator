@@ -163,6 +163,33 @@ inductor = Inductor(name="Smoother", downstream=server, time_constant=1.0, queue
 inductor.stats / inductor.estimated_rate / inductor.queue_depth
 ```
 
+### Industrial Components
+
+Package: `happysimulator.components.industrial`
+
+```python
+from happysimulator.components.industrial import (
+    BalkingQueue, RenegingQueuedResource,
+    ConveyorBelt, InspectionStation, BatchProcessor,
+    ShiftSchedule, ShiftedServer, Shift,
+    BreakdownScheduler, InventoryBuffer, AppointmentScheduler,
+)
+```
+
+| Component | Base | Description |
+|-----------|------|-------------|
+| `BalkingQueue` | `QueuePolicy` | Wraps any queue policy; rejects arrivals when depth >= threshold. `BalkingQueue(inner, balk_threshold=5, balk_probability=1.0)` |
+| `RenegingQueuedResource` | `QueuedResource` | Abstract; checks `(now - created_at) > patience` on dequeue, routes expired to `reneged_target`. Subclass implements `_handle_served_event()` |
+| `ConveyorBelt` | `Entity` | Fixed transit time between stations. `ConveyorBelt(name, transit_time, downstream, capacity=None)` |
+| `InspectionStation` | `QueuedResource` | Probabilistic pass/fail routing. `InspectionStation(name, inspection_time, pass_rate, pass_target, fail_target)` |
+| `BatchProcessor` | `Entity` | Accumulates items until `batch_size` or `timeout_s`, processes as batch. `BatchProcessor(name, batch_size, process_time, downstream, timeout_s=None)` |
+| `ShiftSchedule` + `ShiftedServer` | `QueuedResource` | Time-varying capacity via `Shift(start_s, end_s, capacity)` schedule |
+| `BreakdownScheduler` | `Entity` | Random UP/DOWN cycles on target; sets `target._broken`. `BreakdownScheduler(name, target, mean_time_to_failure, mean_repair_time)` |
+| `InventoryBuffer` | `Entity` | `(s, Q)` reorder policy. `InventoryBuffer(name, initial_stock, reorder_point, reorder_quantity, supplier, lead_time)` |
+| `AppointmentScheduler` | `Entity` | Fixed-time arrivals with `no_show_rate`. `scheduler.start_events()` returns initial events |
+
+**Examples** (10 industrial simulations in `examples/`): `bank_branch.py`, `manufacturing_line.py`, `hospital_er.py`, `call_center.py`, `grocery_store.py`, `car_wash.py`, `restaurant.py`, `supply_chain.py`, `warehouse_fulfillment.py`, `parking_lot.py`
+
 ### Network Topology & Partitions
 
 ```python
@@ -300,8 +327,11 @@ happysimulator/
 │   └── control/    # SimulationControl, breakpoints, state
 ├── load/           # Source, profiles, EventProvider, ArrivalTimeProvider
 ├── components/     # queue, queued_resource, common (Sink/Counter), random_router,
-│                   # rate_limiter/, network/, server/, client/, resilience/,
-│                   # messaging/, datastore/, sync/, queue_policies/
+│   │               # rate_limiter/, network/, server/, client/, resilience/,
+│   │               # messaging/, datastore/, sync/, queue_policies/
+│   └── industrial/ # BalkingQueue, RenegingQueuedResource, ConveyorBelt,
+│                   # InspectionStation, BatchProcessor, ShiftSchedule,
+│                   # BreakdownScheduler, InventoryBuffer, AppointmentScheduler
 ├── distributions/  # ConstantLatency, ExponentialLatency, ZipfDistribution, Uniform
 ├── instrumentation/# Data, LatencyTracker, ThroughputTracker, Probe
 └── utils/

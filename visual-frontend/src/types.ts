@@ -58,6 +58,14 @@ export interface StepResult {
   new_logs: RecordedLog[];
 }
 
+export interface DashboardPanelConfig {
+  id: string;
+  probeName: string;
+  label: string;
+  x: number;
+  y: number;
+}
+
 export type WSMessage =
   | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[] }
   | { type: "simulation_complete" }

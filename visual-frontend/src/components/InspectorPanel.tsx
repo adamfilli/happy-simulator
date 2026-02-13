@@ -14,6 +14,9 @@ export default function InspectorPanel() {
   const state = useSimStore((s) => s.state);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
   const topology = useSimStore((s) => s.topology);
+  const dashboardPanels = useSimStore((s) => s.dashboardPanels);
+  const addDashboardPanel = useSimStore((s) => s.addDashboardPanel);
+  const setActiveView = useSimStore((s) => s.setActiveView);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
   const lastFetchedRef = useRef<{ name: string; events: number } | null>(null);
 
@@ -84,6 +87,23 @@ export default function InspectorPanel() {
                 label={`${tsData.target}.${tsData.metric}`}
                 color="#3b82f6"
               />
+              {!dashboardPanels.some((p) => p.probeName === entityName) && (
+                <button
+                  onClick={() => {
+                    addDashboardPanel({
+                      id: crypto.randomUUID(),
+                      probeName: entityName!,
+                      label: `${tsData.target}.${tsData.metric}`,
+                      x: 20 + dashboardPanels.length * 30,
+                      y: 20 + dashboardPanels.length * 30,
+                    });
+                    setActiveView("dashboard");
+                  }}
+                  className="mt-2 w-full px-2 py-1 text-xs text-blue-400 hover:text-blue-300 hover:bg-gray-800 rounded border border-gray-700"
+                >
+                  + Dashboard
+                </button>
+              )}
             </div>
           )}
         </div>

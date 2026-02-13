@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 
 interface Props {
   times: number[];
@@ -9,27 +9,44 @@ interface Props {
 
 export default function TimeSeriesChart({ times, values, label, color = "#3b82f6" }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
+  // Observe container size changes
   useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        setSize({ w: width, h: height });
+      }
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
+
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || times.length === 0) return;
+    if (!canvas || !size || times.length === 0) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    canvas.width = size.w * dpr;
+    canvas.height = size.h * dpr;
     ctx.scale(dpr, dpr);
 
-    const w = rect.width;
-    const h = rect.height;
+    const w = size.w;
+    const h = size.h;
     const pad = { top: 8, right: 12, bottom: 24, left: 40 };
     const plotW = w - pad.left - pad.right;
     const plotH = h - pad.top - pad.bottom;
 
-    // Clear
     ctx.clearRect(0, 0, w, h);
 
     // Compute ranges
@@ -55,7 +72,6 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
       ctx.lineTo(w - pad.right, y);
       ctx.stroke();
 
-      // Y-axis labels
       ctx.fillStyle = "#6b7280";
       ctx.font = "10px monospace";
       ctx.textAlign = "right";
@@ -92,18 +108,23 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
     ctx.closePath();
     ctx.fillStyle = color + "18";
     ctx.fill();
-  }, [times, values, color]);
+  }, [times, values, color, size]);
+
+  useEffect(() => {
+    draw();
+  }, [draw]);
 
   return (
-    <div className="flex flex-col">
-      <span className="text-[10px] text-gray-500 uppercase tracking-wide px-1 mb-1">
+    <div className="flex flex-col h-full min-h-0">
+      <span className="text-[10px] text-gray-500 uppercase tracking-wide px-1 mb-1 shrink-0">
         {label}
       </span>
-      <canvas
-        ref={canvasRef}
-        className="w-full"
-        style={{ height: 140 }}
-      />
+      <div ref={containerRef} className="flex-1 min-h-0">
+        <canvas
+          ref={canvasRef}
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
     </div>
   );
 }

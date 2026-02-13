@@ -39,7 +39,9 @@
       "Bash(powershell -Command:*)",
       "Bash(npm run build:*)",
       "Bash(gh pr list:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)"
     ]
   },
   "hooks": {

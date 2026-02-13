@@ -94,8 +94,10 @@ export default function InspectorPanel() {
                       id: crypto.randomUUID(),
                       probeName: entityName!,
                       label: `${tsData.target}.${tsData.metric}`,
-                      x: 20 + dashboardPanels.length * 30,
-                      y: 20 + dashboardPanels.length * 30,
+                      x: (dashboardPanels.length % 3) * 4,
+                      y: Math.floor(dashboardPanels.length / 3) * 4,
+                      w: 4,
+                      h: 4,
                     });
                     setActiveView("dashboard");
                   }}

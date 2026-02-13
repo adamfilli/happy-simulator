@@ -61,6 +61,7 @@ class Server(QueuedResource):
         service_time: LatencyDistribution | None = None,
         queue_policy: QueuePolicy | None = None,
         queue_capacity: int | None = None,
+        downstream: 'Entity | None' = None,
     ):
         """Initialize the server.
 
@@ -71,6 +72,9 @@ class Server(QueuedResource):
             service_time: Service time distribution (default 10ms constant).
             queue_policy: Queue ordering policy (default FIFO).
             queue_capacity: Maximum queue size (default unlimited).
+            downstream: Optional entity to forward completed requests to.
+                When set, completed events are automatically sent to this entity
+                with the original context preserved.
         """
         # Create queue policy with capacity if specified
         if queue_policy is None:
@@ -93,6 +97,7 @@ class Server(QueuedResource):
             self._concurrency_model = concurrency
 
         self._service_time = service_time or ConstantLatency(0.01)
+        self._downstream = downstream
 
         # Statistics
         self.stats = ServerStats()
@@ -106,6 +111,15 @@ class Server(QueuedResource):
             self._concurrency_model,
             self._service_time,
         )
+
+    @property
+    def downstream(self) -> 'Entity | None':
+        """Optional downstream entity for event forwarding."""
+        return self._downstream
+
+    @downstream.setter
+    def downstream(self, target: 'Entity | None') -> None:
+        self._downstream = target
 
     @property
     def concurrency_model(self) -> ConcurrencyModel:
@@ -231,6 +245,8 @@ class Server(QueuedResource):
             self._concurrency_model.limit,
         )
 
+        if self._downstream is not None:
+            return [self.forward(event, self._downstream)]
         return None
 
     def get_service_time_percentile(self, percentile: float) -> float:

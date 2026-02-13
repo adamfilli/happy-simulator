@@ -20,6 +20,7 @@ class Node:
     id: str
     type: str
     category: str
+    profile: dict | None = None  # {times: [...], values: [...]} for sources
 
 
 @dataclass
@@ -36,7 +37,13 @@ class Topology:
 
     def to_dict(self) -> dict:
         return {
-            "nodes": [{"id": n.id, "type": n.type, "category": n.category} for n in self.nodes],
+            "nodes": [
+                {
+                    "id": n.id, "type": n.type, "category": n.category,
+                    **({"profile": n.profile} if n.profile else {}),
+                }
+                for n in self.nodes
+            ],
             "edges": [{"source": e.source, "target": e.target, "kind": e.kind} for e in self.edges],
         }
 
@@ -121,10 +128,37 @@ def _find_downstream(entity: object) -> list[Entity]:
     return found
 
 
+def _sample_profile(source: object, end_s: float, num_points: int = 200) -> dict | None:
+    """Sample a Source's rate profile over [0, end_s]."""
+    from happysimulator.core.temporal import Instant
+
+    provider = getattr(source, "_time_provider", None)
+    if provider is None:
+        return None
+    profile = getattr(provider, "profile", None)
+    if profile is None:
+        return None
+
+    step = end_s / num_points
+    times: list[float] = []
+    values: list[float] = []
+    for i in range(num_points + 1):
+        t = i * step
+        times.append(round(t, 6))
+        values.append(profile.get_rate(Instant.from_seconds(t)))
+    return {"times": times, "values": values}
+
+
 def discover(sim: "Simulation") -> Topology:
     """Build the initial topology graph from a simulation's entities and sources."""
+    from happysimulator.load.source import Source as SourceCls
+
     topology = Topology()
     seen_names: set[str] = set()
+
+    end_s = sim._end_time.to_seconds()
+    if end_s == float("inf"):
+        end_s = 60.0
 
     all_entities = list(sim._sources) + list(sim._entities) + list(sim._probes)
 
@@ -134,10 +168,15 @@ def discover(sim: "Simulation") -> Topology:
             continue
         seen_names.add(name)
 
+        profile = None
+        if isinstance(entity, SourceCls):
+            profile = _sample_profile(entity, end_s)
+
         topology.nodes.append(Node(
             id=name,
             type=type(entity).__name__,
             category=classify(entity),
+            profile=profile,
         ))
 
         for downstream in _find_downstream(entity):

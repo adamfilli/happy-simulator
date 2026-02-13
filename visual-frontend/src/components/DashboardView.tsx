@@ -17,9 +17,14 @@ export default function DashboardView() {
   const updateDashboardLayout = useSimStore((s) => s.updateDashboardLayout);
   const removeDashboardPanel = useSimStore((s) => s.removeDashboardPanel);
   const setActiveView = useSimStore((s) => s.setActiveView);
+  const timeRange = useSimStore((s) => s.dashboardTimeRange);
+  const setTimeRange = useSimStore((s) => s.setDashboardTimeRange);
+  const simTime = useSimStore((s) => s.state?.time_s ?? 0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [probes, setProbes] = useState<ProbeInfo[]>([]);
   const [chartsLoaded, setChartsLoaded] = useState(false);
+  const [startInput, setStartInput] = useState("");
+  const [endInput, setEndInput] = useState("");
   const { width, containerRef, mounted } = useContainerWidth();
 
   // Auto-load predefined charts on first mount
@@ -103,8 +108,69 @@ export default function DashboardView() {
     })));
   };
 
+  const applyTimeRange = () => {
+    setTimeRange({
+      start: startInput ? parseFloat(startInput) : null,
+      end: endInput ? parseFloat(endInput) : null,
+    });
+  };
+
+  const resetTimeRange = () => {
+    setStartInput("");
+    setEndInput("");
+    setTimeRange({ start: null, end: null });
+  };
+
+  const hasTimeFilter = timeRange.start != null || timeRange.end != null;
+
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-auto bg-gray-950">
+    <div ref={containerRef} className="w-full h-full relative overflow-auto bg-gray-950 flex flex-col">
+      {/* Time range toolbar */}
+      {panels.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 border-b border-gray-800 shrink-0 z-10">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wide">Time Range</span>
+          <input
+            type="number"
+            placeholder="Start (s)"
+            value={startInput}
+            onChange={(e) => setStartInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && applyTimeRange()}
+            step="any"
+            className="w-20 px-1.5 py-0.5 text-xs bg-gray-800 border border-gray-700 rounded text-gray-300 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+          <span className="text-gray-600 text-xs">&ndash;</span>
+          <input
+            type="number"
+            placeholder="End (s)"
+            value={endInput}
+            onChange={(e) => setEndInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && applyTimeRange()}
+            step="any"
+            className="w-20 px-1.5 py-0.5 text-xs bg-gray-800 border border-gray-700 rounded text-gray-300 placeholder-gray-600 focus:border-blue-500 focus:outline-none"
+          />
+          <button
+            onClick={applyTimeRange}
+            className="px-2 py-0.5 text-xs bg-blue-600 hover:bg-blue-500 text-white rounded"
+          >
+            Apply
+          </button>
+          {hasTimeFilter && (
+            <button
+              onClick={resetTimeRange}
+              className="px-2 py-0.5 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded"
+            >
+              All
+            </button>
+          )}
+          <span className="text-[10px] text-gray-600 ml-1">
+            sim: {simTime.toFixed(1)}s
+            {hasTimeFilter && ` | showing ${timeRange.start ?? 0}s – ${timeRange.end ?? simTime.toFixed(1)}s`}
+          </span>
+        </div>
+      )}
+
+      {/* Grid content */}
+      <div className="flex-1 relative overflow-auto">
       {panels.length > 0 && mounted ? (
         <GridLayout
           width={width}
@@ -134,6 +200,8 @@ export default function DashboardView() {
           </span>
         </div>
       ) : null}
+
+      </div>
 
       {/* Add Chart button */}
       <div className="absolute bottom-4 right-4 z-50">

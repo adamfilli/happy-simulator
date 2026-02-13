@@ -74,31 +74,41 @@ class Chart:
             "y_max": self.y_max,
         }
 
-    def get_data(self) -> dict[str, Any]:
-        """Read from the Data object and apply the transform."""
+    def get_data(self, start_s: float | None = None, end_s: float | None = None) -> dict[str, Any]:
+        """Read from the Data object and apply the transform.
+
+        Args:
+            start_s: Optional start time filter (inclusive).
+            end_s: Optional end time filter (exclusive).
+        """
+        data = self.data
+        if start_s is not None or end_s is not None:
+            s = start_s if start_s is not None else 0.0
+            e = end_s if end_s is not None else float("inf")
+            data = data.between(s, e)
+
         if self.transform == "raw":
-            return {"times": self.data.times(), "values": self.data.raw_values()}
+            return {"times": data.times(), "values": data.raw_values()}
 
         if self.transform == "rate":
-            rate_data = self.data.rate(self.window_s)
+            rate_data = data.rate(self.window_s)
             return {"times": rate_data.times(), "values": rate_data.raw_values()}
 
         if self.transform == "p999":
-            bucketed = self.data.bucket(self.window_s)
+            bucketed = data.bucket(self.window_s)
             times = bucketed.times()
-            # p999 not pre-computed — compute per-bucket manually
             from happysimulator.instrumentation.data import _percentile_sorted
             from collections import defaultdict
             import math
 
-            buckets: dict[int, list[float]] = defaultdict(list)
-            for t, v in self.data.values:
+            buckets_map: dict[int, list[float]] = defaultdict(list)
+            for t, v in data.values:
                 idx = int(math.floor(t / self.window_s))
-                buckets[idx].append(float(v))
+                buckets_map[idx].append(float(v))
 
             values = []
-            for key in sorted(buckets.keys()):
-                vals = sorted(buckets[key])
+            for key in sorted(buckets_map.keys()):
+                vals = sorted(buckets_map[key])
                 values.append(_percentile_sorted(vals, 0.999))
             return {"times": times, "values": values}
 
@@ -106,7 +116,7 @@ class Chart:
         if self.transform not in TRANSFORM_MAP:
             return {"times": [], "values": []}
 
-        bucketed = self.data.bucket(self.window_s)
+        bucketed = data.bucket(self.window_s)
         times = bucketed.times()
         method_name = TRANSFORM_MAP[self.transform]
         values = getattr(bucketed, method_name)()

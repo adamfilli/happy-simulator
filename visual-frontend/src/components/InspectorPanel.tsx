@@ -24,6 +24,7 @@ export default function InspectorPanel() {
   const entityData = entityName ? state?.entities[entityName] : null;
   const nodeInfo = topology?.nodes.find((n) => n.id === entityName);
   const isProbe = nodeInfo?.category === "probe";
+  const sourceProfile = nodeInfo?.profile;
 
   // Fetch time series when a probe is selected or state updates
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function InspectorPanel() {
       .then((r) => r.json())
       .then((data: TimeSeriesData) => setTsData(data));
   }, [isProbe, entityName, state?.events_processed, state]);
+
 
   if (!state) return null;
 
@@ -106,6 +108,21 @@ export default function InspectorPanel() {
                   + Dashboard
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Load profile chart for sources */}
+          {sourceProfile && sourceProfile.times.length > 0 && (
+            <div className="border-t border-gray-800 pt-3">
+              <div className="text-xs font-semibold text-gray-400 mb-1">Load Profile</div>
+              <TimeSeriesChart
+                times={sourceProfile.times}
+                values={sourceProfile.values}
+                label="Rate (req/s)"
+                color="#22c55e"
+                yLabel="req/s"
+                xLabel="Time (s)"
+              />
             </div>
           )}
         </div>

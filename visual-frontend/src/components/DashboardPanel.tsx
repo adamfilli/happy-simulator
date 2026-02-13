@@ -18,23 +18,31 @@ interface Props {
 
 export default function DashboardPanel({ probeName, chartConfig, label, onClose }: Props) {
   const eventsProcessed = useSimStore((s) => s.state?.events_processed);
+  const timeRange = useSimStore((s) => s.dashboardTimeRange);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
-  const lastFetchedRef = useRef<number | null>(null);
+  const lastFetchedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (eventsProcessed === undefined) return;
-    if (lastFetchedRef.current === eventsProcessed) return;
-    lastFetchedRef.current = eventsProcessed;
+    const key = `${eventsProcessed}:${timeRange.start}:${timeRange.end}`;
+    if (lastFetchedRef.current === key) return;
+    lastFetchedRef.current = key;
 
-    const url = chartConfig
-      ? `/api/chart_data?chart_id=${encodeURIComponent(chartConfig.chart_id)}`
-      : `/api/timeseries?probe=${encodeURIComponent(probeName!)}`;
+    const params = new URLSearchParams();
+    if (chartConfig) {
+      params.set("chart_id", chartConfig.chart_id);
+    } else {
+      params.set("probe", probeName!);
+    }
+    if (timeRange.start != null) params.set("start_s", String(timeRange.start));
+    if (timeRange.end != null) params.set("end_s", String(timeRange.end));
 
-    fetch(url)
+    const endpoint = chartConfig ? "/api/chart_data" : "/api/timeseries";
+    fetch(`${endpoint}?${params}`)
       .then((r) => r.json())
       .then((data) => setTsData({ times: data.times, values: data.values }))
       .catch(() => {});
-  }, [probeName, chartConfig, eventsProcessed]);
+  }, [probeName, chartConfig, eventsProcessed, timeRange]);
 
   const chartColor = chartConfig?.color ?? "#3b82f6";
 

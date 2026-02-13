@@ -2,6 +2,7 @@ export interface TopologyNode {
   id: string;
   type: string;
   category: string;
+  profile?: { times: number[]; values: number[] };
 }
 
 export interface TopologyEdge {

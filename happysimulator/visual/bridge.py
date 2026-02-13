@@ -29,9 +29,10 @@ class RecordedEvent:
     source_name: str | None
     event_id: int
     is_internal: bool
+    context: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "time_s": self.time_s,
             "event_type": self.event_type,
             "target_name": self.target_name,
@@ -39,6 +40,9 @@ class RecordedEvent:
             "event_id": self.event_id,
             "is_internal": self.is_internal,
         }
+        if self.context:
+            d["context"] = self.context
+        return d
 
 
 @dataclass
@@ -124,10 +128,41 @@ class SimulationBridge:
         self._log_handler = _BridgeLogHandler(self)
         self._hs_logger.addHandler(self._log_handler)
 
+    @staticmethod
+    def _serialize_context(ctx: dict[str, Any]) -> dict[str, Any]:
+        """Convert event context to JSON-safe dict."""
+        from happysimulator.core.temporal import Instant
+
+        result: dict[str, Any] = {}
+        for key, val in ctx.items():
+            if isinstance(val, Instant):
+                result[key] = val.to_seconds()
+            elif isinstance(val, dict):
+                result[key] = SimulationBridge._serialize_context(val)
+            elif isinstance(val, list):
+                serialized = []
+                for item in val:
+                    if isinstance(item, dict):
+                        serialized.append(SimulationBridge._serialize_context(item))
+                    elif isinstance(item, Instant):
+                        serialized.append(item.to_seconds())
+                    elif isinstance(item, (int, float, str, bool, type(None))):
+                        serialized.append(item)
+                    else:
+                        serialized.append(str(item))
+                result[key] = serialized
+            elif isinstance(val, (int, float, str, bool, type(None))):
+                result[key] = val
+            else:
+                result[key] = str(val)
+        return result
+
     def _on_event(self, event: Event) -> None:
         """Hook called after each event is processed."""
         self._event_counter += 1
         target_name = getattr(event.target, "name", type(event.target).__name__)
+
+        ctx = self._serialize_context(event.context) if event.context else None
 
         recorded = RecordedEvent(
             time_s=event.time.to_seconds(),
@@ -136,6 +171,7 @@ class SimulationBridge:
             source_name=self._last_handler_name,
             event_id=self._event_counter,
             is_internal=is_internal_event(event.event_type),
+            context=ctx,
         )
 
         with self._lock:

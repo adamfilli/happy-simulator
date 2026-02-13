@@ -31,6 +31,7 @@ export interface RecordedEvent {
   source_name: string | null;
   event_id: number;
   is_internal: boolean;
+  context?: Record<string, unknown>;
 }
 
 export interface RecordedLog {

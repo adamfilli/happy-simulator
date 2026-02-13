@@ -2,7 +2,7 @@
 
 Usage::
 
-    from happysimulator.visual import serve
+    from happysimulator.visual import serve, Chart
 
     sim = Simulation(sources=[source], entities=[server, sink])
     serve(sim)  # opens browser, step through interactively
@@ -13,13 +13,18 @@ from __future__ import annotations
 import webbrowser
 from typing import TYPE_CHECKING
 
+from happysimulator.visual.dashboard import Chart
+
 if TYPE_CHECKING:
     from happysimulator.core.simulation import Simulation
+
+__all__ = ["serve", "Chart"]
 
 
 def serve(
     sim: "Simulation",
     *,
+    charts: list[Chart] | None = None,
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = True,
@@ -31,6 +36,7 @@ def serve(
 
     Args:
         sim: A simulation that has NOT been run yet.
+        charts: Optional list of predefined Chart objects to show on the Dashboard.
         host: Bind address for the web server.
         port: Port for the web server.
         open_browser: Whether to open the default browser automatically.
@@ -49,7 +55,7 @@ def serve(
     if sim._is_running:
         raise RuntimeError("Cannot serve a simulation that is already running.")
 
-    bridge = SimulationBridge(sim)
+    bridge = SimulationBridge(sim, charts=charts or [])
     app = create_app(bridge)
 
     # Pause at t=0 then prime the heap

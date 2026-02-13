@@ -8,10 +8,10 @@ import ControlBar from "./components/ControlBar";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
 import SimulationLog from "./components/SimulationLog";
-import type { SimState, Topology, StepResult } from "./types";
+import type { SimState, Topology, StepResult, ChartConfig } from "./types";
 
 export default function App() {
-  const { setTopology, setState, addEvents, addLogs } = useSimStore();
+  const { setTopology, setState, addEvents, addLogs, addDashboardPanel } = useSimStore();
   const activeView = useSimStore((s) => s.activeView);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const { send } = useWebSocket();
@@ -42,16 +42,32 @@ export default function App() {
     document.addEventListener("mouseup", onUp);
   }, []);
 
-  // Fetch initial topology + state
+  // Fetch initial topology + state + predefined charts
   useEffect(() => {
     Promise.all([
       fetch("/api/topology").then((r) => r.json() as Promise<Topology>),
       fetch("/api/state").then((r) => r.json() as Promise<SimState>),
-    ]).then(([topo, state]) => {
+      fetch("/api/charts").then((r) => r.json() as Promise<ChartConfig[]>).catch(() => [] as ChartConfig[]),
+    ]).then(([topo, state, charts]) => {
       setTopology(topo);
       setState(state);
+      if (charts.length > 0) {
+        for (let i = 0; i < charts.length; i++) {
+          const c = charts[i];
+          addDashboardPanel({
+            id: c.chart_id,
+            label: c.title || `Chart ${c.chart_id}`,
+            chartConfig: c,
+            x: (i % 3) * 4,
+            y: Math.floor(i / 3) * 4,
+            w: 4,
+            h: 4,
+          });
+        }
+        setActiveView("dashboard");
+      }
     });
-  }, [setTopology, setState]);
+  }, [setTopology, setState, addDashboardPanel, setActiveView]);
 
   const handleStep = async (count: number) => {
     const res = await fetch(`/api/step?count=${count}`, { method: "POST" });

@@ -3,6 +3,7 @@ import { GridLayout, useContainerWidth, verticalCompactor, type Layout } from "r
 import "react-grid-layout/css/styles.css";
 import { useSimStore } from "../hooks/useSimState";
 import DashboardPanel from "./DashboardPanel";
+import type { ChartConfig } from "../types";
 
 interface ProbeInfo {
   name: string;
@@ -15,9 +16,45 @@ export default function DashboardView() {
   const addDashboardPanel = useSimStore((s) => s.addDashboardPanel);
   const updateDashboardLayout = useSimStore((s) => s.updateDashboardLayout);
   const removeDashboardPanel = useSimStore((s) => s.removeDashboardPanel);
+  const setActiveView = useSimStore((s) => s.setActiveView);
   const [showDropdown, setShowDropdown] = useState(false);
   const [probes, setProbes] = useState<ProbeInfo[]>([]);
+  const [chartsLoaded, setChartsLoaded] = useState(false);
   const { width, containerRef, mounted } = useContainerWidth();
+
+  // Auto-load predefined charts on first mount
+  useEffect(() => {
+    if (chartsLoaded) return;
+    setChartsLoaded(true);
+
+    fetch("/api/charts")
+      .then((r) => r.json())
+      .then((configs: ChartConfig[]) => {
+        if (configs.length === 0) return;
+        // Only add charts that aren't already in the store
+        const existing = useSimStore.getState().dashboardPanels;
+        const existingChartIds = new Set(existing.map((p) => p.chartConfig?.chart_id));
+        const newConfigs = configs.filter((c) => !existingChartIds.has(c.chart_id));
+        if (newConfigs.length === 0) return;
+
+        const offset = existing.length;
+        for (let i = 0; i < newConfigs.length; i++) {
+          const c = newConfigs[i];
+          const idx = offset + i;
+          addDashboardPanel({
+            id: c.chart_id,
+            label: c.title || `Chart ${c.chart_id}`,
+            chartConfig: c,
+            x: (idx % 3) * 4,
+            y: Math.floor(idx / 3) * 4,
+            w: 4,
+            h: 4,
+          });
+        }
+        setActiveView("dashboard");
+      })
+      .catch(() => {});
+  }, [chartsLoaded, addDashboardPanel, setActiveView]);
 
   useEffect(() => {
     if (!showDropdown) return;
@@ -83,6 +120,7 @@ export default function DashboardView() {
               <DashboardPanel
                 id={panel.id}
                 probeName={panel.probeName}
+                chartConfig={panel.chartConfig}
                 label={panel.label}
                 onClose={() => removeDashboardPanel(panel.id)}
               />

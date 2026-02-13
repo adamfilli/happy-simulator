@@ -64,6 +64,14 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
     def get_timeseries(probe: str) -> JSONResponse:
         return JSONResponse(bridge.get_timeseries(probe))
 
+    @app.get("/api/charts")
+    def get_charts() -> JSONResponse:
+        return JSONResponse(bridge.get_chart_configs())
+
+    @app.get("/api/chart_data")
+    def get_chart_data(chart_id: str) -> JSONResponse:
+        return JSONResponse(bridge.get_chart_data(chart_id))
+
     # --- WebSocket for play mode ---
 
     @app.websocket("/api/ws")

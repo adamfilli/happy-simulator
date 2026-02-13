@@ -58,15 +58,29 @@ export interface StepResult {
   new_logs: RecordedLog[];
 }
 
+export interface ChartConfig {
+  chart_id: string;
+  title: string;
+  y_label: string;
+  x_label: string;
+  color: string;
+  transform: string;
+  window_s: number;
+  y_min: number | null;
+  y_max: number | null;
+}
+
 export interface DashboardPanelConfig {
   id: string;
-  probeName: string;
   label: string;
   // react-grid-layout grid units
   x: number;
   y: number;
   w: number;
   h: number;
+  // One of these two — probe-based (user-added) or chart-based (predefined)
+  probeName?: string;
+  chartConfig?: ChartConfig;
 }
 
 export type WSMessage =

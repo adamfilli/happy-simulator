@@ -5,9 +5,22 @@ interface Props {
   values: number[];
   label: string;
   color?: string;
+  yLabel?: string;
+  xLabel?: string;
+  yMin?: number | null;
+  yMax?: number | null;
 }
 
-export default function TimeSeriesChart({ times, values, label, color = "#3b82f6" }: Props) {
+export default function TimeSeriesChart({
+  times,
+  values,
+  label,
+  color = "#3b82f6",
+  yLabel,
+  xLabel,
+  yMin: fixedYMin,
+  yMax: fixedYMax,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
@@ -43,7 +56,14 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
 
     const w = size.w;
     const h = size.h;
-    const pad = { top: 8, right: 12, bottom: 24, left: 40 };
+    const hasYLabel = !!yLabel;
+    const hasXLabel = !!xLabel;
+    const pad = {
+      top: 8,
+      right: 12,
+      bottom: hasXLabel ? 36 : 24,
+      left: hasYLabel ? 54 : 40,
+    };
     const plotW = w - pad.left - pad.right;
     const plotH = h - pad.top - pad.bottom;
 
@@ -53,14 +73,14 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
     const tMin = times[0];
     const tMax = times[times.length - 1];
     const tRange = tMax - tMin || 1;
-    const vMin = 0;
-    const vMax = Math.max(...values, 1);
+    const vMin = fixedYMin != null ? fixedYMin : 0;
+    const vMax = fixedYMax != null ? fixedYMax : Math.max(...values, 1);
     const vRange = vMax - vMin || 1;
 
     const toX = (t: number) => pad.left + ((t - tMin) / tRange) * plotW;
     const toY = (v: number) => pad.top + plotH - ((v - vMin) / vRange) * plotH;
 
-    // Grid lines
+    // Grid lines + Y-axis tick labels
     ctx.strokeStyle = "#1f2937";
     ctx.lineWidth = 1;
     const yTicks = 4;
@@ -79,14 +99,37 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
       ctx.fillText(Number.isInteger(v) ? String(v) : v.toFixed(1), pad.left - 4, y);
     }
 
-    // X-axis labels
+    // X-axis tick labels
+    ctx.fillStyle = "#6b7280";
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const xTicks = Math.min(5, times.length);
     for (let i = 0; i < xTicks; i++) {
       const idx = Math.floor((i / (xTicks - 1 || 1)) * (times.length - 1));
       const t = times[idx];
-      ctx.fillText(t.toFixed(1) + "s", toX(t), h - pad.bottom + 4);
+      ctx.fillText(t.toFixed(1) + "s", toX(t), pad.top + plotH + 4);
+    }
+
+    // Y-axis label (rotated 90deg)
+    if (yLabel) {
+      ctx.save();
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.translate(10, pad.top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    // X-axis label
+    if (xLabel) {
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(xLabel, pad.left + plotW / 2, h - 14);
     }
 
     // Data line
@@ -108,7 +151,7 @@ export default function TimeSeriesChart({ times, values, label, color = "#3b82f6
     ctx.closePath();
     ctx.fillStyle = color + "18";
     ctx.fill();
-  }, [times, values, color, size]);
+  }, [times, values, color, size, yLabel, xLabel, fixedYMin, fixedYMax]);
 
   useEffect(() => {
     draw();

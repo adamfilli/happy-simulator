@@ -41,7 +41,8 @@
       "Bash(gh pr list:*)",
       "WebSearch",
       "Bash(npm install:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(curl:*)"
     ]
   },
   "hooks": {

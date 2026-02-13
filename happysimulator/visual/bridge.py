@@ -99,8 +99,10 @@ class SimulationBridge:
     MAX_EVENT_LOG = 5000
     MAX_LOG_BUFFER = 5000
 
-    def __init__(self, sim: "Simulation") -> None:
+    def __init__(self, sim: "Simulation", charts: list | None = None) -> None:
+        from happysimulator.visual.dashboard import Chart
         self._sim = sim
+        self._charts: list[Chart] = charts or []
         self._topology = discover(sim)
         self._event_log: deque[RecordedEvent] = deque(maxlen=self.MAX_EVENT_LOG)
         self._last_handler_name: str | None = None
@@ -316,3 +318,17 @@ class SimulationBridge:
                     "target": probe.target.name,
                 })
         return result
+
+    def get_chart_configs(self) -> list[dict]:
+        """Return display config for all predefined charts."""
+        return [chart.to_config() for chart in self._charts]
+
+    def get_chart_data(self, chart_id: str) -> dict[str, Any]:
+        """Return time series data for a predefined chart by ID."""
+        for chart in self._charts:
+            if chart.chart_id == chart_id:
+                result = chart.get_data()
+                result["chart_id"] = chart_id
+                result["config"] = chart.to_config()
+                return result
+        return {"chart_id": chart_id, "times": [], "values": [], "config": {}}

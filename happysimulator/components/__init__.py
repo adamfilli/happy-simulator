@@ -154,6 +154,23 @@ from happysimulator.components.replication import (
     LeaderNode,
     MultiLeaderStats,
 )
+from happysimulator.components.microservice import (
+    IdempotencyStore,
+    IdempotencyStoreStats,
+    Sidecar,
+    SidecarStats,
+    OutboxRelay,
+    OutboxRelayStats,
+    OutboxEntry,
+    Saga,
+    SagaStats,
+    SagaState,
+    SagaStep,
+    SagaStepResult,
+    APIGateway,
+    APIGatewayStats,
+    RouteConfig,
+)
 
 __all__ = [
     # Queue components
@@ -309,4 +326,20 @@ __all__ = [
     "build_chain",
     "LeaderNode",
     "MultiLeaderStats",
+    # Microservice patterns
+    "IdempotencyStore",
+    "IdempotencyStoreStats",
+    "Sidecar",
+    "SidecarStats",
+    "OutboxRelay",
+    "OutboxRelayStats",
+    "OutboxEntry",
+    "Saga",
+    "SagaStats",
+    "SagaState",
+    "SagaStep",
+    "SagaStepResult",
+    "APIGateway",
+    "APIGatewayStats",
+    "RouteConfig",
 ]

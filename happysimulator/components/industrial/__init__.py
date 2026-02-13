@@ -38,6 +38,31 @@ from happysimulator.components.industrial.appointment import (
     AppointmentScheduler,
     AppointmentStats,
 )
+from happysimulator.components.industrial.conditional_router import (
+    ConditionalRouter,
+    RouterStats,
+)
+from happysimulator.components.industrial.perishable_inventory import (
+    PerishableInventory,
+    PerishableInventoryStats,
+)
+from happysimulator.components.industrial.pooled_cycle import (
+    PooledCycleResource,
+    PooledCycleStats,
+)
+from happysimulator.components.industrial.gate_controller import (
+    GateController,
+    GateStats,
+)
+from happysimulator.components.industrial.split_merge import (
+    SplitMerge,
+    SplitMergeStats,
+)
+from happysimulator.components.industrial.preemptible_resource import (
+    PreemptibleResource,
+    PreemptibleGrant,
+    PreemptibleResourceStats,
+)
 
 __all__ = [
     "BalkingQueue",
@@ -58,4 +83,17 @@ __all__ = [
     "InventoryStats",
     "AppointmentScheduler",
     "AppointmentStats",
+    "ConditionalRouter",
+    "RouterStats",
+    "PerishableInventory",
+    "PerishableInventoryStats",
+    "PooledCycleResource",
+    "PooledCycleStats",
+    "GateController",
+    "GateStats",
+    "SplitMerge",
+    "SplitMergeStats",
+    "PreemptibleResource",
+    "PreemptibleGrant",
+    "PreemptibleResourceStats",
 ]

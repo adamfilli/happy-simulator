@@ -277,6 +277,13 @@ from happysimulator.components.industrial import (
     BreakdownScheduler,
     InventoryBuffer,
     AppointmentScheduler,
+    ConditionalRouter,
+    PerishableInventory,
+    PooledCycleResource,
+    GateController,
+    SplitMerge,
+    PreemptibleResource,
+    PreemptibleGrant,
 )
 
 # Fault injection
@@ -536,6 +543,13 @@ __all__ = [
     "BreakdownScheduler",
     "InventoryBuffer",
     "AppointmentScheduler",
+    "ConditionalRouter",
+    "PerishableInventory",
+    "PooledCycleResource",
+    "GateController",
+    "SplitMerge",
+    "PreemptibleResource",
+    "PreemptibleGrant",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

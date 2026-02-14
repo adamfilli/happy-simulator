@@ -51,6 +51,7 @@ export interface SimState {
   is_complete: boolean;
   entities: Record<string, Record<string, unknown>>;
   upcoming: SimEvent[];
+  end_time_s?: number | null;
 }
 
 export interface StepResult {

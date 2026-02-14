@@ -191,6 +191,8 @@ class SimulationBridge:
 
     def get_state(self) -> dict[str, Any]:
         """Return full simulation state snapshot."""
+        from happysimulator.core.temporal import Instant
+
         state = self._sim.control.get_state()
         entity_states: dict[str, Any] = {}
 
@@ -208,6 +210,9 @@ class SimulationBridge:
             except RuntimeError:
                 pass
 
+        end_time = self._sim._end_time
+        end_time_s = end_time.to_seconds() if end_time != Instant.Infinity else None
+
         return {
             "time_s": state.current_time.to_seconds(),
             "events_processed": state.events_processed,
@@ -217,6 +222,7 @@ class SimulationBridge:
             "is_complete": state.is_complete,
             "entities": entity_states,
             "upcoming": upcoming,
+            "end_time_s": end_time_s,
         }
 
     def _clear_new_buffers(self) -> None:

@@ -8,10 +8,12 @@ import ControlBar from "./components/ControlBar";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
 import SimulationLog from "./components/SimulationLog";
+import Timeline from "./components/Timeline";
 import type { SimState, Topology, StepResult, ChartConfig } from "./types";
 
 export default function App() {
   const { setTopology, setState, addEvents, addLogs, addDashboardPanel } = useSimStore();
+  const state = useSimStore((s) => s.state);
   const activeView = useSimStore((s) => s.activeView);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const { send } = useWebSocket();
@@ -122,6 +124,11 @@ export default function App() {
         onReset={handleReset}
         onRunTo={handleRunTo}
         onRunToEvent={handleRunToEvent}
+      />
+      <Timeline
+        currentTime={state?.time_s ?? 0}
+        endTime={state?.end_time_s ?? null}
+        onSeekTo={handleRunTo}
       />
       <div className="flex-1 flex overflow-hidden">
         {/* Main content area */}

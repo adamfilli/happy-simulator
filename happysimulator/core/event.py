@@ -144,6 +144,7 @@ class Event:
             return []
 
         handler_label = getattr(self.target, "name", type(self.target).__name__)
+        self.context["stack"].append(handler_label)
         self.trace("handle.start", handler="entity", handler_label=handler_label)
 
         try:

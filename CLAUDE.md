@@ -12,6 +12,7 @@ Discrete-event simulation library for Python 3.13+.
 | **Generators** | Yield delays (float seconds) or `SimFuture`; return events on completion |
 | **Load Gen** | `Source.poisson(rate=10, target=server)` for quick setup |
 | **Resources** | `Resource("cpu", capacity=8)` + `yield resource.acquire(2)` |
+| **Behavior** | `Agent` + `Population` + `Environment` for human behavioral modeling |
 | **Network** | `Network` topology + `partition()`/`.heal()` for failures |
 | **Clocks** | `NodeClock(FixedSkew(...))` for skew/drift; `LamportClock`, `VectorClock`, `HybridLogicalClock` for causal ordering |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` |
@@ -200,6 +201,82 @@ hlc = HybridLogicalClock("node-1", physical_clock=node_clock)  # now(), send(), 
 
 ---
 
+## Behavioral Simulation
+
+Model individual human agents with personality, decision-making, and social dynamics for simulations like product adoption, opinion dynamics, and policy impact.
+
+### Agent
+
+```python
+from happysimulator.components.behavior import Agent, PersonalityTraits, UtilityModel, Choice
+
+agent = Agent(
+    name="consumer_1",
+    traits=PersonalityTraits.big_five(openness=0.8, agreeableness=0.6),
+    decision_model=UtilityModel(utility_fn=lambda c, ctx: 0.9 if c.action == "buy" else 0.1),
+    seed=42,
+    action_delay=0.1,          # simulated delay before action
+    heartbeat_interval=5.0,    # periodic self-maintenance
+)
+agent.on_action("buy", lambda ag, choice, event: [Event(...)])  # register action handlers
+```
+
+### Decision Models
+
+| Model | Theory | Usage |
+|-------|--------|-------|
+| `UtilityModel(fn, temperature=0)` | Rational choice | Maximize utility, optional softmax |
+| `RuleBasedModel(rules, default)` | Heuristics | Priority-ordered if-then rules |
+| `BoundedRationalityModel(fn, aspiration)` | Satisficing | First option above threshold |
+| `SocialInfluenceModel(fn, conformity)` | Conformity | Weighted by peer behavior |
+| `CompositeModel([(model, weight), ...])` | Hybrid | Weighted voting |
+
+### Population
+
+```python
+from happysimulator.components.behavior import Population, DemographicSegment, NormalTraitDistribution
+
+pop = Population.uniform(size=1000, decision_model=model, graph_type="small_world", seed=42)
+pop = Population.from_segments(total_size=1000, segments=[
+    DemographicSegment("innovators", fraction=0.15, trait_distribution=dist, decision_model_factory=fn),
+    DemographicSegment("majority",   fraction=0.85, ...),
+])
+pop.agents / pop.social_graph / pop.size / pop.stats
+```
+
+### Environment & Stimulus
+
+```python
+from happysimulator.components.behavior import Environment, broadcast_stimulus, price_change, influence_propagation
+
+env = Environment(name="market", agents=pop.agents, social_graph=pop.social_graph,
+                  influence_model=DeGrootModel(self_weight=0.3), seed=42)
+
+sim.schedule(broadcast_stimulus(1.0, env, "Promo", choices=["buy", "wait"]))
+sim.schedule(price_change(5.0, env, "ProductX", 100.0, 80.0))
+sim.schedule(influence_propagation(2.0, env, topic="product_sentiment"))
+```
+
+### Influence Models
+
+| Model | Behavior |
+|-------|----------|
+| `DeGrootModel(self_weight)` | Weighted average convergence (consensus) |
+| `BoundedConfidenceModel(epsilon, self_weight)` | Only consider nearby opinions (clustering) |
+| `VoterModel()` | Random adoption from one neighbor |
+
+### Social Graph
+
+```python
+from happysimulator.components.behavior import SocialGraph
+graph = SocialGraph.complete(names)
+graph = SocialGraph.small_world(names, k=4, p_rewire=0.1, rng=rng)
+graph = SocialGraph.random_erdos_renyi(names, p=0.1, rng=rng)
+graph.neighbors("alice") / graph.influencers("bob") / graph.influence_weights("bob")
+```
+
+---
+
 ## Observability & Analysis
 
 ### Data Class
@@ -301,7 +378,7 @@ happysimulator/
 ├── load/           # Source, profiles, EventProvider, ArrivalTimeProvider
 ├── components/     # queue, queued_resource, common (Sink/Counter), random_router,
 │                   # rate_limiter/, network/, server/, client/, resilience/,
-│                   # messaging/, datastore/, sync/, queue_policies/
+│                   # messaging/, datastore/, sync/, queue_policies/, behavior/
 ├── distributions/  # ConstantLatency, ExponentialLatency, ZipfDistribution, Uniform
 ├── instrumentation/# Data, LatencyTracker, ThroughputTracker, Probe
 └── utils/

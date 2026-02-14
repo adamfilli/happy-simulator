@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -13,6 +14,39 @@ from pathlib import Path
 
 BASELINE_PATH = Path(__file__).parent / "baseline.json"
 DATA_DIR = Path(__file__).parent / "data"
+
+
+def _collect_system_info() -> dict:
+    """Collect system specs relevant to performance benchmarking."""
+    info: dict = {
+        "python_version": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "python_build": " ".join(platform.python_build()),
+        "os": platform.system(),
+        "os_version": platform.version(),
+        "os_release": platform.release(),
+        "platform": platform.platform(),
+        "architecture": platform.machine(),
+        "processor": platform.processor(),
+        "cpu_count_logical": os.cpu_count(),
+    }
+
+    try:
+        import psutil
+
+        info["cpu_count_physical"] = psutil.cpu_count(logical=False)
+        freq = psutil.cpu_freq()
+        if freq:
+            info["cpu_freq_mhz"] = freq.current
+            if freq.max:
+                info["cpu_freq_max_mhz"] = freq.max
+        mem = psutil.virtual_memory()
+        info["ram_total_gb"] = round(mem.total / (1024**3), 2)
+        info["ram_available_gb"] = round(mem.available / (1024**3), 2)
+    except ImportError:
+        pass
+
+    return info
 
 
 @dataclass
@@ -137,8 +171,7 @@ def save_baseline(results: list[BenchmarkResult]) -> None:
     """Save current results as the baseline."""
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "python_version": platform.python_version(),
-        "platform": platform.platform(),
+        "system": _collect_system_info(),
         "results": {r.name: asdict(r) for r in results},
     }
     BASELINE_PATH.write_text(json.dumps(payload, indent=2))
@@ -157,7 +190,7 @@ def results_to_json(results: list[BenchmarkResult]) -> str:
     """Serialize results list to JSON string."""
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "python_version": platform.python_version(),
+        "system": _collect_system_info(),
         "results": [asdict(r) for r in results],
     }
     return json.dumps(payload, indent=2)
@@ -192,8 +225,7 @@ def save_checkpoint(results: list[BenchmarkResult]) -> Path:
     payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "git_hash": git_hash,
-        "python_version": platform.python_version(),
-        "platform": platform.platform(),
+        "system": _collect_system_info(),
         "results": {r.name: asdict(r) for r in results},
     }
 

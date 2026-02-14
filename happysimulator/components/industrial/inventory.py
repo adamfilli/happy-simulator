@@ -71,6 +71,12 @@ class InventoryBuffer(Entity):
         downstream: Entity | None = None,
         stockout_target: Entity | None = None,
     ):
+        if initial_stock < 0:
+            raise ValueError(f"initial_stock must be >= 0, got {initial_stock}")
+        if reorder_point < 0:
+            raise ValueError(f"reorder_point must be >= 0, got {reorder_point}")
+        if order_quantity <= 0:
+            raise ValueError(f"order_quantity must be > 0, got {order_quantity}")
         super().__init__(name)
         self._stock = initial_stock
         self.reorder_point = reorder_point

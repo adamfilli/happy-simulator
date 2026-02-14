@@ -71,7 +71,7 @@ class Simulation:
             self._start_time = Instant.Epoch
 
         if duration is not None:
-            self._end_time = Instant.from_seconds(duration)
+            self._end_time = self._start_time + duration
         elif end_time is not None:
             self._end_time = end_time
         else:
@@ -266,24 +266,18 @@ class Simulation:
             # Skip cancelled events (lazy deletion)
             if event.cancelled:
                 self._events_cancelled += 1
-                logger.debug("Skipping cancelled event: %r", event)
-                self._trace.record(
-                    time=event.time,
-                    kind="simulation.skip_cancelled",
-                    event_id=event.context.get("id"),
-                    event_type=event.event_type,
-                )
                 continue
 
             if event.time < self._current_time:
                 logger.warning(
                     "Time travel detected: next event scheduled at %r, but current simulation time is %r. "
-                    "event_type=%s event_id=%s",
+                    "Skipping event. event_type=%s event_id=%s",
                     event.time,
                     self._current_time,
                     event.event_type,
                     event.context.get("id"),
                 )
+                continue
 
             prev_time = self._current_time
             self._current_time = event.time  # Advance clock
@@ -296,10 +290,11 @@ class Simulation:
             if self._control is not None and self._current_time != prev_time:
                 self._control._notify_time_advance(self._current_time)
 
-            logger.debug(
-                "Processing event #%d: %r",
-                self._events_processed, event,
-            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "Processing event #%d: %r",
+                    self._events_processed, event,
+                )
 
             self._trace.record(
                 time=self._current_time,
@@ -314,15 +309,17 @@ class Simulation:
 
             # 3. Push
             if new_events:
-                logger.debug(
-                    "Event %r produced %d new event(s)",
-                    event.event_type, len(new_events),
-                )
-                for new_event in new_events:
+                if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(
-                        "  Scheduling %r for %r",
-                        new_event.event_type, new_event.time,
+                        "Event %r produced %d new event(s)",
+                        event.event_type, len(new_events),
                     )
+                    for new_event in new_events:
+                        logger.debug(
+                            "  Scheduling %r for %r",
+                            new_event.event_type, new_event.time,
+                        )
+                for new_event in new_events:
                     self._trace.record(
                         time=self._current_time,
                         kind="simulation.schedule",

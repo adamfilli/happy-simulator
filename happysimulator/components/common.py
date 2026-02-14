@@ -95,17 +95,5 @@ class Counter(Entity):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _percentile(sorted_values: list[float], p: float) -> float:
-    """Linearly-interpolated percentile from a pre-sorted list."""
-    n = len(sorted_values)
-    if n == 0:
-        return 0.0
-    if p <= 0:
-        return sorted_values[0]
-    if p >= 1:
-        return sorted_values[-1]
-    pos = p * (n - 1)
-    lo = int(pos)
-    hi = min(lo + 1, n - 1)
-    frac = pos - lo
-    return sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac
+# Reuse the canonical percentile implementation from instrumentation.data
+from happysimulator.instrumentation.data import _percentile_sorted as _percentile

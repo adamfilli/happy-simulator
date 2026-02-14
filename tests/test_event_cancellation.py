@@ -128,14 +128,13 @@ def test_cancel_process_continuation() -> None:
     sim.schedule(event)
 
     # At t=1.05 (between step 1 yield and step 2 resume), cancel the
-    # continuation. We capture continuations from the heap via a hook.
-    continuations_to_cancel: list[Event] = []
-
+    # continuation by scanning the heap directly.
     def cancel_continuation(_: Event) -> None:
-        # By the time this fires, the first continuation (t=1.1) is in the
-        # heap. We cancel it.
-        for c in continuations_to_cancel:
-            c.cancel()
+        # By the time this fires (t=1.05), the first continuation (t=1.1)
+        # is in the heap. Cancel all ProcessContinuations.
+        for evt in sim._event_heap._heap:
+            if isinstance(evt, ProcessContinuation):
+                evt.cancel()
 
     cancel_event = Event.once(
         time=Instant.from_seconds(1.05),
@@ -143,19 +142,6 @@ def test_cancel_process_continuation() -> None:
         fn=cancel_continuation,
     )
     sim.schedule(cancel_event)
-
-    # We need to capture the ProcessContinuation that gets scheduled.
-    # Use control hooks to grab them as they're created.
-    original_invoke = event.invoke
-
-    def patched_invoke():
-        result = original_invoke()
-        for e in result:
-            if isinstance(e, ProcessContinuation):
-                continuations_to_cancel.append(e)
-        return result
-
-    event.invoke = patched_invoke
 
     sim.run()
 

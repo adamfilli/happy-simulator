@@ -17,13 +17,15 @@ Discrete-event simulation library for Python 3.13+.
 | **Clocks** | `NodeClock(FixedSkew(...))` for skew/drift; `LamportClock`, `VectorClock`, `HybridLogicalClock` for causal ordering |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
+| **Visual** | `serve(sim, charts=[Chart(...)])` opens browser debugger at `localhost:8765` |
 
 ## Development Commands
 
 ```bash
-pytest -q                                    # all tests (~1719, ~58s)
+pytest -q                                    # all tests (~2755, ~68s)
 pytest tests/integration/test_queue.py -q    # single file
 python examples/m_m_1_queue.py               # run example
+python examples/visual_debugger.py           # launch browser debugger
 ```
 
 ## Reading Order
@@ -33,7 +35,8 @@ python examples/m_m_1_queue.py               # run example
 3. `core/control/control.py` → `core/control/breakpoints.py`
 4. `load/source.py` → `components/queue.py` → `components/queued_resource.py`
 5. `examples/m_m_1_queue.py` + `tests/integration/`
-6. `.dev/COMPONENTLIB.md` for design philosophy
+6. `visual/__init__.py` → `visual/dashboard.py` → `visual/bridge.py` → `visual/server.py`
+7. `.dev/COMPONENTLIB.md` for design philosophy
 
 ---
 
@@ -163,6 +166,41 @@ EWMA-based smoothing with **no throughput cap** — resists rate *changes*, not 
 inductor = Inductor(name="Smoother", downstream=server, time_constant=1.0, queue_capacity=10000)
 inductor.stats / inductor.estimated_rate / inductor.queue_depth
 ```
+
+### Industrial Components
+
+Package: `happysimulator.components.industrial`
+
+```python
+from happysimulator.components.industrial import (
+    BalkingQueue, RenegingQueuedResource,
+    ConveyorBelt, InspectionStation, BatchProcessor,
+    ShiftSchedule, ShiftedServer, Shift,
+    BreakdownScheduler, InventoryBuffer, AppointmentScheduler,
+    ConditionalRouter, PerishableInventory, PooledCycleResource,
+    GateController, SplitMerge, PreemptibleResource, PreemptibleGrant,
+)
+```
+
+| Component | Base | Description |
+|-----------|------|-------------|
+| `BalkingQueue` | `QueuePolicy` | Wraps any queue policy; rejects arrivals when depth >= threshold. `BalkingQueue(inner, balk_threshold=5, balk_probability=1.0)` |
+| `RenegingQueuedResource` | `QueuedResource` | Abstract; checks `(now - created_at) > patience` on dequeue, routes expired to `reneged_target`. Subclass implements `_handle_served_event()` |
+| `ConveyorBelt` | `Entity` | Fixed transit time between stations. `ConveyorBelt(name, transit_time, downstream, capacity=None)` |
+| `InspectionStation` | `QueuedResource` | Probabilistic pass/fail routing. `InspectionStation(name, inspection_time, pass_rate, pass_target, fail_target)` |
+| `BatchProcessor` | `Entity` | Accumulates items until `batch_size` or `timeout_s`, processes as batch. `BatchProcessor(name, batch_size, process_time, downstream, timeout_s=None)` |
+| `ShiftSchedule` + `ShiftedServer` | `QueuedResource` | Time-varying capacity via `Shift(start_s, end_s, capacity)` schedule |
+| `BreakdownScheduler` | `Entity` | Random UP/DOWN cycles on target; sets `target._broken`. `BreakdownScheduler(name, target, mean_time_to_failure, mean_repair_time)` |
+| `InventoryBuffer` | `Entity` | `(s, Q)` reorder policy. `InventoryBuffer(name, initial_stock, reorder_point, reorder_quantity, supplier, lead_time)` |
+| `AppointmentScheduler` | `Entity` | Fixed-time arrivals with `no_show_rate`. `scheduler.start_events()` returns initial events |
+| `ConditionalRouter` | `Entity` | Declarative routing via ordered `(predicate, target)` list. Factory: `ConditionalRouter.by_context_field(name, field, mapping, default)` |
+| `PerishableInventory` | `Entity` | Inventory with shelf life; periodic spoilage sweeps remove expired items. `PerishableInventory(name, initial_stock, shelf_life_s, spoilage_check_interval_s, reorder_point, ...)` |
+| `PooledCycleResource` | `Entity` | Pool of N identical units with fixed cycle time. `PooledCycleResource(name, pool_size, cycle_time, downstream, queue_capacity=0)` |
+| `GateController` | `Entity` | Opens/closes on schedule or programmatically; queues arrivals when closed. `GateController(name, downstream, schedule=[(open_s, close_s)], initially_open=True)` |
+| `SplitMerge` | `Entity` | Fan-out to N targets, `all_of` wait, merge results downstream. Targets resolve `context["reply_future"]`. `SplitMerge(name, targets, downstream)` |
+| `PreemptibleResource` | `Entity` | Priority-based resource with preemption. `acquire(amount, priority, preempt=True, on_preempt=callback)` returns `SimFuture[PreemptibleGrant]` |
+
+**Examples** (20 industrial simulations in `examples/`): `bank_branch.py`, `manufacturing_line.py`, `hospital_er.py`, `call_center.py`, `grocery_store.py`, `car_wash.py`, `restaurant.py`, `supply_chain.py`, `warehouse_fulfillment.py`, `parking_lot.py`, `coffee_shop.py`, `drive_through.py`, `laundromat.py`, `pharmacy.py`, `theme_park.py`, `airport_terminal.py`, `hotel_operations.py`, `blood_bank.py`, `elevator_system.py`, `urgent_care.py`
 
 ### Network Topology & Partitions
 
@@ -344,6 +382,63 @@ sim.control.remove_hook(hook_id)
 
 ---
 
+## Visual Debugger
+
+Browser-based simulation debugger. Requires optional dependencies: `pip install happysimulator[visual]`
+
+```python
+from happysimulator.visual import serve, Chart
+
+serve(sim)                                    # opens browser at http://127.0.0.1:8765
+serve(sim, charts=[...], port=8765)           # with predefined dashboard charts
+```
+
+**Controls**: Step, Play, Pause, Debug (play with breakpoint awareness), Run To time/event, Reset.
+
+### Predefined Charts
+
+```python
+from happysimulator.visual import serve, Chart
+
+depth_data = Data()
+depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+
+serve(sim, charts=[
+    Chart(depth_data, title="Queue Depth", y_label="items"),
+    Chart(depth_data, title="P99 Queue Depth",
+          transform="p99", window_s=1.0, y_label="items", color="#f59e0b"),
+    Chart.from_probe(depth_probe, transform="mean", window_s=0.5),
+])
+```
+
+`Chart` fields: `data` (Data), `title`, `y_label`, `x_label`, `color` (hex), `transform`, `window_s`, `y_min`, `y_max`.
+
+Transforms: `"raw"` | `"mean"` | `"p50"` | `"p99"` | `"p999"` | `"max"` | `"rate"` — all backed by `Data.bucket()`.
+
+### UI Features
+
+- **Graph View**: Entity topology with ELK.js layout, click to inspect
+- **Dashboard View**: Draggable/resizable chart grid (react-grid-layout), time range filtering
+- **Inspector**: Entity metrics, probe time series, source load profile visualization
+- **Event Log**: Expandable rows showing full context — `stack` (entity journey), `trace` spans, `request_id`, `created_at`
+- **Sim Logs**: Streamed `happysimulator.*` logger output with level filtering
+
+### Architecture
+
+```
+happysimulator/visual/
+├── __init__.py      # serve(), Chart exports
+├── dashboard.py     # Chart dataclass with transforms
+├── bridge.py        # SimulationBridge: mediates sim ↔ API
+├── server.py        # FastAPI app with REST + WebSocket
+├── topology.py      # Entity graph discovery (ELK layout)
+├── serializers.py   # Entity/event → JSON (type-aware + fallback)
+└── static/          # Built React frontend (vite build output)
+visual-frontend/     # React + TypeScript source (not shipped in package)
+```
+
+---
+
 ## Logging
 
 Silent by default. Enable explicitly:
@@ -379,11 +474,18 @@ happysimulator/
 ├── components/     # queue, queued_resource, common (Sink/Counter), random_router,
 │                   # rate_limiter/, network/, server/, client/, resilience/,
 │                   # messaging/, datastore/, sync/, queue_policies/, behavior/
+│   └── industrial/ # BalkingQueue, RenegingQueuedResource, ConveyorBelt,
+│                   # InspectionStation, BatchProcessor, ShiftSchedule,
+│                   # BreakdownScheduler, InventoryBuffer, AppointmentScheduler,
+│                   # ConditionalRouter, PerishableInventory, PooledCycleResource,
+│                   # GateController, SplitMerge, PreemptibleResource
 ├── distributions/  # ConstantLatency, ExponentialLatency, ZipfDistribution, Uniform
 ├── instrumentation/# Data, LatencyTracker, ThroughputTracker, Probe
+├── visual/         # Browser debugger: serve(), Chart, bridge, server, topology
 └── utils/
+visual-frontend/    # React + TypeScript source for visual debugger UI
 tests/              # unit/, integration/, conftest.py
-examples/           # m_m_1_queue.py, basic_client_server.py, ...
+examples/           # m_m_1_queue.py, basic_client_server.py, visual_debugger.py, ...
 .dev/               # Design documents (COMPONENTLIB.md, *-design.md)
 ```
 
@@ -425,3 +527,4 @@ Create design docs for major features/architecture decisions. Template: Overview
 | `/line-count` | Count lines of code (source, tests, examples) |
 | `/update-claudemd` | Review changes and update CLAUDE.md |
 | `/update-pypi` | Bump version for PyPI release |
+| `/visual-debugger` | Launch the browser-based simulation debugger |

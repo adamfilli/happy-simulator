@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-def create_app(bridge: "SimulationBridge") -> FastAPI:
+def create_app(bridge: SimulationBridge) -> FastAPI:
     """Create the FastAPI application wired to the given bridge."""
     app = FastAPI(title="Happy Simulator Debugger")
 
@@ -61,7 +61,9 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
         return JSONResponse(bridge.list_probes())
 
     @app.get("/api/timeseries")
-    def get_timeseries(probe: str, start_s: float | None = None, end_s: float | None = None) -> JSONResponse:
+    def get_timeseries(
+        probe: str, start_s: float | None = None, end_s: float | None = None
+    ) -> JSONResponse:
         return JSONResponse(bridge.get_timeseries(probe, start_s=start_s, end_s=end_s))
 
     @app.get("/api/charts")
@@ -69,7 +71,9 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
         return JSONResponse(bridge.get_chart_configs())
 
     @app.get("/api/chart_data")
-    def get_chart_data(chart_id: str, start_s: float | None = None, end_s: float | None = None) -> JSONResponse:
+    def get_chart_data(
+        chart_id: str, start_s: float | None = None, end_s: float | None = None
+    ) -> JSONResponse:
         return JSONResponse(bridge.get_chart_data(chart_id, start_s=start_s, end_s=end_s))
 
     # --- WebSocket for play mode ---
@@ -81,26 +85,71 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
         stop_event = asyncio.Event()
 
         async def play_loop(speed: int) -> None:
-            """Continuously step and push state updates."""
-            while not stop_event.is_set():
-                result = await asyncio.to_thread(bridge.step, speed)
-                try:
-                    await ws.send_json({"type": "state_update", **result})
-                except Exception:
-                    break
+            """Continuously step and push state updates.
 
-                # Check if simulation completed
-                if result["state"].get("is_complete"):
-                    await ws.send_json({"type": "simulation_complete"})
-                    break
+            Speed 0 = Max (large batches, minimal delay).
+            Speed >0 = wall-clock multiplier (1x/10x/100x).
+            """
+            import time as _time
 
-                # Small delay to avoid flooding the browser
-                await asyncio.sleep(0.05)
+            if speed == 0:
+                # Max speed: large batches with minimal delay
+                while not stop_event.is_set():
+                    result = await asyncio.to_thread(bridge.step, 100)
+                    try:
+                        await ws.send_json({"type": "state_update", **result})
+                    except Exception:
+                        break
+                    if result["state"].get("is_complete"):
+                        await ws.send_json({"type": "simulation_complete"})
+                        break
+                    await asyncio.sleep(0.01)
+            else:
+                # Time-based: advance sim time proportional to wall clock
+                last_wall = _time.monotonic()
+                while not stop_event.is_set():
+                    now_wall = _time.monotonic()
+                    wall_elapsed = now_wall - last_wall
+                    target_advance = wall_elapsed * speed
+                    last_wall = now_wall
+                    current_time = bridge.get_current_time_s()
+                    target_time = current_time + target_advance
+                    result = await asyncio.to_thread(bridge.run_to, target_time)
+                    try:
+                        await ws.send_json({"type": "state_update", **result})
+                    except Exception:
+                        break
+                    if result["state"].get("is_complete"):
+                        await ws.send_json({"type": "simulation_complete"})
+                        break
+                    await asyncio.sleep(0.05)
 
         async def debug_loop(speed: int) -> None:
-            """Like play_loop but stops when a breakpoint fires."""
+            """Like play_loop but stops when a breakpoint fires.
+
+            Speed 0 = Max (large batches).
+            Speed >0 = wall-clock multiplier.
+            """
+            import time as _time
+
+            if speed == 0:
+                batch_size = 100
+            else:
+                batch_size = None
+            last_wall = _time.monotonic() if speed > 0 else None
+
             while not stop_event.is_set():
-                result = await asyncio.to_thread(bridge.step, speed)
+                if batch_size:
+                    result = await asyncio.to_thread(bridge.step, batch_size)
+                else:
+                    now_wall = _time.monotonic()
+                    wall_elapsed = now_wall - last_wall  # type: ignore[operator]
+                    target_advance = wall_elapsed * speed
+                    last_wall = now_wall
+                    current_time = bridge.get_current_time_s()
+                    target_time = current_time + target_advance
+                    result = await asyncio.to_thread(bridge.run_to, target_time)
+
                 try:
                     await ws.send_json({"type": "state_update", **result})
                 except Exception:
@@ -114,7 +163,7 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                     await ws.send_json({"type": "breakpoint_hit"})
                     break
 
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.05 if speed != 0 else 0.01)
 
         try:
             while True:
@@ -127,7 +176,7 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     stop_event.clear()
-                    speed = msg.get("speed", 10)
+                    speed = msg.get("speed", 1)
                     play_task = asyncio.create_task(play_loop(speed))
 
                 elif action == "debug":
@@ -135,7 +184,7 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     stop_event.clear()
-                    speed = msg.get("speed", 10)
+                    speed = msg.get("speed", 1)
                     play_task = asyncio.create_task(debug_loop(speed))
 
                 elif action == "pause":
@@ -143,7 +192,15 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     state = bridge.get_state()
-                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": [], "new_logs": []})
+                    await ws.send_json(
+                        {
+                            "type": "state_update",
+                            "state": state,
+                            "new_events": [],
+                            "new_edges": [],
+                            "new_logs": [],
+                        }
+                    )
 
                 elif action == "step":
                     count = msg.get("count", 1)
@@ -171,7 +228,15 @@ def create_app(bridge: "SimulationBridge") -> FastAPI:
                         stop_event.set()
                         await play_task
                     state = await asyncio.to_thread(bridge.reset)
-                    await ws.send_json({"type": "state_update", "state": state, "new_events": [], "new_edges": [], "new_logs": []})
+                    await ws.send_json(
+                        {
+                            "type": "state_update",
+                            "state": state,
+                            "new_events": [],
+                            "new_edges": [],
+                            "new_logs": [],
+                        }
+                    )
 
         except WebSocketDisconnect:
             if play_task and not play_task.done():

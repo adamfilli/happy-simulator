@@ -1,7 +1,12 @@
 import { useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 
-const SPEEDS = [1, 5, 10, 50, 100];
+const SPEEDS = [
+  { label: "1x", value: 1 },
+  { label: "10x", value: 10 },
+  { label: "100x", value: 100 },
+  { label: "Max", value: 0 },
+];
 
 interface Props {
   onStep: (count: number) => void;
@@ -17,7 +22,7 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
-  const [speed, setSpeed] = useState(10);
+  const [speed, setSpeed] = useState(1);
   const debugModeRef = useRef(false);
   const [runToInput, setRunToInput] = useState("");
   const [runToEventInput, setRunToEventInput] = useState("");
@@ -129,11 +134,11 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
           }}
           value={speed}
           className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs"
-          title="Events per batch"
+          title="Simulation speed"
         >
           {SPEEDS.map((s) => (
-            <option key={s} value={s}>
-              {s}/batch
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>

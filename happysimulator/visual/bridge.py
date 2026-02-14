@@ -10,12 +10,12 @@ import logging
 import threading
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from happysimulator.core.event import Event
-from happysimulator.visual.serializers import serialize_entity, serialize_event, is_internal_event
-from happysimulator.visual.topology import Topology, discover
+from happysimulator.visual.serializers import is_internal_event, serialize_entity, serialize_event
+from happysimulator.visual.topology import discover
 
 if TYPE_CHECKING:
     from happysimulator.core.simulation import Simulation
@@ -66,7 +66,7 @@ class RecordedLog:
 class _BridgeLogHandler(logging.Handler):
     """Captures log records from the happysimulator logger hierarchy."""
 
-    def __init__(self, bridge: "SimulationBridge") -> None:
+    def __init__(self, bridge: SimulationBridge) -> None:
         super().__init__(level=logging.DEBUG)
         self._bridge = bridge
 
@@ -80,11 +80,11 @@ class _BridgeLogHandler(logging.Handler):
 
             logger_name = record.name
             if logger_name.startswith("happysimulator."):
-                logger_name = logger_name[len("happysimulator."):]
+                logger_name = logger_name[len("happysimulator.") :]
 
             entry = RecordedLog(
                 time_s=time_s,
-                wall_time=datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3],
+                wall_time=datetime.now(UTC).strftime("%H:%M:%S.%f")[:-3],
                 level=record.levelname,
                 logger_name=logger_name,
                 message=self.format(record),
@@ -103,8 +103,9 @@ class SimulationBridge:
     MAX_EVENT_LOG = 5000
     MAX_LOG_BUFFER = 5000
 
-    def __init__(self, sim: "Simulation", charts: list | None = None) -> None:
+    def __init__(self, sim: Simulation, charts: list | None = None) -> None:
         from happysimulator.visual.dashboard import Chart
+
         self._sim = sim
         self._charts: list[Chart] = charts or []
         self._topology = discover(sim)
@@ -180,6 +181,10 @@ class SimulationBridge:
 
         self._last_handler_name = target_name
 
+    def get_current_time_s(self) -> float:
+        """Return current simulation time in seconds."""
+        return self._sim._current_time.to_seconds()
+
     def get_topology(self) -> dict:
         """Return the current topology as a JSON-safe dict."""
         return self._topology.to_dict()
@@ -189,7 +194,9 @@ class SimulationBridge:
         state = self._sim.control.get_state()
         entity_states: dict[str, Any] = {}
 
-        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+        for entity in (
+            list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
+        ):
             name = getattr(entity, "name", type(entity).__name__)
             entity_states[name] = serialize_entity(entity)
 
@@ -270,9 +277,7 @@ class SimulationBridge:
 
         self._clear_new_buffers()
 
-        self._sim.control.add_breakpoint(
-            EventCountBreakpoint(count=event_number, one_shot=True)
-        )
+        self._sim.control.add_breakpoint(EventCountBreakpoint(count=event_number, one_shot=True))
         self._sim.control.resume()
 
         state = self.get_state()
@@ -312,7 +317,9 @@ class SimulationBridge:
             events = list(self._event_log)
         return [e.to_dict() for e in events[-last_n:]]
 
-    def get_timeseries(self, probe_name: str, start_s: float | None = None, end_s: float | None = None) -> dict[str, Any]:
+    def get_timeseries(
+        self, probe_name: str, start_s: float | None = None, end_s: float | None = None
+    ) -> dict[str, Any]:
         """Return time series data for a named probe."""
         from happysimulator.instrumentation.probe import Probe
 
@@ -339,18 +346,22 @@ class SimulationBridge:
         result = []
         for probe in self._sim._probes:
             if isinstance(probe, Probe):
-                result.append({
-                    "name": probe.name,
-                    "metric": probe.metric,
-                    "target": probe.target.name,
-                })
+                result.append(
+                    {
+                        "name": probe.name,
+                        "metric": probe.metric,
+                        "target": probe.target.name,
+                    }
+                )
         return result
 
     def get_chart_configs(self) -> list[dict]:
         """Return display config for all predefined charts."""
         return [chart.to_config() for chart in self._charts]
 
-    def get_chart_data(self, chart_id: str, start_s: float | None = None, end_s: float | None = None) -> dict[str, Any]:
+    def get_chart_data(
+        self, chart_id: str, start_s: float | None = None, end_s: float | None = None
+    ) -> dict[str, Any]:
         """Return time series data for a predefined chart by ID."""
         for chart in self._charts:
             if chart.chart_id == chart_id:

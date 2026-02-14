@@ -164,6 +164,7 @@ class WriteAheadLog(Entity):
         self._next_sequence: int = 1
         self._writes_since_sync: int = 0
         self._last_sync_time_s: float = 0.0
+        self._synced_up_to_sequence: int = 0
 
         # Stats
         self._total_writes: int = 0
@@ -171,6 +172,11 @@ class WriteAheadLog(Entity):
         self._total_syncs: int = 0
         self._total_sync_latency_s: float = 0.0
         self._entries_recovered: int = 0
+
+    @property
+    def synced_up_to(self) -> int:
+        """Sequence number of the last entry synced to durable storage."""
+        return self._synced_up_to_sequence
 
     @property
     def size(self) -> int:
@@ -217,6 +223,7 @@ class WriteAheadLog(Entity):
         time_since_sync = self.now.to_seconds() - self._last_sync_time_s
         if self._sync_policy.should_sync(self._writes_since_sync, time_since_sync):
             yield self._sync_latency
+            self._synced_up_to_sequence = seq
             self._total_syncs += 1
             self._total_sync_latency_s += self._sync_latency
             self._writes_since_sync = 0
@@ -261,6 +268,21 @@ class WriteAheadLog(Entity):
         Called after a checkpoint to reclaim space.
         """
         self._entries = [e for e in self._entries if e.sequence_number > up_to_sequence]
+
+    def crash(self) -> int:
+        """Simulate power loss: discard entries not yet synced to disk.
+
+        Entries with sequence_number > synced_up_to are lost — they were
+        in volatile memory only. Returns the number of entries lost.
+        """
+        before = len(self._entries)
+        self._entries = [
+            e for e in self._entries
+            if e.sequence_number <= self._synced_up_to_sequence
+        ]
+        lost = before - len(self._entries)
+        self._writes_since_sync = 0
+        return lost
 
     def handle_event(self, event: Event) -> None:
         """WAL does not process events directly."""

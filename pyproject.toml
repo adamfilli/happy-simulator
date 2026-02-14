@@ -36,6 +36,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+visual = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov",
@@ -54,7 +58,7 @@ where = ["."]
 include = ["happysimulator*"]
 
 [tool.setuptools.package-data]
-happysimulator = ["py.typed"]
+happysimulator = ["py.typed", "visual/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

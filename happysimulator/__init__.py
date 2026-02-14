@@ -111,6 +111,18 @@ from happysimulator.components import (
     LateEventPolicy,
 )
 
+# Microservice patterns
+from happysimulator.components.microservice import (
+    IdempotencyStore,
+    Sidecar,
+    OutboxRelay,
+    Saga,
+    SagaStep,
+    SagaState,
+    APIGateway,
+    RouteConfig,
+)
+
 # Distributions
 from happysimulator.distributions import (
     ConstantLatency,
@@ -192,6 +204,35 @@ from happysimulator.components.storage import (
     SyncOnBatch,
 )
 
+# Infrastructure Primitives
+from happysimulator.components.infrastructure import (
+    DiskIO,
+    DiskIOStats,
+    DiskProfile,
+    HDD,
+    SSD,
+    NVMe,
+    PageCache,
+    PageCacheStats,
+    CPUScheduler,
+    CPUSchedulerStats,
+    FairShare,
+    PriorityPreemptive,
+    GarbageCollector,
+    GCStats,
+    StopTheWorld,
+    ConcurrentGC,
+    GenerationalGC,
+    TCPConnection,
+    TCPStats,
+    AIMD,
+    Cubic,
+    BBR,
+    DNSResolver,
+    DNSRecord,
+    DNSStats,
+)
+
 # Scheduling
 from happysimulator.components.scheduling import (
     JobDefinition,
@@ -268,6 +309,28 @@ from happysimulator.components.crdt import (
     ORSet,
     CRDTStore,
     CRDTStoreStats,
+)
+
+# Industrial simulation components
+from happysimulator.components.industrial import (
+    BalkingQueue,
+    RenegingQueuedResource,
+    ConveyorBelt,
+    InspectionStation,
+    BatchProcessor,
+    Shift,
+    ShiftSchedule,
+    ShiftedServer,
+    BreakdownScheduler,
+    InventoryBuffer,
+    AppointmentScheduler,
+    ConditionalRouter,
+    PerishableInventory,
+    PooledCycleResource,
+    GateController,
+    SplitMerge,
+    PreemptibleResource,
+    PreemptibleGrant,
 )
 
 # Fault injection
@@ -422,6 +485,15 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Microservice patterns
+    "IdempotencyStore",
+    "Sidecar",
+    "OutboxRelay",
+    "Saga",
+    "SagaStep",
+    "SagaState",
+    "APIGateway",
+    "RouteConfig",
     # Consensus & Coordination
     "Log",
     "LogEntry",
@@ -455,6 +527,32 @@ __all__ = [
     "SyncEveryWrite",
     "SyncPeriodic",
     "SyncOnBatch",
+    # Infrastructure Primitives
+    "DiskIO",
+    "DiskIOStats",
+    "DiskProfile",
+    "HDD",
+    "SSD",
+    "NVMe",
+    "PageCache",
+    "PageCacheStats",
+    "CPUScheduler",
+    "CPUSchedulerStats",
+    "FairShare",
+    "PriorityPreemptive",
+    "GarbageCollector",
+    "GCStats",
+    "StopTheWorld",
+    "ConcurrentGC",
+    "GenerationalGC",
+    "TCPConnection",
+    "TCPStats",
+    "AIMD",
+    "Cubic",
+    "BBR",
+    "DNSResolver",
+    "DNSRecord",
+    "DNSStats",
     # Scheduling
     "JobDefinition",
     "JobScheduler",
@@ -521,6 +619,25 @@ __all__ = [
     "AgentStats",
     "PopulationStats",
     "EnvironmentStats",
+    # Industrial simulation components
+    "BalkingQueue",
+    "RenegingQueuedResource",
+    "ConveyorBelt",
+    "InspectionStation",
+    "BatchProcessor",
+    "Shift",
+    "ShiftSchedule",
+    "ShiftedServer",
+    "BreakdownScheduler",
+    "InventoryBuffer",
+    "AppointmentScheduler",
+    "ConditionalRouter",
+    "PerishableInventory",
+    "PooledCycleResource",
+    "GateController",
+    "SplitMerge",
+    "PreemptibleResource",
+    "PreemptibleGrant",
     # Fault injection
     "FaultSchedule",
     # Logging configuration

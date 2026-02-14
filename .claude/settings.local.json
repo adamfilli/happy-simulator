@@ -27,12 +27,24 @@
       "Bash(Measure-Object -Line)",
       "Bash(cloc:*)",
       "Bash(gh pr edit:*)",
+      "Bash(pip install:*)",
+      "Bash(C:Python314python.exe \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\2\\\\happy-simulator\\\\examples\\\\saga_failure_cascade.py\" --no-viz)"
       "Bash(ls -la \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\3\\\\happy-simulator\\\\happysimulator\\\\components\"\" | grep -E \"sidecar)",
       "Bash(api)",
       "Bash(saga)",
       "Bash(outbox:*)",
       "Bash(idempotency \")",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(set \"PYTHONPATH=C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\1\\\\happy-simulator\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)",
+      "Bash(powershell -Command:*)",
+      "Bash(npm run build:*)",
+      "Bash(gh pr list:*)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(curl:*)"
     ]
   },
   "hooks": {

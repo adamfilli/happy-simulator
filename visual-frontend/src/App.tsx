@@ -13,7 +13,7 @@ import SimulationLog from "./components/SimulationLog";
 import type { SimState, Topology, StepResult, ChartConfig, BreakpointInfo } from "./types";
 
 export default function App() {
-  const { setTopology, setState, addEvents, addLogs, addDashboardPanel, setEdgeStats } = useSimStore();
+  const { setTopology, setState, addEvents, addLogs, setEdgeStats } = useSimStore();
   const activeView = useSimStore((s) => s.activeView);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const state = useSimStore((s) => s.state);
@@ -63,7 +63,7 @@ export default function App() {
     document.addEventListener("mouseup", onUp);
   }, []);
 
-  // Fetch initial topology + state + predefined charts
+  // Fetch initial topology + state; detect charts and switch to dashboard view
   useEffect(() => {
     Promise.all([
       fetch("/api/topology").then((r) => r.json() as Promise<Topology>),
@@ -73,22 +73,10 @@ export default function App() {
       setTopology(topo);
       setState(initialState);
       if (charts.length > 0) {
-        for (let i = 0; i < charts.length; i++) {
-          const c = charts[i];
-          addDashboardPanel({
-            id: c.chart_id,
-            label: c.title || `Chart ${c.chart_id}`,
-            chartConfig: c,
-            x: (i % 3) * 4,
-            y: Math.floor(i / 3) * 4,
-            w: 4,
-            h: 4,
-          });
-        }
         setActiveView("dashboard");
       }
     });
-  }, [setTopology, setState, addDashboardPanel, setActiveView]);
+  }, [setTopology, setState, setActiveView]);
 
   const applyStepResult = (data: StepResult) => {
     setState(data.state);

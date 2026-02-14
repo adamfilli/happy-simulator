@@ -35,6 +35,16 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
     if (tsData) exportCsv(tsData.times, tsData.values, sanitizedLabel + ".csv");
   };
 
+  // Reset cached data when events_processed drops (i.e. simulation was reset)
+  const prevEventsRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (prevEventsRef.current !== undefined && eventsProcessed !== undefined && eventsProcessed < prevEventsRef.current) {
+      lastFetchedRef.current = null;
+      setTsData(null);
+    }
+    prevEventsRef.current = eventsProcessed;
+  }, [eventsProcessed]);
+
   useEffect(() => {
     if (eventsProcessed === undefined) return;
     const key = `${eventsProcessed}:${timeRange.start}:${timeRange.end}`;

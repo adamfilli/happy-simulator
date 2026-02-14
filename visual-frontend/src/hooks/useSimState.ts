@@ -89,7 +89,10 @@ export const useSimStore = create<SimStore>((set) => ({
   toggleInternal: () => set((prev) => ({ showInternal: !prev.showInternal })),
   selectEntity: (name) => set({ selectedEntity: name }),
   addDashboardPanel: (panel) =>
-    set((prev) => ({ dashboardPanels: [...prev.dashboardPanels, panel] })),
+    set((prev) => {
+      if (prev.dashboardPanels.some((p) => p.id === panel.id)) return {};
+      return { dashboardPanels: [...prev.dashboardPanels, panel] };
+    }),
   removeDashboardPanel: (id) =>
     set((prev) => ({ dashboardPanels: prev.dashboardPanels.filter((p) => p.id !== id) })),
   updateDashboardLayout: (layout) =>

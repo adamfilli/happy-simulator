@@ -265,6 +265,15 @@ from happysimulator.components.deployment import (
     LatencyEvaluator,
 )
 
+# Advertising
+from happysimulator.components.advertising import (
+    AudienceTier,
+    Advertiser,
+    AdvertiserStats,
+    AdPlatform,
+    AdPlatformStats,
+)
+
 # Behavior
 from happysimulator.components.behavior import (
     TraitSet,
@@ -587,6 +596,12 @@ __all__ = [
     "ORSet",
     "CRDTStore",
     "CRDTStoreStats",
+    # Advertising
+    "AudienceTier",
+    "Advertiser",
+    "AdvertiserStats",
+    "AdPlatform",
+    "AdPlatformStats",
     # Behavior
     "TraitSet",
     "PersonalityTraits",

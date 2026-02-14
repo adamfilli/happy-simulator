@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import platform
+import subprocess
 import sys
 import tracemalloc
 from dataclasses import asdict, dataclass, field
@@ -11,6 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASELINE_PATH = Path(__file__).parent / "baseline.json"
+DATA_DIR = Path(__file__).parent / "data"
 
 
 @dataclass
@@ -159,3 +161,54 @@ def results_to_json(results: list[BenchmarkResult]) -> str:
         "results": [asdict(r) for r in results],
     }
     return json.dumps(payload, indent=2)
+
+
+def _git_short_hash() -> str:
+    """Return the current git short hash, or 'unknown' if unavailable."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.stdout.strip() if result.returncode == 0 else "unknown"
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return "unknown"
+
+
+def save_checkpoint(results: list[BenchmarkResult]) -> Path:
+    """Save results as a dated checkpoint in tests/perf/data/.
+
+    Filename format: YYYY-MM-DD_<git-short-hash>.json
+    If a checkpoint for the same date+hash already exists, it is overwritten.
+    """
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    git_hash = _git_short_hash()
+    filename = f"{date_str}_{git_hash}.json"
+
+    payload = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "git_hash": git_hash,
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+        "results": {r.name: asdict(r) for r in results},
+    }
+
+    path = DATA_DIR / filename
+    path.write_text(json.dumps(payload, indent=2))
+    return path
+
+
+def list_checkpoints() -> list[Path]:
+    """Return all checkpoint files in data/, sorted oldest-first."""
+    if not DATA_DIR.exists():
+        return []
+    return sorted(DATA_DIR.glob("*.json"))
+
+
+def load_checkpoint(path: Path) -> dict:
+    """Load a checkpoint file and return its parsed content."""
+    return json.loads(path.read_text())

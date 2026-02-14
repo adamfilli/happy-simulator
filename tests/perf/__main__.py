@@ -9,12 +9,15 @@ import sys
 from pathlib import Path
 
 from tests.perf.runner import (
+    list_checkpoints,
     load_baseline,
+    load_checkpoint,
     print_report,
     results_to_json,
     run_all,
     run_scenario,
     save_baseline,
+    save_checkpoint,
 )
 from tests.perf.scenarios import SCENARIOS
 
@@ -62,7 +65,37 @@ def main() -> None:
         action="store_true",
         help="Output results as JSON to stdout",
     )
+    parser.add_argument(
+        "--checkpoint",
+        action="store_true",
+        help="Save results as a checkpoint in tests/perf/data/ (date + git hash)",
+    )
+    parser.add_argument(
+        "--list-checkpoints",
+        action="store_true",
+        help="List all saved checkpoints and exit",
+    )
+    parser.add_argument(
+        "--compare-checkpoint",
+        metavar="FILE",
+        help="Compare against a specific checkpoint file in tests/perf/data/",
+    )
     args = parser.parse_args()
+
+    # List checkpoints and exit
+    if args.list_checkpoints:
+        checkpoints = list_checkpoints()
+        if not checkpoints:
+            print("  No checkpoints saved yet.")
+        else:
+            print(f"  {len(checkpoints)} checkpoint(s) in tests/perf/data/:")
+            for cp in checkpoints:
+                data = load_checkpoint(cp)
+                ts = data.get("timestamp", "?")[:19]
+                git = data.get("git_hash", "?")
+                n = len(data.get("results", {}))
+                print(f"    {cp.name:<36s}  {ts}  {git}  ({n} scenarios)")
+        return
 
     # Select scenarios
     if args.scenario:
@@ -109,13 +142,31 @@ def main() -> None:
 
     # Load baseline for comparison
     baseline = None
-    if args.compare or (not args.save_baseline):
+    if args.compare_checkpoint:
+        cp_path = Path(args.compare_checkpoint)
+        if not cp_path.exists():
+            # Try as a filename inside data/
+            from tests.perf.runner import DATA_DIR
+
+            cp_path = DATA_DIR / args.compare_checkpoint
+        if cp_path.exists():
+            cp_data = load_checkpoint(cp_path)
+            baseline = cp_data.get("results")
+            git_hash = cp_data.get("git_hash", "?")
+            print(f"  Comparing against checkpoint: {cp_path.name} ({git_hash})")
+        else:
+            print(f"  Warning: checkpoint '{args.compare_checkpoint}' not found, skipping comparison")
+    elif args.compare or (not args.save_baseline):
         baseline = load_baseline()
 
     print_report(results, baseline=baseline)
 
     if args.save_baseline:
         save_baseline(results)
+
+    if args.checkpoint:
+        path = save_checkpoint(results)
+        print(f"  Checkpoint saved to {path}")
 
 
 if __name__ == "__main__":

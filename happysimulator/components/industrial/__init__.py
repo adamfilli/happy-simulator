@@ -27,6 +27,7 @@ from happysimulator.components.industrial.shift_schedule import (
     ShiftedServer,
 )
 from happysimulator.components.industrial.breakdown import (
+    Breakable,
     BreakdownScheduler,
     BreakdownStats,
 )
@@ -77,6 +78,7 @@ __all__ = [
     "Shift",
     "ShiftSchedule",
     "ShiftedServer",
+    "Breakable",
     "BreakdownScheduler",
     "BreakdownStats",
     "InventoryBuffer",

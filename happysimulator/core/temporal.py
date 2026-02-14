@@ -300,7 +300,11 @@ class _InfiniteInstant(Instant):
     """
 
     def __init__(self):
-        super().__init__(float('inf'))
+        import sys
+        # Use maxsize as the nanoseconds value. All comparisons and arithmetic
+        # are overridden so this value is never used directly, but it satisfies
+        # the int type requirement of Instant.__init__.
+        super().__init__(sys.maxsize)
 
     def __add__(self, other: Union[Duration, int, float]) -> Instant:
         if isinstance(other, (int, float, Duration)):
@@ -308,7 +312,7 @@ class _InfiniteInstant(Instant):
         return NotImplemented
 
     def __sub__(self, other: Union[Instant, Duration, int, float]) -> Union[Instant, Duration]:
-        if isinstance(other, Instant) and other.nanoseconds == float('inf'):
+        if isinstance(other, _InfiniteInstant):
             return NotImplemented
         if isinstance(other, (int, float, Duration)):
             return self
@@ -320,12 +324,30 @@ class _InfiniteInstant(Instant):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Instant):
             return NotImplemented
-        return other.nanoseconds == float('inf')
+        return isinstance(other, _InfiniteInstant)
+
+    def __hash__(self) -> int:
+        return hash(float('inf'))
 
     def __lt__(self, other: Instant) -> bool:
         if not isinstance(other, Instant):
             return NotImplemented
         return False
+
+    def __le__(self, other: Instant) -> bool:
+        if not isinstance(other, Instant):
+            return NotImplemented
+        return isinstance(other, _InfiniteInstant)
+
+    def __gt__(self, other: Instant) -> bool:
+        if not isinstance(other, Instant):
+            return NotImplemented
+        return not isinstance(other, _InfiniteInstant)
+
+    def __ge__(self, other: Instant) -> bool:
+        if not isinstance(other, Instant):
+            return NotImplemented
+        return True
 
     def to_seconds(self) -> float:
         return float('inf')

@@ -50,6 +50,10 @@ class InspectionStation(QueuedResource):
         pass_rate: float = 0.95,
         policy: QueuePolicy | None = None,
     ):
+        if not (0.0 <= pass_rate <= 1.0):
+            raise ValueError(f"pass_rate must be between 0 and 1, got {pass_rate}")
+        if inspection_time < 0:
+            raise ValueError(f"inspection_time must be >= 0, got {inspection_time}")
         super().__init__(name, policy=policy or FIFOQueue())
         self.pass_target = pass_target
         self.fail_target = fail_target

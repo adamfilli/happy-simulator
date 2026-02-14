@@ -55,6 +55,10 @@ class PooledCycleResource(Entity):
         downstream: Entity | None = None,
         queue_capacity: int = 0,
     ):
+        if pool_size <= 0:
+            raise ValueError(f"pool_size must be > 0, got {pool_size}")
+        if cycle_time < 0:
+            raise ValueError(f"cycle_time must be >= 0, got {cycle_time}")
         super().__init__(name)
         self.pool_size = pool_size
         self.cycle_time = cycle_time

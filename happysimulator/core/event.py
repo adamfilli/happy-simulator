@@ -11,7 +11,6 @@ processes, enabling entities to yield delays and resume execution later.
 
 import uuid
 import logging
-from dataclasses import dataclass, field
 from itertools import count
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 
@@ -28,7 +27,6 @@ CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
 """Signature for hooks that run when an event or process finishes."""
 
 
-@dataclass
 class Event:
     """The fundamental unit of simulation work.
 
@@ -59,19 +57,46 @@ class Event:
         on_complete: Hooks to run when processing finishes.
         context: Arbitrary metadata for tracing and debugging.
     """
-    time: Instant
-    event_type: str
-    daemon: bool = field(default=False, repr=False)
-    target: Optional['Simulatable'] = None
-    on_complete: List[CompletionHook] = field(default_factory=list, repr=False, compare=False)
-    
-    # Context & Tracing
-    context: Dict[str, Any] = field(default_factory=dict, compare=False)
-    
-    # Sorting Internals
-    _sort_index: int = field(default_factory=_global_event_counter.__next__, init=False, repr=False)
-    _id: uuid.UUID = field(default_factory=uuid.uuid4, init=False, repr=False)
-    _cancelled: bool = field(default=False, init=False, repr=False, compare=False)
+
+    __slots__ = (
+        "time", "event_type", "daemon", "target",
+        "on_complete", "context",
+        "_sort_index", "_id", "_cancelled",
+    )
+
+    def __init__(
+        self,
+        time: Instant,
+        event_type: str,
+        target: Optional['Simulatable'] = None,
+        *,
+        daemon: bool = False,
+        on_complete: List[CompletionHook] | None = None,
+        context: Dict[str, Any] | None = None,
+    ):
+        if target is None:
+            raise ValueError(f"Event '{event_type}' must have a 'target'.")
+
+        self.time = time
+        self.event_type = event_type
+        self.daemon = daemon
+        self.target = target
+        self.on_complete = on_complete if on_complete is not None else []
+        self._sort_index = _global_event_counter.__next__()
+        self._id = uuid.uuid4()
+        self._cancelled = False
+
+        # Lazy context: only allocate dict when caller provides one
+        if context is not None:
+            self.context = context
+        else:
+            self.context = {}
+
+        # Ensure minimal context keys. Stack and trace are lazy (populated on invoke/trace).
+        # Metadata is eager because network/server components access it directly.
+        self.context.setdefault("id", str(self._id))
+        self.context.setdefault("created_at", self.time)
+        self.context.setdefault("metadata", {})
 
     @property
     def cancelled(self) -> bool:
@@ -84,17 +109,6 @@ class Event:
         Cancelling an already-cancelled or already-processed event is a no-op.
         """
         self._cancelled = True
-
-    def __post_init__(self):
-        if self.target is None:
-            raise ValueError(f"Event '{self.event_type}' must have a 'target'.")
-
-        # Always ensure trace context exists (even if caller passed partial context)
-        self.context.setdefault("id", str(self._id))
-        self.context.setdefault("created_at", self.time)
-        self.context.setdefault("stack", [])
-        self.context.setdefault("metadata", {})
-        self.context.setdefault("trace", {"spans": []})
 
     def __repr__(self) -> str:
         """Return a concise representation showing time, type, and target."""
@@ -116,7 +130,7 @@ class Event:
         }
         if data:
             entry["data"] = data
-        self.context["trace"]["spans"].append(entry)
+        self._ensure_trace()["spans"].append(entry)
         
     def add_completion_hook(self, hook: CompletionHook) -> None:
         """Attach a function to run when this event finishes processing.
@@ -129,6 +143,27 @@ class Event:
             hook: Function called with the finish time when processing completes.
         """
         self.on_complete.append(hook)
+
+    _MAX_STACK_DEPTH = 50
+
+    def _ensure_stack(self) -> list:
+        """Lazily initialize and return the context stack (capped at _MAX_STACK_DEPTH)."""
+        stack = self.context.get("stack")
+        if stack is None:
+            stack = []
+            self.context["stack"] = stack
+        elif len(stack) >= self._MAX_STACK_DEPTH:
+            # Trim to keep most recent entries
+            del stack[:len(stack) - self._MAX_STACK_DEPTH + 1]
+        return stack
+
+    def _ensure_trace(self) -> dict:
+        """Lazily initialize and return the context trace."""
+        trace = self.context.get("trace")
+        if trace is None:
+            trace = {"spans": []}
+            self.context["trace"] = trace
+        return trace
 
     def invoke(self) -> List['Event']:
         """Execute this event and return any resulting events.
@@ -144,7 +179,7 @@ class Event:
             return []
 
         handler_label = getattr(self.target, "name", type(self.target).__name__)
-        self.context["stack"].append(handler_label)
+        self._ensure_stack().append(handler_label)
         self.trace("handle.start", handler="entity", handler_label=handler_label)
 
         try:
@@ -229,10 +264,17 @@ class Event:
         return self._id == other._id
 
     def add_context(self, key: str, value: Any):
-        self.context.setdefault("metadata", {})[key] = value
+        meta = self.context.get("metadata")
+        if meta is None:
+            meta = {}
+            self.context["metadata"] = meta
+        meta[key] = value
 
     def get_context(self, key: str) -> Any:
-        return self.context.get("metadata", {}).get(key)
+        meta = self.context.get("metadata")
+        if meta is None:
+            return None
+        return meta.get(key)
 
     @staticmethod
     def once(
@@ -266,7 +308,6 @@ class Event:
             context=context or {},
         )
 
-@dataclass
 class ProcessContinuation(Event):
     """Internal event that resumes a paused generator-based process.
 
@@ -291,10 +332,30 @@ class ProcessContinuation(Event):
     Attributes:
         process: The Python generator being executed incrementally.
     """
-    process: Generator = field(default=None, repr=False)
 
-    # Set by SimFuture._resume() when resuming from a future
-    _send_value: Any = field(default=None, init=False, repr=False)
+    __slots__ = ("process", "_send_value")
+
+    def __init__(
+        self,
+        time: Instant,
+        event_type: str,
+        target: Optional['Simulatable'] = None,
+        *,
+        daemon: bool = False,
+        on_complete: List[CompletionHook] | None = None,
+        context: Dict[str, Any] | None = None,
+        process: Generator = None,
+    ):
+        super().__init__(
+            time=time,
+            event_type=event_type,
+            target=target,
+            daemon=daemon,
+            on_complete=on_complete,
+            context=context,
+        )
+        self.process = process
+        self._send_value: Any = None
 
     def invoke(self) -> List["Event"]:
         """Advance the generator to its next yield and schedule the continuation."""

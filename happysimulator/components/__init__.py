@@ -269,6 +269,7 @@ from happysimulator.components.microservice import (
     APIGateway,
     APIGatewayStats,
     RouteConfig,
+)
 from happysimulator.components.infrastructure import (
     DiskIO,
     DiskIOStats,
@@ -363,6 +364,13 @@ from happysimulator.components.behavior import (
     AgentStats,
     PopulationStats,
     EnvironmentStats,
+)
+from happysimulator.components.advertising import (
+    AudienceTier,
+    Advertiser,
+    AdvertiserStats,
+    AdPlatform,
+    AdPlatformStats,
 )
 from happysimulator.components.streaming import (
     EventLog,
@@ -731,6 +739,12 @@ __all__ = [
     "ORSet",
     "CRDTStore",
     "CRDTStoreStats",
+    # Advertising
+    "AudienceTier",
+    "Advertiser",
+    "AdvertiserStats",
+    "AdPlatform",
+    "AdPlatformStats",
     # Behavior
     "TraitSet",
     "PersonalityTraits",

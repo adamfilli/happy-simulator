@@ -16,13 +16,15 @@ Discrete-event simulation library for Python 3.13+.
 | **Clocks** | `NodeClock(FixedSkew(...))` for skew/drift; `LamportClock`, `VectorClock`, `HybridLogicalClock` for causal ordering |
 | **Control** | `sim.control.pause()` / `.step()` / `.add_breakpoint()` |
 | **Testing** | Use `Source.constant()` or `ConstantArrivalTimeProvider` for deterministic timing |
+| **Visual** | `serve(sim, charts=[Chart(...)])` opens browser debugger at `localhost:8765` |
 
 ## Development Commands
 
 ```bash
-pytest -q                                    # all tests (~1719, ~58s)
+pytest -q                                    # all tests (~1725, ~58s)
 pytest tests/integration/test_queue.py -q    # single file
 python examples/m_m_1_queue.py               # run example
+python examples/visual_debugger.py           # launch browser debugger
 ```
 
 ## Reading Order
@@ -32,7 +34,8 @@ python examples/m_m_1_queue.py               # run example
 3. `core/control/control.py` → `core/control/breakpoints.py`
 4. `load/source.py` → `components/queue.py` → `components/queued_resource.py`
 5. `examples/m_m_1_queue.py` + `tests/integration/`
-6. `.dev/COMPONENTLIB.md` for design philosophy
+6. `visual/__init__.py` → `visual/dashboard.py` → `visual/bridge.py` → `visual/server.py`
+7. `.dev/COMPONENTLIB.md` for design philosophy
 
 ---
 
@@ -267,6 +270,63 @@ sim.control.remove_hook(hook_id)
 
 ---
 
+## Visual Debugger
+
+Browser-based simulation debugger. Requires optional dependencies: `pip install happysimulator[visual]`
+
+```python
+from happysimulator.visual import serve, Chart
+
+serve(sim)                                    # opens browser at http://127.0.0.1:8765
+serve(sim, charts=[...], port=8765)           # with predefined dashboard charts
+```
+
+**Controls**: Step, Play, Pause, Debug (play with breakpoint awareness), Run To time/event, Reset.
+
+### Predefined Charts
+
+```python
+from happysimulator.visual import serve, Chart
+
+depth_data = Data()
+depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+
+serve(sim, charts=[
+    Chart(depth_data, title="Queue Depth", y_label="items"),
+    Chart(depth_data, title="P99 Queue Depth",
+          transform="p99", window_s=1.0, y_label="items", color="#f59e0b"),
+    Chart.from_probe(depth_probe, transform="mean", window_s=0.5),
+])
+```
+
+`Chart` fields: `data` (Data), `title`, `y_label`, `x_label`, `color` (hex), `transform`, `window_s`, `y_min`, `y_max`.
+
+Transforms: `"raw"` | `"mean"` | `"p50"` | `"p99"` | `"p999"` | `"max"` | `"rate"` — all backed by `Data.bucket()`.
+
+### UI Features
+
+- **Graph View**: Entity topology with ELK.js layout, click to inspect
+- **Dashboard View**: Draggable/resizable chart grid (react-grid-layout), time range filtering
+- **Inspector**: Entity metrics, probe time series, source load profile visualization
+- **Event Log**: Expandable rows showing full context — `stack` (entity journey), `trace` spans, `request_id`, `created_at`
+- **Sim Logs**: Streamed `happysimulator.*` logger output with level filtering
+
+### Architecture
+
+```
+happysimulator/visual/
+├── __init__.py      # serve(), Chart exports
+├── dashboard.py     # Chart dataclass with transforms
+├── bridge.py        # SimulationBridge: mediates sim ↔ API
+├── server.py        # FastAPI app with REST + WebSocket
+├── topology.py      # Entity graph discovery (ELK layout)
+├── serializers.py   # Entity/event → JSON (type-aware + fallback)
+└── static/          # Built React frontend (vite build output)
+visual-frontend/     # React + TypeScript source (not shipped in package)
+```
+
+---
+
 ## Logging
 
 Silent by default. Enable explicitly:
@@ -304,9 +364,11 @@ happysimulator/
 │                   # messaging/, datastore/, sync/, queue_policies/
 ├── distributions/  # ConstantLatency, ExponentialLatency, ZipfDistribution, Uniform
 ├── instrumentation/# Data, LatencyTracker, ThroughputTracker, Probe
+├── visual/         # Browser debugger: serve(), Chart, bridge, server, topology
 └── utils/
+visual-frontend/    # React + TypeScript source for visual debugger UI
 tests/              # unit/, integration/, conftest.py
-examples/           # m_m_1_queue.py, basic_client_server.py, ...
+examples/           # m_m_1_queue.py, basic_client_server.py, visual_debugger.py, ...
 .dev/               # Design documents (COMPONENTLIB.md, *-design.md)
 ```
 
@@ -348,3 +410,4 @@ Create design docs for major features/architecture decisions. Template: Overview
 | `/line-count` | Count lines of code (source, tests, examples) |
 | `/update-claudemd` | Review changes and update CLAUDE.md |
 | `/update-pypi` | Bump version for PyPI release |
+| `/visual-debugger` | Launch the browser-based simulation debugger |

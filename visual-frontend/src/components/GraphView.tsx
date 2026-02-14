@@ -13,6 +13,7 @@ import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { useSimStore } from "../hooks/useSimState";
 import EntityNode from "./EntityNode";
+import AnimatedEdge from "./AnimatedEdge";
 
 const elk = new ELK();
 
@@ -28,12 +29,14 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const nodeTypes = { entity: EntityNode };
+const edgeTypes = { animated: AnimatedEdge };
 
 export default function GraphView() {
   const topology = useSimStore((s) => s.topology);
   const state = useSimStore((s) => s.state);
   const selectEntity = useSimStore((s) => s.selectEntity);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
+  const edgeStats = useSimStore((s) => s.edgeStats);
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDone, setLayoutDone] = useState(false);
@@ -43,27 +46,29 @@ export default function GraphView() {
     if (!topology) return [];
     return topology.edges.map((e, i) => {
       const isProbe = e.kind === "probe";
+      const statsKey = `${e.source}->${e.target}`;
+      const stats = edgeStats[statsKey];
       return {
         id: `e-${e.source}-${e.target}-${i}`,
         source: e.source,
         target: e.target,
         sourceHandle: isProbe ? "bottom" : "right",
         targetHandle: isProbe ? "top" : "left",
-        animated: false,
-        style: {
-          stroke: isProbe ? "#06b6d4" : "#4b5563",
-          strokeWidth: isProbe ? 1.5 : 2,
-          strokeDasharray: isProbe ? "6 4" : undefined,
+        type: "animated",
+        data: {
+          rate: stats?.rate ?? 0,
+          count: stats?.count ?? 0,
+          isProbe,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isProbe ? "#06b6d4" : "#4b5563",
+          color: isProbe ? "#06b6d4" : (stats?.rate ?? 0) > 20 ? "#ef4444" : (stats?.rate ?? 0) > 0 ? "#22c55e" : "#4b5563",
           width: 16,
           height: 16,
         },
       };
     });
-  }, [topology]);
+  }, [topology, edgeStats]);
 
   // Run elkjs layout when topology changes
   useEffect(() => {
@@ -140,7 +145,7 @@ export default function GraphView() {
     });
   }, [topology, flowEdges, setNodes, setEdges]);
 
-  // Update edges when topology edges change (dynamic discovery)
+  // Update edges when topology edges or edge stats change (dynamic discovery)
   useEffect(() => {
     if (layoutDone) {
       setEdges(flowEdges);
@@ -180,6 +185,7 @@ export default function GraphView() {
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       minZoom={0.3}
       maxZoom={2}

@@ -5,19 +5,40 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import GraphView from "./components/GraphView";
 import DashboardView from "./components/DashboardView";
 import ControlBar from "./components/ControlBar";
+import Timeline from "./components/Timeline";
+import BreakpointPanel from "./components/BreakpointPanel";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
 import SimulationLog from "./components/SimulationLog";
-import type { SimState, Topology, StepResult, ChartConfig } from "./types";
+import type { SimState, Topology, StepResult, ChartConfig, BreakpointInfo } from "./types";
 
 export default function App() {
-  const { setTopology, setState, addEvents, addLogs, addDashboardPanel } = useSimStore();
+  const { setTopology, setState, addEvents, addLogs, addDashboardPanel, setEdgeStats } = useSimStore();
   const activeView = useSimStore((s) => s.activeView);
   const setActiveView = useSimStore((s) => s.setActiveView);
+  const state = useSimStore((s) => s.state);
+  const topology = useSimStore((s) => s.topology);
   const { send } = useWebSocket();
   const [activeTab, setActiveTab] = useState<"inspector" | "events" | "logs">("inspector");
   const [panelWidth, setPanelWidth] = useState(320);
   const dragging = useRef(false);
+  const [bpPanelOpen, setBpPanelOpen] = useState(false);
+  const [breakpointCount, setBreakpointCount] = useState(0);
+
+  const entityNames = (topology?.nodes ?? []).map((n) => n.id);
+
+  // Fetch breakpoint count periodically
+  useEffect(() => {
+    const fetchBpCount = () => {
+      fetch("/api/breakpoints")
+        .then((r) => r.json())
+        .then((bps: BreakpointInfo[]) => setBreakpointCount(bps.length))
+        .catch(() => {});
+    };
+    fetchBpCount();
+    const interval = setInterval(fetchBpCount, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,9 +69,9 @@ export default function App() {
       fetch("/api/topology").then((r) => r.json() as Promise<Topology>),
       fetch("/api/state").then((r) => r.json() as Promise<SimState>),
       fetch("/api/charts").then((r) => r.json() as Promise<ChartConfig[]>).catch(() => [] as ChartConfig[]),
-    ]).then(([topo, state, charts]) => {
+    ]).then(([topo, initialState, charts]) => {
       setTopology(topo);
-      setState(state);
+      setState(initialState);
       if (charts.length > 0) {
         for (let i = 0; i < charts.length; i++) {
           const c = charts[i];
@@ -69,12 +90,17 @@ export default function App() {
     });
   }, [setTopology, setState, addDashboardPanel, setActiveView]);
 
-  const handleStep = async (count: number) => {
-    const res = await fetch(`/api/step?count=${count}`, { method: "POST" });
-    const data: StepResult = await res.json();
+  const applyStepResult = (data: StepResult) => {
     setState(data.state);
     if (data.new_events?.length) addEvents(data.new_events);
     if (data.new_logs?.length) addLogs(data.new_logs);
+    if (data.edge_stats) setEdgeStats(data.edge_stats);
+  };
+
+  const handleStep = async (count: number) => {
+    const res = await fetch(`/api/step?count=${count}`, { method: "POST" });
+    const data: StepResult = await res.json();
+    applyStepResult(data);
   };
 
   const handlePlay = (speed: number) => {
@@ -92,9 +118,7 @@ export default function App() {
   const handleRunTo = async (time_s: number) => {
     const res = await fetch(`/api/run_to?time_s=${time_s}`, { method: "POST" });
     const data: StepResult = await res.json();
-    setState(data.state);
-    if (data.new_events?.length) addEvents(data.new_events);
-    if (data.new_logs?.length) addLogs(data.new_logs);
+    applyStepResult(data);
   };
 
   const handleRunToEvent = (eventNumber: number) => {
@@ -104,13 +128,31 @@ export default function App() {
   const handleReset = async () => {
     useSimStore.getState().reset();
     const res = await fetch("/api/reset", { method: "POST" });
-    const state: SimState = await res.json();
-    setState(state);
+    const resetState: SimState = await res.json();
+    setState(resetState);
     // Re-fetch topology after reset
     const topoRes = await fetch("/api/topology");
     const topo: Topology = await topoRes.json();
     setTopology(topo);
   };
+
+  const handleSeekTo = (time_s: number) => {
+    handleRunTo(time_s);
+  };
+
+  // Gather time-based breakpoints for timeline markers
+  const [timeBreakpoints, setTimeBreakpoints] = useState<Array<{ id: string; type: string; time_s?: number }>>([]);
+  useEffect(() => {
+    if (bpPanelOpen) {
+      fetch("/api/breakpoints")
+        .then((r) => r.json())
+        .then((bps: BreakpointInfo[]) => {
+          setTimeBreakpoints(bps.filter((bp) => bp.time_s != null));
+          setBreakpointCount(bps.length);
+        })
+        .catch(() => {});
+    }
+  }, [bpPanelOpen, state?.events_processed]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
@@ -122,6 +164,21 @@ export default function App() {
         onReset={handleReset}
         onRunTo={handleRunTo}
         onRunToEvent={handleRunToEvent}
+        onToggleBreakpoints={() => setBpPanelOpen((v) => !v)}
+        breakpointCount={breakpointCount}
+      />
+      {bpPanelOpen && (
+        <BreakpointPanel
+          open={bpPanelOpen}
+          onClose={() => setBpPanelOpen(false)}
+          entityNames={entityNames}
+        />
+      )}
+      <Timeline
+        currentTime={state?.time_s ?? 0}
+        endTime={state?.end_time_s ?? null}
+        breakpoints={timeBreakpoints}
+        onSeekTo={handleSeekTo}
       />
       <div className="flex-1 flex overflow-hidden">
         {/* Main content area */}

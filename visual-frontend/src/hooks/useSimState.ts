@@ -6,6 +6,8 @@ import type {
   RecordedLog,
   TopologyEdge,
   DashboardPanelConfig,
+  EdgeStats,
+  BreakpointInfo,
 } from "../types";
 
 interface SimStore {
@@ -20,6 +22,8 @@ interface SimStore {
   dashboardPanels: DashboardPanelConfig[];
   activeView: "graph" | "dashboard";
   dashboardTimeRange: { start: number | null; end: number | null };
+  edgeStats: EdgeStats;
+  breakpointHitInfo: BreakpointInfo[] | null;
 
   setTopology: (t: Topology) => void;
   setState: (s: SimState) => void;
@@ -35,6 +39,8 @@ interface SimStore {
   updateDashboardLayout: (layout: Array<{ i: string; x: number; y: number; w: number; h: number }>) => void;
   setActiveView: (view: "graph" | "dashboard") => void;
   setDashboardTimeRange: (range: { start: number | null; end: number | null }) => void;
+  setEdgeStats: (stats: EdgeStats) => void;
+  setBreakpointHitInfo: (info: BreakpointInfo[] | null) => void;
   reset: () => void;
 }
 
@@ -53,6 +59,8 @@ export const useSimStore = create<SimStore>((set) => ({
   dashboardPanels: [],
   activeView: "graph",
   dashboardTimeRange: { start: null, end: null },
+  edgeStats: {},
+  breakpointHitInfo: null,
 
   setTopology: (t) => set({ topology: t }),
   setState: (s) => set({ state: s }),
@@ -93,5 +101,7 @@ export const useSimStore = create<SimStore>((set) => ({
     })),
   setActiveView: (view) => set({ activeView: view }),
   setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [], dashboardTimeRange: { start: null, end: null } }),
+  setEdgeStats: (stats) => set({ edgeStats: stats }),
+  setBreakpointHitInfo: (info) => set({ breakpointHitInfo: info }),
+  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [], dashboardTimeRange: { start: null, end: null }, edgeStats: {}, breakpointHitInfo: null }),
 }));

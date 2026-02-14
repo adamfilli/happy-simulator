@@ -1,7 +1,12 @@
 import { useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 
-const SPEEDS = [1, 5, 10, 50, 100];
+const SPEEDS = [
+  { label: "1x", value: 1 },
+  { label: "10x", value: 10 },
+  { label: "100x", value: 100 },
+  { label: "Max", value: 0 },
+];
 
 interface Props {
   onStep: (count: number) => void;
@@ -11,9 +16,11 @@ interface Props {
   onReset: () => void;
   onRunTo: (time_s: number) => void;
   onRunToEvent: (n: number) => void;
+  onToggleBreakpoints?: () => void;
+  breakpointCount?: number;
 }
 
-export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent }: Props) {
+export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent, onToggleBreakpoints, breakpointCount = 0 }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
@@ -115,6 +122,21 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
           </button>
         )}
 
+        {onToggleBreakpoints && (
+          <button
+            onClick={onToggleBreakpoints}
+            className="px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs font-medium relative"
+            title="Manage breakpoints"
+          >
+            BP
+            {breakpointCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-purple-600 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                {breakpointCount}
+              </span>
+            )}
+          </button>
+        )}
+
         <select
           onChange={(e) => {
             const s = Number(e.target.value);
@@ -129,11 +151,11 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
           }}
           value={speed}
           className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs"
-          title="Events per batch"
+          title="Simulation speed"
         >
           {SPEEDS.map((s) => (
-            <option key={s} value={s}>
-              {s}/batch
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>

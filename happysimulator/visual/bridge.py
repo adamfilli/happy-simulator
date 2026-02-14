@@ -115,6 +115,11 @@ class SimulationBridge:
         self._log_buffer: deque[RecordedLog] = deque(maxlen=self.MAX_LOG_BUFFER)
         self._new_logs_buffer: list[RecordedLog] = []
         self._event_counter: int = 0
+        self._edge_counts: dict[tuple[str, str], int] = {}
+        self._edge_timestamps: dict[tuple[str, str], deque] = {}
+        self._entity_history: dict[str, dict[str, list[tuple[float, float]]]] = {}
+        self._last_snapshot_time: float = -1.0
+        self._snapshot_interval: float = 0.1
         self._lock = threading.Lock()
 
         # Install event hook
@@ -178,7 +183,21 @@ class SimulationBridge:
             self._event_log.append(recorded)
             self._new_events_buffer.append(recorded)
 
+        # Track edge flow
+        if self._last_handler_name and self._last_handler_name != target_name:
+            edge_key = (self._last_handler_name, target_name)
+            self._edge_counts[edge_key] = self._edge_counts.get(edge_key, 0) + 1
+            if edge_key not in self._edge_timestamps:
+                self._edge_timestamps[edge_key] = deque(maxlen=1000)
+            self._edge_timestamps[edge_key].append(event.time.to_seconds())
+
         self._last_handler_name = target_name
+
+        # Periodic entity state snapshots
+        time_s = event.time.to_seconds()
+        if time_s - self._last_snapshot_time >= self._snapshot_interval:
+            self._snapshot_entities(time_s)
+            self._last_snapshot_time = time_s
 
     def get_topology(self) -> dict:
         """Return the current topology as a JSON-safe dict."""
@@ -186,6 +205,8 @@ class SimulationBridge:
 
     def get_state(self) -> dict[str, Any]:
         """Return full simulation state snapshot."""
+        from happysimulator.core.temporal import Instant
+
         state = self._sim.control.get_state()
         entity_states: dict[str, Any] = {}
 
@@ -210,6 +231,7 @@ class SimulationBridge:
             "is_complete": state.is_complete,
             "entities": entity_states,
             "upcoming": upcoming,
+            "end_time_s": self._sim._end_time.to_seconds() if self._sim._end_time != Instant.Infinity else None,
         }
 
     def step(self, count: int = 1) -> dict[str, Any]:
@@ -235,6 +257,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def run_to(self, time_s: float) -> dict[str, Any]:
@@ -266,6 +289,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def run_to_event(self, event_number: int) -> dict[str, Any]:
@@ -297,6 +321,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def reset(self) -> dict[str, Any]:
@@ -306,6 +331,10 @@ class SimulationBridge:
         self._log_buffer.clear()
         self._event_counter = 0
         self._last_handler_name = None
+        self._edge_counts.clear()
+        self._edge_timestamps.clear()
+        self._entity_history.clear()
+        self._last_snapshot_time = -1.0
         self._topology = discover(self._sim)
 
         # Re-prime: pause + run
@@ -372,3 +401,127 @@ class SimulationBridge:
                 result["config"] = chart.to_config()
                 return result
         return {"chart_id": chart_id, "times": [], "values": [], "config": {}}
+
+    # --- Breakpoint CRUD ---
+
+    def list_breakpoints_json(self) -> list[dict[str, Any]]:
+        """Serialize all breakpoints to JSON-safe dicts."""
+        from happysimulator.core.control.breakpoints import (
+            TimeBreakpoint, EventCountBreakpoint, EventTypeBreakpoint, MetricBreakpoint,
+        )
+        result = []
+        for bp_id, bp in self._sim.control.list_breakpoints():
+            info: dict[str, Any] = {"id": bp_id, "one_shot": bp.one_shot}
+            if isinstance(bp, TimeBreakpoint):
+                info["type"] = "time"
+                info["time_s"] = bp.time.to_seconds()
+            elif isinstance(bp, EventCountBreakpoint):
+                info["type"] = "event_count"
+                info["count"] = bp.count
+            elif isinstance(bp, EventTypeBreakpoint):
+                info["type"] = "event_type"
+                info["event_type"] = bp.event_type
+            elif isinstance(bp, MetricBreakpoint):
+                info["type"] = "metric"
+                info["entity_name"] = bp.entity_name
+                info["attribute"] = bp.attribute
+                info["operator"] = bp.operator
+                info["threshold"] = bp.threshold
+            else:
+                info["type"] = "custom"
+                info["description"] = str(bp)
+            result.append(info)
+        return result
+
+    def add_breakpoint_from_json(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Create a breakpoint from a JSON body and return its info."""
+        from happysimulator.core.control.breakpoints import (
+            TimeBreakpoint, EventCountBreakpoint, EventTypeBreakpoint, MetricBreakpoint,
+        )
+        from happysimulator.core.temporal import Instant
+
+        bp_type = body.get("type", "")
+        one_shot = body.get("one_shot", True)
+
+        if bp_type == "time":
+            bp = TimeBreakpoint(time=Instant.from_seconds(body["time_s"]), one_shot=one_shot)
+        elif bp_type == "event_count":
+            bp = EventCountBreakpoint(count=body["count"], one_shot=one_shot)
+        elif bp_type == "event_type":
+            bp = EventTypeBreakpoint(event_type=body["event_type"], one_shot=one_shot)
+        elif bp_type == "metric":
+            bp = MetricBreakpoint(
+                entity_name=body["entity_name"],
+                attribute=body["attribute"],
+                operator=body["operator"],
+                threshold=body["threshold"],
+                one_shot=one_shot,
+            )
+        else:
+            raise ValueError(f"Unknown breakpoint type: {bp_type}")
+
+        bp_id = self._sim.control.add_breakpoint(bp)
+        return {"id": bp_id, "type": bp_type}
+
+    def remove_breakpoint(self, bp_id: str) -> None:
+        """Remove a breakpoint by ID."""
+        self._sim.control.remove_breakpoint(bp_id)
+
+    def clear_breakpoints(self) -> None:
+        """Remove all breakpoints."""
+        self._sim.control.clear_breakpoints()
+
+    # --- Edge stats ---
+
+    def get_edge_stats(self) -> dict[str, Any]:
+        """Return per-edge throughput stats."""
+        current_time = self._sim._current_time.to_seconds()
+        window = 5.0  # look back 5 sim-seconds
+        stats = {}
+        for (src, tgt), timestamps in self._edge_timestamps.items():
+            recent = sum(1 for t in timestamps if t >= current_time - window)
+            rate = recent / window if window > 0 else 0
+            key = f"{src}->{tgt}"
+            stats[key] = {"source": src, "target": tgt, "count": self._edge_counts.get((src, tgt), 0), "rate": round(rate, 2)}
+        return stats
+
+    # --- Entity state history ---
+
+    def _snapshot_entities(self, time_s: float) -> None:
+        """Record numeric entity state values."""
+        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+            name = getattr(entity, "name", type(entity).__name__)
+            serialized = serialize_entity(entity)
+            if name not in self._entity_history:
+                self._entity_history[name] = {}
+            for key, val in serialized.items():
+                if isinstance(val, (int, float)):
+                    if key not in self._entity_history[name]:
+                        self._entity_history[name][key] = []
+                    history = self._entity_history[name][key]
+                    history.append((time_s, float(val)))
+                    # Cap at 10000 samples
+                    if len(history) > 10000:
+                        # Downsample: keep every other point for older data
+                        half = len(history) // 2
+                        self._entity_history[name][key] = history[:half:2] + history[half:]
+
+    def get_entity_history(self, entity_name: str, metric: str | None = None) -> dict[str, Any]:
+        """Return entity state history."""
+        history = self._entity_history.get(entity_name, {})
+        if metric:
+            data = history.get(metric, [])
+            return {
+                "entity": entity_name,
+                "metrics": {metric: {"times": [t for t, _ in data], "values": [v for _, v in data]}},
+            }
+        metrics = {}
+        for key, data in history.items():
+            metrics[key] = {"times": [t for t, _ in data], "values": [v for _, v in data]}
+        return {"entity": entity_name, "metrics": metrics}
+
+    # --- Time access ---
+
+    def get_current_time_s(self) -> float:
+        """Return current simulation time in seconds."""
+        return self._sim._current_time.to_seconds()

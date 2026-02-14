@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 import TimeSeriesChart from "./TimeSeriesChart";
 import type { ChartConfig } from "../types";
+import { exportCanvasPng, exportCsv } from "../utils/export";
 
 interface TimeSeriesData {
   times: number[];
@@ -21,6 +22,18 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
   const timeRange = useSimStore((s) => s.dashboardTimeRange);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
   const lastFetchedRef = useRef<string | null>(null);
+  const chartRef = useRef<{ getCanvas: () => HTMLCanvasElement | null }>(null);
+
+  const sanitizedLabel = label.replace(/[^a-zA-Z0-9]/g, "_");
+
+  const handlePngExport = () => {
+    const canvas = chartRef.current?.getCanvas();
+    if (canvas) exportCanvasPng(canvas, sanitizedLabel + ".png");
+  };
+
+  const handleCsvExport = () => {
+    if (tsData) exportCsv(tsData.times, tsData.values, sanitizedLabel + ".csv");
+  };
 
   useEffect(() => {
     if (eventsProcessed === undefined) return;
@@ -51,17 +64,17 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
       {/* Title bar — drag handle */}
       <div className="drag-handle flex items-center justify-between px-3 py-1.5 border-b border-gray-700 cursor-grab active:cursor-grabbing select-none shrink-0">
         <span className="text-xs font-semibold text-gray-300 truncate">{label}</span>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-red-400 text-xs ml-2 leading-none"
-        >
-          &times;
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={handlePngExport} disabled={!tsData?.times.length} className="text-gray-500 hover:text-gray-300 disabled:opacity-30 text-[10px] px-1" title="Export PNG">PNG</button>
+          <button onClick={handleCsvExport} disabled={!tsData?.times.length} className="text-gray-500 hover:text-gray-300 disabled:opacity-30 text-[10px] px-1" title="Export CSV">CSV</button>
+          <button onClick={onClose} className="text-gray-500 hover:text-red-400 text-xs ml-1 leading-none">&times;</button>
+        </div>
       </div>
       {/* Chart body — fills remaining space */}
       <div className="flex-1 min-h-0 p-2">
         {tsData && tsData.times.length > 0 ? (
           <TimeSeriesChart
+            ref={chartRef}
             times={tsData.times}
             values={tsData.values}
             label={label}

@@ -10,6 +10,11 @@ interface TimeSeriesData {
   values: number[];
 }
 
+interface EntityHistoryData {
+  entity: string;
+  metrics: Record<string, { times: number[]; values: number[] }>;
+}
+
 export default function InspectorPanel() {
   const state = useSimStore((s) => s.state);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
@@ -18,7 +23,9 @@ export default function InspectorPanel() {
   const addDashboardPanel = useSimStore((s) => s.addDashboardPanel);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
+  const [entityHistory, setEntityHistory] = useState<EntityHistoryData | null>(null);
   const lastFetchedRef = useRef<{ name: string; events: number } | null>(null);
+  const lastHistoryFetchRef = useRef<{ name: string; events: number } | null>(null);
 
   const entityName = selectedEntity;
   const entityData = entityName ? state?.entities[entityName] : null;
@@ -50,6 +57,34 @@ export default function InspectorPanel() {
       .then((data: TimeSeriesData) => setTsData(data));
   }, [isProbe, entityName, state?.events_processed, state]);
 
+  // Fetch entity history for non-probe entities
+  useEffect(() => {
+    if (!entityName || !state || isProbe) {
+      setEntityHistory(null);
+      lastHistoryFetchRef.current = null;
+      return;
+    }
+
+    const key = { name: entityName, events: state.events_processed };
+    if (
+      lastHistoryFetchRef.current &&
+      lastHistoryFetchRef.current.name === key.name &&
+      lastHistoryFetchRef.current.events === key.events
+    ) {
+      return;
+    }
+
+    lastHistoryFetchRef.current = key;
+    fetch(`/api/entity_history?entity=${encodeURIComponent(entityName)}`)
+      .then((r) => r.json())
+      .then((data: EntityHistoryData) => {
+        // Only set if there are metrics with data
+        const hasData = Object.values(data.metrics).some((m) => m.times.length > 0);
+        setEntityHistory(hasData ? data : null);
+      })
+      .catch(() => setEntityHistory(null));
+  }, [entityName, state?.events_processed, state, isProbe]);
+
 
   if (!state) return null;
 
@@ -70,14 +105,31 @@ export default function InspectorPanel() {
             )}
           </div>
           <div className="space-y-1">
-            {Object.entries(entityData).map(([key, value]) => (
-              <div key={key} className="flex justify-between text-xs">
-                <span className="text-gray-400">{key}</span>
-                <span className="text-white font-mono">
-                  {formatValue(value)}
-                </span>
-              </div>
-            ))}
+            {Object.entries(entityData).map(([key, value]) => {
+              const historyMetric = entityHistory?.metrics[key];
+              const hasHistory = historyMetric && historyMetric.times.length > 1;
+              return (
+                <div key={key}>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">{key}</span>
+                    <span className="text-white font-mono">
+                      {formatValue(value)}
+                    </span>
+                  </div>
+                  {/* Mini sparkline for metrics with history */}
+                  {hasHistory && (
+                    <div className="h-[40px] mt-0.5 mb-1">
+                      <TimeSeriesChart
+                        times={historyMetric.times}
+                        values={historyMetric.values}
+                        label=""
+                        color="#6366f1"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Time series chart for probes */}

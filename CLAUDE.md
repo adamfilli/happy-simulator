@@ -26,6 +26,8 @@ pytest -q                                    # all tests (~2755, ~68s)
 pytest tests/integration/test_queue.py -q    # single file
 python examples/m_m_1_queue.py               # run example
 python examples/visual_debugger.py           # launch browser debugger
+python -m mkdocs serve                       # local docs preview at localhost:8000
+python -m mkdocs build                       # build docs to site/
 ```
 
 ## Reading Order
@@ -486,6 +488,13 @@ happysimulator/
 visual-frontend/    # React + TypeScript source for visual debugger UI
 tests/              # unit/, integration/, conftest.py
 examples/           # m_m_1_queue.py, basic_client_server.py, visual_debugger.py, ...
+docs/               # MkDocs Material site (deployed to GitHub Pages)
+├── guides/         # 16 user guides (getting-started, core-concepts, etc.)
+├── reference/      # 46 auto-generated API pages via mkdocstrings
+│   ├── core/       # simulation, event, entity, temporal, sim-future, clock, control
+│   └── components/ # one page per sub-package (queue, server, network, etc.)
+├── examples/       # 11 example gallery pages linking to examples/
+└── design/         # design philosophy
 .dev/               # Design documents (COMPONENTLIB.md, *-design.md)
 ```
 
@@ -513,6 +522,14 @@ Debug: `happysimulator.enable_console_logging("DEBUG")` or `Probe(target=server,
 
 ---
 
+## Documentation Site
+
+MkDocs Material with **mkdocstrings** for auto-generated API reference. API reference pages use `:::` directives that render docs from source docstrings — no manual API docs to maintain. Guides in `docs/guides/` are hand-written, adapted from this file.
+
+- Config: `mkdocs.yml` (nav tree, plugins, theme)
+- CI: `.github/workflows/docs.yml` deploys to GitHub Pages on push to `main`
+- Preview: `python -m mkdocs serve` at `localhost:8000`
+
 ## .dev Documentation
 
 Create design docs for major features/architecture decisions. Template: Overview, Motivation, Requirements, Design, Examples, Testing, Alternatives, Implementation Plan. Name as `feature-name-design.md`.
@@ -526,5 +543,6 @@ Create design docs for major features/architecture decisions. Template: Overview
 | `/code-review` | Review a PR |
 | `/line-count` | Count lines of code (source, tests, examples) |
 | `/update-claudemd` | Review changes and update CLAUDE.md |
+| `/update-docs` | Review changes and update documentation site |
 | `/update-pypi` | Bump version for PyPI release |
 | `/visual-debugger` | Launch the browser-based simulation debugger |

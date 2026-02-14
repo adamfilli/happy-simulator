@@ -46,6 +46,7 @@ dev = [
     "mypy",
     "ruff",
     "mkdocs-material",
+    "mkdocstrings[python]>=0.25",
 ]
 
 [project.urls]

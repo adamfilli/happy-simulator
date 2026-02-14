@@ -21,18 +21,123 @@ theme:
         name: Switch to light mode
   features:
     - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
     - navigation.sections
+    - navigation.indexes
+    - navigation.expand
+    - search.suggest
+    - toc.follow
     - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            merge_init_into_class: true
+            show_source: false
+            separate_signature: true
+            show_signature_annotations: true
+            members_order: source
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.snippets
   - admonition
+  - attr_list
+  - md_in_html
   - toc:
       permalink: true
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
-  - API Reference: api.md
+  - Installation: installation.md
+  - User Guides:
+    - Getting Started: guides/getting-started.md
+    - Core Concepts: guides/core-concepts.md
+    - Generators & Futures: guides/generators-and-futures.md
+    - Load Generation: guides/load-generation.md
+    - Queuing & Resources: guides/queuing-and-resources.md
+    - Observability: guides/observability.md
+    - Simulation Control: guides/simulation-control.md
+    - Visual Debugger: guides/visual-debugger.md
+    - Networking: guides/networking.md
+    - Clocks: guides/clocks.md
+    - Distributed Systems: guides/distributed-systems.md
+    - Behavioral Modeling: guides/behavioral-modeling.md
+    - Industrial Simulation: guides/industrial-simulation.md
+    - Fault Injection: guides/fault-injection.md
+    - Logging: guides/logging.md
+    - Testing Patterns: guides/testing-patterns.md
+  - API Reference:
+    - reference/index.md
+    - Core:
+      - Simulation: reference/core/simulation.md
+      - Event: reference/core/event.md
+      - Entity: reference/core/entity.md
+      - Instant & Duration: reference/core/temporal.md
+      - SimFuture: reference/core/sim-future.md
+      - Clocks: reference/core/clock.md
+      - Logical Clocks: reference/core/logical-clocks.md
+      - Protocols: reference/core/protocols.md
+      - Control: reference/core/control.md
+    - Load Generation: reference/load/index.md
+    - Components:
+      - Queue: reference/components/queue.md
+      - QueuedResource: reference/components/queued-resource.md
+      - Sink & Counter: reference/components/common.md
+      - Server: reference/components/server.md
+      - Client: reference/components/client.md
+      - Resource: reference/components/resource.md
+      - RandomRouter: reference/components/random-router.md
+      - Rate Limiter: reference/components/rate-limiter.md
+      - Queue Policies: reference/components/queue-policies.md
+      - Resilience: reference/components/resilience.md
+      - Synchronization: reference/components/sync.md
+      - Network: reference/components/network.md
+      - Load Balancer: reference/components/load-balancer.md
+      - Data Store: reference/components/datastore.md
+      - Messaging: reference/components/messaging.md
+      - Streaming: reference/components/streaming.md
+      - Consensus: reference/components/consensus.md
+      - Replication: reference/components/replication.md
+      - CRDTs: reference/components/crdt.md
+      - Microservice: reference/components/microservice.md
+      - Industrial: reference/components/industrial.md
+      - Behavior: reference/components/behavior.md
+      - Storage: reference/components/storage.md
+      - Infrastructure: reference/components/infrastructure.md
+      - Deployment: reference/components/deployment.md
+      - Scheduling: reference/components/scheduling.md
+      - Advertising: reference/components/advertising.md
+    - Distributions: reference/distributions/index.md
+    - Instrumentation: reference/instrumentation/index.md
+    - Analysis: reference/analysis/index.md
+    - Sketching: reference/sketching/index.md
+    - Faults: reference/faults/index.md
+    - Visual: reference/visual/index.md
+    - AI Integration: reference/ai/index.md
+    - Logging: reference/logging.md
+  - Examples:
+    - examples/index.md
+    - Queuing: examples/queuing.md
+    - Distributed Systems: examples/distributed.md
+    - Industrial: examples/industrial.md
+    - Infrastructure: examples/infrastructure.md
+    - Storage: examples/storage.md
+    - Deployment: examples/deployment.md
+    - Performance: examples/performance.md
+    - Behavior: examples/behavior.md
+    - Load Balancing: examples/load-balancing.md
+    - Visual Debugger: examples/visual.md
+  - Design Philosophy: design/philosophy.md

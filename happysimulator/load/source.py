@@ -11,7 +11,7 @@ payload generation and schedules the next SourceEvent.
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import Callable, List
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -25,12 +25,25 @@ from happysimulator.load.profile import ConstantRateProfile, Profile
 logger = logging.getLogger(__name__)
 
 
-class _SimpleEventProvider(EventProvider):
-    """Internal event provider that creates targeted events with metadata.
+class SimpleEventProvider(EventProvider):
+    """Event provider that creates targeted events with auto-incrementing IDs.
 
-    Generates events with auto-incrementing request IDs and ``created_at``
-    timestamps in context. Used by Source factory methods to eliminate the
-    need for custom EventProvider subclasses in common cases.
+    For simple cases, use directly. For custom context, pass a context_fn::
+
+        provider = SimpleEventProvider(
+            target=server,
+            context_fn=lambda time, count: {
+                "created_at": time, "request_id": count, "priority": "high"
+            }
+        )
+
+    Args:
+        target: Entity to receive generated events.
+        event_type: Type string for generated events.
+        stop_after: Stop generating after this time.
+        context_fn: Optional function(time: Instant, count: int) -> dict
+            to generate custom event context. When None, generates
+            ``{"created_at": time, "request_id": count}``.
     """
 
     def __init__(
@@ -38,10 +51,12 @@ class _SimpleEventProvider(EventProvider):
         target: Entity,
         event_type: str = "Request",
         stop_after: Instant | None = None,
+        context_fn: 'Callable[[Instant, int], dict] | None' = None,
     ):
         self._target = target
         self._event_type = event_type
         self._stop_after = stop_after
+        self._context_fn = context_fn
         self._generated: int = 0
 
     def get_events(self, time: Instant) -> list[Event]:
@@ -49,17 +64,25 @@ class _SimpleEventProvider(EventProvider):
             return []
 
         self._generated += 1
+        if self._context_fn is not None:
+            context = self._context_fn(time, self._generated)
+        else:
+            context = {
+                "created_at": time,
+                "request_id": self._generated,
+            }
         return [
             Event(
                 time=time,
                 event_type=self._event_type,
                 target=self._target,
-                context={
-                    "created_at": time,
-                    "request_id": self._generated,
-                },
+                context=context,
             )
         ]
+
+
+# Backwards-compatible alias for internal usage
+_SimpleEventProvider = SimpleEventProvider
 
 
 class Source(Entity):
@@ -151,31 +174,40 @@ class Source(Entity):
     def constant(
         cls,
         rate: float,
-        target: Entity,
+        target: Entity | None = None,
         event_type: str = "Request",
         *,
         name: str = "Source",
         stop_after: float | Instant | None = None,
+        event_provider: EventProvider | None = None,
     ) -> Source:
         """Create a Source with constant (deterministic) arrival rate.
 
         Args:
             rate: Events per second.
-            target: Entity to receive generated events.
+            target: Entity to receive generated events. Required unless
+                event_provider is given.
             event_type: Type string for generated events.
             name: Source identifier for logging.
             stop_after: Stop generating events after this time.
                         Accepts seconds (float) or Instant.
+            event_provider: Custom event provider. When given, target and
+                event_type are ignored.
 
         Returns:
             A fully-wired Source ready for use in a Simulation.
         """
         from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 
-        stop_instant = cls._resolve_stop_after(stop_after)
+        if event_provider is None:
+            if target is None:
+                raise ValueError("Either 'target' or 'event_provider' must be provided")
+            stop_instant = cls._resolve_stop_after(stop_after)
+            event_provider = SimpleEventProvider(target, event_type, stop_instant)
+
         return cls(
             name=name,
-            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            event_provider=event_provider,
             arrival_time_provider=ConstantArrivalTimeProvider(
                 ConstantRateProfile(rate=rate),
                 start_time=Instant.Epoch,
@@ -186,31 +218,40 @@ class Source(Entity):
     def poisson(
         cls,
         rate: float,
-        target: Entity,
+        target: Entity | None = None,
         event_type: str = "Request",
         *,
         name: str = "Source",
         stop_after: float | Instant | None = None,
+        event_provider: EventProvider | None = None,
     ) -> Source:
         """Create a Source with Poisson (stochastic) arrival rate.
 
         Args:
             rate: Mean events per second.
-            target: Entity to receive generated events.
+            target: Entity to receive generated events. Required unless
+                event_provider is given.
             event_type: Type string for generated events.
             name: Source identifier for logging.
             stop_after: Stop generating events after this time.
                         Accepts seconds (float) or Instant.
+            event_provider: Custom event provider. When given, target and
+                event_type are ignored.
 
         Returns:
             A fully-wired Source ready for use in a Simulation.
         """
         from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
-        stop_instant = cls._resolve_stop_after(stop_after)
+        if event_provider is None:
+            if target is None:
+                raise ValueError("Either 'target' or 'event_provider' must be provided")
+            stop_instant = cls._resolve_stop_after(stop_after)
+            event_provider = SimpleEventProvider(target, event_type, stop_instant)
+
         return cls(
             name=name,
-            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            event_provider=event_provider,
             arrival_time_provider=PoissonArrivalTimeProvider(
                 ConstantRateProfile(rate=rate),
                 start_time=Instant.Epoch,
@@ -221,24 +262,28 @@ class Source(Entity):
     def with_profile(
         cls,
         profile: Profile,
-        target: Entity,
+        target: Entity | None = None,
         event_type: str = "Request",
         *,
         poisson: bool = True,
         name: str = "Source",
         stop_after: float | Instant | None = None,
+        event_provider: EventProvider | None = None,
     ) -> Source:
         """Create a Source with a custom rate profile.
 
         Args:
             profile: Rate profile defining how arrival rate varies over time.
-            target: Entity to receive generated events.
+            target: Entity to receive generated events. Required unless
+                event_provider is given.
             event_type: Type string for generated events.
             poisson: If True (default), use stochastic Poisson arrivals.
                      If False, use deterministic constant arrivals.
             name: Source identifier for logging.
             stop_after: Stop generating events after this time.
                         Accepts seconds (float) or Instant.
+            event_provider: Custom event provider. When given, target and
+                event_type are ignored.
 
         Returns:
             A fully-wired Source ready for use in a Simulation.
@@ -246,11 +291,16 @@ class Source(Entity):
         from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
         from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
-        stop_instant = cls._resolve_stop_after(stop_after)
+        if event_provider is None:
+            if target is None:
+                raise ValueError("Either 'target' or 'event_provider' must be provided")
+            stop_instant = cls._resolve_stop_after(stop_after)
+            event_provider = SimpleEventProvider(target, event_type, stop_instant)
+
         provider_cls = PoissonArrivalTimeProvider if poisson else ConstantArrivalTimeProvider
         return cls(
             name=name,
-            event_provider=_SimpleEventProvider(target, event_type, stop_instant),
+            event_provider=event_provider,
             arrival_time_provider=provider_cls(
                 profile,
                 start_time=Instant.Epoch,

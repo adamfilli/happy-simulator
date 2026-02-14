@@ -41,7 +41,11 @@
       "WebSearch",
       "Bash(npm install:*)",
       "Bash(node -e:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:www.mathworks.com)",
+      "WebFetch(domain:simpy.readthedocs.io)",
+      "WebFetch(domain:ciw.readthedocs.io)",
+      "Bash(git checkout:*)"
     ]
   },
   "hooks": {

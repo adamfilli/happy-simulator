@@ -50,9 +50,23 @@ from happysimulator.load import (
     LinearRampProfile,
     PoissonArrivalTimeProvider,
     Profile,
+    SimpleEventProvider,
     Source,
     SpikeProfile,
 )
+
+# AI integration
+from happysimulator.ai import (
+    SimulationResult,
+    SimulationComparison,
+    SweepResult,
+    MetricDiff,
+    Recommendation,
+    generate_recommendations,
+)
+
+# Server
+from happysimulator.components.server import Server, ServerStats
 
 # Components
 from happysimulator.components import (
@@ -395,7 +409,18 @@ __all__ = [
     "ConditionBreakpoint",
     "MetricBreakpoint",
     "EventTypeBreakpoint",
+    # AI integration
+    "SimulationResult",
+    "SimulationComparison",
+    "SweepResult",
+    "MetricDiff",
+    "Recommendation",
+    "generate_recommendations",
+    # Server
+    "Server",
+    "ServerStats",
     # Load
+    "SimpleEventProvider",
     "Source",
     "EventProvider",
     "Profile",

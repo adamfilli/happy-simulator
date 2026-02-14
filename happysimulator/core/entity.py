@@ -69,6 +69,24 @@ class Entity(ABC):
         """
         raise NotImplementedError
 
+    def forward(self, event: Event, target: "Entity", event_type: str | None = None) -> Event:
+        """Create a forwarding event that preserves context.
+
+        Args:
+            event: The original event to forward.
+            target: The downstream entity to receive the event.
+            event_type: Override the event type (default: keep original).
+
+        Returns:
+            A new Event with the same context, targeted at the downstream entity.
+        """
+        return Event(
+            time=self.now,
+            event_type=event_type or event.event_type,
+            target=target,
+            context=event.context,
+        )
+
     def has_capacity(self) -> bool:
         """Check if this entity can accept additional work.
 

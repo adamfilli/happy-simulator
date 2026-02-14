@@ -61,13 +61,20 @@ class Simulation:
         probes: list[Source] = None,
         trace_recorder: TraceRecorder | None = None,
         fault_schedule: 'FaultSchedule | None' = None,
+        duration: float | None = None,
     ):
+        if duration is not None and end_time is not None:
+            raise ValueError("Cannot specify both 'duration' and 'end_time'")
+
         self._start_time = start_time
         if self._start_time is None:
             self._start_time = Instant.Epoch
 
-        self._end_time = end_time
-        if self._end_time is None:
+        if duration is not None:
+            self._end_time = Instant.from_seconds(duration)
+        elif end_time is not None:
+            self._end_time = end_time
+        else:
             self._end_time = Instant.Infinity
 
         self._clock = Clock(self._start_time)

@@ -123,3 +123,42 @@ class Probe(Source):
             "Probe created: target=%s metric=%s interval=%.3fs",
             target.name, metric, interval
         )
+
+    @classmethod
+    def on(cls, target: Entity, metric: str, interval: float = 1.0) -> tuple["Probe", Data]:
+        """Create a Probe and its Data container in one call.
+
+        Args:
+            target: The entity to measure.
+            metric: Attribute or property name to sample.
+            interval: Seconds between measurements. Defaults to 1.0.
+
+        Returns:
+            (probe, data) tuple. Pass probe to Simulation(probes=[...]),
+            use data for post-simulation analysis.
+        """
+        data = Data()
+        probe = cls(target=target, metric=metric, data=data, interval=interval)
+        return probe, data
+
+    @classmethod
+    def on_many(
+        cls, target: Entity, metrics: list[str], interval: float = 1.0
+    ) -> tuple[list["Probe"], dict[str, Data]]:
+        """Create Probes for multiple metrics on the same target.
+
+        Args:
+            target: The entity to measure.
+            metrics: List of attribute/property names to sample.
+            interval: Seconds between measurements. Defaults to 1.0.
+
+        Returns:
+            (probes_list, data_dict) where data_dict is keyed by metric name.
+        """
+        probes: list[Probe] = []
+        data_dict: dict[str, Data] = {}
+        for metric in metrics:
+            probe, data = cls.on(target, metric, interval=interval)
+            probes.append(probe)
+            data_dict[metric] = data
+        return probes, data_dict

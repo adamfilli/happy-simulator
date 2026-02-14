@@ -93,5 +93,5 @@ export const useSimStore = create<SimStore>((set) => ({
     })),
   setActiveView: (view) => set({ activeView: view }),
   setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [], dashboardTimeRange: { start: null, end: null } }),
+  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardTimeRange: { start: null, end: null } }),
 }));

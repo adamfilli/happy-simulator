@@ -26,8 +26,10 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Install dependencies
-        run: pip install mkdocs-material
+      - name: Install package and dependencies
+        run: |
+          pip install -e .
+          pip install -e ".[dev]"
 
       - name: Build docs
         run: mkdocs build

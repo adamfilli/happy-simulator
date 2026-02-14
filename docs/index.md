@@ -1,35 +1,69 @@
 # happy-simulator
 
-A discrete-event simulation library for Python 3.13+, inspired by MATLAB SimEvents.
+A discrete-event simulation library for Python 3.13+, built for modeling distributed systems, queuing networks, and complex real-world processes.
 
-## Overview
+---
 
-happy-simulator models systems using an event-driven architecture where a central `EventHeap` schedules and executes `Event` objects until the simulation ends.
+<div class="grid cards" markdown>
 
-## Installation
+-   **Event-Driven Core**
 
-```bash
-pip install happysim
-```
+    ---
+
+    Central `EventHeap` schedules and executes `Event` objects through `Entity` handlers. Generators let you express delays with `yield`.
+
+-   **200+ Components**
+
+    ---
+
+    Queues, servers, networks, consensus protocols, storage engines, industrial processes, behavioral models, and more.
+
+-   **Observability Built In**
+
+    ---
+
+    `Data`, `Probe`, `LatencyTracker`, `SimulationSummary`, and bucketed time-series analysis out of the box.
+
+-   **Visual Debugger**
+
+    ---
+
+    Browser-based dashboard with entity graphs, charts, event logs, and step/play/pause controls.
+
+</div>
 
 ## Quick Example
 
 ```python
-from happysimulator import Simulation, Event, Instant
+from happysimulator import (
+    Simulation, Event, Entity, Instant, Source, Sink,
+)
 
-def on_ping(event):
-    print(f"Pong at {event.time}")
+class Server(Entity):
+    def __init__(self, name, downstream):
+        super().__init__(name)
+        self.downstream = downstream
 
-sim = Simulation(end_time=Instant.from_seconds(10))
-sim.schedule(Event(
-    time=Instant.from_seconds(1),
-    event_type="Ping",
-    callback=on_ping
-))
-sim.run()
+    def handle_event(self, event):
+        yield 0.1  # simulate 100ms processing
+        return [Event(time=self.now, event_type="Done", target=self.downstream)]
+
+sink = Sink()
+server = Server("server", downstream=sink)
+source = Source.constant(rate=5, target=server)
+
+sim = Simulation(
+    entities=[source, server, sink],
+    end_time=Instant.from_seconds(10),
+)
+summary = sim.run()
+print(f"Processed {sink.events_received} requests")
+print(f"Avg latency: {sink.latency_stats()['avg']:.3f}s")
 ```
 
 ## Next Steps
 
-- [Getting Started](getting-started.md) - Learn the basics
-- [API Reference](api.md) - Full API documentation
+- [Installation](installation.md) — install from PyPI or source
+- [Getting Started](guides/getting-started.md) — build your first simulation
+- [API Reference](reference/index.md) — full auto-generated API docs
+- [Examples](examples/index.md) — 78 runnable examples across 10 categories

@@ -5,13 +5,11 @@ causes the source to produce payload events and schedule its next tick,
 creating a self-perpetuating loop until the simulation ends.
 """
 
-from dataclasses import dataclass
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
 from happysimulator.core.entity import Entity
 
 
-@dataclass
 class SourceEvent(Event):
     """Tick event that triggers a Source to generate its next payload.
 

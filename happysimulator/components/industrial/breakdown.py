@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import Generator, Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -37,6 +37,13 @@ class BreakdownStats:
         if total == 0:
             return 1.0
         return self.total_uptime_s / total
+
+
+@runtime_checkable
+class Breakable(Protocol):
+    """Protocol for entities that can be broken down."""
+
+    _broken: bool
 
 
 class BreakdownScheduler(Entity):
@@ -65,7 +72,9 @@ class BreakdownScheduler(Entity):
         mean_repair_time: float = 5.0,
     ):
         super().__init__(name)
-        self.target = target
+        if not hasattr(target, "_broken"):
+            target._broken = False  # type: ignore[attr-defined]
+        self.target: Breakable = target  # type: ignore[assignment]
         self.mean_time_to_failure = mean_time_to_failure
         self.mean_repair_time = mean_repair_time
 
@@ -116,7 +125,7 @@ class BreakdownScheduler(Entity):
 
             # Break the target
             self._is_down = True
-            self.target._broken = True  # type: ignore[attr-defined]
+            self.target._broken = True
             self._breakdown_count += 1
 
             # Schedule repair
@@ -142,7 +151,7 @@ class BreakdownScheduler(Entity):
 
             # Restore the target
             self._is_down = False
-            self.target._broken = False  # type: ignore[attr-defined]
+            self.target._broken = False
 
             # Schedule next failure
             ttf = random.expovariate(1.0 / self.mean_time_to_failure)

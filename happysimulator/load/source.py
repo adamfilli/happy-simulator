@@ -125,7 +125,7 @@ class Source(Entity):
             # Calculate when the first event should happen
             first_time = self._time_provider.next_arrival_time()
             
-            logger.info(f"[{self.name}] Source starting. First event at {first_time}")
+            logger.debug(f"[{self.name}] Source starting. First event at {first_time}")
             
             # Return the first 'Tick'
             return [SourceEvent(time=first_time, source_entity=self)]

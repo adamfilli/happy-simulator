@@ -53,6 +53,10 @@ class BatchProcessor(Entity):
         process_time: float = 1.0,
         timeout_s: float = 0.0,
     ):
+        if batch_size <= 0:
+            raise ValueError(f"batch_size must be > 0, got {batch_size}")
+        if process_time < 0:
+            raise ValueError(f"process_time must be >= 0, got {process_time}")
         super().__init__(name)
         self.downstream = downstream
         self.batch_size = batch_size

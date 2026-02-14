@@ -37,6 +37,8 @@ class ArrivalTimeProvider(ABC):
     def __init__(self, profile: Profile, start_time: Instant):
         self.profile = profile
         self.current_time = start_time
+        self._is_constant_rate = isinstance(profile, ConstantRateProfile)
+        self._constant_rate: float = profile.rate if self._is_constant_rate else 0.0
 
     @abstractmethod
     def _get_target_integral_value(self) -> float:
@@ -63,8 +65,8 @@ class ArrivalTimeProvider(ABC):
         t_start_sec = self.current_time.to_seconds()
 
         # Fast path for ConstantRateProfile: O(1) direct calculation
-        if isinstance(self.profile, ConstantRateProfile):
-            rate = self.profile.rate
+        if self._is_constant_rate:
+            rate = self._constant_rate
             if rate <= 0:
                 raise RuntimeError("Cannot compute arrival with zero or negative rate")
             t_next = t_start_sec + target_area / rate

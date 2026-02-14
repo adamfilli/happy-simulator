@@ -28,6 +28,7 @@ Example::
 
 from __future__ import annotations
 
+import contextvars
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -39,27 +40,30 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Active simulation context — set by Simulation.run(), used by resolve()
-_active_heap: EventHeap | None = None
-_active_clock: Clock | None = None
+# Uses contextvars for async/thread safety instead of module-level globals.
+_active_heap_var: contextvars.ContextVar[EventHeap | None] = contextvars.ContextVar(
+    "_active_heap", default=None
+)
+_active_clock_var: contextvars.ContextVar[Clock | None] = contextvars.ContextVar(
+    "_active_clock", default=None
+)
 
 
 def _set_active_context(heap: EventHeap, clock: Clock) -> None:
     """Set the active simulation context. Called by Simulation.run()."""
-    global _active_heap, _active_clock
-    _active_heap = heap
-    _active_clock = clock
+    _active_heap_var.set(heap)
+    _active_clock_var.set(clock)
 
 
 def _clear_active_context() -> None:
     """Clear the active simulation context. Called when Simulation.run() exits."""
-    global _active_heap, _active_clock
-    _active_heap = None
-    _active_clock = None
+    _active_heap_var.set(None)
+    _active_clock_var.set(None)
 
 
 def _get_active_heap() -> EventHeap | None:
     """Return the active event heap, or None if no simulation is running."""
-    return _active_heap
+    return _active_heap_var.get()
 
 
 class SimFuture:
@@ -188,8 +192,8 @@ class SimFuture:
         """Create and schedule a ProcessContinuation to resume the generator."""
         from happysimulator.core.event import ProcessContinuation
 
-        heap = _active_heap
-        clock = _active_clock
+        heap = _active_heap_var.get()
+        clock = _active_clock_var.get()
         if heap is None or clock is None:
             raise RuntimeError(
                 "SimFuture.resolve() called outside a running simulation. "

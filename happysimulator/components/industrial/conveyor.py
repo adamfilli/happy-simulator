@@ -47,6 +47,8 @@ class ConveyorBelt(Entity):
         transit_time: float,
         capacity: int = 0,
     ):
+        if transit_time < 0:
+            raise ValueError(f"transit_time must be >= 0, got {transit_time}")
         super().__init__(name)
         self.downstream = downstream
         self.transit_time = transit_time

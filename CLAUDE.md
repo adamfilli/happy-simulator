@@ -21,7 +21,7 @@ Discrete-event simulation library for Python 3.13+.
 ## Development Commands
 
 ```bash
-pytest -q                                    # all tests (~1725, ~58s)
+pytest -q                                    # all tests (~2755, ~68s)
 pytest tests/integration/test_queue.py -q    # single file
 python examples/m_m_1_queue.py               # run example
 python examples/visual_debugger.py           # launch browser debugger
@@ -165,6 +165,41 @@ EWMA-based smoothing with **no throughput cap** — resists rate *changes*, not 
 inductor = Inductor(name="Smoother", downstream=server, time_constant=1.0, queue_capacity=10000)
 inductor.stats / inductor.estimated_rate / inductor.queue_depth
 ```
+
+### Industrial Components
+
+Package: `happysimulator.components.industrial`
+
+```python
+from happysimulator.components.industrial import (
+    BalkingQueue, RenegingQueuedResource,
+    ConveyorBelt, InspectionStation, BatchProcessor,
+    ShiftSchedule, ShiftedServer, Shift,
+    BreakdownScheduler, InventoryBuffer, AppointmentScheduler,
+    ConditionalRouter, PerishableInventory, PooledCycleResource,
+    GateController, SplitMerge, PreemptibleResource, PreemptibleGrant,
+)
+```
+
+| Component | Base | Description |
+|-----------|------|-------------|
+| `BalkingQueue` | `QueuePolicy` | Wraps any queue policy; rejects arrivals when depth >= threshold. `BalkingQueue(inner, balk_threshold=5, balk_probability=1.0)` |
+| `RenegingQueuedResource` | `QueuedResource` | Abstract; checks `(now - created_at) > patience` on dequeue, routes expired to `reneged_target`. Subclass implements `_handle_served_event()` |
+| `ConveyorBelt` | `Entity` | Fixed transit time between stations. `ConveyorBelt(name, transit_time, downstream, capacity=None)` |
+| `InspectionStation` | `QueuedResource` | Probabilistic pass/fail routing. `InspectionStation(name, inspection_time, pass_rate, pass_target, fail_target)` |
+| `BatchProcessor` | `Entity` | Accumulates items until `batch_size` or `timeout_s`, processes as batch. `BatchProcessor(name, batch_size, process_time, downstream, timeout_s=None)` |
+| `ShiftSchedule` + `ShiftedServer` | `QueuedResource` | Time-varying capacity via `Shift(start_s, end_s, capacity)` schedule |
+| `BreakdownScheduler` | `Entity` | Random UP/DOWN cycles on target; sets `target._broken`. `BreakdownScheduler(name, target, mean_time_to_failure, mean_repair_time)` |
+| `InventoryBuffer` | `Entity` | `(s, Q)` reorder policy. `InventoryBuffer(name, initial_stock, reorder_point, reorder_quantity, supplier, lead_time)` |
+| `AppointmentScheduler` | `Entity` | Fixed-time arrivals with `no_show_rate`. `scheduler.start_events()` returns initial events |
+| `ConditionalRouter` | `Entity` | Declarative routing via ordered `(predicate, target)` list. Factory: `ConditionalRouter.by_context_field(name, field, mapping, default)` |
+| `PerishableInventory` | `Entity` | Inventory with shelf life; periodic spoilage sweeps remove expired items. `PerishableInventory(name, initial_stock, shelf_life_s, spoilage_check_interval_s, reorder_point, ...)` |
+| `PooledCycleResource` | `Entity` | Pool of N identical units with fixed cycle time. `PooledCycleResource(name, pool_size, cycle_time, downstream, queue_capacity=0)` |
+| `GateController` | `Entity` | Opens/closes on schedule or programmatically; queues arrivals when closed. `GateController(name, downstream, schedule=[(open_s, close_s)], initially_open=True)` |
+| `SplitMerge` | `Entity` | Fan-out to N targets, `all_of` wait, merge results downstream. Targets resolve `context["reply_future"]`. `SplitMerge(name, targets, downstream)` |
+| `PreemptibleResource` | `Entity` | Priority-based resource with preemption. `acquire(amount, priority, preempt=True, on_preempt=callback)` returns `SimFuture[PreemptibleGrant]` |
+
+**Examples** (20 industrial simulations in `examples/`): `bank_branch.py`, `manufacturing_line.py`, `hospital_er.py`, `call_center.py`, `grocery_store.py`, `car_wash.py`, `restaurant.py`, `supply_chain.py`, `warehouse_fulfillment.py`, `parking_lot.py`, `coffee_shop.py`, `drive_through.py`, `laundromat.py`, `pharmacy.py`, `theme_park.py`, `airport_terminal.py`, `hotel_operations.py`, `blood_bank.py`, `elevator_system.py`, `urgent_care.py`
 
 ### Network Topology & Partitions
 
@@ -360,8 +395,13 @@ happysimulator/
 │   └── control/    # SimulationControl, breakpoints, state
 ├── load/           # Source, profiles, EventProvider, ArrivalTimeProvider
 ├── components/     # queue, queued_resource, common (Sink/Counter), random_router,
-│                   # rate_limiter/, network/, server/, client/, resilience/,
-│                   # messaging/, datastore/, sync/, queue_policies/
+│   │               # rate_limiter/, network/, server/, client/, resilience/,
+│   │               # messaging/, datastore/, sync/, queue_policies/
+│   └── industrial/ # BalkingQueue, RenegingQueuedResource, ConveyorBelt,
+│                   # InspectionStation, BatchProcessor, ShiftSchedule,
+│                   # BreakdownScheduler, InventoryBuffer, AppointmentScheduler,
+│                   # ConditionalRouter, PerishableInventory, PooledCycleResource,
+│                   # GateController, SplitMerge, PreemptibleResource
 ├── distributions/  # ConstantLatency, ExponentialLatency, ZipfDistribution, Uniform
 ├── instrumentation/# Data, LatencyTracker, ThroughputTracker, Probe
 ├── visual/         # Browser debugger: serve(), Chart, bridge, server, topology

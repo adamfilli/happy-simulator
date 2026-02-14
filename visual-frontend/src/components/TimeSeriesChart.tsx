@@ -1,0 +1,173 @@
+import { useEffect, useRef, useCallback, useState } from "react";
+
+interface Props {
+  times: number[];
+  values: number[];
+  label: string;
+  color?: string;
+  yLabel?: string;
+  xLabel?: string;
+  yMin?: number | null;
+  yMax?: number | null;
+}
+
+export default function TimeSeriesChart({
+  times,
+  values,
+  label,
+  color = "#3b82f6",
+  yLabel,
+  xLabel,
+  yMin: fixedYMin,
+  yMax: fixedYMax,
+}: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+
+  // Observe container size changes
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) {
+        setSize({ w: width, h: height });
+      }
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !size || times.length === 0) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size.w * dpr;
+    canvas.height = size.h * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = size.w;
+    const h = size.h;
+    const hasYLabel = !!yLabel;
+    const hasXLabel = !!xLabel;
+    const pad = {
+      top: 8,
+      right: 12,
+      bottom: hasXLabel ? 36 : 24,
+      left: hasYLabel ? 54 : 40,
+    };
+    const plotW = w - pad.left - pad.right;
+    const plotH = h - pad.top - pad.bottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Compute ranges
+    const tMin = times[0];
+    const tMax = times[times.length - 1];
+    const tRange = tMax - tMin || 1;
+    const vMin = fixedYMin != null ? fixedYMin : 0;
+    const vMax = fixedYMax != null ? fixedYMax : Math.max(...values, 1);
+    const vRange = vMax - vMin || 1;
+
+    const toX = (t: number) => pad.left + ((t - tMin) / tRange) * plotW;
+    const toY = (v: number) => pad.top + plotH - ((v - vMin) / vRange) * plotH;
+
+    // Grid lines + Y-axis tick labels
+    ctx.strokeStyle = "#1f2937";
+    ctx.lineWidth = 1;
+    const yTicks = 4;
+    for (let i = 0; i <= yTicks; i++) {
+      const v = vMin + (vRange * i) / yTicks;
+      const y = toY(v);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(w - pad.right, y);
+      ctx.stroke();
+
+      ctx.fillStyle = "#6b7280";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(Number.isInteger(v) ? String(v) : v.toFixed(1), pad.left - 4, y);
+    }
+
+    // X-axis tick labels
+    ctx.fillStyle = "#6b7280";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const xTicks = Math.min(5, times.length);
+    for (let i = 0; i < xTicks; i++) {
+      const idx = Math.floor((i / (xTicks - 1 || 1)) * (times.length - 1));
+      const t = times[idx];
+      ctx.fillText(t.toFixed(1) + "s", toX(t), pad.top + plotH + 4);
+    }
+
+    // Y-axis label (rotated 90deg)
+    if (yLabel) {
+      ctx.save();
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.translate(10, pad.top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(yLabel, 0, 0);
+      ctx.restore();
+    }
+
+    // X-axis label
+    if (xLabel) {
+      ctx.fillStyle = "#9ca3af";
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(xLabel, pad.left + plotW / 2, h - 14);
+    }
+
+    // Data line
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let i = 0; i < times.length; i++) {
+      const x = toX(times[i]);
+      const y = toY(values[i]);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill under curve
+    ctx.lineTo(toX(times[times.length - 1]), toY(vMin));
+    ctx.lineTo(toX(times[0]), toY(vMin));
+    ctx.closePath();
+    ctx.fillStyle = color + "18";
+    ctx.fill();
+  }, [times, values, color, size, yLabel, xLabel, fixedYMin, fixedYMax]);
+
+  useEffect(() => {
+    draw();
+  }, [draw]);
+
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <span className="text-[10px] text-gray-500 uppercase tracking-wide px-1 mb-1 shrink-0">
+        {label}
+      </span>
+      <div ref={containerRef} className="flex-1 min-h-0">
+        <canvas
+          ref={canvasRef}
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
+    </div>
+  );
+}

@@ -292,6 +292,8 @@ class SimulationBridge:
         self._event_counter = 0
         self._last_handler_name = None
         self._topology = discover(self._sim)
+        for chart in self._charts:
+            chart.data.clear()
 
         # Re-prime: pause + run
         self._sim.control.pause()

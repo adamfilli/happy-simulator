@@ -27,6 +27,8 @@
       "Bash(Measure-Object -Line)",
       "Bash(cloc:*)",
       "Bash(gh pr edit:*)",
+      "Bash(pip install:*)",
+      "Bash(C:Python314python.exe \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\2\\\\happy-simulator\\\\examples\\\\saga_failure_cascade.py\" --no-viz)"
       "Bash(ls -la \"C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\3\\\\happy-simulator\\\\happysimulator\\\\components\"\" | grep -E \"sidecar)",
       "Bash(api)",
       "Bash(saga)",

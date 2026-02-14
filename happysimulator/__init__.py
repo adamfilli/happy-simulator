@@ -111,6 +111,18 @@ from happysimulator.components import (
     LateEventPolicy,
 )
 
+# Microservice patterns
+from happysimulator.components.microservice import (
+    IdempotencyStore,
+    Sidecar,
+    OutboxRelay,
+    Saga,
+    SagaStep,
+    SagaState,
+    APIGateway,
+    RouteConfig,
+)
+
 # Distributions
 from happysimulator.distributions import (
     ConstantLatency,
@@ -438,6 +450,15 @@ __all__ = [
     "SketchCollector",
     "TopKCollector",
     "QuantileEstimator",
+    # Microservice patterns
+    "IdempotencyStore",
+    "Sidecar",
+    "OutboxRelay",
+    "Saga",
+    "SagaStep",
+    "SagaState",
+    "APIGateway",
+    "RouteConfig",
     # Consensus & Coordination
     "Log",
     "LogEntry",

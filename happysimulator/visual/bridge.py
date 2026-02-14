@@ -337,6 +337,15 @@ class SimulationBridge:
         self._last_snapshot_time = -1.0
         self._topology = discover(self._sim)
 
+        # Clear chart data so it doesn't accumulate across runs
+        for chart in self._charts:
+            chart.data.clear()
+        # Clear probe data sinks
+        from happysimulator.instrumentation.probe import Probe
+        for probe in self._sim._probes:
+            if isinstance(probe, Probe):
+                probe.data_sink.clear()
+
         # Re-prime: pause + run
         self._sim.control.pause()
         self._sim.run()

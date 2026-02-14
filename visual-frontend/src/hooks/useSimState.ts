@@ -103,5 +103,5 @@ export const useSimStore = create<SimStore>((set) => ({
   setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
   setEdgeStats: (stats) => set({ edgeStats: stats }),
   setBreakpointHitInfo: (info) => set({ breakpointHitInfo: info }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardPanels: [], dashboardTimeRange: { start: null, end: null }, edgeStats: {}, breakpointHitInfo: null }),
+  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardTimeRange: { start: null, end: null }, edgeStats: {}, breakpointHitInfo: null }),
 }));

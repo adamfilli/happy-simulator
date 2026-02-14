@@ -38,6 +38,10 @@ class Data:
         """
         self._samples.append((time.to_seconds(), value))
 
+    def clear(self) -> None:
+        """Remove all recorded samples."""
+        self._samples.clear()
+
     @property
     def values(self) -> List[Tuple[float, Any]]:
         """All recorded samples as (time_seconds, value) tuples."""

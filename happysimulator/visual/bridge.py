@@ -212,16 +212,15 @@ class SimulationBridge:
             "upcoming": upcoming,
         }
 
-    def step(self, count: int = 1) -> dict[str, Any]:
-        """Step the simulation and return new state + processed events."""
+    def _clear_new_buffers(self) -> None:
+        """Clear the new-event, new-edge, and new-log buffers under the lock."""
         with self._lock:
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
             self._new_logs_buffer.clear()
 
-        self._sim.control.step(count)
-        state = self.get_state()
-
+    def _drain_new_buffers(self) -> tuple[list[dict], list[dict], list[dict]]:
+        """Drain and return contents of the new-event/edge/log buffers."""
         with self._lock:
             new_events = [e.to_dict() for e in self._new_events_buffer]
             new_edges = list(self._new_edges_buffer)
@@ -229,7 +228,15 @@ class SimulationBridge:
             self._new_events_buffer.clear()
             self._new_edges_buffer.clear()
             self._new_logs_buffer.clear()
+        return new_events, new_edges, new_logs
 
+    def step(self, count: int = 1) -> dict[str, Any]:
+        """Step the simulation and return new state + processed events."""
+        self._clear_new_buffers()
+
+        self._sim.control.step(count)
+        state = self.get_state()
+        new_events, new_edges, new_logs = self._drain_new_buffers()
         return {
             "state": state,
             "new_events": new_events,
@@ -242,25 +249,14 @@ class SimulationBridge:
         from happysimulator.core.control.breakpoints import TimeBreakpoint
         from happysimulator.core.temporal import Instant
 
-        with self._lock:
-            self._new_events_buffer.clear()
-            self._new_edges_buffer.clear()
-            self._new_logs_buffer.clear()
+        self._clear_new_buffers()
 
         target = Instant.from_seconds(time_s)
         self._sim.control.add_breakpoint(TimeBreakpoint(time=target, one_shot=True))
         self._sim.control.resume()
 
         state = self.get_state()
-
-        with self._lock:
-            new_events = [e.to_dict() for e in self._new_events_buffer]
-            new_edges = list(self._new_edges_buffer)
-            new_logs = [l.to_dict() for l in self._new_logs_buffer]
-            self._new_events_buffer.clear()
-            self._new_edges_buffer.clear()
-            self._new_logs_buffer.clear()
-
+        new_events, new_edges, new_logs = self._drain_new_buffers()
         return {
             "state": state,
             "new_events": new_events,
@@ -272,10 +268,7 @@ class SimulationBridge:
         """Run the simulation until the given event number, then return state."""
         from happysimulator.core.control.breakpoints import EventCountBreakpoint
 
-        with self._lock:
-            self._new_events_buffer.clear()
-            self._new_edges_buffer.clear()
-            self._new_logs_buffer.clear()
+        self._clear_new_buffers()
 
         self._sim.control.add_breakpoint(
             EventCountBreakpoint(count=event_number, one_shot=True)
@@ -283,15 +276,7 @@ class SimulationBridge:
         self._sim.control.resume()
 
         state = self.get_state()
-
-        with self._lock:
-            new_events = [e.to_dict() for e in self._new_events_buffer]
-            new_edges = list(self._new_edges_buffer)
-            new_logs = [l.to_dict() for l in self._new_logs_buffer]
-            self._new_events_buffer.clear()
-            self._new_edges_buffer.clear()
-            self._new_logs_buffer.clear()
-
+        new_events, new_edges, new_logs = self._drain_new_buffers()
         return {
             "state": state,
             "new_events": new_events,

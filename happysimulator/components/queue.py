@@ -14,43 +14,53 @@ from dataclasses import dataclass, field
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 from happysimulator.components.queue_policy import QueuePolicy, FIFOQueue
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class QueuePollEvent(Event):
     """Request from driver to queue for the next work item.
 
     Sent when the driver's target has capacity and is ready for work.
     The queue responds with QueueDeliverEvent if items are available.
     """
-    event_type: str = field(default="QUEUE_POLL", init=False)
-    requestor: Entity = None
+
+    __slots__ = ("requestor",)
+
+    def __init__(self, *, time: Instant, target, requestor: Entity = None, **kwargs):
+        super().__init__(time=time, event_type="QUEUE_POLL", target=target, **kwargs)
+        self.requestor = requestor
 
 
-@dataclass
 class QueueNotifyEvent(Event):
     """Notification from queue to driver that work is available.
 
     Sent when an item is enqueued into a previously empty queue.
     The driver should check target capacity and poll if ready.
     """
-    event_type: str = field(default="QUEUE_NOTIFY", init=False)
-    queue_entity: Entity = None
+
+    __slots__ = ("queue_entity",)
+
+    def __init__(self, *, time: Instant, target, queue_entity: Entity = None, **kwargs):
+        super().__init__(time=time, event_type="QUEUE_NOTIFY", target=target, **kwargs)
+        self.queue_entity = queue_entity
 
 
-@dataclass
 class QueueDeliverEvent(Event):
     """Delivery from queue to driver containing one work item.
 
     The payload event is passed unmodified. The driver is responsible
     for retargeting it to the downstream entity before scheduling.
     """
-    event_type: str = field(default="QUEUE_DELIVER", init=False)
-    payload: Event | None = None
-    queue_entity: Entity | None = None
+
+    __slots__ = ("payload", "queue_entity")
+
+    def __init__(self, *, time: Instant, target, payload: Event | None = None, queue_entity: Entity | None = None, **kwargs):
+        super().__init__(time=time, event_type="QUEUE_DELIVER", target=target, **kwargs)
+        self.payload = payload
+        self.queue_entity = queue_entity
 
 
 @dataclass

@@ -70,6 +70,7 @@ class PerishableInventory(Entity):
         lead_time: float = 5.0,
         downstream: Entity | None = None,
         waste_target: Entity | None = None,
+        initial_stock_time: float | None = None,
     ):
         super().__init__(name)
         self.shelf_life_s = shelf_life_s
@@ -83,8 +84,13 @@ class PerishableInventory(Entity):
         # FIFO batches: (arrival_instant, quantity)
         from happysimulator.core.temporal import Instant
         self._items: deque[tuple[Instant, int]] = deque()
+        self._deferred_initial_stock = 0
         if initial_stock > 0:
-            self._items.append((Instant.Epoch, initial_stock))
+            if initial_stock_time is not None:
+                self._items.append((Instant.from_seconds(initial_stock_time), initial_stock))
+            else:
+                # Defer initialization until first event so items use simulation start time
+                self._deferred_initial_stock = initial_stock
 
         self._total_consumed = 0
         self._total_spoiled = 0
@@ -94,7 +100,7 @@ class PerishableInventory(Entity):
 
     @property
     def stock(self) -> int:
-        return sum(qty for _, qty in self._items)
+        return self._deferred_initial_stock + sum(qty for _, qty in self._items)
 
     @property
     def stats(self) -> PerishableInventoryStats:
@@ -118,6 +124,9 @@ class PerishableInventory(Entity):
         )
 
     def handle_event(self, event: Event) -> list[Event]:
+        if self._deferred_initial_stock > 0:
+            self._items.append((self.now, self._deferred_initial_stock))
+            self._deferred_initial_stock = 0
         if event.event_type == _SPOILAGE_CHECK:
             return self._handle_spoilage_check()
         if event.event_type == _REPLENISH:

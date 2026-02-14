@@ -33,7 +33,16 @@
       "Bash(outbox:*)",
       "Bash(idempotency \")",
       "Bash(pip install:*)",
-      "Bash(set \"PYTHONPATH=C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\1\\\\happy-simulator\")"
+      "Bash(set \"PYTHONPATH=C:\\\\AdamsRoot\\\\Src\\\\happy-simulator-workspaces\\\\1\\\\happy-simulator\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)",
+      "Bash(powershell -Command:*)",
+      "Bash(npm run build:*)",
+      "Bash(gh pr list:*)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(curl:*)"
     ]
   },
   "hooks": {

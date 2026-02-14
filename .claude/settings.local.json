@@ -56,7 +56,8 @@
       "Bash(taskkill //PID $pid //F)",
       "Bash(done)",
       "Bash(taskkill:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git rebase:*)"
     ]
   },
   "hooks": {

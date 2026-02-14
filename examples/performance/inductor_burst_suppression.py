@@ -6,7 +6,7 @@ limiter the Inductor has **no throughput cap** — it only resists rapid
 rate *changes*.
 
 Launch with:
-    python examples/inductor_burst_suppression.py
+    python examples/performance/inductor_burst_suppression.py
 
 Opens a browser at http://127.0.0.1:8765 with four charts showing
 input/output throughput, EWMA rate estimate, and queue depth.

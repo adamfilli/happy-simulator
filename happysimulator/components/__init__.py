@@ -269,6 +269,7 @@ from happysimulator.components.microservice import (
     APIGateway,
     APIGatewayStats,
     RouteConfig,
+)
 from happysimulator.components.infrastructure import (
     DiskIO,
     DiskIOStats,

@@ -55,7 +55,8 @@
       "Bash(do echo \"Killing PID $pid\")",
       "Bash(taskkill //PID $pid //F)",
       "Bash(done)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(git checkout:*)"
     ]
   },
   "hooks": {

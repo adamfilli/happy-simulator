@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import math
 import statistics
-from typing import Any, List, Tuple
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.temporal import Instant
+if TYPE_CHECKING:
+    from happysimulator.core.temporal import Instant
 
 
 class Data:
@@ -27,7 +28,7 @@ class Data:
     """
 
     def __init__(self) -> None:
-        self._samples: List[Tuple[float, Any]] = []
+        self._samples: list[tuple[float, Any]] = []
 
     def add_stat(self, value: Any, time: Instant) -> None:
         """Record a data point at the given simulation time.
@@ -43,7 +44,7 @@ class Data:
         self._samples.clear()
 
     @property
-    def values(self) -> List[Tuple[float, Any]]:
+    def values(self) -> list[tuple[float, Any]]:
         """All recorded samples as (time_seconds, value) tuples."""
         return self._samples
 
@@ -133,9 +134,10 @@ class Data:
             BucketedData with per-bucket aggregations.
         """
         from collections import defaultdict
+
         buckets: dict[int, list[float]] = defaultdict(list)
         for t, v in self._samples:
-            bucket_idx = int(math.floor(t / window_s))
+            bucket_idx = math.floor(t / window_s)
             buckets[bucket_idx].append(float(v))
 
         sorted_keys = sorted(buckets.keys())
@@ -180,7 +182,7 @@ class Data:
         """
         bucketed = self.bucket(window_s)
         result = Data()
-        for t, c in zip(bucketed.times(), bucketed.counts()):
+        for t, c in zip(bucketed.times(), bucketed.counts(), strict=False):
             # Build Instant from seconds for add_stat
             result._samples.append((t, c / window_s))
         return result

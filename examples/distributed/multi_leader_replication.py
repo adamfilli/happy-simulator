@@ -35,7 +35,6 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 from happysimulator import (
     Entity,
@@ -43,14 +42,12 @@ from happysimulator import (
     Instant,
     Network,
     Simulation,
-    SimFuture,
     Source,
     datacenter_network,
 )
 from happysimulator.components.datastore import KVStore
 from happysimulator.components.replication.conflict_resolver import LastWriterWins
 from happysimulator.components.replication.multi_leader import LeaderNode
-
 
 # =============================================================================
 # Writer entity
@@ -129,13 +126,15 @@ def run_simulation(
 
     # Network links
     network.add_bidirectional_link(
-        leaders[0], leaders[1], datacenter_network("cross-region"),
+        leaders[0],
+        leaders[1],
+        datacenter_network("cross-region"),
     )
 
     # Writers
     writers = [
         RegionalWriter(f"writer-{region}", leader)
-        for region, leader in zip(["east", "west"], leaders)
+        for region, leader in zip(["east", "west"], leaders, strict=False)
     ]
 
     # Sources
@@ -150,14 +149,15 @@ def run_simulation(
     ]
 
     # Anti-entropy bootstrap events
-    ae_events = []
-    for leader in leaders:
-        ae_events.append(Event(
+    ae_events = [
+        Event(
             time=Instant.from_seconds(anti_entropy_interval),
             event_type="AntiEntropy",
             target=leader,
             daemon=True,
-        ))
+        )
+        for leader in leaders
+    ]
 
     # Partition/heal events
     from happysimulator import CallbackEntity
@@ -188,8 +188,7 @@ def run_simulation(
 
     # Assemble all entities
     all_entities: list = [*leaders, *writers, network, partition_entity, heal_entity]
-    for l in leaders:
-        all_entities.append(l.store)
+    all_entities.extend(l.store for l in leaders)
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -226,7 +225,7 @@ def print_summary(result: MultiLeaderResult) -> None:
     for writer in result.writers:
         print(f"  {writer.name}: {writer.write_count} writes")
 
-    print(f"\nPer-Leader Statistics:")
+    print("\nPer-Leader Statistics:")
     header = (
         f"  {'Leader':<15s} {'Writes':>7s} {'ReplSent':>9s} {'ReplRecv':>9s} "
         f"{'Conflicts':>10s} {'AEsyncs':>8s} {'AErepairs':>10s} {'Keys':>5s}"
@@ -256,7 +255,7 @@ def print_summary(result: MultiLeaderResult) -> None:
         if result.leaders[0].store.get_sync(key) != result.leaders[1].store.get_sync(key):
             divergent += 1
 
-    print(f"\nConvergence:")
+    print("\nConvergence:")
     print(f"  Keys on leader-east: {len(keys_0)}")
     print(f"  Keys on leader-west: {len(keys_1)}")
     print(f"  Common keys:         {len(common)}")
@@ -272,6 +271,7 @@ def print_summary(result: MultiLeaderResult) -> None:
 def visualize_results(result: MultiLeaderResult, output_dir: Path) -> None:
     """Generate convergence visualization."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
     print("Running multi-leader replication simulation...")
     print(f"  Duration: {args.duration}s | Write rate: {args.rate} req/s/leader")
     print(f"  Anti-entropy interval: {args.ae_interval}s")
-    print(f"  Phases: Normal [0-15s], Partition [15-30s], Heal [30-45s]")
+    print("  Phases: Normal [0-15s], Partition [15-30s], Heal [30-45s]")
 
     result = run_simulation(
         duration_s=args.duration,

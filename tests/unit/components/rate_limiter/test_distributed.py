@@ -1,7 +1,9 @@
 """Tests for DistributedRateLimiter."""
 
+from collections.abc import Generator
+from typing import Any
+
 import pytest
-from typing import Generator, Any
 
 from happysimulator.components.rate_limiter import DistributedRateLimiter
 from happysimulator.core.entity import Entity
@@ -40,7 +42,7 @@ class MockKVStore(Entity):
         yield 0.0
         return self._data.get(key)
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Put a value (yields 0 delay for testing)."""
         self.write_count += 1
         yield 0.0
@@ -129,7 +131,7 @@ class TestDistributedForwarding:
                 target=limiter,
             )
             gen = limiter.handle_event(event)
-            result = list(gen)[-1] if gen else []
+            list(gen)[-1] if gen else []
             # Run the generator to completion
             try:
                 while True:

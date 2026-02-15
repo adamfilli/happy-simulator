@@ -34,25 +34,24 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 from happysimulator.components.industrial import BalkingQueue, ConditionalRouter
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -131,9 +130,7 @@ class Station(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 # =============================================================================
@@ -189,8 +186,8 @@ def run_drive_through_simulation(config: DriveThruConfig | None = None) -> Drive
     stop_after = Instant.from_seconds(config.duration_s)
     car_provider = CarProvider(order_board, config.simple_pct, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Cars",
@@ -240,7 +237,7 @@ def print_summary(result: DriveThruResult) -> None:
     print("DRIVE-THROUGH SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 60:.0f} minutes")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f} cars/min")
     print(f"  Balk threshold:      {config.balk_threshold}")
@@ -248,16 +245,16 @@ def print_summary(result: DriveThruResult) -> None:
     total = result.car_provider.generated
     balked = result.balking_queue.balked
 
-    print(f"\nCustomer Flow:")
+    print("\nCustomer Flow:")
     print(f"  Arrived:             {total}")
     print(f"  Balked:              {balked} ({100 * balked / max(total, 1):.1f}%)")
     print(f"  Orders taken:        {result.order_board.processed}")
 
-    print(f"\nKitchen Routing:")
+    print("\nKitchen Routing:")
     for name, count in result.router.routed_counts.items():
         print(f"  {name:20s} {count}")
 
-    print(f"\nStation Throughput:")
+    print("\nStation Throughput:")
     print(f"  Order board:         {result.order_board.processed}")
     print(f"  Fast kitchen:        {result.fast_kitchen.processed}")
     print(f"  Slow kitchen:        {result.slow_kitchen.processed}")
@@ -266,7 +263,7 @@ def print_summary(result: DriveThruResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency():.1f}s")
         print(f"  p50:     {result.sink.p50():.1f}s")

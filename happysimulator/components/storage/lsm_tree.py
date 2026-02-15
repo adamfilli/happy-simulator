@@ -13,14 +13,17 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
-from happysimulator.components.storage.sstable import SSTable
-from happysimulator.components.storage.wal import WriteAheadLog
 from happysimulator.components.storage.memtable import Memtable
+from happysimulator.components.storage.sstable import SSTable
+from happysimulator.core.entity import Entity
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.storage.wal import WriteAheadLog
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +111,7 @@ class LeveledCompaction(CompactionStrategy):
             return True
         # Other levels: too many keys
         for i in range(1, len(levels)):
-            limit = self.base_size_keys * (self.size_ratio ** i)
+            limit = self.base_size_keys * (self.size_ratio**i)
             total_keys = sum(s.key_count for s in levels[i])
             if total_keys > limit:
                 return True
@@ -120,7 +123,7 @@ class LeveledCompaction(CompactionStrategy):
             return 0, list(levels[0])
         # Then check other levels
         for i in range(1, len(levels)):
-            limit = self.base_size_keys * (self.size_ratio ** i)
+            limit = self.base_size_keys * (self.size_ratio**i)
             total_keys = sum(s.key_count for s in levels[i])
             if total_keys > limit:
                 return i, list(levels[i])
@@ -282,18 +285,15 @@ class LSMTree(Entity):
         logical_bytes = len(self._logical_data) * 64
 
         read_amp = (
-            self._total_sstables_checked / self._total_reads
-            if self._total_reads > 0 else 0.0
+            self._total_sstables_checked / self._total_reads if self._total_reads > 0 else 0.0
         )
         write_amp = (
             self._sstable_bytes_written / self._user_bytes_written
-            if self._user_bytes_written > 0 else 1.0
+            if self._user_bytes_written > 0
+            else 1.0
         )
         total_stored = sum(s.size_bytes for level in self._levels for s in level)
-        space_amp = (
-            total_stored / logical_bytes
-            if logical_bytes > 0 else 1.0
-        )
+        space_amp = total_stored / logical_bytes if logical_bytes > 0 else 1.0
 
         return LSMTreeStats(
             writes=self._total_writes,
@@ -317,15 +317,17 @@ class LSMTree(Entity):
         result = []
         for i, level in enumerate(self._levels):
             if level:
-                result.append({
-                    "level": i,
-                    "sstables": len(level),
-                    "total_keys": sum(s.key_count for s in level),
-                    "total_bytes": sum(s.size_bytes for s in level),
-                })
+                result.append(
+                    {
+                        "level": i,
+                        "sstables": len(level),
+                        "total_keys": sum(s.key_count for s in level),
+                        "total_bytes": sum(s.size_bytes for s in level),
+                    }
+                )
         return result
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Write a key-value pair through WAL -> memtable -> (flush).
 
         Yields I/O latency for WAL and potential flush operations.
@@ -439,7 +441,7 @@ class LSMTree(Entity):
         self._total_read_misses += 1
         return None
 
-    def delete(self, key: str) -> Generator[float, None, None]:
+    def delete(self, key: str) -> Generator[float]:
         """Delete a key by writing a tombstone marker."""
         self._total_writes += 1
         self._user_bytes_written += 64
@@ -460,10 +462,9 @@ class LSMTree(Entity):
         Yields I/O latency for SSTable reads.
         """
         # Collect from memtable
-        merged: dict[str, Any] = {}
-        for k, v in self._memtable._data.items():
-            if start_key <= k < end_key:
-                merged[k] = v
+        merged: dict[str, Any] = {
+            k: v for k, v in self._memtable._data.items() if start_key <= k < end_key
+        }
 
         # Collect from immutable memtables (newer first)
         for imm in reversed(self._immutable_memtables):
@@ -486,7 +487,7 @@ class LSMTree(Entity):
         result = [(k, v) for k, v in sorted(merged.items()) if v is not _TOMBSTONE]
         return result
 
-    def _flush_memtable(self) -> Generator[float, None, None]:
+    def _flush_memtable(self) -> Generator[float]:
         """Flush the active memtable to an L0 SSTable."""
         if self._memtable.size == 0:
             return
@@ -523,7 +524,9 @@ class LSMTree(Entity):
 
         logger.debug(
             "[%s] Flushed memtable to L0 SSTable(%d keys), L0 now has %d SSTables",
-            self.name, sstable.key_count, len(self._levels[0]),
+            self.name,
+            sstable.key_count,
+            len(self._levels[0]),
         )
 
         # Check if compaction needed
@@ -548,7 +551,7 @@ class LSMTree(Entity):
         if self._compaction_strategy.should_compact(self._levels):
             self._compact_sync()
 
-    def _compact(self) -> Generator[float, None, None]:
+    def _compact(self) -> Generator[float]:
         """Run a compaction cycle."""
         source_level, sstables = self._compaction_strategy.select_compaction(self._levels)
         if not sstables:
@@ -557,11 +560,8 @@ class LSMTree(Entity):
         target_level = min(source_level + 1, self._max_levels - 1)
 
         # Merge all selected SSTables
-        merged_data: dict[str, Any] = {}
         # Process from oldest to newest so newer values win
-        for sst in sstables:
-            for k, v in sst.scan():
-                merged_data[k] = v
+        merged_data: dict[str, Any] = {k: v for sst in sstables for k, v in sst.scan()}
 
         # Also include overlapping SSTables from target level
         overlapping = []
@@ -599,7 +599,10 @@ class LSMTree(Entity):
         self._total_compactions += 1
         logger.debug(
             "[%s] Compacted L%d -> L%d (%d SSTables merged)",
-            self.name, source_level, target_level, len(sstables) + len(overlapping),
+            self.name,
+            source_level,
+            target_level,
+            len(sstables) + len(overlapping),
         )
 
     def _compact_sync(self) -> None:
@@ -610,10 +613,7 @@ class LSMTree(Entity):
 
         target_level = min(source_level + 1, self._max_levels - 1)
 
-        merged_data: dict[str, Any] = {}
-        for sst in sstables:
-            for k, v in sst.scan():
-                merged_data[k] = v
+        merged_data: dict[str, Any] = {k: v for sst in sstables for k, v in sst.scan()}
 
         overlapping = []
         if target_level != source_level:
@@ -691,9 +691,7 @@ class LSMTree(Entity):
                 self._memtable.put_sync(entry.key, entry.value)
             wal_recovered = len(entries)
 
-        sstable_keys = sum(
-            s.key_count for level in self._levels for s in level
-        )
+        sstable_keys = sum(s.key_count for level in self._levels for s in level)
 
         return {
             "wal_entries_replayed": wal_recovered,
@@ -701,11 +699,12 @@ class LSMTree(Entity):
             "total_keys_recovered": self._memtable.size + sstable_keys,
         }
 
-    def handle_event(self, event: Event) -> Generator[float, None, None] | None:
+    def handle_event(self, event: Event) -> Generator[float] | None:
         """Handle CompactionTrigger events."""
-        if event.event_type == "CompactionTrigger":
-            if self._compaction_strategy.should_compact(self._levels):
-                return self._compact()
+        if event.event_type == "CompactionTrigger" and self._compaction_strategy.should_compact(
+            self._levels
+        ):
+            return self._compact()
         return None
 
     def __repr__(self) -> str:

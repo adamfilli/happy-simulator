@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
 from happysimulator.distributions.latency_distribution import LatencyDistribution
-from happysimulator.faults.fault import FaultContext
+
+if TYPE_CHECKING:
+    from happysimulator.faults.fault import FaultContext
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +32,7 @@ class _CompoundLatency(LatencyDistribution):
     of the existing link latency.
     """
 
-    def __init__(
-        self, base: LatencyDistribution, extra: LatencyDistribution
-    ) -> None:
+    def __init__(self, base: LatencyDistribution, extra: LatencyDistribution) -> None:
         # Mean is sum of means (informational only)
         super().__init__(base._mean_latency + extra._mean_latency)
         self._base = base
@@ -40,9 +41,7 @@ class _CompoundLatency(LatencyDistribution):
     def get_latency(self, current_time: Instant) -> Duration:
         base_dur = self._base.get_latency(current_time)
         extra_dur = self._extra.get_latency(current_time)
-        return Duration.from_seconds(
-            base_dur.to_seconds() + extra_dur.to_seconds()
-        )
+        return Duration.from_seconds(base_dur.to_seconds() + extra_dur.to_seconds())
 
 
 @dataclass(frozen=True)
@@ -74,9 +73,7 @@ class InjectLatency:
         network = self._resolve_network(ctx)
         link = network.get_link(self.source_name, self.dest_name)
         if link is None:
-            raise ValueError(
-                f"No link found: {self.source_name} -> {self.dest_name}"
-            )
+            raise ValueError(f"No link found: {self.source_name} -> {self.dest_name}")
 
         original_latency = link.latency
         extra_dist = ConstantLatency(self.extra_ms / 1000.0)
@@ -87,14 +84,19 @@ class InjectLatency:
             link.latency = _CompoundLatency(original_latency, extra_dist)
             logger.info(
                 "[FaultInjection] Injected +%sms latency on %s -> %s at %s",
-                self.extra_ms, src, dst, e.time,
+                self.extra_ms,
+                src,
+                dst,
+                e.time,
             )
 
         def deactivate(e: Event) -> None:
             link.latency = original_latency
             logger.info(
                 "[FaultInjection] Restored latency on %s -> %s at %s",
-                src, dst, e.time,
+                src,
+                dst,
+                e.time,
             )
 
         return [
@@ -147,9 +149,7 @@ class InjectPacketLoss:
         network = self._resolve_network(ctx)
         link = network.get_link(self.source_name, self.dest_name)
         if link is None:
-            raise ValueError(
-                f"No link found: {self.source_name} -> {self.dest_name}"
-            )
+            raise ValueError(f"No link found: {self.source_name} -> {self.dest_name}")
 
         original_loss = link.packet_loss_rate
         src = self.source_name
@@ -160,14 +160,19 @@ class InjectPacketLoss:
             link.packet_loss_rate = min(1.0, original_loss + extra)
             logger.info(
                 "[FaultInjection] Injected +%.1f%% packet loss on %s -> %s at %s",
-                extra * 100, src, dst, e.time,
+                extra * 100,
+                src,
+                dst,
+                e.time,
             )
 
         def deactivate(e: Event) -> None:
             link.packet_loss_rate = original_loss
             logger.info(
                 "[FaultInjection] Restored packet loss on %s -> %s at %s",
-                src, dst, e.time,
+                src,
+                dst,
+                e.time,
             )
 
         return [
@@ -225,12 +230,12 @@ class NetworkPartition:
 
         def activate(e: Event) -> None:
             nonlocal partition_handle
-            partition_handle = network.partition(
-                entities_a, entities_b, asymmetric=asymmetric
-            )
+            partition_handle = network.partition(entities_a, entities_b, asymmetric=asymmetric)
             logger.info(
                 "[FaultInjection] Network partition %s <-X-> %s at %s",
-                self.group_a, self.group_b, e.time,
+                self.group_a,
+                self.group_b,
+                e.time,
             )
 
         def deactivate(e: Event) -> None:
@@ -238,7 +243,9 @@ class NetworkPartition:
                 partition_handle.heal()
                 logger.info(
                     "[FaultInjection] Partition healed %s <-> %s at %s",
-                    self.group_a, self.group_b, e.time,
+                    self.group_a,
+                    self.group_b,
+                    e.time,
                 )
 
         return [
@@ -316,7 +323,9 @@ class RandomPartition:
                 partition_handle = network.partition(group_a, group_b)
                 logger.info(
                     "[FaultInjection] Random partition %s <-X-> %s at %s",
-                    group_a_names, group_b_names, e.time,
+                    group_a_names,
+                    group_b_names,
+                    e.time,
                 )
 
                 # Schedule heal

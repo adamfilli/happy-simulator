@@ -3,10 +3,10 @@
 import random
 
 from happysimulator.components.behavior.traits import (
-    PersonalityTraits,
     NormalTraitDistribution,
-    UniformTraitDistribution,
+    PersonalityTraits,
     TraitSet,
+    UniformTraitDistribution,
 )
 
 
@@ -34,7 +34,7 @@ class TestPersonalityTraits:
         # frozen dataclass
         try:
             traits.dimensions = {}  # type: ignore
-            assert False, "Should raise"
+            raise AssertionError("Should raise")
         except AttributeError:
             pass
 

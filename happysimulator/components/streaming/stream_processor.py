@@ -6,7 +6,9 @@ progress tracking, and late event handling.
 Example::
 
     from happysimulator.components.streaming import (
-        StreamProcessor, TumblingWindow, LateEventPolicy,
+        StreamProcessor,
+        TumblingWindow,
+        LateEventPolicy,
     )
 
     processor = StreamProcessor(
@@ -23,14 +25,17 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Callable, Generator, Protocol
 from abc import abstractmethod
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Protocol
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +255,7 @@ class StreamProcessor(Entity):
         # Window state: keyed by grouping key
         self._windows: dict[str, list[WindowState]] = {}
         self._watermark_s: float = 0.0
-        self._min_event_time_seen: float = float('inf')
+        self._min_event_time_seen: float = float("inf")
         self._watermark_scheduled: bool = False
 
         self._events_processed = 0
@@ -370,18 +375,20 @@ class StreamProcessor(Entity):
                     window.emitted = True
                     self._windows_emitted += 1
 
-                    events.append(Event(
-                        time=self.now,
-                        event_type="WindowResult",
-                        target=self._downstream,
-                        context={
-                            "key": key,
-                            "window_start": window.start,
-                            "window_end": window.end,
-                            "result": result,
-                            "record_count": len(window.records),
-                        },
-                    ))
+                    events.append(
+                        Event(
+                            time=self.now,
+                            event_type="WindowResult",
+                            target=self._downstream,
+                            context={
+                                "key": key,
+                                "window_start": window.start,
+                                "window_end": window.end,
+                                "result": result,
+                                "record_count": len(window.records),
+                            },
+                        )
+                    )
 
         return events
 
@@ -398,7 +405,7 @@ class StreamProcessor(Entity):
 
             if event_time_s is None:
                 if event_time is not None:
-                    if hasattr(event_time, 'to_seconds'):
+                    if hasattr(event_time, "to_seconds"):
                         event_time_s = event_time.to_seconds()
                     else:
                         event_time_s = float(event_time)
@@ -424,16 +431,18 @@ class StreamProcessor(Entity):
                     self._late_events_side_output += 1
                     if self._side_output is not None:
                         yield 0.0
-                        return [Event(
-                            time=self.now,
-                            event_type="LateEvent",
-                            target=self._side_output,
-                            context={
-                                "key": key,
-                                "value": value,
-                                "event_time_s": event_time_s,
-                            },
-                        )]
+                        return [
+                            Event(
+                                time=self.now,
+                                event_type="LateEvent",
+                                target=self._side_output,
+                                context={
+                                    "key": key,
+                                    "value": value,
+                                    "event_time_s": event_time_s,
+                                },
+                            )
+                        ]
                     yield 0.0
                     return None
 
@@ -478,14 +487,16 @@ class StreamProcessor(Entity):
             if not self._watermark_scheduled:
                 self._watermark_scheduled = True
                 yield 0.0
-                return [Event(
-                    time=Instant.from_seconds(
-                        self.now.to_seconds() + self._watermark_interval_s
-                    ),
-                    event_type="Watermark",
-                    target=self,
-                    context={"watermark_s": event_time_s},
-                )]
+                return [
+                    Event(
+                        time=Instant.from_seconds(
+                            self.now.to_seconds() + self._watermark_interval_s
+                        ),
+                        event_type="Watermark",
+                        target=self,
+                        context={"watermark_s": event_time_s},
+                    )
+                ]
 
             yield 0.0
             return None
@@ -503,17 +514,17 @@ class StreamProcessor(Entity):
             result_events = self._emit_closed_windows()
 
             # Reschedule watermark
-            next_time = Instant.from_seconds(
-                self.now.to_seconds() + self._watermark_interval_s
-            )
+            next_time = Instant.from_seconds(self.now.to_seconds() + self._watermark_interval_s)
             # Advance watermark based on simulation time
             next_watermark = self.now.to_seconds()
-            result_events.append(Event(
-                time=next_time,
-                event_type="Watermark",
-                target=self,
-                context={"watermark_s": next_watermark},
-            ))
+            result_events.append(
+                Event(
+                    time=next_time,
+                    event_type="Watermark",
+                    target=self,
+                    context={"watermark_s": next_watermark},
+                )
+            )
 
             return result_events if result_events else None
 

@@ -32,32 +32,31 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Resource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 from happysimulator.components.industrial import (
     AppointmentScheduler,
     GateController,
     Shift,
-    ShiftSchedule,
     ShiftedServer,
+    ShiftSchedule,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -68,24 +67,24 @@ from happysimulator.components.industrial import (
 class HotelConfig:
     """Configuration for the hotel operations simulation."""
 
-    duration_s: float = 86400.0       # 24 hours
+    duration_s: float = 86400.0  # 24 hours
     walkin_rate_per_hour: float = 2.0
     num_rooms: int = 80
     stay_duration_s: float = 28800.0  # 8 hour average stay
-    checkin_time: float = 300.0       # 5 min
-    checkout_time: float = 180.0      # 3 min
-    housekeeping_time: float = 1800.0 # 30 min per room
+    checkin_time: float = 300.0  # 5 min
+    checkout_time: float = 180.0  # 3 min
+    housekeeping_time: float = 1800.0  # 30 min per room
     # Gate: no check-in from 11am-3pm (turnover window)
-    gate_close_s: float = 39600.0     # 11:00 AM
-    gate_open_s: float = 54000.0      # 3:00 PM
+    gate_close_s: float = 39600.0  # 11:00 AM
+    gate_open_s: float = 54000.0  # 3:00 PM
     # Appointments every 30 min from 2pm-10pm
-    appt_start_s: float = 50400.0     # 2:00 PM
-    appt_end_s: float = 79200.0       # 10:00 PM
-    appt_interval_s: float = 1800.0   # every 30 min
+    appt_start_s: float = 50400.0  # 2:00 PM
+    appt_end_s: float = 79200.0  # 10:00 PM
+    appt_interval_s: float = 1800.0  # every 30 min
     no_show_rate: float = 0.10
     # Housekeeping shift: 8am-6pm
-    hk_shift_start: float = 28800.0   # 8:00 AM
-    hk_shift_end: float = 64800.0     # 6:00 PM
+    hk_shift_start: float = 28800.0  # 8:00 AM
+    hk_shift_end: float = 64800.0  # 6:00 PM
     hk_staff: int = 4
     seed: int = 42
 
@@ -130,8 +129,14 @@ class WalkinProvider(EventProvider):
 class FrontDesk(QueuedResource):
     """Check-in desk."""
 
-    def __init__(self, name: str, checkin_time: float, rooms: Resource,
-                 stay_duration: float, checkout_entity: Entity):
+    def __init__(
+        self,
+        name: str,
+        checkin_time: float,
+        rooms: Resource,
+        stay_duration: float,
+        checkout_entity: Entity,
+    ):
         super().__init__(name, policy=FIFOQueue())
         self.checkin_time = checkin_time
         self.rooms = rooms
@@ -155,9 +160,7 @@ class FrontDesk(QueuedResource):
         yield stay
 
         grant.release()
-        return [
-            self.forward(event, self.checkout_entity, event_type="CheckOut")
-        ]
+        return [self.forward(event, self.checkout_entity, event_type="CheckOut")]
 
 
 class CheckOutDesk(QueuedResource):
@@ -172,9 +175,7 @@ class CheckOutDesk(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.checkout_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Housekeeping")
-        ]
+        return [self.forward(event, self.downstream, event_type="Housekeeping")]
 
 
 # =============================================================================
@@ -228,7 +229,11 @@ def run_hotel_simulation(config: HotelConfig | None = None) -> HotelResult:
 
     rooms = Resource("Rooms", capacity=config.num_rooms)
     front_desk = FrontDesk(
-        "FrontDesk", config.checkin_time, rooms, config.stay_duration_s, checkout,
+        "FrontDesk",
+        config.checkin_time,
+        rooms,
+        config.stay_duration_s,
+        checkout,
     )
 
     # Gate blocks check-in during turnover
@@ -258,8 +263,8 @@ def run_hotel_simulation(config: HotelConfig | None = None) -> HotelResult:
     stop_after = Instant.from_seconds(config.duration_s)
     walkin_provider = WalkinProvider(gate, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     walkin_source = Source(
         name="WalkIns",
@@ -314,7 +319,7 @@ def print_summary(result: HotelResult) -> None:
     print("HOTEL OPERATIONS SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Rooms:               {config.num_rooms}")
     print(f"  Walk-in rate:        {config.walkin_rate_per_hour:.1f}/hour")
@@ -324,7 +329,7 @@ def print_summary(result: HotelResult) -> None:
     walkins = result.walkin_provider.generated
     appt_stats = result.appointments.stats
 
-    print(f"\nGuest Flow:")
+    print("\nGuest Flow:")
     print(f"  Walk-ins:            {walkins}")
     print(f"  Appointments:        {appt_stats.arrivals} (no-shows: {appt_stats.no_shows})")
     print(f"  Gate passed:         {result.gate.stats.passed_through}")
@@ -334,13 +339,13 @@ def print_summary(result: HotelResult) -> None:
     print(f"  Checked out:         {result.checkout._processed}")
 
     room_stats = result.rooms.stats
-    print(f"\nRoom Stats:")
+    print("\nRoom Stats:")
     print(f"  Utilization:         {room_stats.utilization:.1%}")
     print(f"  Housekeeping done:   {result.housekeeping.processed}")
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 3600:.1f} hours")
 

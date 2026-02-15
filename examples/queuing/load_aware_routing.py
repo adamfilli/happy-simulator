@@ -41,9 +41,9 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -63,6 +63,8 @@ from happysimulator import (
     SpikeProfile,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Load Reporting Server
@@ -147,6 +149,7 @@ class LoadReportingServer(QueuedResource):
 @dataclass
 class LoadSample:
     """A timestamped load sample from a server."""
+
     time: Instant
     load: float
 
@@ -191,7 +194,7 @@ class LoadAwareClient(Entity):
 
         # Routing decisions over time for visualization
         self.routing_times: list[Instant] = []
-        self.routing_decisions: list[tuple[int, int]]  = []  # (customer_id, server_id)
+        self.routing_decisions: list[tuple[int, int]] = []  # (customer_id, server_id)
 
     def handle_event(self, event: Event) -> list[Event]:
         """Handle incoming request or server response."""
@@ -199,7 +202,7 @@ class LoadAwareClient(Entity):
 
         if event_type == "Request":
             return self._handle_request(event)
-        elif event_type == "Response":
+        if event_type == "Response":
             return self._handle_response(event)
 
         return []
@@ -276,7 +279,7 @@ class LoadAwareClient(Entity):
         """Remove load samples older than the window."""
         cutoff = self.now - Instant.from_seconds(self.load_window_s)
 
-        for server_id, samples in self._server_loads.items():
+        for samples in self._server_loads.values():
             while samples and samples[0].time < cutoff:
                 samples.popleft()
 
@@ -376,6 +379,7 @@ class HighRateCustomerProvider(EventProvider):
 @dataclass
 class SimulationResult:
     """Results from the load-aware routing simulation."""
+
     servers: list[LoadReportingServer]
     clients: list[LoadAwareClient]
     router: RandomRouter
@@ -496,7 +500,7 @@ def run_load_aware_routing_simulation(
     )
 
     # Collect all entities
-    entities: list[Entity] = [router] + clients + servers
+    entities: list[Entity] = [router, *clients, *servers]
 
     # Run simulation
     sim = Simulation(
@@ -534,43 +538,51 @@ def print_summary(result: SimulationResult) -> None:
 
     profile = result.spike_profile
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Smart routing: {'ENABLED' if result.enable_smart_routing else 'DISABLED'}")
     print(f"  Servers: {len(result.servers)}")
     print(f"  Clients: {len(result.clients)}")
 
-    print(f"\nSpike Profile (Customer 1001):")
+    print("\nSpike Profile (Customer 1001):")
     print(f"  [0-{profile.warmup_s}s]: {profile.baseline_rate} req/s (warmup)")
-    print(f"  [{profile.warmup_s}-{profile.warmup_s + profile.spike_duration_s}s]: {profile.spike_rate} req/s (SPIKE)")
-    print(f"  [{profile.warmup_s + profile.spike_duration_s}s+]: {profile.baseline_rate} req/s (recovery)")
+    print(
+        f"  [{profile.warmup_s}-{profile.warmup_s + profile.spike_duration_s}s]: {profile.spike_rate} req/s (SPIKE)"
+    )
+    print(
+        f"  [{profile.warmup_s + profile.spike_duration_s}s+]: {profile.baseline_rate} req/s (recovery)"
+    )
 
-    print(f"\nLoad Generation:")
+    print("\nLoad Generation:")
     print(f"  Random customers (0-999): {result.random_generated} requests")
     print(f"  High-rate customer (1001): {result.high_rate_generated} requests")
 
-    print(f"\nRouter Distribution:")
+    print("\nRouter Distribution:")
     for i, count in result.router.target_counts.items():
         pct = count / result.router.stats_routed * 100 if result.router.stats_routed else 0
         print(f"  Client{i}: {count} ({pct:.1f}%)")
 
-    print(f"\nServer Processing:")
+    print("\nServer Processing:")
     for server in result.servers:
         print(f"  {server.name}: {server.stats_processed} requests")
 
-    print(f"\nClient Stats:")
+    print("\nClient Stats:")
     total_rehashes = 0
     for client in result.clients:
-        rehash_pct = client.stats_rehashes / client.stats_requests * 100 if client.stats_requests else 0
+        rehash_pct = (
+            client.stats_rehashes / client.stats_requests * 100 if client.stats_requests else 0
+        )
         total_rehashes += client.stats_rehashes
-        print(f"  {client.name}: {client.stats_requests} requests, {client.stats_rehashes} rehashes ({rehash_pct:.1f}%)")
+        print(
+            f"  {client.name}: {client.stats_requests} requests, {client.stats_rehashes} rehashes ({rehash_pct:.1f}%)"
+        )
 
     # Latency analysis
-    print(f"\nLatency Analysis:")
+    print("\nLatency Analysis:")
 
     # Aggregate latencies from all clients
     all_latencies: list[tuple[float, int]] = []  # (latency_s, customer_id)
     for client in result.clients:
-        for lat, cid in zip(client.latencies_s, client.customer_ids):
+        for lat, cid in zip(client.latencies_s, client.customer_ids, strict=False):
             all_latencies.append((lat, cid))
 
     random_latencies = [lat for lat, cid in all_latencies if cid != 1001]
@@ -581,7 +593,7 @@ def print_summary(result: SimulationResult) -> None:
         avg = sum(random_sorted) / len(random_sorted)
         p50 = random_sorted[len(random_sorted) // 2]
         p99 = random_sorted[int(len(random_sorted) * 0.99)]
-        print(f"  Random customers (0-999):")
+        print("  Random customers (0-999):")
         print(f"    Count: {len(random_sorted)}")
         print(f"    Avg: {avg * 1000:.1f}ms, p50: {p50 * 1000:.1f}ms, p99: {p99 * 1000:.1f}ms")
 
@@ -590,12 +602,12 @@ def print_summary(result: SimulationResult) -> None:
         avg = sum(hr_sorted) / len(hr_sorted)
         p50 = hr_sorted[len(hr_sorted) // 2]
         p99 = hr_sorted[int(len(hr_sorted) * 0.99)]
-        print(f"  High-rate customer (1001):")
+        print("  High-rate customer (1001):")
         print(f"    Count: {len(hr_sorted)}")
         print(f"    Avg: {avg * 1000:.1f}ms, p50: {p50 * 1000:.1f}ms, p99: {p99 * 1000:.1f}ms")
 
     # Server load analysis
-    print(f"\nServer Load (average):")
+    print("\nServer Load (average):")
     for i, server in enumerate(result.servers):
         load_samples = result.server_load_data[i].values
         if load_samples:
@@ -663,7 +675,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     all_customer_ids: list[int] = []
 
     for client in result.clients:
-        for t, lat, cid in zip(client.completion_times, client.latencies_s, client.customer_ids):
+        for t, lat, cid in zip(
+            client.completion_times, client.latencies_s, client.customer_ids, strict=False
+        ):
             all_times_s.append(t.to_seconds())
             all_latencies_s.append(lat)
             all_customer_ids.append(cid)
@@ -672,7 +686,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     random_buckets: dict[int, list[float]] = defaultdict(list)
     hr_buckets: dict[int, list[float]] = defaultdict(list)
 
-    for t, lat, cid in zip(all_times_s, all_latencies_s, all_customer_ids):
+    for t, lat, cid in zip(all_times_s, all_latencies_s, all_customer_ids, strict=False):
         bucket = int(t)
         if cid == 1001:
             hr_buckets[bucket].append(lat)
@@ -681,12 +695,12 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Plot average latency per bucket
     random_bucket_times = sorted(random_buckets.keys())
-    random_bucket_avg = [sum(random_buckets[b]) / len(random_buckets[b]) * 1000
-                         for b in random_bucket_times]
+    random_bucket_avg = [
+        sum(random_buckets[b]) / len(random_buckets[b]) * 1000 for b in random_bucket_times
+    ]
 
     hr_bucket_times = sorted(hr_buckets.keys())
-    hr_bucket_avg = [sum(hr_buckets[b]) / len(hr_buckets[b]) * 1000
-                     for b in hr_bucket_times]
+    hr_bucket_avg = [sum(hr_buckets[b]) / len(hr_buckets[b]) * 1000 for b in hr_bucket_times]
 
     ax.plot(random_bucket_times, random_bucket_avg, "b-", label="Random (0-999)", alpha=0.8)
     ax.plot(hr_bucket_times, hr_bucket_avg, "r-", label="Customer 1001", alpha=0.8)
@@ -700,8 +714,16 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # 4. Latency distribution comparison
     ax = axes[1, 1]
 
-    random_latencies = [lat * 1000 for lat, cid in zip(all_latencies_s, all_customer_ids) if cid != 1001]
-    hr_latencies = [lat * 1000 for lat, cid in zip(all_latencies_s, all_customer_ids) if cid == 1001]
+    random_latencies = [
+        lat * 1000
+        for lat, cid in zip(all_latencies_s, all_customer_ids, strict=False)
+        if cid != 1001
+    ]
+    hr_latencies = [
+        lat * 1000
+        for lat, cid in zip(all_latencies_s, all_customer_ids, strict=False)
+        if cid == 1001
+    ]
 
     if random_latencies:
         ax.hist(random_latencies, bins=50, alpha=0.5, label="Random (0-999)", color="blue")
@@ -721,7 +743,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     hr_server_choices: list[int] = []
 
     for client in result.clients:
-        for t, (cid, server_id) in zip(client.routing_times, client.routing_decisions):
+        for t, (cid, server_id) in zip(
+            client.routing_times, client.routing_decisions, strict=False
+        ):
             if cid == 1001:
                 hr_routing_times.append(t.to_seconds())
                 hr_server_choices.append(server_id)
@@ -729,7 +753,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     if hr_routing_times:
         # Bucket by second and count per server
         server_buckets: dict[int, dict[int, int]] = defaultdict(lambda: defaultdict(int))
-        for t, sid in zip(hr_routing_times, hr_server_choices):
+        for t, sid in zip(hr_routing_times, hr_server_choices, strict=False):
             bucket = int(t)
             server_buckets[bucket][sid] += 1
 
@@ -759,7 +783,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Get rehash events (when server chosen != hash-based default)
     for client in result.clients:
-        for t, (cid, chosen_server) in zip(client.routing_times, client.routing_decisions):
+        for t, (cid, chosen_server) in zip(
+            client.routing_times, client.routing_decisions, strict=False
+        ):
             bucket = int(t.to_seconds())
             expected_server = hash(cid) % num_servers
             if chosen_server != expected_server:
@@ -799,16 +825,28 @@ if __name__ == "__main__":
     parser.add_argument("--clients", type=int, default=10, help="Number of clients")
     parser.add_argument("--concurrency", type=int, default=10, help="Server concurrency")
     parser.add_argument("--service-time", type=float, default=0.1, help="Mean service time (s)")
-    parser.add_argument("--random-rate", type=float, default=20.0, help="Random customer rate (req/s)")
-    parser.add_argument("--spike-baseline", type=float, default=10.0, help="Customer 1001 baseline rate (req/s)")
-    parser.add_argument("--spike-rate", type=float, default=150.0, help="Customer 1001 spike rate (req/s)")
-    parser.add_argument("--spike-warmup", type=float, default=10.0, help="Seconds before spike starts")
+    parser.add_argument(
+        "--random-rate", type=float, default=20.0, help="Random customer rate (req/s)"
+    )
+    parser.add_argument(
+        "--spike-baseline", type=float, default=10.0, help="Customer 1001 baseline rate (req/s)"
+    )
+    parser.add_argument(
+        "--spike-rate", type=float, default=150.0, help="Customer 1001 spike rate (req/s)"
+    )
+    parser.add_argument(
+        "--spike-warmup", type=float, default=10.0, help="Seconds before spike starts"
+    )
     parser.add_argument("--spike-duration", type=float, default=15.0, help="Spike duration (s)")
     parser.add_argument("--load-window", type=float, default=5.0, help="Load tracking window (s)")
-    parser.add_argument("--load-threshold", type=float, default=0.9, help="Load threshold for rehash")
+    parser.add_argument(
+        "--load-threshold", type=float, default=0.9, help="Load threshold for rehash"
+    )
     parser.add_argument("--no-smart-routing", action="store_true", help="Disable smart routing")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/load_aware_routing", help="Output dir")
+    parser.add_argument(
+        "--output", type=str, default="output/load_aware_routing", help="Output dir"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()
 
@@ -819,7 +857,9 @@ if __name__ == "__main__":
     print(f"  Duration: {args.duration}s + {args.drain}s drain")
     print(f"  Servers: {args.servers}, Clients: {args.clients}")
     print(f"  Random customers: {args.random_rate} req/s (constant)")
-    print(f"  Customer 1001: {args.spike_baseline} -> {args.spike_rate} -> {args.spike_baseline} req/s")
+    print(
+        f"  Customer 1001: {args.spike_baseline} -> {args.spike_rate} -> {args.spike_baseline} req/s"
+    )
     print(f"    Spike at t={args.spike_warmup}s for {args.spike_duration}s")
     print(f"  Smart routing: {'ENABLED' if enable_smart_routing else 'DISABLED'}")
 

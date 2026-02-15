@@ -13,12 +13,12 @@ Example::
 
     from happysimulator.components.crdt import CRDTStore, GCounter
 
-    store_a = CRDTStore("node-a", network=net,
-                        crdt_factory=lambda nid: GCounter(nid),
-                        gossip_interval=1.0)
-    store_b = CRDTStore("node-b", network=net,
-                        crdt_factory=lambda nid: GCounter(nid),
-                        gossip_interval=1.0)
+    store_a = CRDTStore(
+        "node-a", network=net, crdt_factory=lambda nid: GCounter(nid), gossip_interval=1.0
+    )
+    store_b = CRDTStore(
+        "node-b", network=net, crdt_factory=lambda nid: GCounter(nid), gossip_interval=1.0
+    )
     store_a.add_peers([store_b])
     store_b.add_peers([store_a])
 """
@@ -29,13 +29,17 @@ import hashlib
 import logging
 import random
 from dataclasses import dataclass
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING, Any
 
+from happysimulator.components.crdt.lww_register import LWWRegister
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.crdt.protocol import CRDT
-from happysimulator.components.crdt.lww_register import LWWRegister
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
+    from happysimulator.components.crdt.protocol import CRDT
+    from happysimulator.core.sim_future import SimFuture
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +146,7 @@ class CRDTStore(Entity):
         if self._gossip_interval <= 0 or not self._peers:
             return None
         from happysimulator.core.temporal import Instant
+
         t = self.now if self.now.to_seconds() > 0 else Instant.from_seconds(self._gossip_interval)
         return Event(
             time=t,
@@ -164,8 +169,11 @@ class CRDTStore(Entity):
         return self._crdts[key]
 
     def handle_event(
-        self, event: Event,
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+        self,
+        event: Event,
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """Route events by type."""
         if event.event_type == "Write":
             return (yield from self._handle_write(event))
@@ -180,7 +188,8 @@ class CRDTStore(Entity):
         return None
 
     def _handle_write(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Apply a write to the local CRDT.
 
@@ -209,7 +218,8 @@ class CRDTStore(Entity):
         return None
 
     def _handle_read(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float, None, list[Event] | Event | None]:
         """Read a value from the local CRDT store.
 
@@ -233,7 +243,8 @@ class CRDTStore(Entity):
         return None
 
     def _handle_gossip_tick(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Periodic gossip: push full state to a random peer."""
         if not self._peers:
@@ -244,7 +255,9 @@ class CRDTStore(Entity):
         state_hash = self._state_hash()
 
         push_event = self._network.send(
-            self, peer, "GossipPush",
+            self,
+            peer,
+            "GossipPush",
             payload={
                 "state": state,
                 "state_hash": state_hash,
@@ -254,10 +267,9 @@ class CRDTStore(Entity):
 
         # Schedule next gossip tick
         from happysimulator.core.temporal import Instant
+
         next_tick = Event(
-            time=Instant.from_seconds(
-                self.now.to_seconds() + self._gossip_interval
-            ),
+            time=Instant.from_seconds(self.now.to_seconds() + self._gossip_interval),
             event_type="GossipTick",
             target=self,
             daemon=True,
@@ -267,7 +279,8 @@ class CRDTStore(Entity):
         return None
 
     def _handle_gossip_push(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Receive a gossip push: merge remote state, respond with ours."""
         metadata = event.context.get("metadata", {})
@@ -294,7 +307,9 @@ class CRDTStore(Entity):
         # Respond with our state
         state = self._serialize_state()
         resp = self._network.send(
-            self, requester, "GossipResponse",
+            self,
+            requester,
+            "GossipResponse",
             payload={
                 "state": state,
                 "state_hash": self._state_hash(),
@@ -306,7 +321,8 @@ class CRDTStore(Entity):
         return None
 
     def _handle_gossip_response(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float, None, list[Event] | Event | None]:
         """Receive a gossip response: merge remote state."""
         metadata = event.context.get("metadata", {})
@@ -338,7 +354,9 @@ class CRDTStore(Entity):
         else:
             logger.warning(
                 "[%s] Unknown operation %r on CRDT type %s",
-                self.name, operation, type(crdt).__name__,
+                self.name,
+                operation,
+                type(crdt).__name__,
             )
 
     def _serialize_state(self) -> dict:
@@ -348,16 +366,14 @@ class CRDTStore(Entity):
     def _state_hash(self) -> str:
         """Compute a hash of the current state for convergence checking."""
         # Deterministic hash: sort keys, hash serialized state
-        parts = []
-        for key in sorted(self._crdts.keys()):
-            parts.append(f"{key}:{self._crdts[key].to_dict()}")
+        parts = [f"{key}:{self._crdts[key].to_dict()}" for key in sorted(self._crdts.keys())]
         content = "|".join(parts)
         return hashlib.md5(content.encode()).hexdigest()
 
     def _merge_remote_state(self, remote_state: dict) -> None:
         """Merge serialized remote state into local CRDTs."""
         for key, remote_dict in remote_state.items():
-            crdt_type = remote_dict.get("type", "")
+            remote_dict.get("type", "")
 
             if key in self._crdts:
                 # Merge into existing local CRDT
@@ -378,8 +394,8 @@ class CRDTStore(Entity):
         Uses the ``type`` field to dispatch to the correct class.
         """
         from happysimulator.components.crdt.g_counter import GCounter
-        from happysimulator.components.crdt.pn_counter import PNCounter
         from happysimulator.components.crdt.or_set import ORSet
+        from happysimulator.components.crdt.pn_counter import PNCounter
 
         type_map: dict[str, type] = {
             "GCounter": GCounter,

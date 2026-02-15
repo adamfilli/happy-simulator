@@ -10,15 +10,17 @@ from __future__ import annotations
 import heapq
 import logging
 import uuid
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
-from happysimulator.core.control.breakpoints import Breakpoint
 from happysimulator.core.control.state import BreakpointContext, SimulationState
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.core.control.breakpoints import Breakpoint
+    from happysimulator.core.event import Event
     from happysimulator.core.simulation import Simulation
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -283,9 +285,7 @@ class SimulationControl:
         """
         if self._pause_requested:
             return True
-        if self._steps_remaining is not None and self._steps_remaining <= 0:
-            return True
-        return False
+        return bool(self._steps_remaining is not None and self._steps_remaining <= 0)
 
     def _notify_time_advance(self, new_time: Instant) -> None:
         """Fire time-advance hooks."""

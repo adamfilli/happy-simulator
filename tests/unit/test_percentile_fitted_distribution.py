@@ -75,10 +75,7 @@ class TestPercentileFittedSampling:
         target_p50 = 0.1
         dist = PercentileFittedLatency(p50=target_p50)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(10000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(10000)]
         samples.sort()
 
         observed_p50 = samples[len(samples) // 2]
@@ -91,10 +88,7 @@ class TestPercentileFittedSampling:
         target_p99 = 0.5
         dist = PercentileFittedLatency(p99=target_p99)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(10000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(10000)]
         samples.sort()
 
         observed_p99 = samples[int(len(samples) * 0.99)]
@@ -118,10 +112,7 @@ class TestPercentileFittedSampling:
             p99=target_p99,
         )
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(20000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(20000)]
         samples.sort()
 
         observed_p50 = samples[int(len(samples) * 0.50)]
@@ -138,10 +129,7 @@ class TestPercentileFittedSampling:
         dist = PercentileFittedLatency(p50=0.1)
         expected_mean = dist._mean_latency
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(10000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(10000)]
 
         observed_mean = sum(samples) / len(samples)
 
@@ -152,10 +140,7 @@ class TestPercentileFittedSampling:
         """All sampled latencies should be positive."""
         dist = PercentileFittedLatency(p50=0.1)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(1000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(1000)]
 
         assert all(s > 0 for s in samples)
 
@@ -181,10 +166,7 @@ class TestPercentileFittedWithInconsistentTargets:
         assert dist._lambda > 0
 
         # Sample and verify we get a reasonable distribution
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(10000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(10000)]
         samples.sort()
 
         # The fitted values won't match targets exactly, but should be reasonable
@@ -251,10 +233,7 @@ class TestPercentileFittedStatisticalProperties:
         """Exponential distribution has CV = 1 (std dev equals mean)."""
         dist = PercentileFittedLatency(p50=0.1)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(20000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(20000)]
 
         mean = sum(samples) / len(samples)
         variance = sum((s - mean) ** 2 for s in samples) / len(samples)
@@ -268,10 +247,7 @@ class TestPercentileFittedStatisticalProperties:
         """Samples above median should follow same relative distribution."""
         dist = PercentileFittedLatency(p50=0.1)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(20000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(20000)]
 
         median = sorted(samples)[len(samples) // 2]
 
@@ -291,10 +267,7 @@ class TestPercentileFittedStatisticalProperties:
         """With many samples, observed percentiles converge to theoretical."""
         dist = PercentileFittedLatency(p90=0.5)
 
-        samples = [
-            dist.get_latency(Instant.Epoch).to_seconds()
-            for _ in range(50000)
-        ]
+        samples = [dist.get_latency(Instant.Epoch).to_seconds() for _ in range(50000)]
         samples.sort()
 
         # Check multiple percentiles
@@ -309,6 +282,6 @@ class TestPercentileFittedStatisticalProperties:
             relative_error = abs(observed - theoretical) / theoretical
 
             assert relative_error < tolerance, (
-                f"p{int(p*100)}: theoretical={theoretical:.4f}, "
+                f"p{int(p * 100)}: theoretical={theoretical:.4f}, "
                 f"observed={observed:.4f}, error={relative_error:.2%}"
             )

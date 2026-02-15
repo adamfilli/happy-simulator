@@ -5,7 +5,8 @@ function-based actions and the entity-based event system. NullEntity is a
 singleton that silently discards all events.
 """
 
-from typing import Callable, Union
+from collections.abc import Callable
+from typing import Union
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event

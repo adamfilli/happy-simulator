@@ -32,8 +32,8 @@ Example:
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity

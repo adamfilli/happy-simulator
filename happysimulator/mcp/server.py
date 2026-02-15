@@ -24,7 +24,6 @@ from happysimulator.mcp.tools import (
     run_queue_simulation,
 )
 
-
 mcp_server = Server("happysimulator")
 
 
@@ -234,7 +233,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         )
         return [TextContent(type="text", text=format_response(result))]
 
-    elif name == "simulate_pipeline":
+    if name == "simulate_pipeline":
         result = run_pipeline_simulation(
             stages=arguments["stages"],
             source_rate=arguments["source_rate"],
@@ -244,7 +243,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         )
         return [TextContent(type="text", text=format_response(result))]
 
-    elif name == "sweep_parameter":
+    if name == "sweep_parameter":
         param = arguments["parameter"]
         values = arguments["values"]
         base_arrival = arguments.get("arrival_rate", 10)
@@ -270,15 +269,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             parameter_values=values,
             results=results,
         )
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "prompt_context": sweep.to_prompt_context(),
-                "data": sweep.to_dict(),
-            }, indent=2, default=str),
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "prompt_context": sweep.to_prompt_context(),
+                        "data": sweep.to_dict(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
 
-    elif name == "compare_scenarios":
+    if name == "compare_scenarios":
         seed = arguments.get("seed")
         a_cfg = arguments["scenario_a"]
         b_cfg = arguments["scenario_b"]
@@ -298,22 +303,33 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             seed=seed,
         )
         comparison = result_a.compare(result_b)
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "prompt_context": comparison.to_prompt_context(),
-                "data": comparison.to_dict(),
-            }, indent=2, default=str),
-        )]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "prompt_context": comparison.to_prompt_context(),
+                        "data": comparison.to_dict(),
+                    },
+                    indent=2,
+                    default=str,
+                ),
+            )
+        ]
 
-    elif name == "list_distributions":
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "prompt_context": format_distributions(),
-                "data": {"distributions": DISTRIBUTIONS_INFO},
-            }, indent=2),
-        )]
+    if name == "list_distributions":
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "prompt_context": format_distributions(),
+                        "data": {"distributions": DISTRIBUTIONS_INFO},
+                    },
+                    indent=2,
+                ),
+            )
+        ]
 
     raise ValueError(f"Unknown tool: {name}")
 
@@ -322,6 +338,7 @@ async def run_server():
     """Run the MCP server with stdio transport."""
     async with stdio_server() as (read_stream, write_stream):
         await mcp_server.run(
-            read_stream, write_stream,
+            read_stream,
+            write_stream,
             mcp_server.create_initialization_options(),
         )

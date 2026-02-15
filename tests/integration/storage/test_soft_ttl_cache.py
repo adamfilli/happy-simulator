@@ -4,7 +4,7 @@ Verifies the three cache zones (fresh, stale, expired) work correctly
 when a client reads through a SoftTTLCache backed by a KVStore.
 """
 
-from typing import Generator
+from collections.abc import Generator
 
 from happysimulator import Entity, Event, Instant, Simulation
 from happysimulator.components.datastore import KVStore, SoftTTLCache
@@ -18,7 +18,7 @@ class Client(Entity):
         self.cache = cache
         self.results: list[tuple[str, object]] = []
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         key = event.context["key"]
         value = yield from self.cache.get(key)
         self.results.append((key, value))
@@ -85,8 +85,8 @@ class TestClientCacheDatastoreFlow:
             duration=2.0,
             entities=[client, cache],
         )
-        sim.schedule(_request(client, 0.0, "user:1"))   # cold miss
-        sim.schedule(_request(client, 1.0, "user:1"))   # fresh hit (1s < 5s soft_ttl)
+        sim.schedule(_request(client, 0.0, "user:1"))  # cold miss
+        sim.schedule(_request(client, 1.0, "user:1"))  # fresh hit (1s < 5s soft_ttl)
         sim.run()
 
         assert cache.stats.hard_misses == 1
@@ -104,8 +104,8 @@ class TestClientCacheDatastoreFlow:
             duration=5.0,
             entities=[client, cache],
         )
-        sim.schedule(_request(client, 0.0, "user:1"))   # cold miss
-        sim.schedule(_request(client, 3.0, "user:1"))   # stale hit (3s > 2s soft_ttl)
+        sim.schedule(_request(client, 0.0, "user:1"))  # cold miss
+        sim.schedule(_request(client, 3.0, "user:1"))  # stale hit (3s > 2s soft_ttl)
         sim.run()
 
         assert cache.stats.hard_misses == 1
@@ -125,8 +125,8 @@ class TestClientCacheDatastoreFlow:
             duration=8.0,
             entities=[client, cache],
         )
-        sim.schedule(_request(client, 0.0, "user:1"))    # cold miss
-        sim.schedule(_request(client, 6.0, "user:1"))    # expired (6s > 5s hard_ttl)
+        sim.schedule(_request(client, 0.0, "user:1"))  # cold miss
+        sim.schedule(_request(client, 6.0, "user:1"))  # expired (6s > 5s hard_ttl)
         sim.run()
 
         assert cache.stats.hard_misses == 2
@@ -173,9 +173,7 @@ class TestClientCacheDatastoreFlow:
 
     def test_lru_eviction_under_capacity(self):
         """When cache is at capacity, least-recently-used key is evicted."""
-        datastore, cache, client = _build(
-            soft_ttl=30.0, hard_ttl=60.0, cache_capacity=2
-        )
+        datastore, cache, client = _build(soft_ttl=30.0, hard_ttl=60.0, cache_capacity=2)
         for i in range(3):
             datastore.put_sync(f"k{i}", f"v{i}")
 

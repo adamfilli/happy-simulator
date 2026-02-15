@@ -6,6 +6,7 @@ state snapshots, event recording, and topology tracking.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from collections import deque
@@ -13,13 +14,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.event import Event
 from happysimulator.visual.code_debugger import CodeBreakpoint, CodeDebugger
 from happysimulator.visual.serializers import is_internal_event, serialize_entity, serialize_event
 from happysimulator.visual.topology import discover
 
 if TYPE_CHECKING:
+    from happysimulator.core.event import Event
     from happysimulator.core.simulation import Simulation
+    from happysimulator.visual.dashboard import Chart
 
 
 @dataclass
@@ -74,10 +76,8 @@ class _BridgeLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             time_s: float | None = None
-            try:
+            with contextlib.suppress(Exception):
                 time_s = self._bridge._sim._current_time.to_seconds()
-            except Exception:
-                pass
 
             logger_name = record.name
             if logger_name.startswith("happysimulator."):
@@ -110,7 +110,6 @@ class SimulationBridge:
     MAX_HISTORY_SAMPLES = 10_000
 
     def __init__(self, sim: Simulation, charts: list | None = None) -> None:
-        from happysimulator.visual.dashboard import Chart
 
         self._sim = sim
         self._charts: list[Chart] = charts or []
@@ -265,11 +264,8 @@ class SimulationBridge:
 
         upcoming: list[dict] = []
         if state.is_paused:
-            try:
-                for evt in self._sim.control.peek_next(10):
-                    upcoming.append(serialize_event(evt))
-            except RuntimeError:
-                pass
+            with contextlib.suppress(RuntimeError):
+                upcoming.extend(serialize_event(evt) for evt in self._sim.control.peek_next(10))
 
         end_time = self._sim._end_time
         end_time_s = end_time.to_seconds() if end_time != Instant.Infinity else None
@@ -426,16 +422,15 @@ class SimulationBridge:
         """Return metadata for all registered probes."""
         from happysimulator.instrumentation.probe import Probe
 
-        result = []
-        for probe in self._sim._probes:
-            if isinstance(probe, Probe):
-                result.append(
-                    {
-                        "name": probe.name,
-                        "metric": probe.metric,
-                        "target": probe.target.name,
-                    }
-                )
+        result = [
+            {
+                "name": probe.name,
+                "metric": probe.metric,
+                "target": probe.target.name,
+            }
+            for probe in self._sim._probes
+            if isinstance(probe, Probe)
+        ]
         return result
 
     def get_chart_configs(self) -> list[dict]:
@@ -463,9 +458,7 @@ class SimulationBridge:
             return {"entity": entity_name, "metrics": {}}
 
         # Collect all numeric metric names from the first snapshot
-        metric_names = [
-            k for k, v in snapshots[0][1].items() if isinstance(v, (int, float))
-        ]
+        metric_names = [k for k, v in snapshots[0][1].items() if isinstance(v, (int, float))]
 
         metrics: dict[str, dict[str, list]] = {}
         for name in metric_names:
@@ -503,7 +496,9 @@ class SimulationBridge:
 
     def get_entity_source(self, entity_name: str) -> dict[str, Any] | None:
         """Return source code for an entity's handler method."""
-        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+        for entity in (
+            list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
+        ):
             name = getattr(entity, "name", type(entity).__name__)
             if name == entity_name:
                 location = self._code_debugger.get_source(entity)
@@ -515,7 +510,9 @@ class SimulationBridge:
     def activate_code_debug(self, entity_name: str) -> dict[str, Any]:
         """Activate code-level debugging for an entity."""
         # Pre-cache source
-        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+        for entity in (
+            list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
+        ):
             name = getattr(entity, "name", type(entity).__name__)
             if name == entity_name:
                 self._code_debugger.get_source(entity)

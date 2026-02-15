@@ -19,10 +19,10 @@ from happysimulator.components.rate_limiter.policy import (
 )
 from happysimulator.core.temporal import Duration, Instant
 
-
 # ---------------------------------------------------------------------------
 # Protocol conformance
 # ---------------------------------------------------------------------------
+
 
 def test_all_policies_implement_protocol():
     """All concrete policies satisfy the RateLimiterPolicy protocol."""
@@ -41,8 +41,8 @@ def test_all_policies_implement_protocol():
 # TokenBucketPolicy
 # ---------------------------------------------------------------------------
 
-class TestTokenBucketPolicy:
 
+class TestTokenBucketPolicy:
     def test_acquire_within_capacity(self):
         p = TokenBucketPolicy(capacity=3.0, refill_rate=1.0, initial_tokens=3.0)
         t = Instant.Epoch
@@ -86,8 +86,8 @@ class TestTokenBucketPolicy:
 # LeakyBucketPolicy
 # ---------------------------------------------------------------------------
 
-class TestLeakyBucketPolicy:
 
+class TestLeakyBucketPolicy:
     def test_first_acquire_succeeds(self):
         p = LeakyBucketPolicy(leak_rate=2.0)
         assert p.try_acquire(Instant.Epoch) is True
@@ -118,8 +118,8 @@ class TestLeakyBucketPolicy:
 # SlidingWindowPolicy
 # ---------------------------------------------------------------------------
 
-class TestSlidingWindowPolicy:
 
+class TestSlidingWindowPolicy:
     def test_within_limit(self):
         p = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=3)
         t = Instant.Epoch
@@ -152,8 +152,8 @@ class TestSlidingWindowPolicy:
 # FixedWindowPolicy
 # ---------------------------------------------------------------------------
 
-class TestFixedWindowPolicy:
 
+class TestFixedWindowPolicy:
     def test_validation(self):
         with pytest.raises(ValueError):
             FixedWindowPolicy(requests_per_window=0)
@@ -188,8 +188,8 @@ class TestFixedWindowPolicy:
 # AdaptivePolicy
 # ---------------------------------------------------------------------------
 
-class TestAdaptivePolicy:
 
+class TestAdaptivePolicy:
     def test_validation(self):
         with pytest.raises(ValueError):
             AdaptivePolicy(min_rate=0)

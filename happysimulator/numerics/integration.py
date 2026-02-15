@@ -4,7 +4,7 @@ Provides adaptive Simpson's rule integration as a pure Python replacement
 for scipy.integrate.quad.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 
 def integrate_adaptive_simpson(
@@ -73,12 +73,8 @@ def integrate_adaptive_simpson(
             return s_combined + error_estimate, abs(error_estimate)
 
         # Recurse on each half with tighter tolerance
-        left_result, left_error = _adaptive(
-            a, m, fa, fm, s_left, depth + 1, tol / 2.0
-        )
-        right_result, right_error = _adaptive(
-            m, b, fm, fb, s_right, depth + 1, tol / 2.0
-        )
+        left_result, left_error = _adaptive(a, m, fa, fm, s_left, depth + 1, tol / 2.0)
+        right_result, right_error = _adaptive(m, b, fm, fb, s_right, depth + 1, tol / 2.0)
 
         return left_result + right_result, left_error + right_error
 

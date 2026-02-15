@@ -204,9 +204,7 @@ class ExponentialBackoff:
         if initial_delay <= 0:
             raise ValueError(f"initial_delay must be > 0, got {initial_delay}")
         if max_delay < initial_delay:
-            raise ValueError(
-                f"max_delay ({max_delay}) must be >= initial_delay ({initial_delay})"
-            )
+            raise ValueError(f"max_delay ({max_delay}) must be >= initial_delay ({initial_delay})")
         if multiplier < 1:
             raise ValueError(f"multiplier must be >= 1, got {multiplier}")
         if jitter < 0:
@@ -279,7 +277,7 @@ class ExponentialBackoff:
         # attempt=2 (first retry): initial_delay
         # attempt=3 (second retry): initial_delay * multiplier
         exponent = max(0, attempt - 2)  # 0 for first retry
-        delay = self._initial_delay * (self._multiplier ** exponent)
+        delay = self._initial_delay * (self._multiplier**exponent)
 
         # Cap at max_delay
         delay = min(delay, self._max_delay)
@@ -326,9 +324,7 @@ class DecorrelatedJitter:
         if base_delay <= 0:
             raise ValueError(f"base_delay must be > 0, got {base_delay}")
         if max_delay < base_delay:
-            raise ValueError(
-                f"max_delay ({max_delay}) must be >= base_delay ({base_delay})"
-            )
+            raise ValueError(f"max_delay ({max_delay}) must be >= base_delay ({base_delay})")
 
         self._max_attempts = max_attempts
         self._base_delay = base_delay

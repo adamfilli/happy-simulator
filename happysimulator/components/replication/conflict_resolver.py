@@ -11,23 +11,31 @@ the same key is written concurrently on multiple replicas. Three strategies:
 Example::
 
     from happysimulator.components.replication import (
-        LastWriterWins, VectorClockMerge, VersionedValue,
+        LastWriterWins,
+        VectorClockMerge,
+        VersionedValue,
     )
 
     resolver = LastWriterWins()
-    winner = resolver.resolve("user:123", [
-        VersionedValue(value={"name": "Alice"}, timestamp=1.0, writer_id="dc-east"),
-        VersionedValue(value={"name": "Bob"}, timestamp=2.0, writer_id="dc-west"),
-    ])
+    winner = resolver.resolve(
+        "user:123",
+        [
+            VersionedValue(value={"name": "Alice"}, timestamp=1.0, writer_id="dc-east"),
+            VersionedValue(value={"name": "Bob"}, timestamp=2.0, writer_id="dc-west"),
+        ],
+    )
     assert winner.value == {"name": "Bob"}  # Higher timestamp wins
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from happysimulator.core.logical_clocks import HLCTimestamp
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 @dataclass(frozen=True)
@@ -115,10 +123,7 @@ class VectorClockMerge:
 
     def __init__(
         self,
-        merge_fn: Callable[
-            [str, VersionedValue, VersionedValue], VersionedValue
-        ]
-        | None = None,
+        merge_fn: Callable[[str, VersionedValue, VersionedValue], VersionedValue] | None = None,
     ):
         self._merge_fn = merge_fn
 
@@ -137,9 +142,7 @@ class VectorClockMerge:
             result = self._resolve_pair(key, result, v)
         return result
 
-    def _resolve_pair(
-        self, key: str, a: VersionedValue, b: VersionedValue
-    ) -> VersionedValue:
+    def _resolve_pair(self, key: str, a: VersionedValue, b: VersionedValue) -> VersionedValue:
         """Resolve a pair of versions."""
         vc_a = a.vector_clock or {}
         vc_b = b.vector_clock or {}

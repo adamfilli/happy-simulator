@@ -66,6 +66,7 @@ class MockClock:
     def advance(self, seconds: float):
         """Advance time by given seconds."""
         from happysimulator.core.temporal import Duration
+
         self._time = self._time + Duration.from_seconds(seconds)
 
 

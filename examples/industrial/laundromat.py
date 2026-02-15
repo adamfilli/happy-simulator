@@ -31,17 +31,15 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     Resource,
     Simulation,
     SimulationSummary,
@@ -50,6 +48,8 @@ from happysimulator import (
 from happysimulator.components.common import Counter
 from happysimulator.components.industrial import PooledCycleResource, RenegingQueuedResource
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -149,9 +149,7 @@ class WasherStation(RenegingQueuedResource):
             self._active -= 1
 
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Washed")
-        ]
+        return [self.forward(event, self.downstream, event_type="Washed")]
 
 
 class FoldingArea(Entity):
@@ -169,9 +167,7 @@ class FoldingArea(Entity):
         yield self.fold_time
         grant.release()
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Done")
-        ]
+        return [self.forward(event, self.downstream, event_type="Done")]
 
 
 # =============================================================================
@@ -233,8 +229,8 @@ def run_laundromat_simulation(config: LaundromatConfig | None = None) -> Laundro
     stop_after = Instant.from_seconds(config.duration_s)
     customer_provider = CustomerProvider(washers, config.patience_s, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Arrivals",
@@ -282,18 +278,22 @@ def print_summary(result: LaundromatResult) -> None:
     print("LAUNDROMAT SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 60:.0f} minutes")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f}/min")
-    print(f"  Washers:             {config.num_washers} ({config.wash_cycle_time / 60:.0f} min cycle)")
-    print(f"  Dryers:              {config.num_dryers} ({config.dry_cycle_time / 60:.0f} min cycle)")
+    print(
+        f"  Washers:             {config.num_washers} ({config.wash_cycle_time / 60:.0f} min cycle)"
+    )
+    print(
+        f"  Dryers:              {config.num_dryers} ({config.dry_cycle_time / 60:.0f} min cycle)"
+    )
     print(f"  Folding tables:      {config.num_folding_tables}")
     print(f"  Patience:            {config.patience_s / 60:.0f} min")
 
     total = result.customer_provider.generated
     reneged = result.washers.reneged
 
-    print(f"\nCustomer Flow:")
+    print("\nCustomer Flow:")
     print(f"  Arrived:             {total}")
     print(f"  Reneged:             {reneged} ({100 * reneged / max(total, 1):.1f}%)")
     print(f"  Washed:              {result.washers.processed}")
@@ -308,7 +308,7 @@ def print_summary(result: LaundromatResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.1f} min")
         print(f"  p50:     {result.sink.p50() / 60:.1f} min")

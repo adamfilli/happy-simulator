@@ -51,10 +51,14 @@ class RequestProvider(EventProvider):
         if time > self._stop_after:
             return []
         self._count += 1
-        return [Event(
-            time=time, event_type="Request", target=self._target,
-            context={"created_at": time},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._target,
+                context={"created_at": time},
+            )
+        ]
 
 
 def make_server(name: str) -> Server:
@@ -90,10 +94,12 @@ def run_rolling_deployment(
     # Traffic
     provider = RequestProvider(lb, stop_after=duration_s - 5.0)
     arrival = ConstantArrivalTimeProvider(
-        ConstantRateProfile(rate=20.0), start_time=Instant.Epoch,
+        ConstantRateProfile(rate=20.0),
+        start_time=Instant.Epoch,
     )
     source = Source(
-        name="Traffic", event_provider=provider,
+        name="Traffic",
+        event_provider=provider,
         arrival_time_provider=arrival,
     )
 
@@ -101,11 +107,10 @@ def run_rolling_deployment(
         start_time=Instant.Epoch,
         duration=duration_s,
         sources=[source],
-        entities=[lb, deployer, sink] + v1_servers,
+        entities=[lb, deployer, sink, *v1_servers],
     )
 
     # Start deployment at t=5s
-    from happysimulator.core.temporal import Duration
     deploy_event = Event(
         time=Instant.from_seconds(5.0),
         event_type="_rolling_deploy_start",
@@ -124,14 +129,16 @@ def run_rolling_deployment(
     print(f"  Replaced: {deployer.state.replaced}")
     print(f"  Failed: {deployer.state.failed}")
 
-    print(f"\nDeployer stats:")
+    print("\nDeployer stats:")
     print(f"  Deployments started: {deployer.stats.deployments_started}")
     print(f"  Deployments completed: {deployer.stats.deployments_completed}")
     print(f"  Deployments rolled back: {deployer.stats.deployments_rolled_back}")
     print(f"  Instances replaced: {deployer.stats.instances_replaced}")
-    print(f"  Health checks: {deployer.stats.health_checks_performed} performed, "
-          f"{deployer.stats.health_checks_passed} passed, "
-          f"{deployer.stats.health_checks_failed} failed")
+    print(
+        f"  Health checks: {deployer.stats.health_checks_performed} performed, "
+        f"{deployer.stats.health_checks_passed} passed, "
+        f"{deployer.stats.health_checks_failed} failed"
+    )
 
     print(f"\nCurrent backends: {[b.name for b in lb.all_backends]}")
 

@@ -6,11 +6,12 @@ comparison against skewed distributions like Zipf.
 """
 
 import random
-from typing import Sequence, TypeVar
+from collections.abc import Sequence
+from typing import TypeVar
 
 from happysimulator.distributions.value_distribution import ValueDistribution
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class UniformDistribution(ValueDistribution[T]):

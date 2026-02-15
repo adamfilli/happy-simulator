@@ -74,7 +74,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -93,6 +93,8 @@ from happysimulator import (
     Source,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Profile: Multi-step load function for metastable failure demonstration
@@ -122,9 +124,9 @@ class MetastableLoadProfile(Profile):
     step_down_start: float = 65.0
 
     # Rates (requests per second)
-    stable_rate: float = 5.0      # 50% utilization
+    stable_rate: float = 5.0  # 50% utilization
     vulnerable_rate: float = 9.0  # 90% utilization
-    spike_rate: float = 15.0      # 150% - overload
+    spike_rate: float = 15.0  # 150% - overload
 
     # Step-down rates for recovery search
     step_down_rates: tuple[float, ...] = (7.0, 6.0, 5.0, 4.0, 3.0)
@@ -257,6 +259,7 @@ class MM1Server(QueuedResource):
 @dataclass
 class SimulationResult:
     """Results from the metastable failure simulation."""
+
     sink: LatencyTracker
     server: MM1Server
     queue_depth_data: Data
@@ -355,53 +358,71 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Top: Load profile
     ax1 = axes[0]
-    time_points = list(range(0, 130))
+    time_points = list(range(130))
     rates = [profile.get_rate(Instant.from_seconds(t)) for t in time_points]
-    ax1.plot(time_points, rates, 'b-', linewidth=2, label='Arrival Rate')
-    ax1.axhline(y=10, color='r', linestyle='--', label='Service Capacity (10 req/s)')
-    ax1.fill_between([spike1_start, spike1_end], 0, 20, alpha=0.2, color='orange', label='Spike 1 (stable)')
-    ax1.fill_between([spike2_start, spike2_end], 0, 20, alpha=0.2, color='red', label='Spike 2 (vulnerable)')
-    ax1.axvline(x=vulnerable_start, color='purple', linestyle=':', alpha=0.7)
-    ax1.axvline(x=step_down_start, color='green', linestyle=':', alpha=0.7)
-    ax1.set_ylabel('Rate (req/s)')
-    ax1.set_title('Load Profile: Metastable Failure Demonstration')
-    ax1.legend(loc='upper right')
+    ax1.plot(time_points, rates, "b-", linewidth=2, label="Arrival Rate")
+    ax1.axhline(y=10, color="r", linestyle="--", label="Service Capacity (10 req/s)")
+    ax1.fill_between(
+        [spike1_start, spike1_end], 0, 20, alpha=0.2, color="orange", label="Spike 1 (stable)"
+    )
+    ax1.fill_between(
+        [spike2_start, spike2_end], 0, 20, alpha=0.2, color="red", label="Spike 2 (vulnerable)"
+    )
+    ax1.axvline(x=vulnerable_start, color="purple", linestyle=":", alpha=0.7)
+    ax1.axvline(x=step_down_start, color="green", linestyle=":", alpha=0.7)
+    ax1.set_ylabel("Rate (req/s)")
+    ax1.set_title("Load Profile: Metastable Failure Demonstration")
+    ax1.legend(loc="upper right")
     ax1.set_ylim(0, 18)
     ax1.grid(True, alpha=0.3)
 
     # Annotations
-    ax1.annotate('Stable\n(50%)', xy=(12, 5), ha='center', fontsize=9)
-    ax1.annotate('Vulnerable\n(90%)', xy=(45, 9), ha='center', fontsize=9)
-    ax1.annotate('Step-down\nRecovery', xy=(95, 5), ha='center', fontsize=9)
+    ax1.annotate("Stable\n(50%)", xy=(12, 5), ha="center", fontsize=9)
+    ax1.annotate("Vulnerable\n(90%)", xy=(45, 9), ha="center", fontsize=9)
+    ax1.annotate("Step-down\nRecovery", xy=(95, 5), ha="center", fontsize=9)
 
     # Middle: Queue depth
     ax2 = axes[1]
-    ax2.plot(q_times, q_depths, 'g-', linewidth=1, alpha=0.8)
-    ax2.fill_between([spike1_start, spike1_end], 0, max(q_depths) if q_depths else 10,
-                     alpha=0.2, color='orange')
-    ax2.fill_between([spike2_start, spike2_end], 0, max(q_depths) if q_depths else 10,
-                     alpha=0.2, color='red')
-    ax2.axvline(x=vulnerable_start, color='purple', linestyle=':', alpha=0.7, label='Enter vulnerable state')
-    ax2.axvline(x=step_down_start, color='green', linestyle=':', alpha=0.7, label='Begin step-down')
-    ax2.set_ylabel('Queue Depth')
-    ax2.set_title('Queue Depth Over Time')
-    ax2.legend(loc='upper right')
+    ax2.plot(q_times, q_depths, "g-", linewidth=1, alpha=0.8)
+    ax2.fill_between(
+        [spike1_start, spike1_end], 0, max(q_depths) if q_depths else 10, alpha=0.2, color="orange"
+    )
+    ax2.fill_between(
+        [spike2_start, spike2_end], 0, max(q_depths) if q_depths else 10, alpha=0.2, color="red"
+    )
+    ax2.axvline(
+        x=vulnerable_start, color="purple", linestyle=":", alpha=0.7, label="Enter vulnerable state"
+    )
+    ax2.axvline(x=step_down_start, color="green", linestyle=":", alpha=0.7, label="Begin step-down")
+    ax2.set_ylabel("Queue Depth")
+    ax2.set_title("Queue Depth Over Time")
+    ax2.legend(loc="upper right")
     ax2.grid(True, alpha=0.3)
 
     # Bottom: Latency (using built-in bucketed data)
     ax3 = axes[2]
-    ax3.plot(latency_buckets["time_s"], latency_buckets["mean"], 'b-', linewidth=2, label='Avg')
-    ax3.plot(latency_buckets["time_s"], latency_buckets["p99"], 'r-', linewidth=1.5, label='p99')
-    ax3.fill_between([spike1_start, spike1_end], 0, max(latency_buckets["p99"]) if latency_buckets["p99"] else 1,
-                     alpha=0.2, color='orange')
-    ax3.fill_between([spike2_start, spike2_end], 0, max(latency_buckets["p99"]) if latency_buckets["p99"] else 1,
-                     alpha=0.2, color='red')
-    ax3.axvline(x=vulnerable_start, color='purple', linestyle=':', alpha=0.7)
-    ax3.axvline(x=step_down_start, color='green', linestyle=':', alpha=0.7)
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Latency (s)')
-    ax3.set_title('End-to-End Latency Over Time')
-    ax3.legend(loc='upper right')
+    ax3.plot(latency_buckets["time_s"], latency_buckets["mean"], "b-", linewidth=2, label="Avg")
+    ax3.plot(latency_buckets["time_s"], latency_buckets["p99"], "r-", linewidth=1.5, label="p99")
+    ax3.fill_between(
+        [spike1_start, spike1_end],
+        0,
+        max(latency_buckets["p99"]) if latency_buckets["p99"] else 1,
+        alpha=0.2,
+        color="orange",
+    )
+    ax3.fill_between(
+        [spike2_start, spike2_end],
+        0,
+        max(latency_buckets["p99"]) if latency_buckets["p99"] else 1,
+        alpha=0.2,
+        color="red",
+    )
+    ax3.axvline(x=vulnerable_start, color="purple", linestyle=":", alpha=0.7)
+    ax3.axvline(x=step_down_start, color="green", linestyle=":", alpha=0.7)
+    ax3.set_xlabel("Time (s)")
+    ax3.set_ylabel("Latency (s)")
+    ax3.set_title("End-to-End Latency Over Time")
+    ax3.legend(loc="upper right")
     ax3.grid(True, alpha=0.3)
 
     fig.tight_layout()
@@ -419,12 +440,12 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     ax = axes[0, 0]
     if pre_spike1:
-        ax.hist(pre_spike1.raw_values(), bins=30, alpha=0.5, label='Before spike', color='blue')
+        ax.hist(pre_spike1.raw_values(), bins=30, alpha=0.5, label="Before spike", color="blue")
     if post_spike1:
-        ax.hist(post_spike1.raw_values(), bins=30, alpha=0.5, label='After spike', color='green')
-    ax.set_xlabel('Latency (s)')
-    ax.set_ylabel('Count')
-    ax.set_title('Spike 1 (Stable State): Latency Distribution')
+        ax.hist(post_spike1.raw_values(), bins=30, alpha=0.5, label="After spike", color="green")
+    ax.set_xlabel("Latency (s)")
+    ax.set_ylabel("Count")
+    ax.set_title("Spike 1 (Stable State): Latency Distribution")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -434,20 +455,23 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     ax = axes[0, 1]
     if pre_spike2:
-        ax.hist(pre_spike2.raw_values(), bins=30, alpha=0.5, label='Before spike', color='blue')
+        ax.hist(pre_spike2.raw_values(), bins=30, alpha=0.5, label="Before spike", color="blue")
     if post_spike2:
-        ax.hist(post_spike2.raw_values(), bins=30, alpha=0.5, label='After spike', color='red')
-    ax.set_xlabel('Latency (s)')
-    ax.set_ylabel('Count')
-    ax.set_title('Spike 2 (Vulnerable State): Latency Distribution')
+        ax.hist(post_spike2.raw_values(), bins=30, alpha=0.5, label="After spike", color="red")
+    ax.set_xlabel("Latency (s)")
+    ax.set_ylabel("Count")
+    ax.set_title("Spike 2 (Vulnerable State): Latency Distribution")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     # Recovery analysis
-    step_times = [step_down_start + i * profile.step_down_duration for i in range(len(profile.step_down_rates))]
+    step_times = [
+        step_down_start + i * profile.step_down_duration
+        for i in range(len(profile.step_down_rates))
+    ]
 
     ax = axes[1, 0]
-    for i, (start_t, rate) in enumerate(zip(step_times, profile.step_down_rates)):
+    for i, (start_t, _rate) in enumerate(zip(step_times, profile.step_down_rates, strict=False)):
         end_t = start_t + profile.step_down_duration
         step_data = latency_data.between(start_t, end_t)
         if step_data:
@@ -456,10 +480,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     ax.set_xticks(range(1, len(profile.step_down_rates) + 1))
     ax.set_xticklabels([f"{r} req/s" for r in profile.step_down_rates])
-    ax.set_xlabel('Load Level')
-    ax.set_ylabel('Latency (s)')
-    ax.set_title('Recovery Search: Latency at Each Step-Down Level')
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.set_xlabel("Load Level")
+    ax.set_ylabel("Latency (s)")
+    ax.set_title("Recovery Search: Latency at Each Step-Down Level")
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Throughput over time - derive from sink data (one event = one completion)
     tp_buckets = result.sink.data.bucket(window_s=1.0)
@@ -468,16 +492,22 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     ax = axes[1, 1]
     ax.bar(tp_times, tp_values, width=0.8, alpha=0.7)
-    ax.axhline(y=10, color='r', linestyle='--', label='Capacity')
-    ax.fill_between([spike1_start, spike1_end], 0, max(tp_values) if tp_values else 15,
-                    alpha=0.2, color='orange')
-    ax.fill_between([spike2_start, spike2_end], 0, max(tp_values) if tp_values else 15,
-                    alpha=0.2, color='red')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Completions/second')
-    ax.set_title('Throughput Over Time')
+    ax.axhline(y=10, color="r", linestyle="--", label="Capacity")
+    ax.fill_between(
+        [spike1_start, spike1_end],
+        0,
+        max(tp_values) if tp_values else 15,
+        alpha=0.2,
+        color="orange",
+    )
+    ax.fill_between(
+        [spike2_start, spike2_end], 0, max(tp_values) if tp_values else 15, alpha=0.2, color="red"
+    )
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Completions/second")
+    ax.set_title("Throughput Over Time")
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     fig.tight_layout()
     fig.savefig(output_dir / "metastable_analysis.png", dpi=150)
@@ -493,13 +523,19 @@ def print_summary(result: SimulationResult) -> None:
 
     profile = result.profile
 
-    print(f"\nConfiguration:")
-    print(f"  Service capacity: 10 req/s (mean service time = 100ms)")
-    print(f"  Stable rate: {profile.stable_rate} req/s ({profile.stable_rate/10*100:.0f}% utilization)")
-    print(f"  Vulnerable rate: {profile.vulnerable_rate} req/s ({profile.vulnerable_rate/10*100:.0f}% utilization)")
-    print(f"  Spike rate: {profile.spike_rate} req/s ({profile.spike_rate/10*100:.0f}% utilization)")
+    print("\nConfiguration:")
+    print("  Service capacity: 10 req/s (mean service time = 100ms)")
+    print(
+        f"  Stable rate: {profile.stable_rate} req/s ({profile.stable_rate / 10 * 100:.0f}% utilization)"
+    )
+    print(
+        f"  Vulnerable rate: {profile.vulnerable_rate} req/s ({profile.vulnerable_rate / 10 * 100:.0f}% utilization)"
+    )
+    print(
+        f"  Spike rate: {profile.spike_rate} req/s ({profile.spike_rate / 10 * 100:.0f}% utilization)"
+    )
 
-    print(f"\nRequests:")
+    print("\nRequests:")
     print(f"  Generated: {result.source_generated}")
     print(f"  Completed: {result.sink.count}")
     print(f"  Processed by server: {result.server.stats_processed}")
@@ -507,32 +543,54 @@ def print_summary(result: SimulationResult) -> None:
     # Queue depth analysis using Data.between().mean() / .max()
     qd = result.queue_depth_data
 
-    print(f"\nQueue Depth Analysis:")
-    print(f"  Stable period (10-25s):     avg={qd.between(10, 25).mean():.1f}, max={qd.between(10, 25).max():.0f}")
-    print(f"  During spike 1 (25-30s):    avg={qd.between(25, 30).mean():.1f}, max={qd.between(25, 30).max():.0f}")
-    print(f"  Post-spike 1 (30-35s):      avg={qd.between(30, 35).mean():.1f}, max={qd.between(30, 35).max():.0f}")
-    print(f"  Vulnerable period (45-55s): avg={qd.between(45, 55).mean():.1f}, max={qd.between(45, 55).max():.0f}")
-    print(f"  During spike 2 (55-60s):    avg={qd.between(55, 60).mean():.1f}, max={qd.between(55, 60).max():.0f}")
-    print(f"  Post-spike 2 (60-65s):      avg={qd.between(60, 65).mean():.1f}, max={qd.between(60, 65).max():.0f}")
+    print("\nQueue Depth Analysis:")
+    print(
+        f"  Stable period (10-25s):     avg={qd.between(10, 25).mean():.1f}, max={qd.between(10, 25).max():.0f}"
+    )
+    print(
+        f"  During spike 1 (25-30s):    avg={qd.between(25, 30).mean():.1f}, max={qd.between(25, 30).max():.0f}"
+    )
+    print(
+        f"  Post-spike 1 (30-35s):      avg={qd.between(30, 35).mean():.1f}, max={qd.between(30, 35).max():.0f}"
+    )
+    print(
+        f"  Vulnerable period (45-55s): avg={qd.between(45, 55).mean():.1f}, max={qd.between(45, 55).max():.0f}"
+    )
+    print(
+        f"  During spike 2 (55-60s):    avg={qd.between(55, 60).mean():.1f}, max={qd.between(55, 60).max():.0f}"
+    )
+    print(
+        f"  Post-spike 2 (60-65s):      avg={qd.between(60, 65).mean():.1f}, max={qd.between(60, 65).max():.0f}"
+    )
 
     # Latency analysis using Data.between() methods
     lat = result.sink.data
 
-    print(f"\nLatency Analysis (average / p99):")
-    print(f"  Stable period (10-25s):     {lat.between(10, 25).mean()*1000:.1f}ms / {lat.between(10, 25).percentile(0.99)*1000:.1f}ms")
-    print(f"  Post-spike 1 (30-35s):      {lat.between(30, 35).mean()*1000:.1f}ms / {lat.between(30, 35).percentile(0.99)*1000:.1f}ms")
-    print(f"  Vulnerable period (45-55s): {lat.between(45, 55).mean()*1000:.1f}ms / {lat.between(45, 55).percentile(0.99)*1000:.1f}ms")
-    print(f"  Post-spike 2 (60-65s):      {lat.between(60, 65).mean()*1000:.1f}ms / {lat.between(60, 65).percentile(0.99)*1000:.1f}ms")
+    print("\nLatency Analysis (average / p99):")
+    print(
+        f"  Stable period (10-25s):     {lat.between(10, 25).mean() * 1000:.1f}ms / {lat.between(10, 25).percentile(0.99) * 1000:.1f}ms"
+    )
+    print(
+        f"  Post-spike 1 (30-35s):      {lat.between(30, 35).mean() * 1000:.1f}ms / {lat.between(30, 35).percentile(0.99) * 1000:.1f}ms"
+    )
+    print(
+        f"  Vulnerable period (45-55s): {lat.between(45, 55).mean() * 1000:.1f}ms / {lat.between(45, 55).percentile(0.99) * 1000:.1f}ms"
+    )
+    print(
+        f"  Post-spike 2 (60-65s):      {lat.between(60, 65).mean() * 1000:.1f}ms / {lat.between(60, 65).percentile(0.99) * 1000:.1f}ms"
+    )
 
     # Recovery search analysis
-    print(f"\nRecovery Search (step-down phases):")
+    print("\nRecovery Search (step-down phases):")
     step_start = profile.step_down_start
     for i, rate in enumerate(profile.step_down_rates):
         start_t = step_start + i * profile.step_down_duration
         end_t = start_t + profile.step_down_duration
         avg_lat = lat.between(start_t, end_t).mean()
         avg_q = qd.between(start_t, end_t).mean()
-        print(f"  {rate} req/s ({rate/10*100:.0f}%): avg_latency={avg_lat*1000:.1f}ms, avg_queue={avg_q:.1f}")
+        print(
+            f"  {rate} req/s ({rate / 10 * 100:.0f}%): avg_latency={avg_lat * 1000:.1f}ms, avg_queue={avg_q:.1f}"
+        )
 
     print("\n" + "=" * 70)
     print("INTERPRETATION:")
@@ -542,17 +600,19 @@ def print_summary(result: SimulationResult) -> None:
     post_spike1_q = qd.between(30, 35).mean()
     post_spike2_q = qd.between(60, 65).mean()
 
-    print(f"\n1. SPIKE IN STABLE STATE (50% utilization):")
-    print(f"   Queue recovers quickly after spike ends.")
+    print("\n1. SPIKE IN STABLE STATE (50% utilization):")
+    print("   Queue recovers quickly after spike ends.")
     print(f"   Post-spike queue depth: {post_spike1_q:.1f}")
 
-    print(f"\n2. SPIKE IN VULNERABLE STATE (90% utilization):")
-    print(f"   Queue buildup persists after spike ends - METASTABLE FAILURE.")
+    print("\n2. SPIKE IN VULNERABLE STATE (90% utilization):")
+    print("   Queue buildup persists after spike ends - METASTABLE FAILURE.")
     print(f"   Post-spike queue depth: {post_spike2_q:.1f}")
 
     if post_spike1_q > 0 and post_spike2_q > post_spike1_q * 2:
-        print(f"\n   The {post_spike2_q/post_spike1_q:.1f}x higher queue depth after spike 2 demonstrates")
-        print(f"   why systems near saturation are vulnerable to metastable failure.")
+        print(
+            f"\n   The {post_spike2_q / post_spike1_q:.1f}x higher queue depth after spike 2 demonstrates"
+        )
+        print("   why systems near saturation are vulnerable to metastable failure.")
 
     # Print auto-generated simulation summary
     print(f"\n{result.summary}")

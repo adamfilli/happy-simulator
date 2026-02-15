@@ -48,9 +48,9 @@ flushes, while smaller thresholds flush more often with less data.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -65,6 +65,8 @@ from happysimulator import (
 )
 from happysimulator.components.storage import Memtable, SSTable
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # MemtableWorker Entity
@@ -111,9 +113,7 @@ class MemtableWorker(Entity):
             self.sstables.append(sstable)
             self.flush_times.append(self.now.to_seconds())
 
-        return [
-            self.forward(event, self.downstream, event_type="WriteComplete")
-        ]
+        return [self.forward(event, self.downstream, event_type="WriteComplete")]
 
 
 # =============================================================================
@@ -161,8 +161,8 @@ def run_memtable_flush_simulation(
     memtable = Memtable(
         "memtable",
         size_threshold=size_threshold,
-        write_latency=0.00001,   # 10us per put
-        read_latency=0.000005,   # 5us per get
+        write_latency=0.00001,  # 10us per put
+        read_latency=0.000005,  # 5us per get
     )
 
     tracker = LatencyTracker(name="WriteTracker")
@@ -217,19 +217,19 @@ def print_summary(result: SimulationResult) -> None:
 
     stats = result.memtable.stats
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:        {result.duration_s}s")
     print(f"  Write rate:      {result.write_rate} writes/s")
     print(f"  Size threshold:  {result.size_threshold} entries")
 
-    print(f"\nMemtable Statistics:")
+    print("\nMemtable Statistics:")
     print(f"  Total writes:       {stats.writes:,}")
     print(f"  Total flushes:      {stats.flushes}")
     print(f"  Current size:       {stats.current_size}")
     print(f"  Bytes written:      {stats.total_bytes_written:,}")
 
     num_flushes = len(result.worker.flush_times)
-    print(f"\nFlush Behavior:")
+    print("\nFlush Behavior:")
     print(f"  Flushes observed:   {num_flushes}")
     if num_flushes > 0:
         expected_flushes = int(result.write_rate * result.duration_s / result.size_threshold)
@@ -240,14 +240,14 @@ def print_summary(result: SimulationResult) -> None:
 
     if result.worker.sstables:
         sizes = [sst.key_count for sst in result.worker.sstables]
-        print(f"\nSSTable Outputs:")
+        print("\nSSTable Outputs:")
         print(f"  Total SSTables:    {len(sizes)}")
         print(f"  Avg keys/SSTable:  {sum(sizes) / len(sizes):.0f}")
         print(f"  Min keys:          {min(sizes)}")
         print(f"  Max keys:          {max(sizes)}")
 
     if result.tracker.count > 0:
-        print(f"\nWrite Latency:")
+        print("\nWrite Latency:")
         print(f"  Completed writes:  {result.tracker.count:,}")
         print(f"  Avg latency:       {result.tracker.mean_latency() * 1000:.4f} ms")
         print(f"  p99 latency:       {result.tracker.p99() * 1000:.4f} ms")
@@ -265,6 +265,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate time series visualization of memtable size."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -325,8 +326,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         ax.set_ylabel("Write Latency (us)")
         ax.legend(loc="upper right")
     else:
-        ax.text(0.5, 0.5, "No latency data", transform=ax.transAxes,
-                ha="center", va="center")
+        ax.text(0.5, 0.5, "No latency data", transform=ax.transAxes, ha="center", va="center")
 
     ax.set_xlabel("Time (s)")
     ax.set_title("Write Latency Over Time")
@@ -358,7 +358,9 @@ if __name__ == "__main__":
     parser.add_argument("--rate", type=float, default=1000.0, help="Write rate (writes/s)")
     parser.add_argument("--threshold", type=int, default=500, help="Memtable size threshold")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/memtable_flush", help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/memtable_flush", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 

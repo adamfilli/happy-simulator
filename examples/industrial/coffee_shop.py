@@ -31,26 +31,25 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 from happysimulator.components.industrial import BatchProcessor, ConditionalRouter
 from happysimulator.components.queue_policy import PriorityQueue
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -107,7 +106,7 @@ class CustomerProvider(EventProvider):
         r = random.random()
         cumulative = 0.0
         drink_type = DRINK_TYPES[-1]
-        for dt, pct in zip(DRINK_TYPES, self._drink_pcts):
+        for dt, pct in zip(DRINK_TYPES, self._drink_pcts, strict=False):
             cumulative += pct
             if r < cumulative:
                 drink_type = dt
@@ -150,9 +149,7 @@ class OrderCounter(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.order_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Order")
-        ]
+        return [self.forward(event, self.downstream, event_type="Order")]
 
 
 class CoffeeStation(QueuedResource):
@@ -167,9 +164,7 @@ class CoffeeStation(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Served")
-        ]
+        return [self.forward(event, self.downstream, event_type="Served")]
 
 
 # =============================================================================
@@ -236,8 +231,8 @@ def run_coffee_shop_simulation(config: CoffeeShopConfig | None = None) -> Coffee
     walkin_provider = CustomerProvider(counter, "walkin", drink_pcts, stop_after)
     mobile_provider = CustomerProvider(counter, "mobile", drink_pcts, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     walkin_source = Source(
         name="WalkIns",
@@ -294,7 +289,7 @@ def print_summary(result: CoffeeShopResult) -> None:
     print("COFFEE SHOP SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 60:.0f} minutes")
     print(f"  Walk-in rate:        {config.walkin_rate_per_min:.1f}/min")
     print(f"  Mobile rate:         {config.mobile_rate_per_min:.1f}/min")
@@ -303,18 +298,18 @@ def print_summary(result: CoffeeShopResult) -> None:
     mobiles = result.mobile_provider.generated
     total = walkins + mobiles
 
-    print(f"\nCustomer Flow:")
+    print("\nCustomer Flow:")
     print(f"  Walk-in customers:   {walkins}")
     print(f"  Mobile customers:    {mobiles}")
     print(f"  Total:               {total}")
     print(f"  Orders processed:    {result.counter._processed}")
 
-    print(f"\nDrink Routing:")
+    print("\nDrink Routing:")
     for name, count in result.router.routed_counts.items():
         print(f"  {name:20s} {count}")
     print(f"  Dropped:             {result.router.dropped}")
 
-    print(f"\nStation Stats:")
+    print("\nStation Stats:")
     print(f"  Drip batches:        {result.drip_batch.batches_processed}")
     print(f"  Drip items:          {result.drip_batch.items_processed}")
     print(f"  Espresso served:     {result.espresso_station._processed}")
@@ -322,7 +317,7 @@ def print_summary(result: CoffeeShopResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency():.1f}s")
         print(f"  p50:     {result.sink.p50():.1f}s")
@@ -340,7 +335,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Coffee shop simulation")
     parser.add_argument("--duration", type=float, default=3600.0, help="Duration in seconds")
     parser.add_argument("--walkin-rate", type=float, default=2.0, help="Walk-in rate per minute")
-    parser.add_argument("--mobile-rate", type=float, default=1.0, help="Mobile order rate per minute")
+    parser.add_argument(
+        "--mobile-rate", type=float, default=1.0, help="Mobile order rate per minute"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 

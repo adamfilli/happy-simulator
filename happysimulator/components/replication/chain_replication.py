@@ -29,12 +29,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.datastore.kv_store import KVStore
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
+    from happysimulator.components.datastore.kv_store import KVStore
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +150,11 @@ class ChainNode(Entity):
         return set(self._dirty_keys)
 
     def handle_event(
-        self, event: Event,
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+        self,
+        event: Event,
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """Route events by type."""
         if event.event_type == "Write":
             return (yield from self._handle_write(event))
@@ -164,8 +171,11 @@ class ChainNode(Entity):
         return None
 
     def _handle_write(
-        self, event: Event,
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+        self,
+        event: Event,
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """HEAD: accept write, apply locally, propagate to next."""
         if self._role != ChainNodeRole.HEAD:
             logger.warning("[%s] Write received by non-HEAD node", self.name)
@@ -198,7 +208,9 @@ class ChainNode(Entity):
 
             # Propagate to next
             prop_event = self._network.send(
-                self, self.next_node, "Propagate",
+                self,
+                self.next_node,
+                "Propagate",
                 payload={"key": key, "value": value, "seq": seq},
             )
             self._propagations_sent += 1
@@ -221,7 +233,8 @@ class ChainNode(Entity):
         return None
 
     def _handle_propagate(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """MIDDLE/TAIL: receive propagation, apply, forward or ack."""
         metadata = event.context.get("metadata", {})
@@ -242,7 +255,9 @@ class ChainNode(Entity):
             head = self.head_node or self.prev_node
             if head is not None:
                 ack_event = self._network.send(
-                    self, head, "WriteAck",
+                    self,
+                    head,
+                    "WriteAck",
                     payload={"key": key, "seq": seq},
                 )
                 self._acks_sent += 1
@@ -259,7 +274,9 @@ class ChainNode(Entity):
         elif self.next_node is not None:
             # Forward to next
             prop_event = self._network.send(
-                self, self.next_node, "Propagate",
+                self,
+                self.next_node,
+                "Propagate",
                 payload={"key": key, "value": value, "seq": seq},
             )
             self._propagations_sent += 1
@@ -284,7 +301,8 @@ class ChainNode(Entity):
             self._dirty_keys.discard(key)
 
     def _handle_read(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Serve a read request."""
         metadata = event.context.get("metadata", {})
@@ -296,18 +314,19 @@ class ChainNode(Entity):
             self._craq_enabled
             and self._role != ChainNodeRole.TAIL
             and key in self._dirty_keys
+            and self.head_node is not None
         ):
-            # Forward read to tail
-            if self.head_node is not None:
-                # Find tail (last in chain)
-                tail = self._find_tail()
-                if tail is not None and tail is not self:
-                    fwd_event = self._network.send(
-                        self, tail, "Read",
-                        payload={"key": key, "reply_future": reply_future},
-                    )
-                    yield 0.0, [fwd_event]
-                    return None
+            # Find tail (last in chain)
+            tail = self._find_tail()
+            if tail is not None and tail is not self:
+                fwd_event = self._network.send(
+                    self,
+                    tail,
+                    "Read",
+                    payload={"key": key, "reply_future": reply_future},
+                )
+                yield 0.0, [fwd_event]
+                return None
 
         # Serve locally
         self._reads_served += 1
@@ -329,10 +348,14 @@ class ChainNode(Entity):
         events = []
         node = self.prev_node
         while node is not None:
-            events.append(self._network.send(
-                self, node, "CommitNotify",
-                payload={"key": key, "seq": seq},
-            ))
+            events.append(
+                self._network.send(
+                    self,
+                    node,
+                    "CommitNotify",
+                    payload={"key": key, "seq": seq},
+                )
+            )
             node = node.prev_node
         return events
 

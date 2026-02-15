@@ -20,10 +20,13 @@ to complete, and Load waits for Transform.
 from __future__ import annotations
 
 import random
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import Entity, Event, Instant, Simulation
 from happysimulator.components.scheduling import JobDefinition, JobScheduler
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class ETLWorker(Entity):
@@ -35,7 +38,7 @@ class ETLWorker(Entity):
         self.jobs_processed = 0
         self.execution_times: list[float] = []
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         start = self.now.to_seconds()
         yield self._delay
         self.jobs_processed += 1
@@ -55,18 +58,35 @@ def run_dag_scheduler(duration_s: float = 30.0, seed: int = 42) -> None:
     scheduler = JobScheduler(name="ETL_Scheduler", tick_interval=1.0)
 
     # Define DAG: Extract -> Transform -> Load
-    scheduler.add_job(JobDefinition(
-        name="extract", target=extract_worker, event_type="Extract",
-        interval=5.0, priority=10,
-    ))
-    scheduler.add_job(JobDefinition(
-        name="transform", target=transform_worker, event_type="Transform",
-        interval=5.0, priority=5, depends_on=["extract"],
-    ))
-    scheduler.add_job(JobDefinition(
-        name="load", target=load_worker, event_type="Load",
-        interval=5.0, priority=1, depends_on=["transform"],
-    ))
+    scheduler.add_job(
+        JobDefinition(
+            name="extract",
+            target=extract_worker,
+            event_type="Extract",
+            interval=5.0,
+            priority=10,
+        )
+    )
+    scheduler.add_job(
+        JobDefinition(
+            name="transform",
+            target=transform_worker,
+            event_type="Transform",
+            interval=5.0,
+            priority=5,
+            depends_on=["extract"],
+        )
+    )
+    scheduler.add_job(
+        JobDefinition(
+            name="load",
+            target=load_worker,
+            event_type="Load",
+            interval=5.0,
+            priority=1,
+            depends_on=["transform"],
+        )
+    )
 
     # Run simulation
     sim = Simulation(
@@ -88,13 +108,13 @@ def run_dag_scheduler(duration_s: float = 30.0, seed: int = 42) -> None:
     print(f"Jobs skipped (dependency): {scheduler.stats.jobs_skipped_dependency}")
     print(f"Jobs skipped (running): {scheduler.stats.jobs_skipped_running}")
 
-    print(f"\nPer-job execution counts:")
+    print("\nPer-job execution counts:")
     print(f"  Extract:   {extract_worker.jobs_processed} runs")
     print(f"  Transform: {transform_worker.jobs_processed} runs")
     print(f"  Load:      {load_worker.jobs_processed} runs")
 
     if extract_worker.execution_times and transform_worker.execution_times:
-        print(f"\nExecution timeline (first 5 of each):")
+        print("\nExecution timeline (first 5 of each):")
         print(f"  Extract:   {[f'{t:.1f}s' for t in extract_worker.execution_times[:5]]}")
         print(f"  Transform: {[f'{t:.1f}s' for t in transform_worker.execution_times[:5]]}")
         print(f"  Load:      {[f'{t:.1f}s' for t in load_worker.execution_times[:5]]}")

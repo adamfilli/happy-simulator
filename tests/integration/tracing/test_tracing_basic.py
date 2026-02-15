@@ -12,20 +12,19 @@ The test verifies that each event's trace contains the expected spans
 for entity-based handling through the pipeline.
 """
 
-from typing import Generator, List
+from collections.abc import Generator
 
 import pytest
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.profile import Profile
-from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
 
 # --- Entities ---
+
 
 class FirstEntity(Entity):
     """First stop in the pipeline. Handles via handle_event, then forwards to middle."""
@@ -76,14 +75,15 @@ class SinkEntity(Entity):
 
     def __init__(self):
         super().__init__("sink_entity")
-        self.collected_events: List[Event] = []
+        self.collected_events: list[Event] = []
 
-    def handle_event(self, event: Event) -> List[Event]:
+    def handle_event(self, event: Event) -> list[Event]:
         self.collected_events.append(event)
         return []
 
 
 # --- Source Components ---
+
 
 class ConstantOnePerSecondProfile(Profile):
     """Returns a rate of 1.0 event per second for duration seconds."""
@@ -98,6 +98,7 @@ class ConstantOnePerSecondProfile(Profile):
 
 
 # --- Test Case ---
+
 
 def test_tracing_spans_through_pipeline():
     """
@@ -133,8 +134,11 @@ def test_tracing_spans_through_pipeline():
     # Setup source
     profile = ConstantOnePerSecondProfile(sim_duration)
     event_source = Source.with_profile(
-        profile=profile, target=first, event_type="StartEvent",
-        poisson=False, name="PipelineSource",
+        profile=profile,
+        target=first,
+        event_type="StartEvent",
+        poisson=False,
+        name="PipelineSource",
     )
 
     # B. RUN SIMULATION
@@ -142,16 +146,22 @@ def test_tracing_spans_through_pipeline():
         sources=[event_source],
         entities=[first, middle, sink],
         probes=[],
-        duration=sim_duration + 1  # Extra time for pipeline to drain
+        duration=sim_duration + 1,  # Extra time for pipeline to drain
     )
     sim.run()
 
     # C. ASSERTIONS
 
     # Verify events flowed through the entire pipeline
-    assert first.events_handled >= 4, f"Expected >= 4 events at first entity, got {first.events_handled}"
-    assert middle.events_processed >= 4, f"Expected >= 4 events at middle entity, got {middle.events_processed}"
-    assert len(sink.collected_events) >= 4, f"Expected >= 4 events at sink, got {len(sink.collected_events)}"
+    assert first.events_handled >= 4, (
+        f"Expected >= 4 events at first entity, got {first.events_handled}"
+    )
+    assert middle.events_processed >= 4, (
+        f"Expected >= 4 events at middle entity, got {middle.events_processed}"
+    )
+    assert len(sink.collected_events) >= 4, (
+        f"Expected >= 4 events at sink, got {len(sink.collected_events)}"
+    )
 
     # Verify trace spans on collected events
     for i, event in enumerate(sink.collected_events):
@@ -174,22 +184,27 @@ def test_tracing_spans_through_pipeline():
 
         # Verify we have spans from all three entities
         handle_starts = [s for s in spans if s["action"] == "handle.start"]
-        assert len(handle_starts) >= 3, \
+        assert len(handle_starts) >= 3, (
             f"Event {i} should have handle.start spans for first, middle, and sink. Got {len(handle_starts)}"
+        )
 
         # All handlers should be entity-based
         handler_kinds = [s.get("data", {}).get("handler") for s in handle_starts]
-        assert all(k == "entity" for k in handler_kinds), \
+        assert all(k == "entity" for k in handler_kinds), (
             f"Event {i} all handlers should be entity-based, got {handler_kinds}"
+        )
 
         # Verify handler labels
         handler_labels = [s.get("data", {}).get("handler_label") for s in handle_starts]
-        assert any("first_entity" in str(label) for label in handler_labels), \
+        assert any("first_entity" in str(label) for label in handler_labels), (
             f"Event {i} should have first_entity in handler labels: {handler_labels}"
-        assert any("middle_entity" in str(label) for label in handler_labels), \
+        )
+        assert any("middle_entity" in str(label) for label in handler_labels), (
             f"Event {i} should have middle_entity in handler labels: {handler_labels}"
-        assert any("sink_entity" in str(label) for label in handler_labels), \
+        )
+        assert any("sink_entity" in str(label) for label in handler_labels), (
             f"Event {i} should have sink_entity in handler labels: {handler_labels}"
+        )
 
     # Verify span ordering (handle.start should come before handle.end for each handler)
     for i, event in enumerate(sink.collected_events):
@@ -199,21 +214,25 @@ def test_tracing_spans_through_pipeline():
         end_indices = [j for j, s in enumerate(spans) if s["action"] == "handle.end"]
 
         # Each start should have a corresponding end that comes after it
-        assert len(start_indices) == len(end_indices), \
+        assert len(start_indices) == len(end_indices), (
             f"Event {i}: mismatched handle.start ({len(start_indices)}) and handle.end ({len(end_indices)}) counts"
+        )
 
-        for start_idx, end_idx in zip(start_indices, end_indices):
-            assert start_idx < end_idx, \
+        for start_idx, end_idx in zip(start_indices, end_indices, strict=False):
+            assert start_idx < end_idx, (
                 f"Event {i}: handle.start at {start_idx} should come before handle.end at {end_idx}"
+            )
 
-    print(f"\n✓ Tracing test passed")
+    print("\n✓ Tracing test passed")
     print(f"  - Events through pipeline: {len(sink.collected_events)}")
-    print(f"  - Average spans per event: {sum(len(e.context['trace']['spans']) for e in sink.collected_events) / len(sink.collected_events):.1f}")
+    print(
+        f"  - Average spans per event: {sum(len(e.context['trace']['spans']) for e in sink.collected_events) / len(sink.collected_events):.1f}"
+    )
 
     # Print sample trace for debugging
     if sink.collected_events:
         sample_event = sink.collected_events[0]
-        print(f"\n  Sample trace for first event:")
+        print("\n  Sample trace for first event:")
         for span in sample_event.context["trace"]["spans"]:
             data_str = f" | {span.get('data', {})}" if span.get("data") else ""
             print(f"    {span['action']}{data_str}")
@@ -231,15 +250,15 @@ def test_tracing_preserves_event_identity():
 
     profile = ConstantOnePerSecondProfile(2.0)
     event_source = Source.with_profile(
-        profile=profile, target=first, event_type="StartEvent",
-        poisson=False, name="PipelineSource",
+        profile=profile,
+        target=first,
+        event_type="StartEvent",
+        poisson=False,
+        name="PipelineSource",
     )
 
     sim = Simulation(
-        sources=[event_source],
-        entities=[first, middle, sink],
-        probes=[],
-        duration=3.0
+        sources=[event_source], entities=[first, middle, sink], probes=[], duration=3.0
     )
     sim.run()
 
@@ -252,7 +271,7 @@ def test_tracing_preserves_event_identity():
         spans = trace["spans"]
 
         # All spans should reference the same event_id (the original event's ID)
-        event_ids = set(span["event_id"] for span in spans)
+        {span["event_id"] for span in spans}
 
         # Note: In the current design, event_id in spans may vary because
         # new Event objects are created at each stage. The key is that
@@ -263,7 +282,7 @@ def test_tracing_preserves_event_identity():
         context_id = event.context.get("id")
         assert context_id is not None, f"Event {i} should have a context ID"
 
-    print(f"\n✓ Identity preservation test passed")
+    print("\n✓ Identity preservation test passed")
     print(f"  - Events collected: {len(sink.collected_events)}")
 
 
@@ -289,16 +308,14 @@ def test_tracing_captures_errors():
     failing_entity = FailingEntity()
     profile = ConstantOnePerSecondProfile(5.0)
     event_source = Source.with_profile(
-        profile=profile, target=failing_entity, event_type="FailEvent",
-        poisson=False, name="FailingSource",
+        profile=profile,
+        target=failing_entity,
+        event_type="FailEvent",
+        poisson=False,
+        name="FailingSource",
     )
 
-    sim = Simulation(
-        sources=[event_source],
-        entities=[failing_entity],
-        probes=[],
-        duration=10.0
-    )
+    sim = Simulation(sources=[event_source], entities=[failing_entity], probes=[], duration=10.0)
 
     # Run simulation - it should propagate the error
     with pytest.raises(ValueError, match="Intentional test failure"):
@@ -322,9 +339,13 @@ def test_tracing_captures_errors():
     assert len(error_spans) == 1, "Should have exactly one handle.error span"
 
     error_data = error_spans[0].get("data", {})
-    assert error_data.get("error") == "ValueError", f"Error type should be ValueError, got {error_data}"
-    assert "Intentional test failure" in error_data.get("message", ""), "Error message should be captured"
+    assert error_data.get("error") == "ValueError", (
+        f"Error type should be ValueError, got {error_data}"
+    )
+    assert "Intentional test failure" in error_data.get("message", ""), (
+        "Error message should be captured"
+    )
 
-    print(f"\n✓ Error tracing test passed")
+    print("\n✓ Error tracing test passed")
     print(f"  - Attempts before failure: {failing_entity.attempts}")
     print(f"  - Error span captured: {error_spans[0]}")

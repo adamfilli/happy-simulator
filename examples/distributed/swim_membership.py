@@ -48,17 +48,15 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
-from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
-from happysimulator.core.event import Event
-from happysimulator.components.network.network import Network, Partition
-from happysimulator.components.network.conditions import datacenter_network
 from happysimulator.components.consensus.membership import (
     MembershipProtocol,
-    MembershipStats,
     MemberState,
 )
-
+from happysimulator.components.network.conditions import datacenter_network
+from happysimulator.components.network.network import Network, Partition
+from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
 
 # =============================================================================
 # Simulation Result
@@ -68,6 +66,7 @@ from happysimulator.components.consensus.membership import (
 @dataclass
 class SimulationResult:
     """Results from the SWIM membership simulation."""
+
     protocols: list[MembershipProtocol]
     network: Network
     partition_time_s: float
@@ -122,10 +121,8 @@ def run(args=None) -> SimulationResult:
 
     # Create datacenter links between all pairs
     for i, a in enumerate(protocols):
-        for b in protocols[i + 1:]:
-            network.add_bidirectional_link(
-                a, b, datacenter_network(f"link-{a.name}-{b.name}")
-            )
+        for b in protocols[i + 1 :]:
+            network.add_bidirectional_link(a, b, datacenter_network(f"link-{a.name}-{b.name}"))
 
     # Schedule protocol starts
     start_events: list[Event] = []
@@ -134,6 +131,7 @@ def run(args=None) -> SimulationResult:
         def make_start_fn(p: MembershipProtocol):
             def fn(event: Event):
                 return p.start()
+
             return fn
 
         evt = Event.once(
@@ -153,7 +151,7 @@ def run(args=None) -> SimulationResult:
     def create_partition(event: Event):
         p = network.partition(group_a, group_b)
         partition_handle.append(p)
-        return None
+        return
 
     partition_evt = Event.once(
         time=Instant.from_seconds(partition_time),
@@ -165,7 +163,7 @@ def run(args=None) -> SimulationResult:
     def heal_partition(event: Event):
         if partition_handle:
             partition_handle[0].heal()
-        return None
+        return
 
     heal_evt = Event.once(
         time=Instant.from_seconds(heal_time),
@@ -177,7 +175,7 @@ def run(args=None) -> SimulationResult:
     sim = Simulation(
         start_time=Instant.Epoch,
         duration=duration_s,
-        entities=[network] + protocols,
+        entities=[network, *protocols],
     )
 
     for evt in start_events:
@@ -213,7 +211,7 @@ def print_summary(result: SimulationResult) -> None:
     print(f"Healed at:    t={result.heal_time_s}s")
     print(f"Duration:     {result.duration_s}s")
 
-    print(f"\nMembership View per Node:")
+    print("\nMembership View per Node:")
     print(f"  {'Observer':<10} {'Alive':<30} {'Suspect':<20} {'Dead':<20}")
     print(f"  {'-' * 80}")
 
@@ -226,20 +224,23 @@ def print_summary(result: SimulationResult) -> None:
         dead_str = ", ".join(sorted(dead)) if dead else "-"
         print(f"  {proto.name:<10} {alive_str:<30} {suspect_str:<20} {dead_str:<20}")
 
-    print(f"\nProtocol Statistics:")
-    print(f"  {'Node':<10} {'Probes':<8} {'Indirect':<10} {'Acks':<8} "
-          f"{'Updates':<10} {'Alive':<7} {'Suspect':<9} {'Dead':<6}")
+    print("\nProtocol Statistics:")
+    print(
+        f"  {'Node':<10} {'Probes':<8} {'Indirect':<10} {'Acks':<8} "
+        f"{'Updates':<10} {'Alive':<7} {'Suspect':<9} {'Dead':<6}"
+    )
     print(f"  {'-' * 68}")
 
     for proto in result.protocols:
         s = proto.stats
-        print(f"  {proto.name:<10} {s.probes_sent:<8} {s.indirect_probes_sent:<10} "
-              f"{s.acks_received:<8} {s.updates_disseminated:<10} "
-              f"{s.alive_count:<7} {s.suspect_count:<9} {s.dead_count:<6}")
+        print(
+            f"  {proto.name:<10} {s.probes_sent:<8} {s.indirect_probes_sent:<10} "
+            f"{s.acks_received:<8} {s.updates_disseminated:<10} "
+            f"{s.alive_count:<7} {s.suspect_count:<9} {s.dead_count:<6}"
+        )
 
     # Check that nodes in the majority partition detected the minority as failed
-    majority_nodes = [p for p in result.protocols
-                      if p.name not in result.partitioned_nodes]
+    majority_nodes = [p for p in result.protocols if p.name not in result.partitioned_nodes]
     detected_count = 0
     for p in majority_nodes:
         for partitioned_name in result.partitioned_nodes:
@@ -248,11 +249,10 @@ def print_summary(result: SimulationResult) -> None:
                 detected_count += 1
 
     total_expected = len(majority_nodes) * len(result.partitioned_nodes)
-    print(f"\nFailure Detection:")
-    print(f"  Partitioned nodes detected as suspect/dead: "
-          f"{detected_count}/{total_expected}")
+    print("\nFailure Detection:")
+    print(f"  Partitioned nodes detected as suspect/dead: {detected_count}/{total_expected}")
 
-    print(f"\nNetwork Statistics:")
+    print("\nNetwork Statistics:")
     print(f"  Events routed:  {result.network.events_routed}")
     print(f"  Dropped (partition): {result.network.events_dropped_partition}")
 
@@ -283,9 +283,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     x = range(len(node_names))
     ax.bar(x, alive_counts, label="Alive", color="seagreen")
     ax.bar(x, suspect_counts, bottom=alive_counts, label="Suspect", color="gold")
-    ax.bar(x, dead_counts,
-           bottom=[a + s for a, s in zip(alive_counts, suspect_counts)],
-           label="Dead", color="indianred")
+    ax.bar(
+        x,
+        dead_counts,
+        bottom=[a + s for a, s in zip(alive_counts, suspect_counts, strict=False)],
+        label="Dead",
+        color="indianred",
+    )
     ax.set_xlabel("Observer Node")
     ax.set_ylabel("Member Count")
     ax.set_title("Membership View per Node")
@@ -329,10 +333,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="SWIM membership protocol simulation")
     parser.add_argument("--duration", type=float, default=30.0, help="Simulation duration (s)")
-    parser.add_argument("--partition-time", type=float, default=8.0,
-                        help="Time to create partition (s)")
-    parser.add_argument("--heal-time", type=float, default=22.0,
-                        help="Time to heal partition (s)")
+    parser.add_argument(
+        "--partition-time", type=float, default=8.0, help="Time to create partition (s)"
+    )
+    parser.add_argument("--heal-time", type=float, default=22.0, help="Time to heal partition (s)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
     parser.add_argument("--output", type=str, default="output/swim", help="Output directory")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
@@ -352,6 +356,7 @@ if __name__ == "__main__":
     if not args.no_viz:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             output_dir = Path(args.output)
             visualize_results(result, output_dir)

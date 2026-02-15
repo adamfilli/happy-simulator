@@ -3,10 +3,10 @@
 import pytest
 
 from happysimulator.components.datastore import (
-    KVStore,
     CachedStore,
-    LRUEviction,
     FIFOEviction,
+    KVStore,
+    LRUEviction,
 )
 
 

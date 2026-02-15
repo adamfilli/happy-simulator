@@ -33,9 +33,10 @@ Example:
     )
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass, field
-from typing import Any, Generator, Optional
 from enum import Enum
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -111,7 +112,7 @@ class MultiTierCache(Entity):
         # Statistics
         self._reads = 0
         self._writes = 0
-        self._tier_hits: dict[int, int] = {i: 0 for i in range(len(tiers))}
+        self._tier_hits: dict[int, int] = dict.fromkeys(range(len(tiers)), 0)
         self._backing_store_hits = 0
         self._misses = 0
         self._promotions = 0
@@ -156,7 +157,7 @@ class MultiTierCache(Entity):
         total_hits = sum(self._tier_hits.values())
         return total_hits / self._reads
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value, checking tiers from fastest to slowest.
 
         Args:
@@ -174,7 +175,7 @@ class MultiTierCache(Entity):
         # Check each tier in order
         for tier_idx, tier in enumerate(self._tiers):
             # Check if tier has the key cached
-            if hasattr(tier, 'contains_cached') and tier.contains_cached(key):
+            if hasattr(tier, "contains_cached") and tier.contains_cached(key):
                 value = yield from tier.get(key)
                 if value is not None:
                     self._tier_hits[tier_idx] = self._tier_hits.get(tier_idx, 0) + 1
@@ -197,7 +198,7 @@ class MultiTierCache(Entity):
 
         return value
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Store a value in cache and backing store.
 
         Writes to backing store and invalidates/updates all cache tiers.
@@ -218,7 +219,7 @@ class MultiTierCache(Entity):
         if self._tiers:
             # Invalidate from all tiers first
             for tier in self._tiers:
-                if hasattr(tier, 'invalidate'):
+                if hasattr(tier, "invalidate"):
                     tier.invalidate(key)
 
             # Write to L1
@@ -240,7 +241,7 @@ class MultiTierCache(Entity):
 
         # Remove from all tiers
         for tier in self._tiers:
-            if hasattr(tier, 'invalidate'):
+            if hasattr(tier, "invalidate"):
                 tier.invalidate(key)
                 existed = True
 
@@ -259,13 +260,13 @@ class MultiTierCache(Entity):
             key: The key to invalidate.
         """
         for tier in self._tiers:
-            if hasattr(tier, 'invalidate'):
+            if hasattr(tier, "invalidate"):
                 tier.invalidate(key)
 
     def invalidate_all(self) -> None:
         """Clear all cache tiers."""
         for tier in self._tiers:
-            if hasattr(tier, 'invalidate_all'):
+            if hasattr(tier, "invalidate_all"):
                 tier.invalidate_all()
         self._access_counts.clear()
 
@@ -289,7 +290,7 @@ class MultiTierCache(Entity):
 
         # Promote to L1 (synchronously, no yield)
         target_tier = self._tiers[0]
-        if hasattr(target_tier, '_cache_put'):
+        if hasattr(target_tier, "_cache_put"):
             target_tier._cache_put(key, value)
             self._promotions += 1
 
@@ -298,7 +299,7 @@ class MultiTierCache(Entity):
         # For new values, cache in L1
         if self._tiers:
             target_tier = self._tiers[0]
-            if hasattr(target_tier, '_cache_put'):
+            if hasattr(target_tier, "_cache_put"):
                 target_tier._cache_put(key, value)
 
     def get_tier_stats(self) -> dict[int, dict]:
@@ -309,14 +310,13 @@ class MultiTierCache(Entity):
         """
         result = {}
         for i, tier in enumerate(self._tiers):
-            if hasattr(tier, 'stats'):
+            if hasattr(tier, "stats"):
                 result[i] = {
-                    'hits': self._tier_hits.get(i, 0),
-                    'cache_size': tier.cache_size if hasattr(tier, 'cache_size') else 0,
-                    'capacity': tier.cache_capacity if hasattr(tier, 'cache_capacity') else 0,
+                    "hits": self._tier_hits.get(i, 0),
+                    "cache_size": tier.cache_size if hasattr(tier, "cache_size") else 0,
+                    "capacity": tier.cache_capacity if hasattr(tier, "cache_capacity") else 0,
                 }
         return result
 
     def handle_event(self, event: Event) -> None:
         """MultiTierCache can handle events for cache operations."""
-        pass

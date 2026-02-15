@@ -1,14 +1,13 @@
 """Unit tests for GarbageCollector."""
 
-import pytest
 import random
 
 from happysimulator.components.infrastructure.garbage_collector import (
+    ConcurrentGC,
     GarbageCollector,
     GCStats,
-    StopTheWorld,
-    ConcurrentGC,
     GenerationalGC,
+    StopTheWorld,
 )
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -86,7 +85,7 @@ class TestGarbageCollector:
         assert gc.collection_count == 0
 
     def test_stats_initial(self):
-        gc, sim = self._make_gc()
+        gc, _sim = self._make_gc()
         stats = gc.stats
         assert isinstance(stats, GCStats)
         assert stats.collections == 0
@@ -97,7 +96,7 @@ class TestGarbageCollector:
 
     def test_pause_generator(self):
         random.seed(42)
-        gc, sim = self._make_gc(strategy=StopTheWorld(), heap_pressure=0.5)
+        gc, _sim = self._make_gc(strategy=StopTheWorld(), heap_pressure=0.5)
         gen = gc.pause()
         latency = next(gen)
         assert latency > 0
@@ -111,14 +110,14 @@ class TestGarbageCollector:
 
     def test_fixed_heap_pressure(self):
         random.seed(42)
-        gc, sim = self._make_gc(heap_pressure=0.9)
+        gc, _sim = self._make_gc(heap_pressure=0.9)
         gc._do_collect()
         # The heap pressure function should return 0.9
         assert gc._heap_pressure() == 0.9
 
     def test_stats_track_min_max(self):
         random.seed(42)
-        gc, sim = self._make_gc(strategy=StopTheWorld(), heap_pressure=0.5)
+        gc, _sim = self._make_gc(strategy=StopTheWorld(), heap_pressure=0.5)
         gc._do_collect()
         gc._do_collect()
         gc._do_collect()
@@ -130,7 +129,7 @@ class TestGarbageCollector:
 
     def test_generational_tracks_minor_major(self):
         random.seed(42)
-        gc, sim = self._make_gc(
+        gc, _sim = self._make_gc(
             strategy=GenerationalGC(major_threshold=0.75),
             heap_pressure=0.5,
         )
@@ -140,7 +139,7 @@ class TestGarbageCollector:
 
     def test_generational_major_above_threshold(self):
         random.seed(42)
-        gc, sim = self._make_gc(
+        gc, _sim = self._make_gc(
             strategy=GenerationalGC(major_threshold=0.75),
             heap_pressure=0.8,
         )
@@ -149,9 +148,10 @@ class TestGarbageCollector:
 
     def test_handle_event_gc_collect(self):
         random.seed(42)
-        gc, sim = self._make_gc(strategy=ConcurrentGC(), heap_pressure=0.5)
+        gc, _sim = self._make_gc(strategy=ConcurrentGC(), heap_pressure=0.5)
 
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="_gc_collect",
@@ -170,12 +170,12 @@ class TestGarbageCollector:
             assert events[0].event_type == "_gc_collect"
 
     def test_repr(self):
-        gc, sim = self._make_gc()
+        gc, _sim = self._make_gc()
         assert "test_gc" in repr(gc)
         assert "GenerationalGC" in repr(gc)  # default strategy
 
     def test_prime_creates_event(self):
-        gc, sim = self._make_gc()
+        gc, _sim = self._make_gc()
         event = gc.prime()
         assert event.event_type == "_gc_collect"
         assert event.target is gc

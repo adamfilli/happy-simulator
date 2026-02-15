@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
-import pytest
-
-from happysimulator.instrumentation.probe import Probe
-from happysimulator.core.entity import Entity
 from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.core.event import Event
-from happysimulator.load.source import Source
+from happysimulator.core.entity import Entity
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 
 class RecordingSink(Entity):
@@ -59,9 +60,7 @@ class FixedTimeResource(QueuedResource):
         if self.downstream is None:
             return []
 
-        return [
-            self.forward(event, self.downstream, event_type="Completed")
-        ]
+        return [self.forward(event, self.downstream, event_type="Completed")]
 
 
 def test_queued_resource_processes_work_end_to_end() -> None:

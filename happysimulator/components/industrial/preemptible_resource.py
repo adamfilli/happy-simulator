@@ -7,14 +7,18 @@ holders, notifying them via an ``on_preempt`` callback.
 
 from __future__ import annotations
 
+import heapq
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable
-import heapq
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +49,12 @@ class PreemptibleGrant:
     """
 
     __slots__ = (
-        "_resource", "_amount", "_priority", "_released",
-        "_preempted", "_on_preempt",
+        "_amount",
+        "_on_preempt",
+        "_preempted",
+        "_priority",
+        "_released",
+        "_resource",
     )
 
     def __init__(
@@ -97,7 +105,7 @@ class PreemptibleGrant:
         if self._preempted:
             return f"PreemptibleGrant(preempted, priority={self._priority})"
         if self._released:
-            return f"PreemptibleGrant(released)"
+            return "PreemptibleGrant(released)"
         return f"PreemptibleGrant({self._amount}, priority={self._priority})"
 
 
@@ -197,7 +205,7 @@ class PreemptibleResource(Entity):
 
         # Try preemption
         if preempt:
-            freed = self._try_preempt(amount, priority)
+            self._try_preempt(amount, priority)
             if self._available >= amount:
                 self._grant_immediate(future, amount, priority, on_preempt)
                 return future
@@ -216,7 +224,10 @@ class PreemptibleResource(Entity):
 
         logger.debug(
             "[%s] Queued acquire(%d, priority=%.1f), waiters=%d",
-            self.name, amount, priority, len(self._waiters),
+            self.name,
+            amount,
+            priority,
+            len(self._waiters),
         )
 
         return future
@@ -253,7 +264,9 @@ class PreemptibleResource(Entity):
             freed += grant.amount
             logger.debug(
                 "[%s] Preempted grant (priority=%.1f, amount=%d)",
-                self.name, grant.priority, grant.amount,
+                self.name,
+                grant.priority,
+                grant.amount,
             )
 
         return freed
@@ -275,11 +288,13 @@ class PreemptibleResource(Entity):
             if self._available >= waiter.amount:
                 heapq.heappop(self._waiters)
                 self._grant_immediate(
-                    waiter.future, waiter.amount, waiter.priority, waiter.on_preempt,
+                    waiter.future,
+                    waiter.amount,
+                    waiter.priority,
+                    waiter.on_preempt,
                 )
             else:
                 break
 
     def handle_event(self, event: Event) -> None:
         """PreemptibleResource does not process events directly."""
-        pass

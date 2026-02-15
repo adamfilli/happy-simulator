@@ -7,12 +7,16 @@ such as transitions from stable to degraded states.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from happysimulator.instrumentation.data import Data
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from happysimulator.instrumentation.data import Data
 
 
 @dataclass
 class Phase:
     """A detected phase/regime in the time series."""
+
     start_s: float
     end_s: float
     mean: float
@@ -68,13 +72,15 @@ def detect_phases(
 
     if len(times) < 2:
         label = _classify_phase(means[0], means[0], 0.0)
-        return [Phase(
-            start_s=times[0],
-            end_s=times[0] + window_s,
-            mean=means[0],
-            std=0.0,
-            label=label,
-        )]
+        return [
+            Phase(
+                start_s=times[0],
+                end_s=times[0] + window_s,
+                mean=means[0],
+                std=0.0,
+                label=label,
+            )
+        ]
 
     # Group consecutive windows into phases using change-point detection
     phases: list[Phase] = []
@@ -96,13 +102,15 @@ def detect_phases(
             baseline = means[0]  # Use first window as baseline
             label = _classify_phase(overall_mean, baseline, overall_std)
 
-            phases.append(Phase(
-                start_s=times[phase_start_idx],
-                end_s=times[i],
-                mean=overall_mean,
-                std=overall_std,
-                label=label,
-            ))
+            phases.append(
+                Phase(
+                    start_s=times[phase_start_idx],
+                    end_s=times[i],
+                    mean=overall_mean,
+                    std=overall_std,
+                    label=label,
+                )
+            )
             phase_start_idx = i
             phase_values = [means[i]]
         else:
@@ -114,13 +122,15 @@ def detect_phases(
     baseline = means[0]
     label = _classify_phase(overall_mean, baseline, overall_std)
 
-    phases.append(Phase(
-        start_s=times[phase_start_idx],
-        end_s=times[-1] + window_s,
-        mean=overall_mean,
-        std=overall_std,
-        label=label,
-    ))
+    phases.append(
+        Phase(
+            start_s=times[phase_start_idx],
+            end_s=times[-1] + window_s,
+            mean=overall_mean,
+            std=overall_std,
+            label=label,
+        )
+    )
 
     return phases
 
@@ -146,4 +156,4 @@ def _pstdev(values: list[float]) -> float:
         return 0.0
     mean = sum(values) / len(values)
     variance = sum((x - mean) ** 2 for x in values) / len(values)
-    return variance ** 0.5
+    return variance**0.5

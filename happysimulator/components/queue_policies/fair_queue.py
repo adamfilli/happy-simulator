@@ -13,9 +13,10 @@ Example:
     )
 """
 
-from collections import deque, OrderedDict
+from collections import OrderedDict, deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypeVar, Optional, Callable
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
 
@@ -161,7 +162,7 @@ class FairQueue(QueuePolicy[T]):
         self._enqueued += 1
         return True
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         """Remove and return the next item using round-robin.
 
         Returns:
@@ -197,7 +198,7 @@ class FairQueue(QueuePolicy[T]):
             del self._flows[flow_id]
             self._flows_removed += 1
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         """Return the next item without removing it."""
         if not self._flows:
             return None

@@ -9,22 +9,25 @@ This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from happysimulator import (
     Entity,
     Event,
     EventProvider,
+    FIFOQueue,
     Instant,
     QueuedResource,
-    FIFOQueue,
 )
-from happysimulator.components.datastore.kv_store import KVStore
 from happysimulator.components.datastore.cached_store import CachedStore
 from happysimulator.components.datastore.eviction_policies import TTLEviction
 from happysimulator.components.load_balancer.strategies import ConsistentHash
-from happysimulator.distributions.value_distribution import ValueDistribution
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.datastore.kv_store import KVStore
+    from happysimulator.distributions.value_distribution import ValueDistribution
 
 # =============================================================================
 # Custom Key Extraction for ConsistentHash
@@ -76,6 +79,7 @@ def create_customer_ip_hash():
         IPHash configured with customer_id key extraction.
     """
     from happysimulator.components.load_balancer.strategies import IPHash
+
     return IPHash(get_key=customer_id_key_extractor)
 
 
@@ -202,10 +206,7 @@ class CachingServer(QueuedResource):
         cache_key = f"customer:{customer_id}"
 
         # Check cache - must verify key exists AND is not expired
-        was_in_cache = (
-            cache_key in cache._cache
-            and not self._eviction_policy.is_expired(cache_key)
-        )
+        was_in_cache = cache_key in cache._cache and not self._eviction_policy.is_expired(cache_key)
 
         # Simulate cache lookup time
         yield self._cache_read_latency_s
@@ -429,8 +430,8 @@ def plot_hit_rate_comparison(
     rates2 = [r2 for _, _, r2 in time_series]
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(times, rates1, 'b-', linewidth=2, label=labels[0])
-    ax.plot(times, rates2, 'r--', linewidth=2, label=labels[1])
+    ax.plot(times, rates1, "b-", linewidth=2, label=labels[0])
+    ax.plot(times, rates2, "r--", linewidth=2, label=labels[1])
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Cache Hit Rate")
@@ -462,23 +463,23 @@ def plot_key_distribution(
     counts = list(distribution.values())
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    bars = ax.bar(servers, counts, color='steelblue', alpha=0.8)
+    bars = ax.bar(servers, counts, color="steelblue", alpha=0.8)
 
     # Add value labels on bars
-    for bar, count in zip(bars, counts):
+    for bar, count in zip(bars, counts, strict=False):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + max(counts) * 0.01,
             str(count),
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             fontsize=9,
         )
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Number of Keys")
     ax.set_title(title)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Add coefficient of variation annotation
     mean = sum(counts) / len(counts)
@@ -487,10 +488,10 @@ def plot_key_distribution(
     ax.annotate(
         f"CoV: {cov:.3f}",
         xy=(0.95, 0.95),
-        xycoords='axes fraction',
-        ha='right',
+        xycoords="axes fraction",
+        ha="right",
         fontsize=10,
-        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+        bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.5},
     )
 
     fig.tight_layout()
@@ -523,11 +524,11 @@ def plot_fleet_change_impact(
     times_m = [t for t, _ in time_series_modulo]
     rates_m = [r for _, r in time_series_modulo]
 
-    ax.plot(times_c, rates_c, 'b-', linewidth=2, label='Consistent Hashing')
-    ax.plot(times_m, rates_m, 'r--', linewidth=2, label='Modulo Hashing (IPHash)')
+    ax.plot(times_c, rates_c, "b-", linewidth=2, label="Consistent Hashing")
+    ax.plot(times_m, rates_m, "r--", linewidth=2, label="Modulo Hashing (IPHash)")
 
     # Mark fleet change
-    ax.axvline(x=change_time, color='green', linestyle=':', linewidth=2, label='Fleet Change')
+    ax.axvline(x=change_time, color="green", linestyle=":", linewidth=2, label="Fleet Change")
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Cache Hit Rate")

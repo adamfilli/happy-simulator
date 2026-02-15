@@ -19,9 +19,9 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass
-from typing import Generator
 from collections import deque
+from collections.abc import Generator
+from dataclasses import dataclass
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -125,11 +125,7 @@ class Topic(Entity):
     @property
     def subscribers(self) -> list[Entity]:
         """List of active subscribers."""
-        return [
-            sub.subscriber
-            for sub in self._subscriptions.values()
-            if sub.active
-        ]
+        return [sub.subscriber for sub in self._subscriptions.values() if sub.active]
 
     @property
     def max_subscribers(self) -> int | None:
@@ -153,9 +149,8 @@ class Topic(Entity):
         Raises:
             RuntimeError: If max subscribers reached.
         """
-        if self._max_subscribers is not None:
-            if self.subscriber_count >= self._max_subscribers:
-                raise RuntimeError(f"Topic {self.name} at max subscribers")
+        if self._max_subscribers is not None and self.subscriber_count >= self._max_subscribers:
+            raise RuntimeError(f"Topic {self.name} at max subscribers")
 
         now = self._clock.now if self._clock else Instant.Epoch
 
@@ -178,9 +173,9 @@ class Topic(Entity):
                     event_type="topic_message",
                     target=subscriber,
                     context={
-                        'topic': self.name,
-                        'payload': msg,
-                        'is_replay': True,
+                        "topic": self.name,
+                        "payload": msg,
+                        "is_replay": True,
                     },
                 )
                 events.append(delivery_event)
@@ -218,10 +213,7 @@ class Topic(Entity):
 
         # Deliver to all active subscribers
         delivery_events = []
-        active_subscribers = [
-            sub for sub in self._subscriptions.values()
-            if sub.active
-        ]
+        active_subscribers = [sub for sub in self._subscriptions.values() if sub.active]
 
         for subscription in active_subscribers:
             # Delivery latency
@@ -236,9 +228,9 @@ class Topic(Entity):
                 event_type="topic_message",
                 target=subscription.subscriber,
                 context={
-                    'topic': self.name,
-                    'payload': message,
-                    'is_replay': False,
+                    "topic": self.name,
+                    "payload": message,
+                    "is_replay": False,
                 },
             )
             delivery_events.append(delivery_event)
@@ -271,9 +263,9 @@ class Topic(Entity):
                     event_type="topic_message",
                     target=subscription.subscriber,
                     context={
-                        'topic': self.name,
-                        'payload': message,
-                        'is_replay': False,
+                        "topic": self.name,
+                        "payload": message,
+                        "is_replay": False,
                     },
                 )
                 delivery_events.append(delivery_event)
@@ -306,7 +298,7 @@ class Topic(Entity):
         event_type = event.event_type
 
         if event_type == "publish":
-            payload = event.context.get('payload')
+            payload = event.context.get("payload")
             if payload:
                 return (yield from self.publish(payload))
             return []

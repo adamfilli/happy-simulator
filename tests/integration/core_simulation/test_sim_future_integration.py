@@ -4,18 +4,18 @@ Tests cover: basic resolve, pre-resolved futures, request-response
 patterns, timeout races (any_of), quorum waits (all_of), and chaining.
 """
 
-from typing import Generator
+from collections.abc import Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.sim_future import SimFuture, all_of, any_of
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.core.sim_future import SimFuture, any_of, all_of
-
 
 # ---------------------------------------------------------------------------
 # Helper entities
 # ---------------------------------------------------------------------------
+
 
 class FutureResolver(Entity):
     """Entity that resolves a future from event context after a delay."""
@@ -45,12 +45,17 @@ class RequestResponseClient(Entity):
 
     def handle_event(self, event: Event) -> Generator:
         future = SimFuture()
-        yield 0.0, [Event(
-            time=self.now,
-            event_type="Request",
-            target=self.server,
-            context={"future": future, "delay": 0.5, "value": {"status": "ok"}},
-        )]
+        yield (
+            0.0,
+            [
+                Event(
+                    time=self.now,
+                    event_type="Request",
+                    target=self.server,
+                    context={"future": future, "delay": 0.5, "value": {"status": "ok"}},
+                )
+            ],
+        )
         self.response_value = yield future
         self.completed = True
         return []
@@ -66,17 +71,20 @@ def _make_sim(*entities):
 
 def _trigger(sim, target, event_type="Go", time_s=0.0, **extra_context):
     """Schedule a trigger event into the simulation."""
-    sim.schedule(Event(
-        time=Instant.from_seconds(time_s),
-        event_type=event_type,
-        target=target,
-        context=extra_context,
-    ))
+    sim.schedule(
+        Event(
+            time=Instant.from_seconds(time_s),
+            event_type=event_type,
+            target=target,
+            context=extra_context,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSimFutureBasicResolve:
     """Test basic resolve flow through the simulation."""
@@ -94,9 +102,11 @@ class TestSimFutureBasicResolve:
 
     def test_resolve_value_is_none_by_default(self):
         """resolve() with no args sends None into the generator."""
+
         class NoneResolver(Entity):
             def __init__(self):
                 super().__init__("NoneResolver")
+
             def handle_event(self, event: Event) -> Generator:
                 future: SimFuture = event.context["future"]
                 yield 0.1
@@ -109,12 +119,20 @@ class TestSimFutureBasicResolve:
                 self.resolver = resolver
                 self.result = "NOT_SET"
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 future = SimFuture()
-                yield 0.0, [Event(
-                    time=self.now, event_type="Req", target=self.resolver,
-                    context={"future": future},
-                )]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Req",
+                            target=self.resolver,
+                            context={"future": future},
+                        )
+                    ],
+                )
                 self.result = yield future
                 self.completed = True
                 return []
@@ -138,6 +156,7 @@ class TestPreResolvedFuture:
                 super().__init__("PreResolved")
                 self.result = None
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 future = SimFuture()
                 future.resolve(99)
@@ -167,18 +186,26 @@ class TestAnyOfIntegration:
                 self.result_index = None
                 self.result_value = None
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 response_future = SimFuture()
                 timeout_future = SimFuture()
-                yield 0.0, [
-                    Event(time=self.now, event_type="Request", target=resolver,
-                          context={"future": response_future, "delay": 0.1, "value": "response"}),
-                    Event.once(
-                        time=Instant.from_seconds(self.now.to_seconds() + 1.0),
-                        event_type="Timeout",
-                        fn=lambda e: timeout_future.resolve("timeout"),
-                    ),
-                ]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Request",
+                            target=resolver,
+                            context={"future": response_future, "delay": 0.1, "value": "response"},
+                        ),
+                        Event.once(
+                            time=Instant.from_seconds(self.now.to_seconds() + 1.0),
+                            event_type="Timeout",
+                            fn=lambda e: timeout_future.resolve("timeout"),
+                        ),
+                    ],
+                )
                 idx, value = yield any_of(response_future, timeout_future)
                 self.result_index = idx
                 self.result_value = value
@@ -204,18 +231,26 @@ class TestAnyOfIntegration:
                 self.result_index = None
                 self.result_value = None
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 response_future = SimFuture()
                 timeout_future = SimFuture()
-                yield 0.0, [
-                    Event(time=self.now, event_type="Request", target=resolver,
-                          context={"future": response_future, "delay": 2.0, "value": "response"}),
-                    Event.once(
-                        time=Instant.from_seconds(self.now.to_seconds() + 0.5),
-                        event_type="Timeout",
-                        fn=lambda e: timeout_future.resolve("timeout"),
-                    ),
-                ]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Request",
+                            target=resolver,
+                            context={"future": response_future, "delay": 2.0, "value": "response"},
+                        ),
+                        Event.once(
+                            time=Instant.from_seconds(self.now.to_seconds() + 0.5),
+                            event_type="Timeout",
+                            fn=lambda e: timeout_future.resolve("timeout"),
+                        ),
+                    ],
+                )
                 idx, value = yield any_of(response_future, timeout_future)
                 self.result_index = idx
                 self.result_value = value
@@ -243,16 +278,21 @@ class TestAllOfIntegration:
                 super().__init__("QuorumClient")
                 self.results = None
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 futures = []
                 side_effects = []
                 for i, replica in enumerate(replicas):
                     f = SimFuture()
                     futures.append(f)
-                    side_effects.append(Event(
-                        time=self.now, event_type="Write", target=replica,
-                        context={"future": f, "delay": 0.1 * (i + 1), "value": f"ack-{i}"},
-                    ))
+                    side_effects.append(
+                        Event(
+                            time=self.now,
+                            event_type="Write",
+                            target=replica,
+                            context={"future": f, "delay": 0.1 * (i + 1), "value": f"ack-{i}"},
+                        )
+                    )
                 yield 0.0, side_effects
                 self.results = yield all_of(*futures)
                 self.completed = True
@@ -278,15 +318,23 @@ class TestMultiStepFuture:
                 super().__init__("MultiStep")
                 self.steps = []
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 yield 0.1
                 self.steps.append("after_delay_1")
 
                 future1 = SimFuture()
-                yield 0.0, [Event(
-                    time=self.now, event_type="Req", target=resolver,
-                    context={"future": future1, "delay": 0.2, "value": "resp1"},
-                )]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Req",
+                            target=resolver,
+                            context={"future": future1, "delay": 0.2, "value": "resp1"},
+                        )
+                    ],
+                )
                 resp1 = yield future1
                 self.steps.append(f"after_future_1:{resp1}")
 
@@ -294,10 +342,17 @@ class TestMultiStepFuture:
                 self.steps.append("after_delay_2")
 
                 future2 = SimFuture()
-                yield 0.0, [Event(
-                    time=self.now, event_type="Req", target=resolver,
-                    context={"future": future2, "delay": 0.1, "value": "resp2"},
-                )]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Req",
+                            target=resolver,
+                            context={"future": future2, "delay": 0.1, "value": "resp2"},
+                        )
+                    ],
+                )
                 resp2 = yield future2
                 self.steps.append(f"after_future_2:{resp2}")
 
@@ -329,12 +384,20 @@ class TestCompletionHooksWithFuture:
             def __init__(self):
                 super().__init__("HookedClient")
                 self.completed = False
+
             def handle_event(self, event: Event) -> Generator:
                 future = SimFuture()
-                yield 0.0, [Event(
-                    time=self.now, event_type="Req", target=resolver,
-                    context={"future": future, "delay": 0.1, "value": "done"},
-                )]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Req",
+                            target=resolver,
+                            context={"future": future, "delay": 0.1, "value": "done"},
+                        )
+                    ],
+                )
                 yield future
                 self.completed = True
                 return []

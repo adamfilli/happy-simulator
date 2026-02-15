@@ -21,13 +21,14 @@ Example:
         value = yield from cache.get("user:123")
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Generator, Optional
+from typing import Any
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.components.datastore.eviction_policies import CacheEvictionPolicy
 from happysimulator.components.datastore.kv_store import KVStore
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
 
 
 @dataclass(frozen=True)
@@ -143,7 +144,7 @@ class CachedStore(Entity):
             return 0.0
         return self._misses / self._reads
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value, checking cache first.
 
         Args:
@@ -176,7 +177,7 @@ class CachedStore(Entity):
 
         return value
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Store a value.
 
         With write-through, writes to both cache and backing store.
@@ -309,4 +310,3 @@ class CachedStore(Entity):
 
     def handle_event(self, event: Event) -> None:
         """CachedStore can handle events for cache operations."""
-        pass

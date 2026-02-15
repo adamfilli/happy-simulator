@@ -2,19 +2,17 @@
 
 import pytest
 
-from happysimulator.core.clock import Clock
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
-
 from happysimulator.components.deployment.auto_scaler import (
     AutoScaler,
-    AutoScalerStats,
     QueueDepthScaling,
     ScalingEvent,
     StepScaling,
     TargetUtilization,
 )
+from happysimulator.core.clock import Clock
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 
 
 class FakeBackend(Entity):
@@ -174,15 +172,17 @@ class TestQueueDepthPolicy:
 class TestScaleOut:
     def test_scale_out_adds_backend(self):
         backends = [FakeBackend(f"s{i}", utilization=0.95) for i in range(2)]
-        scaler, lb, clock = make_scaler(
+        scaler, lb, _clock = make_scaler(
             backends=backends,
             policy=TargetUtilization(target=0.5),
             scale_out_cooldown=0.0,
         )
 
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler._is_running = True
         scaler.handle_event(eval_event)
@@ -193,7 +193,7 @@ class TestScaleOut:
 
     def test_max_bound_enforced(self):
         backends = [FakeBackend(f"s{i}", utilization=0.99) for i in range(5)]
-        scaler, lb, clock = make_scaler(
+        scaler, lb, _clock = make_scaler(
             backends=backends,
             policy=TargetUtilization(target=0.1),
             max_instances=6,
@@ -202,8 +202,10 @@ class TestScaleOut:
 
         scaler._is_running = True
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval_event)
         assert len(lb.all_backends) <= 6
@@ -212,7 +214,7 @@ class TestScaleOut:
 class TestScaleIn:
     def test_scale_in_removes_backend(self):
         backends = [FakeBackend(f"s{i}", utilization=0.1) for i in range(5)]
-        scaler, lb, clock = make_scaler(
+        scaler, lb, _clock = make_scaler(
             backends=backends,
             policy=TargetUtilization(target=0.7),
             scale_in_cooldown=0.0,
@@ -224,15 +226,17 @@ class TestScaleIn:
 
         scaler._is_running = True
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval_event)
         assert len(lb.all_backends) < 5
 
     def test_min_bound_enforced(self):
         backends = [FakeBackend(f"s{i}", utilization=0.05) for i in range(3)]
-        scaler, lb, clock = make_scaler(
+        scaler, lb, _clock = make_scaler(
             backends=backends,
             policy=TargetUtilization(target=0.7),
             min_instances=2,
@@ -244,8 +248,10 @@ class TestScaleIn:
 
         scaler._is_running = True
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval_event)
         assert len(lb.all_backends) >= 2
@@ -263,8 +269,10 @@ class TestCooldown:
 
         # First evaluation: scale out
         eval1 = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval1)
         count_after_first = len(lb.all_backends)
@@ -273,8 +281,10 @@ class TestCooldown:
         # Second evaluation at t=10s (within cooldown)
         clock._current_time = Instant.from_seconds(10.0)
         eval2 = Event(
-            time=Instant.from_seconds(10.0), event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.from_seconds(10.0),
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval2)
         assert len(lb.all_backends) == count_after_first
@@ -284,6 +294,7 @@ class TestCooldown:
 class TestClockInjection:
     def test_new_instances_receive_clock(self):
         created_servers = []
+
         def factory(name):
             server = FakeBackend(name)
             created_servers.append(server)
@@ -295,7 +306,8 @@ class TestClockInjection:
         lb.set_clock(clock)
 
         scaler = AutoScaler(
-            name="scaler", load_balancer=lb,
+            name="scaler",
+            load_balancer=lb,
             server_factory=factory,
             policy=TargetUtilization(target=0.5),
             scale_out_cooldown=0.0,
@@ -304,8 +316,10 @@ class TestClockInjection:
         scaler._is_running = True
 
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval_event)
 
@@ -317,7 +331,7 @@ class TestClockInjection:
 class TestScalingHistory:
     def test_history_records_events(self):
         backends = [FakeBackend(f"s{i}", utilization=0.95) for i in range(2)]
-        scaler, lb, clock = make_scaler(
+        scaler, _lb, _clock = make_scaler(
             backends=backends,
             policy=TargetUtilization(target=0.5),
             scale_out_cooldown=0.0,
@@ -325,8 +339,10 @@ class TestScalingHistory:
         scaler._is_running = True
 
         eval_event = Event(
-            time=Instant.Epoch, event_type="_autoscaler_evaluate",
-            target=scaler, context={},
+            time=Instant.Epoch,
+            event_type="_autoscaler_evaluate",
+            target=scaler,
+            context={},
         )
         scaler.handle_event(eval_event)
 

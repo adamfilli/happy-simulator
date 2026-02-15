@@ -8,7 +8,6 @@ This package provides utilities for understanding simulation behavior:
 """
 
 from happysimulator.analysis.phases import Phase, detect_phases
-from happysimulator.analysis.trace_analysis import EventLifecycle, trace_event_lifecycle
 from happysimulator.analysis.report import (
     Anomaly,
     CausalChain,
@@ -16,15 +15,16 @@ from happysimulator.analysis.report import (
     SimulationAnalysis,
     analyze,
 )
+from happysimulator.analysis.trace_analysis import EventLifecycle, trace_event_lifecycle
 
 __all__ = [
-    "Phase",
-    "detect_phases",
-    "EventLifecycle",
-    "trace_event_lifecycle",
     "Anomaly",
     "CausalChain",
+    "EventLifecycle",
     "MetricSummary",
+    "Phase",
     "SimulationAnalysis",
     "analyze",
+    "detect_phases",
+    "trace_event_lifecycle",
 ]

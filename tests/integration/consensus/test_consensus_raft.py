@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
-from happysimulator.components.consensus.raft import RaftNode, RaftState
+from happysimulator.components.consensus.raft import RaftNode
 from happysimulator.components.consensus.raft_state_machine import KVStateMachine
 from happysimulator.components.network.conditions import datacenter_network
 from happysimulator.components.network.network import Network
@@ -77,13 +75,11 @@ class TestRaftConsensus:
         )
 
         # All non-leader nodes should recognize the leader
-        leader_name = leaders[0].name
+        _leader_name = leaders[0].name
         for node in nodes:
             if not node.is_leader:
                 # Followers should know who the leader is
-                assert node.current_leader is not None, (
-                    f"{node.name} does not know the leader"
-                )
+                assert node.current_leader is not None, f"{node.name} does not know the leader"
 
     def test_leader_election_majority(self):
         """Majority of the cluster can elect a leader even with varied timeouts."""
@@ -130,13 +126,15 @@ class TestRaftConsensus:
             if leaders:
                 leader = leaders[0]
                 leader.submit({"op": "set", "key": "x", "value": 42})
-            return None
+            return
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(5.0),
-            event_type="SubmitCommand",
-            fn=submit_command,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(5.0),
+                event_type="SubmitCommand",
+                fn=submit_command,
+            )
+        )
         sim.run()
 
         # Find the leader and verify the log was replicated
@@ -174,17 +172,13 @@ class TestRaftConsensus:
         # Let a leader be elected first (run to t=5.0)
         from happysimulator.core.control.breakpoints import TimeBreakpoint
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(5.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(5.0)))
         sim.run()
 
         leaders_before = [n for n in nodes if n.is_leader]
         if not leaders_before:
             # If no leader yet, continue a bit longer
-            sim.control.add_breakpoint(
-                TimeBreakpoint(time=Instant.from_seconds(10.0))
-            )
+            sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(10.0)))
             sim.control.resume()
             leaders_before = [n for n in nodes if n.is_leader]
 
@@ -197,16 +191,12 @@ class TestRaftConsensus:
         partition = network.partition([old_leader], others)
 
         # Let the majority group elect a new leader
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(20.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(20.0)))
         sim.control.resume()
 
         # The majority group should have elected a new leader
         new_leaders = [n for n in others if n.is_leader]
-        assert len(new_leaders) >= 1, (
-            "No new leader elected in majority group after partition"
-        )
+        assert len(new_leaders) >= 1, "No new leader elected in majority group after partition"
         new_leader = new_leaders[0]
         assert new_leader.current_term > old_term, (
             f"New leader term ({new_leader.current_term}) should be > old term ({old_term})"
@@ -238,13 +228,15 @@ class TestRaftConsensus:
             leaders = [n for n in nodes if n.is_leader]
             if leaders:
                 leaders[0].submit({"op": "set", "key": "cluster_size", "value": 5})
-            return None
+            return
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(8.0),
-            event_type="SubmitCmd5Node",
-            fn=submit_command,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(8.0),
+                event_type="SubmitCmd5Node",
+                fn=submit_command,
+            )
+        )
         sim.run()
 
         # A leader should exist
@@ -283,13 +275,15 @@ class TestRaftConsensus:
             leaders = [n for n in nodes if n.is_leader]
             if leaders:
                 leaders[0].submit({"op": "set", "key": "answer", "value": 42})
-            return None
+            return
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(6.0),
-            event_type="SubmitSetCmd",
-            fn=submit_set_command,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(6.0),
+                event_type="SubmitSetCmd",
+                fn=submit_set_command,
+            )
+        )
         sim.run()
 
         # At least the leader should have committed
@@ -298,7 +292,7 @@ class TestRaftConsensus:
 
         leader = leaders[0]
         leader_idx = nodes.index(leader)
-        leader_sm = state_machines[leader_idx]
+        state_machines[leader_idx]
 
         # Check commit index advanced
         assert leader.log.commit_index >= 1, (
@@ -311,9 +305,7 @@ class TestRaftConsensus:
         )
 
         # Check that at least a quorum has the entry committed
-        committed_count = sum(
-            1 for n in nodes if n.log.commit_index >= 1
-        )
+        committed_count = sum(1 for n in nodes if n.log.commit_index >= 1)
         assert committed_count >= leader.quorum_size, (
             f"Only {committed_count} nodes committed, need {leader.quorum_size}"
         )

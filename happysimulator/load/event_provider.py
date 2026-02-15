@@ -6,7 +6,7 @@ messages) with appropriate targets and payloads.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import Union
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
@@ -20,7 +20,7 @@ class EventProvider(ABC):
     """
 
     @abstractmethod
-    def get_events(self, time: Instant) -> Union[Event, List[Event]]:
+    def get_events(self, time: Instant) -> Union[Event, list[Event]]:
         """Create one or more events to be scheduled at the given time.
 
         Args:
@@ -29,4 +29,3 @@ class EventProvider(ABC):
         Returns:
             A single Event or list of Events to schedule.
         """
-        pass

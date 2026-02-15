@@ -2,17 +2,14 @@
 
 import pytest
 
+from happysimulator.components.scheduling.work_stealing_pool import (
+    WorkerStats,
+    WorkStealingPool,
+)
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-
-from happysimulator.components.scheduling.work_stealing_pool import (
-    WorkerStats,
-    WorkStealingPool,
-    WorkStealingPoolStats,
-    _Worker,
-)
 
 
 class DummySink(Entity):
@@ -24,7 +21,7 @@ class DummySink(Entity):
 
     def handle_event(self, event):
         self.received.append(event)
-        return None
+        return
 
 
 def make_pool(
@@ -73,7 +70,7 @@ class TestPoolCreation:
 
 class TestWorkAssignment:
     def test_assigns_to_shortest_queue(self):
-        pool, clock = make_pool(num_workers=3)
+        pool, _clock = make_pool(num_workers=3)
 
         # Add 3 tasks to worker 0 by directly adding to its queue
         w0 = pool._workers[0]
@@ -95,12 +92,14 @@ class TestWorkAssignment:
 
 class TestStealingBehavior:
     def test_steal_from_busiest_neighbor(self):
-        pool, clock = make_pool(num_workers=2)
+        pool, _clock = make_pool(num_workers=2)
 
         # Directly add tasks to worker 0's queue
-        for i in range(5):
+        for _i in range(5):
             e = Event(
-                time=Instant.Epoch, event_type="Task", target=pool,
+                time=Instant.Epoch,
+                event_type="Task",
+                target=pool,
                 context={"metadata": {"processing_time": 0.1}},
             )
             pool._workers[0]._queue.appendleft(e)
@@ -113,12 +112,14 @@ class TestStealingBehavior:
 
     def test_steal_takes_from_tail(self):
         """Verify steal pops from tail (LIFO) while local processes from head (FIFO)."""
-        pool, clock = make_pool(num_workers=2)
+        pool, _clock = make_pool(num_workers=2)
 
         # Add tasks with identifiable context
         for i in range(3):
             e = Event(
-                time=Instant.Epoch, event_type="Task", target=pool,
+                time=Instant.Epoch,
+                event_type="Task",
+                target=pool,
                 context={"metadata": {"task_id": i, "processing_time": 0.1}},
             )
             pool._workers[0]._queue.appendleft(e)
@@ -135,7 +136,7 @@ class TestStealingBehavior:
         assert stolen.context["metadata"]["task_id"] == 0
 
     def test_no_steal_when_neighbor_empty(self):
-        pool, clock = make_pool(num_workers=2)
+        pool, _clock = make_pool(num_workers=2)
         stolen = pool._steal_for(0)
         assert stolen is None
 
@@ -148,7 +149,7 @@ class TestWorkerStats:
             assert worker.stats.tasks_stolen == 0
 
     def test_pool_stats_tracks_submissions(self):
-        pool, clock = make_pool()
+        pool, _clock = make_pool()
         for _ in range(5):
             task = make_task_event(pool)
             pool.handle_event(task)
@@ -164,12 +165,14 @@ class TestWorkerStats:
 
 class TestProcessingFlow:
     def test_worker_processes_task(self):
-        pool, clock = make_pool(num_workers=1)
+        pool, _clock = make_pool(num_workers=1)
         worker = pool._workers[0]
 
         # Enqueue a task
         task = Event(
-            time=Instant.Epoch, event_type="Task", target=pool,
+            time=Instant.Epoch,
+            event_type="Task",
+            target=pool,
             context={"metadata": {"processing_time": 0.5}},
         )
         events = worker.enqueue(task)
@@ -179,18 +182,22 @@ class TestProcessingFlow:
         assert events[0].event_type == "_worker_try_next"
 
     def test_try_next_creates_process_event(self):
-        pool, clock = make_pool(num_workers=1)
+        pool, _clock = make_pool(num_workers=1)
         worker = pool._workers[0]
 
         task = Event(
-            time=Instant.Epoch, event_type="Task", target=pool,
+            time=Instant.Epoch,
+            event_type="Task",
+            target=pool,
             context={"metadata": {"processing_time": 0.5}},
         )
         worker._queue.appendleft(task)
 
         try_event = Event(
-            time=Instant.Epoch, event_type="_worker_try_next",
-            target=worker, context={},
+            time=Instant.Epoch,
+            event_type="_worker_try_next",
+            target=worker,
+            context={},
         )
         result = worker.handle_event(try_event)
         assert len(result) == 1

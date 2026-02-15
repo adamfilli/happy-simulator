@@ -25,14 +25,13 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
     Instant,
     Simulation,
-    SimFuture,
     Source,
 )
 from happysimulator.components.streaming.stream_processor import (
@@ -41,6 +40,8 @@ from happysimulator.components.streaming.stream_processor import (
     TumblingWindow,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Client entities
@@ -56,7 +57,7 @@ class EventEmitter(Entity):
         self._jitter_s = jitter_s
         self._count = 0
 
-    def handle_event(self, event: Event) -> Generator[float | tuple[float, list[Event]], None, None]:
+    def handle_event(self, event: Event) -> Generator[float | tuple[float, list[Event]]]:
         self._count += 1
         # Simulate out-of-order: event_time = now + random jitter
         base_time = self.now.to_seconds()
@@ -66,16 +67,21 @@ class EventEmitter(Entity):
         key = f"group-{self._count % 3}"
         value = random.randint(1, 100)
 
-        yield 0.0, [Event(
-            time=self.now,
-            event_type="Process",
-            target=self.processor,
-            context={
-                "key": key,
-                "value": value,
-                "event_time_s": event_time_s,
-            },
-        )]
+        yield (
+            0.0,
+            [
+                Event(
+                    time=self.now,
+                    event_type="Process",
+                    target=self.processor,
+                    context={
+                        "key": key,
+                        "value": value,
+                        "event_time_s": event_time_s,
+                    },
+                )
+            ],
+        )
 
 
 class ResultCollector(Entity):
@@ -86,11 +92,13 @@ class ResultCollector(Entity):
         self.results: list[dict] = []
 
     def handle_event(self, event: Event) -> None:
-        self.results.append({
-            "type": event.event_type,
-            "time": self.now.to_seconds(),
-            **event.context,
-        })
+        self.results.append(
+            {
+                "type": event.event_type,
+                "time": self.now.to_seconds(),
+                **event.context,
+            }
+        )
 
 
 # =============================================================================
@@ -142,8 +150,10 @@ def run_stream_processor(
     emitter = EventEmitter("emitter", processor, jitter_s=jitter_s)
 
     source = Source.constant(
-        rate=event_rate, target=emitter,
-        event_type="Emit", stop_after=duration_s,
+        rate=event_rate,
+        target=emitter,
+        event_type="Emit",
+        stop_after=duration_s,
     )
 
     sim = Simulation(
@@ -185,8 +195,7 @@ def print_summary(results: list[ProcessorResult]) -> None:
         print(f"  Watermark:           {proc.watermark_s:.2f}s")
 
         window_results = [
-            r_entry for r_entry in r.result_sink.results
-            if r_entry["type"] == "WindowResult"
+            r_entry for r_entry in r.result_sink.results if r_entry["type"] == "WindowResult"
         ]
         if window_results:
             print(f"\n  {'Key':>10s} {'Window':>15s} {'Count':>6s} {'Sum':>8s} {'Avg':>8s}")
@@ -212,6 +221,7 @@ def print_summary(results: list[ProcessorResult]) -> None:
 def visualize_results(results: list[ProcessorResult], output_dir: Path) -> None:
     """Generate window emission timeline chart."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -222,8 +232,7 @@ def visualize_results(results: list[ProcessorResult], output_dir: Path) -> None:
 
         # Window emissions over time
         window_results = [
-            entry for entry in r.result_sink.results
-            if entry["type"] == "WindowResult"
+            entry for entry in r.result_sink.results if entry["type"] == "WindowResult"
         ]
         if window_results:
             times = [wr["time"] for wr in window_results]
@@ -235,10 +244,7 @@ def visualize_results(results: list[ProcessorResult], output_dir: Path) -> None:
         ax1.grid(True, alpha=0.2)
 
         # Late events over time
-        late_events = [
-            entry for entry in r.late_sink.results
-            if entry["type"] == "LateEvent"
-        ]
+        late_events = [entry for entry in r.late_sink.results if entry["type"] == "LateEvent"]
         if late_events:
             late_times = [le["time"] for le in late_events]
             late_event_times = [le["event_time_s"] for le in late_events]
@@ -248,7 +254,9 @@ def visualize_results(results: list[ProcessorResult], output_dir: Path) -> None:
         ax2.set_title(f"Late Events (total: {len(late_events)})")
         ax2.grid(True, alpha=0.2)
 
-        fig.suptitle(f"Stream Processor — Window={r.window_size_s}s, Lateness={r.allowed_lateness_s}s")
+        fig.suptitle(
+            f"Stream Processor — Window={r.window_size_s}s, Lateness={r.allowed_lateness_s}s"
+        )
         fig.tight_layout()
 
         path = output_dir / "stream_processor.png"

@@ -13,8 +13,7 @@ Verifies that events are dropped during fault windows and resume after.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.components.common import Counter
 from happysimulator.components.network.conditions import datacenter_network
@@ -33,6 +32,8 @@ from happysimulator.faults import (
 )
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Entities
@@ -61,12 +62,14 @@ class ForwardingNode(Entity):
     def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
         self.received += 1
         yield 0.001  # 1ms processing
-        return [Event(
-            time=self.now,
-            event_type="Forwarded",
-            target=self._downstream,
-            context=event.context.copy(),
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="Forwarded",
+                target=self._downstream,
+                context=event.context.copy(),
+            )
+        ]
 
 
 # =============================================================================
@@ -95,7 +98,7 @@ def test_multi_fault_scenario():
         entities=[node_a, node_b, node_c, sink],
         fault_schedule=schedule,
     )
-    summary = sim.run()
+    sim.run()
 
     # Node A should process all events (not crashed)
     assert node_a.received > 0
@@ -160,8 +163,8 @@ def test_fault_stats_tracking():
     counter = Counter("target")
     schedule = FaultSchedule()
 
-    h1 = schedule.add(CrashNode("target", at=5.0))
-    h2 = schedule.add(CrashNode("target", at=10.0, restart_at=15.0))
+    schedule.add(CrashNode("target", at=5.0))
+    schedule.add(CrashNode("target", at=10.0, restart_at=15.0))
     h3 = schedule.add(CrashNode("target", at=20.0))
 
     # Cancel one fault
@@ -216,9 +219,7 @@ def test_inject_latency_fault():
     network.add_bidirectional_link(node_a, node_b, link)
 
     schedule = FaultSchedule()
-    schedule.add(
-        InjectLatency("a", "b", extra_ms=100, start=3.0, end=8.0)
-    )
+    schedule.add(InjectLatency("a", "b", extra_ms=100, start=3.0, end=8.0))
 
     sim = Simulation(
         duration=10.0,

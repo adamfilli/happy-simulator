@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from happysimulator.components.consensus.paxos import Ballot, PaxosNode
 from happysimulator.components.network.conditions import datacenter_network
 from happysimulator.components.network.network import Network
@@ -91,16 +89,20 @@ class TestPaxosConsensus:
             proposer_b.propose("beta")
             return proposer_b.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="ProposeA",
-            fn=propose_a,
-        ))
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="ProposeB",
-            fn=propose_b,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="ProposeA",
+                fn=propose_a,
+            )
+        )
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="ProposeB",
+                fn=propose_b,
+            )
+        )
         sim.run()
 
         # At least one node must have decided
@@ -138,23 +140,21 @@ class TestPaxosConsensus:
             isolated.propose("lonely-value")
             return isolated.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="ProposeIsolated",
-            fn=propose_isolated,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="ProposeIsolated",
+                fn=propose_isolated,
+            )
+        )
         sim.run()
 
         # The isolated proposer cannot form a quorum (needs 2 of 3)
         # It self-promises but never gets a second promise
-        assert not isolated.is_decided, (
-            "Isolated proposer should not decide without a quorum"
-        )
+        assert not isolated.is_decided, "Isolated proposer should not decide without a quorum"
         # The other nodes should also not have decided (no proposal reached them)
         for node in majority:
-            assert not node.is_decided, (
-                f"{node.name} should not have decided"
-            )
+            assert not node.is_decided, f"{node.name} should not have decided"
 
     def test_partition_heal_reaches_consensus(self):
         """Partition blocks consensus; healing allows it to complete."""
@@ -176,11 +176,13 @@ class TestPaxosConsensus:
             isolated.propose("delayed-value")
             return isolated.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="ProposePartitioned",
-            fn=propose_partitioned,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="ProposePartitioned",
+                fn=propose_partitioned,
+            )
+        )
 
         # Heal partition at t=3.0 and re-propose
         def heal_and_retry(event):
@@ -189,11 +191,13 @@ class TestPaxosConsensus:
             isolated.propose("delayed-value")
             return isolated.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(3.0),
-            event_type="HealAndRetry",
-            fn=heal_and_retry,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(3.0),
+                event_type="HealAndRetry",
+                fn=heal_and_retry,
+            )
+        )
         sim.run()
 
         # After healing, consensus should have been reached
@@ -201,9 +205,7 @@ class TestPaxosConsensus:
         assert len(decided_nodes) >= 1, "No node decided after partition healed"
 
         decided_values = {n.decided_value for n in decided_nodes}
-        assert len(decided_values) == 1, (
-            f"Safety violation: {decided_values}"
-        )
+        assert len(decided_values) == 1, f"Safety violation: {decided_values}"
 
     def test_five_node_cluster(self):
         """5-node cluster reaches consensus through a single proposal."""
@@ -220,11 +222,13 @@ class TestPaxosConsensus:
             proposer.propose("five-node-value")
             return proposer.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="Propose5Node",
-            fn=do_propose,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="Propose5Node",
+                fn=do_propose,
+            )
+        )
         sim.run()
 
         # All nodes should learn the decided value
@@ -257,16 +261,20 @@ class TestPaxosConsensus:
             high_proposer.propose("high-ballot-value")
             return high_proposer.start_phase1()
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="ProposeLow",
-            fn=propose_low,
-        ))
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.2),
-            event_type="ProposeHigh",
-            fn=propose_high,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="ProposeLow",
+                fn=propose_low,
+            )
+        )
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.2),
+                event_type="ProposeHigh",
+                fn=propose_high,
+            )
+        )
         sim.run()
 
         # At least one node must have decided
@@ -275,9 +283,7 @@ class TestPaxosConsensus:
 
         # All decided nodes must agree (safety)
         decided_values = {n.decided_value for n in decided_nodes}
-        assert len(decided_values) == 1, (
-            f"Safety violation: {decided_values}"
-        )
+        assert len(decided_values) == 1, f"Safety violation: {decided_values}"
 
         # The decided value must be one of the proposed values
         decided_value = decided_values.pop()
@@ -286,9 +292,7 @@ class TestPaxosConsensus:
         )
 
         # Verify that ballots are correctly ordered
-        assert Ballot(1, "paxos-0") < Ballot(2, "paxos-1"), (
-            "Higher ballot number should be greater"
-        )
+        assert Ballot(1, "paxos-0") < Ballot(2, "paxos-1"), "Higher ballot number should be greater"
         assert Ballot(1, "paxos-0") < Ballot(1, "paxos-1"), (
             "Same number, higher node_id should be greater"
         )

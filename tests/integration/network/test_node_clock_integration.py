@@ -23,7 +23,6 @@ Outputs:
 
 import json
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
@@ -32,7 +31,6 @@ from happysimulator.core.event import Event
 from happysimulator.core.node_clock import FixedSkew, NodeClock
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Duration, Instant
-
 
 # ---------------------------------------------------------------------------
 # Entities
@@ -80,15 +78,17 @@ class LeaseCoordinator(Entity):
         else:
             self.log.append((now.to_seconds(), "denied", requester_name))
 
-        return [Event(
-            time=now,
-            event_type="LeaseResponse",
-            target=reply_target,
-            context={
-                "granted": granted,
-                "expires_at_s": self.lease_expires_at.to_seconds() if granted else 0,
-            },
-        )]
+        return [
+            Event(
+                time=now,
+                event_type="LeaseResponse",
+                target=reply_target,
+                context={
+                    "granted": granted,
+                    "expires_at_s": self.lease_expires_at.to_seconds() if granted else 0,
+                },
+            )
+        ]
 
 
 class LeaseNode(Entity):
@@ -98,8 +98,13 @@ class LeaseNode(Entity):
     a real node that only has access to its own wall clock.
     """
 
-    def __init__(self, name: str, coordinator: LeaseCoordinator,
-                 node_clock: NodeClock, check_interval: float = 0.5):
+    def __init__(
+        self,
+        name: str,
+        coordinator: LeaseCoordinator,
+        node_clock: NodeClock,
+        check_interval: float = 0.5,
+    ):
         super().__init__(name)
         self.coordinator = coordinator
         self._node_clock = node_clock
@@ -145,7 +150,23 @@ class LeaseNode(Entity):
 
             if not self.holds_lease:
                 # Try to acquire
-                return [Event(
+                return [
+                    Event(
+                        time=self.now,
+                        event_type="LeaseRequest",
+                        target=self.coordinator,
+                        context={
+                            "node_name": self.name,
+                            "reply_target": self,
+                        },
+                    )
+                ]
+            return self._schedule_check()
+
+        if event.event_type == "Start":
+            self.history.append((true_t, local_t, self.holds_lease))
+            return [
+                Event(
                     time=self.now,
                     event_type="LeaseRequest",
                     target=self.coordinator,
@@ -153,30 +174,20 @@ class LeaseNode(Entity):
                         "node_name": self.name,
                         "reply_target": self,
                     },
-                )]
-            return self._schedule_check()
-
-        if event.event_type == "Start":
-            self.history.append((true_t, local_t, self.holds_lease))
-            return [Event(
-                time=self.now,
-                event_type="LeaseRequest",
-                target=self.coordinator,
-                context={
-                    "node_name": self.name,
-                    "reply_target": self,
-                },
-            )]
+                )
+            ]
 
         return []
 
     def _schedule_check(self) -> list[Event]:
         next_time = self.now + Duration.from_seconds(self.check_interval)
-        return [Event(
-            time=next_time,
-            event_type="Check",
-            target=self,
-        )]
+        return [
+            Event(
+                time=next_time,
+                event_type="Check",
+                target=self,
+            )
+        ]
 
 
 def _find_overlap_periods(
@@ -188,6 +199,7 @@ def _find_overlap_periods(
     Builds a timeline of lease-holding intervals for each node (by true time),
     then finds overlaps.
     """
+
     def _holding_intervals(history: list[tuple[float, float, bool]]) -> list[tuple[float, float]]:
         intervals = []
         start = None
@@ -215,8 +227,11 @@ def _find_overlap_periods(
 
 
 def _run_lease_simulation(
-    skew_a_s: float, skew_b_s: float, duration: float = 10.0,
-    ttl: float = 2.0, check_interval: float = 0.3,
+    skew_a_s: float,
+    skew_b_s: float,
+    duration: float = 10.0,
+    ttl: float = 2.0,
+    check_interval: float = 0.3,
 ):
     """Run the lease simulation with given skew values.
 
@@ -236,16 +251,20 @@ def _run_lease_simulation(
     )
 
     # Kick off both nodes
-    sim.schedule(Event(
-        time=Instant.Epoch,
-        event_type="Start",
-        target=node_a,
-    ))
-    sim.schedule(Event(
-        time=Instant.from_seconds(0.1),
-        event_type="Start",
-        target=node_b,
-    ))
+    sim.schedule(
+        Event(
+            time=Instant.Epoch,
+            event_type="Start",
+            target=node_a,
+        )
+    )
+    sim.schedule(
+        Event(
+            time=Instant.from_seconds(0.1),
+            event_type="Start",
+            target=node_b,
+        )
+    )
 
     sim.run()
     return coordinator, node_a, node_b
@@ -261,15 +280,14 @@ class TestLeaseRaceCondition:
 
     def test_skew_causes_overlap(self):
         """With skew, both nodes believe they hold the lease simultaneously."""
-        coordinator, node_a, node_b = _run_lease_simulation(
+        _coordinator, node_a, node_b = _run_lease_simulation(
             skew_a_s=-0.3,  # slow clock
             skew_b_s=+0.3,  # fast clock
         )
 
         overlaps = _find_overlap_periods(node_a.history, node_b.history)
         assert len(overlaps) > 0, (
-            "Expected at least one overlap period where both nodes "
-            "believe they hold the lease"
+            "Expected at least one overlap period where both nodes believe they hold the lease"
         )
 
         # The overlap should be non-trivial
@@ -280,15 +298,13 @@ class TestLeaseRaceCondition:
 
     def test_no_skew_no_overlap(self):
         """Without skew, no overlap occurs (control case)."""
-        coordinator, node_a, node_b = _run_lease_simulation(
+        _coordinator, node_a, node_b = _run_lease_simulation(
             skew_a_s=0.0,
             skew_b_s=0.0,
         )
 
         overlaps = _find_overlap_periods(node_a.history, node_b.history)
-        assert len(overlaps) == 0, (
-            f"Expected no overlap without skew, but found: {overlaps}"
-        )
+        assert len(overlaps) == 0, f"Expected no overlap without skew, but found: {overlaps}"
 
 
 class TestLeaseRaceVisualization:
@@ -297,8 +313,8 @@ class TestLeaseRaceVisualization:
     def test_visualization(self, test_output_dir: Path):
         matplotlib = pytest.importorskip("matplotlib")
         matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        import matplotlib.pyplot as plt
 
         DURATION = 10.0
         SKEW_A = -0.3
@@ -388,16 +404,17 @@ class TestLeaseRaceVisualization:
         for true_t, etype, node_name in coordinator.log:
             y = 1.0 if node_name == "NodeA" else 0.0
             ax3.scatter(
-                true_t, y,
+                true_t,
+                y,
                 color=event_colors.get(etype, "black"),
                 marker=event_markers.get(etype, "o"),
-                s=60, zorder=5,
+                s=60,
+                zorder=5,
             )
 
         # Legend for event types
         legend_handles = [
-            mpatches.Patch(color=c, label=e.capitalize())
-            for e, c in event_colors.items()
+            mpatches.Patch(color=c, label=e.capitalize()) for e, c in event_colors.items()
         ]
         ax3.legend(handles=legend_handles, loc="upper right", fontsize=8)
         ax3.set_yticks([0.0, 1.0])
@@ -427,17 +444,14 @@ class TestLeaseRaceVisualization:
             "results": {
                 "overlap_count": len(overlaps),
                 "total_overlap_s": round(total_overlap, 6),
-                "overlaps": [
-                    {"start_s": round(s, 6), "end_s": round(e, 6)}
-                    for s, e in overlaps
-                ],
+                "overlaps": [{"start_s": round(s, 6), "end_s": round(e, 6)} for s, e in overlaps],
                 "coordinator_events": len(coordinator.log),
                 "node_a_history_points": len(node_a.history),
                 "node_b_history_points": len(node_b.history),
             },
         }
         json_path = test_output_dir / "lease_race_summary.json"
-        with open(json_path, "w") as f:
+        with json_path.open("w") as f:
             json.dump(summary, f, indent=2)
 
         assert json_path.exists()

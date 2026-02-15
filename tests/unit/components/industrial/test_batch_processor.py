@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
-from happysimulator.components.industrial.batch_processor import BatchProcessor
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.batch_processor import BatchProcessor
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestBatchProcessorBasics:
-
     def test_creates_with_defaults(self):
         sink = Sink()
         bp = BatchProcessor("batch", downstream=sink)
@@ -31,10 +28,8 @@ class TestBatchProcessorBasics:
             end_time=Instant.from_seconds(2.0),
             entities=[bp, sink],
         )
-        for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=bp)
-            )
+        for _i in range(3):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=bp))
         sim.run()
 
         assert bp.batches_processed == 1
@@ -51,10 +46,8 @@ class TestBatchProcessorBasics:
             entities=[bp, sink],
         )
         # Only send 3 items, batch_size is 5, no timeout
-        for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=bp)
-            )
+        for _i in range(3):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=bp))
         sim.run()
 
         assert bp.batches_processed == 0
@@ -64,8 +57,11 @@ class TestBatchProcessorBasics:
     def test_timeout_flushes_partial_batch(self):
         sink = Sink()
         bp = BatchProcessor(
-            "batch", downstream=sink,
-            batch_size=10, process_time=0.1, timeout_s=1.0,
+            "batch",
+            downstream=sink,
+            batch_size=10,
+            process_time=0.1,
+            timeout_s=1.0,
         )
 
         sim = Simulation(
@@ -74,10 +70,8 @@ class TestBatchProcessorBasics:
             entities=[bp, sink],
         )
         # Send 3 items, timeout should flush after 1s
-        for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=bp)
-            )
+        for _i in range(3):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=bp))
         sim.run()
 
         assert bp.batches_processed == 1
@@ -111,8 +105,11 @@ class TestBatchProcessorBasics:
     def test_stats_snapshot(self):
         sink = Sink()
         bp = BatchProcessor(
-            "batch", downstream=sink,
-            batch_size=2, process_time=0.01, timeout_s=1.0,
+            "batch",
+            downstream=sink,
+            batch_size=2,
+            process_time=0.01,
+            timeout_s=1.0,
         )
 
         sim = Simulation(
@@ -120,10 +117,8 @@ class TestBatchProcessorBasics:
             end_time=Instant.from_seconds(5.0),
             entities=[bp, sink],
         )
-        for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=bp)
-            )
+        for _i in range(3):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=bp))
         sim.run()
 
         stats = bp.stats

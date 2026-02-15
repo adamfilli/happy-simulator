@@ -12,12 +12,13 @@ Common use cases:
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Sequence
+from collections.abc import Sequence
+from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
-class ValueDistribution(ABC, Generic[T]):
+class ValueDistribution[T](ABC):
     """Abstract base for sampling discrete values from a distribution.
 
     Subclasses implement sample() to return values according to their
@@ -40,7 +41,6 @@ class ValueDistribution(ABC, Generic[T]):
         Returns:
             A value from the population according to the distribution.
         """
-        pass
 
     def sample_n(self, n: int) -> list[T]:
         """Sample n values from the distribution.
@@ -61,7 +61,6 @@ class ValueDistribution(ABC, Generic[T]):
         Returns:
             Sequence of all values that can be sampled.
         """
-        pass
 
     @property
     @abstractmethod
@@ -71,4 +70,3 @@ class ValueDistribution(ABC, Generic[T]):
         Returns:
             Population size.
         """
-        pass

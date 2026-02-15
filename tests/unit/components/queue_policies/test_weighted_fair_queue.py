@@ -147,7 +147,7 @@ class TestWeightedFairQueueFairness:
         )
 
         # Fill queues
-        for i in range(30):
+        for _i in range(30):
             queue.push({"flow": "premium"})  # weight 3
             queue.push({"flow": "standard"})  # weight 1
 
@@ -163,6 +163,7 @@ class TestWeightedFairQueueFairness:
 
     def test_minimum_weight_is_one(self):
         """Flows with weight < 1 are treated as weight 1."""
+
         def zero_weight(flow_id: str) -> int:
             return 0 if flow_id == "zero" else 1
 

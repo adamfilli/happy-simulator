@@ -20,9 +20,9 @@ CPU/network overhead.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -36,6 +36,8 @@ from happysimulator import (
 )
 from happysimulator.components.microservice import OutboxRelay
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Components
@@ -67,10 +69,12 @@ class OrderService(Entity):
         self.orders_processed += 1
         yield self._processing_time
 
-        self._outbox.write({
-            "order_id": self.orders_processed,
-            "event_type": "order_created",
-        })
+        self._outbox.write(
+            {
+                "order_id": self.orders_processed,
+                "event_type": "order_created",
+            }
+        )
 
         # Prime the poll loop on first write
         if not self._poll_primed:
@@ -199,14 +203,18 @@ def print_summary(result: SimulationResult) -> None:
     print("OUTBOX RELAY LAG — RESULTS")
     print("=" * 70)
 
-    print(f"\n{'Poll Interval':>14s}  {'Written':>8s}  {'Relayed':>8s}  {'Polls':>6s}  "
-          f"{'Avg Lag':>10s}  {'Max Lag':>10s}")
+    print(
+        f"\n{'Poll Interval':>14s}  {'Written':>8s}  {'Relayed':>8s}  {'Polls':>6s}  "
+        f"{'Avg Lag':>10s}  {'Max Lag':>10s}"
+    )
     print("-" * 70)
 
     for s in result.scenarios:
-        print(f"{s.poll_interval:>13.3f}s  {s.entries_written:>8d}  {s.entries_relayed:>8d}  "
-              f"{s.poll_cycles:>6d}  {s.avg_relay_lag * 1000:>9.2f}ms  "
-              f"{s.max_relay_lag * 1000:>9.2f}ms")
+        print(
+            f"{s.poll_interval:>13.3f}s  {s.entries_written:>8d}  {s.entries_relayed:>8d}  "
+            f"{s.poll_cycles:>6d}  {s.avg_relay_lag * 1000:>9.2f}ms  "
+            f"{s.max_relay_lag * 1000:>9.2f}ms"
+        )
 
     print("=" * 70)
 
@@ -214,6 +222,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate lag vs poll interval visualization."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -239,8 +248,14 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Overhead (poll cycles) vs poll interval
     ax = axes[1]
-    ax.bar(range(len(intervals)), poll_counts, tick_label=[f"{i:.3f}s" for i in intervals],
-           color="#3498db", edgecolor="black", alpha=0.8)
+    ax.bar(
+        range(len(intervals)),
+        poll_counts,
+        tick_label=[f"{i:.3f}s" for i in intervals],
+        color="#3498db",
+        edgecolor="black",
+        alpha=0.8,
+    )
     ax.set_xlabel("Poll Interval")
     ax.set_ylabel("Poll Cycles")
     ax.set_title("Polling Overhead vs Interval")

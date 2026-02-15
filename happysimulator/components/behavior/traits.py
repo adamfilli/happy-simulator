@@ -8,11 +8,14 @@ across a population.
 from __future__ import annotations
 
 import logging
-import random
 
 logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
-from typing import Protocol, Sequence, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    import random
+    from collections.abc import Sequence
 
 
 @runtime_checkable
@@ -58,13 +61,15 @@ class PersonalityTraits:
         neuroticism: float = 0.5,
     ) -> PersonalityTraits:
         """Construct traits using the Big Five personality model."""
-        return PersonalityTraits(dimensions={
-            "openness": _clamp(openness),
-            "conscientiousness": _clamp(conscientiousness),
-            "extraversion": _clamp(extraversion),
-            "agreeableness": _clamp(agreeableness),
-            "neuroticism": _clamp(neuroticism),
-        })
+        return PersonalityTraits(
+            dimensions={
+                "openness": _clamp(openness),
+                "conscientiousness": _clamp(conscientiousness),
+                "extraversion": _clamp(extraversion),
+                "agreeableness": _clamp(agreeableness),
+                "neuroticism": _clamp(neuroticism),
+            }
+        )
 
 
 @runtime_checkable
@@ -86,7 +91,7 @@ class NormalTraitDistribution:
 
     def __init__(self, means: dict[str, float], stds: dict[str, float] | None = None):
         self._means = means
-        self._stds = stds or {k: 0.15 for k in means}
+        self._stds = stds or dict.fromkeys(means, 0.15)
 
     def sample(self, rng: random.Random) -> PersonalityTraits:
         dims = {}

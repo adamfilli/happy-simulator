@@ -38,9 +38,9 @@ LSMTree (SizeTiered)   LSMTree (Leveled)
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -54,12 +54,14 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.storage import (
+    LeveledCompaction,
     LSMTree,
     LSMTreeStats,
     SizeTieredCompaction,
-    LeveledCompaction,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity: StorageWorkloadDriver
@@ -314,9 +316,15 @@ def print_summary(result: SimulationResult) -> None:
     print(f"{'Total SSTables':<30} {st.total_sstables:>15,} {lv.total_sstables:>15,}")
     print(f"{'Occupied levels':<30} {st.levels:>15,} {lv.levels:>15,}")
     print(f"{'Bloom filter saves':<30} {st.bloom_filter_saves:>15,} {lv.bloom_filter_saves:>15,}")
-    print(f"{'Read amplification':<30} {st.read_amplification:>15.2f} {lv.read_amplification:>15.2f}")
-    print(f"{'Write amplification':<30} {st.write_amplification:>15.2f} {lv.write_amplification:>15.2f}")
-    print(f"{'Space amplification':<30} {st.space_amplification:>15.2f} {lv.space_amplification:>15.2f}")
+    print(
+        f"{'Read amplification':<30} {st.read_amplification:>15.2f} {lv.read_amplification:>15.2f}"
+    )
+    print(
+        f"{'Write amplification':<30} {st.write_amplification:>15.2f} {lv.write_amplification:>15.2f}"
+    )
+    print(
+        f"{'Space amplification':<30} {st.space_amplification:>15.2f} {lv.space_amplification:>15.2f}"
+    )
 
     # Level summaries
     for cr in [result.size_tiered, result.leveled]:
@@ -335,24 +343,34 @@ def print_summary(result: SimulationResult) -> None:
     print("-" * 72)
 
     if st.write_amplification < lv.write_amplification:
-        print(f"\n  SizeTiered has LOWER write amplification "
-              f"({st.write_amplification:.2f}x vs {lv.write_amplification:.2f}x).")
+        print(
+            f"\n  SizeTiered has LOWER write amplification "
+            f"({st.write_amplification:.2f}x vs {lv.write_amplification:.2f}x)."
+        )
         print("  This makes it better for write-heavy workloads.")
     else:
-        print(f"\n  Leveled has LOWER write amplification "
-              f"({lv.write_amplification:.2f}x vs {st.write_amplification:.2f}x).")
+        print(
+            f"\n  Leveled has LOWER write amplification "
+            f"({lv.write_amplification:.2f}x vs {st.write_amplification:.2f}x)."
+        )
 
     if st.read_amplification > lv.read_amplification:
-        print(f"\n  Leveled has LOWER read amplification "
-              f"({lv.read_amplification:.2f}x vs {st.read_amplification:.2f}x).")
+        print(
+            f"\n  Leveled has LOWER read amplification "
+            f"({lv.read_amplification:.2f}x vs {st.read_amplification:.2f}x)."
+        )
         print("  This makes it better for read-heavy workloads.")
     else:
-        print(f"\n  SizeTiered has LOWER read amplification "
-              f"({st.read_amplification:.2f}x vs {lv.read_amplification:.2f}x).")
+        print(
+            f"\n  SizeTiered has LOWER read amplification "
+            f"({st.read_amplification:.2f}x vs {lv.read_amplification:.2f}x)."
+        )
 
     if lv.space_amplification < st.space_amplification:
-        print(f"\n  Leveled has LOWER space amplification "
-              f"({lv.space_amplification:.2f}x vs {st.space_amplification:.2f}x).")
+        print(
+            f"\n  Leveled has LOWER space amplification "
+            f"({lv.space_amplification:.2f}x vs {st.space_amplification:.2f}x)."
+        )
         print("  Leveled compaction is more space-efficient on disk.")
 
     print("\n" + "=" * 72)
@@ -367,6 +385,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate comparison charts for the two compaction strategies."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -388,10 +407,24 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     x = range(len(metrics))
     width = 0.35
-    bars1 = ax.bar([i - width / 2 for i in x], st_values, width,
-                   label="SizeTiered", color="#4C72B0", edgecolor="black", alpha=0.85)
-    bars2 = ax.bar([i + width / 2 for i in x], lv_values, width,
-                   label="Leveled", color="#DD8452", edgecolor="black", alpha=0.85)
+    bars1 = ax.bar(
+        [i - width / 2 for i in x],
+        st_values,
+        width,
+        label="SizeTiered",
+        color="#4C72B0",
+        edgecolor="black",
+        alpha=0.85,
+    )
+    bars2 = ax.bar(
+        [i + width / 2 for i in x],
+        lv_values,
+        width,
+        label="Leveled",
+        color="#DD8452",
+        edgecolor="black",
+        alpha=0.85,
+    )
     ax.set_xticks(list(x))
     ax.set_xticklabels(metrics)
     ax.set_ylabel("Amplification Factor")
@@ -401,11 +434,23 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Add value labels on bars
     for bar in bars1:
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
-                f"{bar.get_height():.2f}", ha="center", va="bottom", fontsize=9)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.05,
+            f"{bar.get_height():.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
     for bar in bars2:
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.05,
-                f"{bar.get_height():.2f}", ha="center", va="bottom", fontsize=9)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.05,
+            f"{bar.get_height():.2f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
 
     # --- Chart 2: Compaction and flush counts ---
     ax = axes[0, 1]
@@ -414,10 +459,24 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     lv_counts = [lv.compactions, lv.memtable_flushes, lv.total_sstables, lv.bloom_filter_saves]
 
     x2 = range(len(count_metrics))
-    ax.bar([i - width / 2 for i in x2], st_counts, width,
-           label="SizeTiered", color="#4C72B0", edgecolor="black", alpha=0.85)
-    ax.bar([i + width / 2 for i in x2], lv_counts, width,
-           label="Leveled", color="#DD8452", edgecolor="black", alpha=0.85)
+    ax.bar(
+        [i - width / 2 for i in x2],
+        st_counts,
+        width,
+        label="SizeTiered",
+        color="#4C72B0",
+        edgecolor="black",
+        alpha=0.85,
+    )
+    ax.bar(
+        [i + width / 2 for i in x2],
+        lv_counts,
+        width,
+        label="Leveled",
+        color="#DD8452",
+        edgecolor="black",
+        alpha=0.85,
+    )
     ax.set_xticks(list(x2))
     ax.set_xticklabels(count_metrics)
     ax.set_ylabel("Count")
@@ -446,10 +505,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # --- Chart 4: Level distribution (stacked bar) ---
     ax = axes[1, 1]
     strategies = ["SizeTiered", "Leveled"]
-    max_levels = max(
-        max((d["level"] for d in result.size_tiered.level_summary), default=0),
-        max((d["level"] for d in result.leveled.level_summary), default=0),
-    ) + 1
+    max_levels = (
+        max(
+            max((d["level"] for d in result.size_tiered.level_summary), default=0),
+            max((d["level"] for d in result.leveled.level_summary), default=0),
+        )
+        + 1
+    )
 
     level_keys_st = [0] * max_levels
     level_keys_lv = [0] * max_levels
@@ -461,15 +523,20 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
             level_keys_lv[d["level"]] = d["total_keys"]
 
     x3 = range(len(strategies))
-    bottom_st = 0
-    bottom_lv = 0
     colors = plt.cm.viridis([i / max(max_levels - 1, 1) for i in range(max_levels)])
 
     for level_idx in range(max_levels):
         vals = [level_keys_st[level_idx], level_keys_lv[level_idx]]
         bottoms = [sum(level_keys_st[:level_idx]), sum(level_keys_lv[:level_idx])]
-        ax.bar(list(x3), vals, bottom=bottoms, width=0.5,
-               label=f"L{level_idx}", color=colors[level_idx], edgecolor="black")
+        ax.bar(
+            list(x3),
+            vals,
+            bottom=bottoms,
+            width=0.5,
+            label=f"L{level_idx}",
+            color=colors[level_idx],
+            edgecolor="black",
+        )
 
     ax.set_xticks(list(x3))
     ax.set_xticklabels(strategies)
@@ -493,17 +560,18 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="LSM compaction strategy comparison simulation"
+    parser = argparse.ArgumentParser(description="LSM compaction strategy comparison simulation")
+    parser.add_argument(
+        "--duration", type=float, default=30.0, help="Simulation duration in seconds"
     )
-    parser.add_argument("--duration", type=float, default=30.0,
-                        help="Simulation duration in seconds")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/lsm_compaction",
-                        help="Output directory for visualizations")
-    parser.add_argument("--no-viz", action="store_true",
-                        help="Skip visualization generation")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="output/lsm_compaction",
+        help="Output directory for visualizations",
+    )
+    parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
     seed = None if args.seed == -1 else args.seed

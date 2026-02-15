@@ -29,6 +29,7 @@ def _make_sim(rate: int = 10, duration: float = 10.0) -> Simulation:
 # Lazy creation
 # -------------------------------------------------------
 
+
 class TestLazyCreation:
     def test_control_not_created_until_accessed(self):
         sim = _make_sim()
@@ -48,6 +49,7 @@ class TestLazyCreation:
 # -------------------------------------------------------
 # Pause / Resume
 # -------------------------------------------------------
+
 
 class TestPauseResume:
     def test_pause_before_first_event(self):
@@ -89,6 +91,7 @@ class TestPauseResume:
 # -------------------------------------------------------
 # Step
 # -------------------------------------------------------
+
 
 class TestStep:
     def test_step_one(self):
@@ -141,6 +144,7 @@ class TestStep:
 # Get State
 # -------------------------------------------------------
 
+
 class TestGetState:
     def test_initial_state(self):
         sim = _make_sim()
@@ -177,6 +181,7 @@ class TestGetState:
 # -------------------------------------------------------
 # Breakpoint management
 # -------------------------------------------------------
+
 
 class TestBreakpointManagement:
     def test_add_and_list_breakpoints(self):
@@ -236,6 +241,7 @@ class TestBreakpointManagement:
 # Event hooks
 # -------------------------------------------------------
 
+
 class TestEventHooks:
     def test_on_event_fires_for_each_event(self):
         sim = _make_sim(rate=1, duration=3.0)
@@ -273,6 +279,7 @@ class TestEventHooks:
 # -------------------------------------------------------
 # Heap introspection
 # -------------------------------------------------------
+
 
 class TestHeapIntrospection:
     def test_peek_next_while_paused(self):
@@ -313,6 +320,7 @@ class TestHeapIntrospection:
 # -------------------------------------------------------
 # Reset
 # -------------------------------------------------------
+
 
 class TestReset:
     def test_reset_after_completion(self):

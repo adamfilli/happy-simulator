@@ -40,12 +40,12 @@ Or use the @simulatable decorator for automatic clock injection:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generator, Protocol, Union, runtime_checkable
+from collections.abc import Generator
+from typing import TYPE_CHECKING, Protocol, Union, runtime_checkable
 
 if TYPE_CHECKING:
     from happysimulator.core.clock import Clock
     from happysimulator.core.event import Event
-    from happysimulator.core.temporal import Instant
 
 
 # Type alias matching Entity's return type
@@ -75,7 +75,7 @@ class Simulatable(Protocol):
 
     name: str
 
-    def set_clock(self, clock: "Clock") -> None:
+    def set_clock(self, clock: Clock) -> None:
         """Receive the simulation clock for time-aware operations.
 
         Called automatically by Simulation during initialization.
@@ -83,7 +83,7 @@ class Simulatable(Protocol):
         """
         ...
 
-    def handle_event(self, event: "Event") -> HandleEventReturn:
+    def handle_event(self, event: Event) -> HandleEventReturn:
         """Process an incoming event and return any resulting events.
 
         Returns:

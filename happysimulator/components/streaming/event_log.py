@@ -23,14 +23,17 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Generator, Protocol
 from abc import abstractmethod
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Protocol
 
+from happysimulator.components.datastore.sharded_store import HashSharding
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.datastore.sharded_store import HashSharding
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -203,9 +206,7 @@ class EventLog(Entity):
         self._read_latency = read_latency
         self._retention_check_interval = retention_check_interval
 
-        self._partitions: list[Partition] = [
-            Partition(id=i) for i in range(num_partitions)
-        ]
+        self._partitions: list[Partition] = [Partition(id=i) for i in range(num_partitions)]
 
         self._retention_scheduled = False
 
@@ -262,7 +263,9 @@ class EventLog(Entity):
         """Route a key to a partition index."""
         return self._sharding.get_shard(key, self._num_partitions)
 
-    def append(self, key: str, value: Any) -> Generator[float | SimFuture | tuple[float, list[Event]], None, Record]:
+    def append(
+        self, key: str, value: Any
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]], None, Record]:
         """Append a record to the log.
 
         Convenience generator for ``yield from`` in entity handlers.
@@ -288,7 +291,9 @@ class EventLog(Entity):
         result = yield reply
         return result
 
-    def read(self, partition_id: int, offset: int = 0, max_records: int = 100) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Record]]:
+    def read(
+        self, partition_id: int, offset: int = 0, max_records: int = 100
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Record]]:
         """Read records from a partition.
 
         Convenience generator for ``yield from`` in entity handlers.
@@ -379,8 +384,7 @@ class EventLog(Entity):
             for partition in self._partitions:
                 before = len(partition.records)
                 partition.records = [
-                    r for r in partition.records
-                    if self._retention_policy.should_retain(r, now_s)
+                    r for r in partition.records if self._retention_policy.should_retain(r, now_s)
                 ]
                 total_expired += before - len(partition.records)
 
@@ -407,11 +411,13 @@ class EventLog(Entity):
             # Schedule retention daemon on first append
             if not self._retention_scheduled and self._retention_policy is not None:
                 self._retention_scheduled = True
-                return [Event(
-                    time=self.now,
-                    event_type="RetentionCheck",
-                    target=self,
-                )]
+                return [
+                    Event(
+                        time=self.now,
+                        event_type="RetentionCheck",
+                        target=self,
+                    )
+                ]
 
             return None
 
@@ -435,13 +441,14 @@ class EventLog(Entity):
 
             # Reschedule
             from happysimulator.core.temporal import Instant
-            next_time = Instant.from_seconds(
-                self.now.to_seconds() + self._retention_check_interval
-            )
-            return [Event(
-                time=next_time,
-                event_type="RetentionCheck",
-                target=self,
-            )]
+
+            next_time = Instant.from_seconds(self.now.to_seconds() + self._retention_check_interval)
+            return [
+                Event(
+                    time=next_time,
+                    event_type="RetentionCheck",
+                    target=self,
+                )
+            ]
 
         return None

@@ -20,21 +20,23 @@ Reference:
 from __future__ import annotations
 
 import sys
+from collections.abc import Hashable
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Hashable
+from typing import TypeVar
 
-from happysimulator.sketching.base import FrequencySketch, FrequencyEstimate
+from happysimulator.sketching.base import FrequencyEstimate, FrequencySketch
 
-T = TypeVar('T', bound=Hashable)
+T = TypeVar("T", bound=Hashable)
 
 
 @dataclass(slots=True)
-class _Counter(Generic[T]):
+class _Counter[T: Hashable]:
     """Internal counter for Space-Saving algorithm.
 
     Tracks an item, its count, and the error (overestimation) introduced
     when the counter was reassigned from another item.
     """
+
     item: T
     count: int
     error: int  # Overestimation bound from counter reuse
@@ -210,7 +212,7 @@ class TopK(FrequencySketch[T]):
             return 0
         return self._total_count // self._k
 
-    def merge(self, other: "TopK[T]") -> None:
+    def merge(self, other: TopK[T]) -> None:
         """Merge another TopK sketch into this one.
 
         After merging, this sketch approximates the top-k of the combined stream.
@@ -251,8 +253,7 @@ class TopK(FrequencySketch[T]):
         # Update total: add other's total, subtract what add() already added
         # (add() increments _total_count for items that weren't already tracked)
         self._total_count += other._total_count - sum(
-            c.count for c in other._counters.values()
-            if c.item not in items_already_tracked
+            c.count for c in other._counters.values() if c.item not in items_already_tracked
         )
 
     @property

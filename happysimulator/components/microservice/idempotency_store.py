@@ -16,8 +16,8 @@ Example:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event

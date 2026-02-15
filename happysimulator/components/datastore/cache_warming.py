@@ -22,8 +22,8 @@ Example:
     initial_event = warmer.start_warming()
 """
 
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Generator, Callable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -168,7 +168,7 @@ class CacheWarmer(Entity):
             context={"action": "warm_next"},
         )
 
-    def warm_keys(self, now: Instant) -> Generator[float, None, None]:
+    def warm_keys(self, now: Instant) -> Generator[float]:
         """Warm all keys.
 
         This is a generator that yields delays while warming.
@@ -210,9 +210,7 @@ class CacheWarmer(Entity):
         if self._clock:
             self._end_time = self._clock.now
             if self._start_time:
-                self._warmup_time_seconds = (
-                    self._end_time - self._start_time
-                ).to_seconds()
+                self._warmup_time_seconds = (self._end_time - self._start_time).to_seconds()
 
     def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
         """Handle warming events.

@@ -4,21 +4,18 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
-from happysimulator.components.industrial.appointment import AppointmentScheduler
 from happysimulator.components.common import Sink
-from happysimulator.core.event import Event
+from happysimulator.components.industrial.appointment import AppointmentScheduler
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestAppointmentBasics:
-
     def test_creates_with_parameters(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0, 2.0, 3.0],
         )
         assert scheduler.no_show_rate == 0.0
@@ -26,7 +23,8 @@ class TestAppointmentBasics:
     def test_generates_all_arrivals(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0, 2.0, 3.0],
             no_show_rate=0.0,
         )
@@ -48,7 +46,8 @@ class TestAppointmentBasics:
     def test_no_shows(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0, 2.0, 3.0],
             no_show_rate=1.0,  # All no-show
         )
@@ -72,7 +71,8 @@ class TestAppointmentBasics:
         sink = Sink()
         appointments = [float(i) for i in range(1, 51)]
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=appointments,
             no_show_rate=0.2,
         )
@@ -95,7 +95,8 @@ class TestAppointmentBasics:
     def test_arrival_times_match_appointments(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0, 3.0, 5.0],
         )
 
@@ -115,7 +116,8 @@ class TestAppointmentBasics:
     def test_custom_event_type(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0],
             event_type="Reservation",
         )
@@ -134,7 +136,8 @@ class TestAppointmentBasics:
     def test_stats_snapshot(self):
         sink = Sink()
         scheduler = AppointmentScheduler(
-            "appt", target=sink,
+            "appt",
+            target=sink,
             appointments=[1.0, 2.0],
         )
         stats = scheduler.stats

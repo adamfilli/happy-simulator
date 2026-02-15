@@ -1,18 +1,15 @@
 """Tests for MembershipProtocol (SWIM-style failure detection)."""
 
-import pytest
-
+from happysimulator.components.consensus.membership import (
+    MembershipProtocol,
+    MembershipStats,
+    MemberState,
+)
+from happysimulator.components.network import Network
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.membership import (
-    MembershipProtocol,
-    MemberState,
-    MemberInfo,
-    MembershipStats,
-)
-from happysimulator.components.network import Network
 
 
 def make_clock(t=0.0):
@@ -115,7 +112,7 @@ class TestMembershipProbeTick:
 
     def test_probe_tick_generates_events(self):
         """start() + handling probe tick generates ping, timeout, and next tick."""
-        mp, network, clock = make_membership()
+        mp, _network, clock = make_membership()
         peer = DummyEntity(name="peer-1")
         peer.set_clock(clock)
         mp.add_member(peer)
@@ -143,7 +140,7 @@ class TestMembershipPing:
 
     def test_ping_generates_ack(self):
         """Handling a ping generates an ack response via network."""
-        mp, network, clock = make_membership()
+        mp, _network, clock = make_membership()
         sender = DummyEntity(name="peer-1")
         sender.set_clock(clock)
         mp.add_member(sender)
@@ -164,7 +161,7 @@ class TestMembershipPing:
 
     def test_ack_records_heartbeat(self):
         """Handling an ack increments acks_received counter."""
-        mp, network, clock = make_membership()
+        mp, _network, clock = make_membership()
         sender = DummyEntity(name="peer-1")
         sender.set_clock(clock)
         mp.add_member(sender)
@@ -186,7 +183,7 @@ class TestMembershipSuspicionTimeout:
 
     def test_suspicion_timeout_marks_dead(self):
         """A suspected member is declared dead on suspicion timeout."""
-        mp, network, clock = make_membership()
+        mp, _network, clock = make_membership()
         peer = DummyEntity(name="peer-1")
         peer.set_clock(clock)
         mp.add_member(peer)

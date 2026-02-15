@@ -5,12 +5,20 @@ receives work events without knowing they came from a queue. The driver
 manages polling based on target capacity and re-polls after work completion.
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+from typing import TYPE_CHECKING
+
 from happysimulator.components.queue import QueueDeliverEvent, QueueNotifyEvent, QueuePollEvent
+from happysimulator.core.entity import Entity
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +43,7 @@ class QueueDriver(Entity):
         queue: The upstream Queue entity.
         target: The downstream entity that processes work.
     """
+
     name: str = "QueueDriver"
     queue: Entity = None
     target: Entity = None
@@ -42,12 +51,12 @@ class QueueDriver(Entity):
     def handle_event(self, event: Event) -> Generator[Instant, None, list[Event]] | list[Event]:
         if isinstance(event, QueueNotifyEvent):
             return self._handle_notify(event)
-        
+
         if isinstance(event, QueueDeliverEvent):
             return self._handle_delivery(event)
-        
+
         return None
-        
+
     def _handle_delivery(self, event: QueueDeliverEvent) -> list[Event]:
         """Queue delivered one payload event; clone/retarget and re-emit."""
         if event.payload is None:
@@ -55,7 +64,8 @@ class QueueDriver(Entity):
             return []
         logger.debug(
             "[%s] Received delivery: type=%s, forwarding to target",
-            self.name, event.payload.event_type
+            self.name,
+            event.payload.event_type,
         )
         return self._handle_work_payload(event.payload)
 
@@ -81,4 +91,3 @@ class QueueDriver(Entity):
 
         logger.debug("[%s] Notify received, polling queue", self.name)
         return [QueuePollEvent(time=self.now, target=self.queue, requestor=self)]
-

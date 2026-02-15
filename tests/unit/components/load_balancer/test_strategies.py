@@ -3,27 +3,30 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
-from typing import Generator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.load_balancer.strategies import (
-    LoadBalancingStrategy,
-    RoundRobin,
-    WeightedRoundRobin,
-    Random,
-    LeastConnections,
-    WeightedLeastConnections,
-    LeastResponseTime,
-    IPHash,
     ConsistentHash,
+    IPHash,
+    LeastConnections,
+    LeastResponseTime,
+    LoadBalancingStrategy,
     PowerOfTwoChoices,
+    Random,
+    RoundRobin,
+    WeightedLeastConnections,
+    WeightedRoundRobin,
 )
 from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 _null = NullEntity()
 
@@ -31,10 +34,11 @@ _null = NullEntity()
 @dataclass
 class MockBackend(Entity):
     """Mock backend for testing."""
+
     name: str
     active_connections: int = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         yield 0.01
 
 
@@ -285,12 +289,11 @@ class TestIPHash:
 
         # Multiple requests from same client
         selections = [
-            strategy.select(backends, create_request(client_id="user123"))
-            for _ in range(10)
+            strategy.select(backends, create_request(client_id="user123")) for _ in range(10)
         ]
 
         # All should go to same backend
-        assert len(set(b.name for b in selections)) == 1
+        assert len({b.name for b in selections}) == 1
 
     def test_different_clients_may_differ(self):
         """IPHash routes different clients potentially to different backends."""
@@ -298,8 +301,7 @@ class TestIPHash:
         strategy = IPHash()
 
         selections = {
-            strategy.select(backends, create_request(client_id=f"user{i}")).name
-            for i in range(100)
+            strategy.select(backends, create_request(client_id=f"user{i}")).name for i in range(100)
         }
 
         # With 100 clients and 5 backends, should hit multiple backends
@@ -338,11 +340,10 @@ class TestConsistentHash:
         strategy = ConsistentHash()
 
         selections = [
-            strategy.select(backends, create_request(client_id="user123"))
-            for _ in range(10)
+            strategy.select(backends, create_request(client_id="user123")) for _ in range(10)
         ]
 
-        assert len(set(b.name for b in selections)) == 1
+        assert len({b.name for b in selections}) == 1
 
     def test_minimal_remapping_on_add(self):
         """ConsistentHash minimizes remapping when backend added."""

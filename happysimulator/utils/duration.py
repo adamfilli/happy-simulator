@@ -1,4 +1,9 @@
-from typing import Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from happysimulator.core.temporal import Instant
 
 
 class Duration:
@@ -19,14 +24,14 @@ class Duration:
         return float(self.nanoseconds) / 1_000_000_000
 
     # Arithmetic with other Durations or numeric seconds
-    def __add__(self, other: Union['Duration', int, float]):
+    def __add__(self, other: Union[Duration, int, float]):
         if isinstance(other, (int, float)):
             return Duration(self.nanoseconds + int(other * 1_000_000_000))
-        elif isinstance(other, Duration):
+        if isinstance(other, Duration):
             return Duration(self.nanoseconds + other.nanoseconds)
         return NotImplemented
 
-    def __radd__(self, other: Union['Duration', 'Instant', int, float]):
+    def __radd__(self, other: Union[Duration, Instant, int, float]):
         # support Instant + Duration by handling Instant on the right-hand side
         try:
             from happysimulator.core.temporal import Instant
@@ -38,14 +43,14 @@ class Duration:
 
         return self.__add__(other)
 
-    def __sub__(self, other: Union['Duration', int, float]):
+    def __sub__(self, other: Union[Duration, int, float]):
         if isinstance(other, (int, float)):
             return Duration(self.nanoseconds - int(other * 1_000_000_000))
-        elif isinstance(other, Duration):
+        if isinstance(other, Duration):
             return Duration(self.nanoseconds - other.nanoseconds)
         return NotImplemented
 
-    def __rsub__(self, other: Union['Instant', int, float]):
+    def __rsub__(self, other: Union[Instant, int, float]):
         try:
             from happysimulator.core.temporal import Instant
         except Exception:  # pragma: no cover - defensive import
@@ -73,7 +78,7 @@ class Duration:
     def __rmul__(self, other: Union[int, float]):
         return self.__mul__(other)
 
-    def __truediv__(self, other: Union[int, float, 'Duration']):
+    def __truediv__(self, other: Union[int, float, Duration]):
         if isinstance(other, (int, float)):
             return Duration(int(self.nanoseconds / other))
         if isinstance(other, Duration):

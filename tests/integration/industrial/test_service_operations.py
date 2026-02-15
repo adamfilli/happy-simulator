@@ -7,22 +7,24 @@ configurations.
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.balking import BalkingQueue
 from happysimulator.components.industrial.reneging import RenegingQueuedResource
 from happysimulator.components.industrial.shift_schedule import (
     Shift,
-    ShiftSchedule,
     ShiftedServer,
+    ShiftSchedule,
 )
-from happysimulator.components.common import Sink
 from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class SimpleRenegingServer(RenegingQueuedResource):
@@ -45,9 +47,7 @@ class SimpleRenegingServer(RenegingQueuedResource):
         finally:
             self._active -= 1
         if self.downstream:
-            return [
-                self.forward(event, self.downstream, event_type="Served")
-            ]
+            return [self.forward(event, self.downstream, event_type="Served")]
         return []
 
 
@@ -71,9 +71,7 @@ class FixedTimeServer(QueuedResource):
         finally:
             self._active -= 1
         if self.downstream:
-            return [
-                self.forward(event, self.downstream, event_type="Served")
-            ]
+            return [self.forward(event, self.downstream, event_type="Served")]
         return []
 
 
@@ -83,8 +81,11 @@ class TestServiceWithBalking:
     def test_balking_occurs_at_threshold(self):
         sink = Sink("served")
         server = FixedTimeServer(
-            "server", service_time=0.5, downstream=sink,
-            concurrency=1, policy=BalkingQueue(FIFOQueue(), balk_threshold=3),
+            "server",
+            service_time=0.5,
+            downstream=sink,
+            concurrency=1,
+            policy=BalkingQueue(FIFOQueue(), balk_threshold=3),
         )
 
         # High arrival rate to cause queue buildup
@@ -113,7 +114,9 @@ class TestServiceWithReneging:
         reneged_sink = Sink("reneged")
 
         server = SimpleRenegingServer(
-            "server", service_time=1.0, downstream=served_sink,
+            "server",
+            service_time=1.0,
+            downstream=served_sink,
             concurrency=1,
             reneged_target=reneged_sink,
             default_patience_s=0.5,
@@ -145,13 +148,15 @@ class TestShiftBasedCapacity:
 
         schedule = ShiftSchedule(
             shifts=[
-                Shift(0, 10, capacity=1),    # Low capacity shift
-                Shift(10, 20, capacity=5),   # High capacity shift
+                Shift(0, 10, capacity=1),  # Low capacity shift
+                Shift(10, 20, capacity=5),  # High capacity shift
             ]
         )
         server = ShiftedServer(
-            "server", schedule=schedule,
-            service_time=0.1, downstream=sink,
+            "server",
+            schedule=schedule,
+            service_time=0.1,
+            downstream=sink,
         )
 
         source = Source.constant(rate=10.0, target=server, stop_after=20.0)
@@ -175,8 +180,11 @@ class TestCombinedBalkingRenegingComparison:
         # Balking setup
         balk_sink = Sink("balk_served")
         balk_server = FixedTimeServer(
-            "balk_server", service_time=0.5, downstream=balk_sink,
-            concurrency=1, policy=BalkingQueue(FIFOQueue(), balk_threshold=3),
+            "balk_server",
+            service_time=0.5,
+            downstream=balk_sink,
+            concurrency=1,
+            policy=BalkingQueue(FIFOQueue(), balk_threshold=3),
         )
         balk_source = Source.constant(rate=10.0, target=balk_server, stop_after=5.0)
 
@@ -192,7 +200,9 @@ class TestCombinedBalkingRenegingComparison:
         renege_served = Sink("renege_served")
         renege_lost = Sink("renege_lost")
         renege_server = SimpleRenegingServer(
-            "renege_server", service_time=0.5, downstream=renege_served,
+            "renege_server",
+            service_time=0.5,
+            downstream=renege_served,
             concurrency=1,
             reneged_target=renege_lost,
             default_patience_s=0.5,

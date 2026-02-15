@@ -1,5 +1,7 @@
 """Unit tests for per-node clocks and clock models."""
 
+import pytest
+
 from happysimulator.core.clock import Clock
 from happysimulator.core.node_clock import (
     ClockModel,
@@ -9,16 +11,12 @@ from happysimulator.core.node_clock import (
 )
 from happysimulator.core.temporal import Duration, Instant
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # FixedSkew
 # ---------------------------------------------------------------------------
 
 
 class TestFixedSkew:
-
     def test_positive_offset_reads_ahead(self):
         """A positive offset makes the clock read ahead of true time."""
         skew = FixedSkew(Duration.from_seconds(0.3))
@@ -60,7 +58,6 @@ class TestFixedSkew:
 
 
 class TestLinearDrift:
-
     def test_positive_ppm_clock_runs_fast(self):
         """Positive ppm means the clock gains time — reads ahead."""
         drift = LinearDrift(rate_ppm=1000)  # 1ms per second
@@ -118,7 +115,6 @@ class TestLinearDrift:
 
 
 class TestNodeClock:
-
     def _make_clock(self, time_s: float = 0.0) -> Clock:
         """Create a Clock set to the given time."""
         clock = Clock(Instant.from_seconds(time_s))

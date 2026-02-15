@@ -97,13 +97,14 @@ class Chart:
         if self.transform == "p999":
             bucketed = data.bucket(self.window_s)
             times = bucketed.times()
-            from happysimulator.instrumentation.data import _percentile_sorted
-            from collections import defaultdict
             import math
+            from collections import defaultdict
+
+            from happysimulator.instrumentation.data import _percentile_sorted
 
             buckets_map: dict[int, list[float]] = defaultdict(list)
             for t, v in data.values:
-                idx = int(math.floor(t / self.window_s))
+                idx = math.floor(t / self.window_s)
                 buckets_map[idx].append(float(v))
 
             values = []

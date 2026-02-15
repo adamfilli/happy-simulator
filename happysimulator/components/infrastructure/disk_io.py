@@ -20,10 +20,14 @@ import math
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +262,7 @@ class DiskIO(Entity):
             peak_queue_depth=self._peak_queue_depth,
         )
 
-    def read(self, size_bytes: int = 4096) -> Generator[float, None, None]:
+    def read(self, size_bytes: int = 4096) -> Generator[float]:
         """Read from disk, yielding I/O latency.
 
         Args:
@@ -277,7 +281,7 @@ class DiskIO(Entity):
             self._bytes_read += size_bytes
             self._total_read_latency_s += latency
 
-    def write(self, size_bytes: int = 4096) -> Generator[float, None, None]:
+    def write(self, size_bytes: int = 4096) -> Generator[float]:
         """Write to disk, yielding I/O latency.
 
         Args:
@@ -298,7 +302,6 @@ class DiskIO(Entity):
 
     def handle_event(self, event: Event) -> None:
         """DiskIO does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         profile_name = type(self._profile).__name__

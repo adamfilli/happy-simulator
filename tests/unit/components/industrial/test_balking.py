@@ -4,19 +4,11 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from happysimulator.components.industrial.balking import BalkingQueue
 from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue
-from happysimulator.components.common import Sink
-from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.core.event import Event
-from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
 
 
 class TestBalkingQueuePolicy:
-
     def test_creates_with_defaults(self):
         inner = FIFOQueue()
         bq = BalkingQueue(inner)

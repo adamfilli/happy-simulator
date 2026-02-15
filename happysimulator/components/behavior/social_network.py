@@ -11,7 +11,7 @@ import logging
 import random
 
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -133,7 +133,7 @@ class SocialGraph:
         for name in names:
             g.add_node(name)
         for i, a in enumerate(names):
-            for b in names[i + 1:]:
+            for b in names[i + 1 :]:
                 g.add_bidirectional_edge(a, b, weight, trust)
         return g
 
@@ -210,7 +210,8 @@ class SocialGraph:
 
                     # Pick new target (avoid self and existing neighbors)
                     candidates = [
-                        names[c] for c in range(n)
+                        names[c]
+                        for c in range(n)
                         if c != i and names[c] not in g._adjacency.get(names[i], {})
                     ]
                     if candidates:

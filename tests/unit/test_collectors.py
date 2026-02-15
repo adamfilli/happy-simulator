@@ -7,7 +7,6 @@ from happysimulator import (
     ConstantRateProfile,
     Entity,
     Event,
-    FIFOQueue,
     Instant,
     Simulation,
     Source,

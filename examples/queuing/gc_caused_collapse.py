@@ -74,9 +74,9 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -95,6 +95,8 @@ from happysimulator import (
 )
 from happysimulator.analysis import analyze, detect_phases
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # GC-Aware Server
@@ -184,9 +186,7 @@ class GCServer(QueuedResource):
     def has_capacity(self) -> bool:
         return self._in_flight < self.concurrency
 
-    def handle_queued_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]]:
+    def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         """Process request, pausing for GC if necessary."""
         self._in_flight += 1
         try:
@@ -283,9 +283,7 @@ class RetryingClientWithStats(Entity):
         """Return (completion_times_s, latencies_s) for plotting."""
         return [t.to_seconds() for t in self.completion_times], list(self.latencies_s)
 
-    def goodput_time_series(
-        self, bucket_size_s: float = 1.0
-    ) -> tuple[list[float], list[int]]:
+    def goodput_time_series(self, bucket_size_s: float = 1.0) -> tuple[list[float], list[int]]:
         """Return (bucket_times, completion_counts) for plotting goodput."""
         if not self.completion_times:
             return [], []
@@ -307,11 +305,11 @@ class RetryingClientWithStats(Entity):
 
         if event_type == "NewRequest":
             return self._handle_new_request(event)
-        elif event_type == "Completion":
+        if event_type == "Completion":
             return self._handle_completion(event)
-        elif event_type == "Timeout":
+        if event_type == "Timeout":
             return self._handle_timeout(event)
-        elif event_type == "DoRetry":
+        if event_type == "DoRetry":
             return self._handle_do_retry(event)
 
         return []
@@ -323,9 +321,7 @@ class RetryingClientWithStats(Entity):
 
         return self._send_request(request_id, event.time, attempt=1)
 
-    def _send_request(
-        self, request_id: int, created_at: Instant, attempt: int
-    ) -> list[Event]:
+    def _send_request(self, request_id: int, created_at: Instant, attempt: int) -> list[Event]:
         """Send a request to the server and schedule a timeout."""
         self.stats_attempts_sent += 1
         self._next_timeout_id += 1
@@ -633,7 +629,7 @@ def run_comparison(
 def _build_latency_data(client: RetryingClientWithStats) -> Data:
     """Build a Data object from client latency measurements for analysis."""
     d = Data()
-    for t, lat in zip(client.completion_times, client.latencies_s):
+    for t, lat in zip(client.completion_times, client.latencies_s, strict=False):
         d.add_stat(lat, t)
     return d
 
@@ -671,9 +667,7 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     # Get goodput data
     gp_times_with, gp_counts_with = with_r.client.goodput_time_series(bucket_size_s=1.0)
-    gp_times_without, gp_counts_without = without_r.client.goodput_time_series(
-        bucket_size_s=1.0
-    )
+    gp_times_without, gp_counts_without = without_r.client.goodput_time_series(bucket_size_s=1.0)
 
     # =========================================================================
     # Figure 1: Overview (3 subplots, shared x-axis)
@@ -708,9 +702,7 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     # Plot 2: Queue Depth
     ax2 = axes[1]
     ax2.plot(q_times_with, q_depths_with, "r-", linewidth=1.5, label="With Retries")
-    ax2.plot(
-        q_times_without, q_depths_without, "g-", linewidth=1.5, label="Without Retries"
-    )
+    ax2.plot(q_times_without, q_depths_without, "g-", linewidth=1.5, label="Without Retries")
 
     for gc_start, gc_end in gc_events:
         ax2.axvspan(gc_start, gc_end, alpha=0.1, color="red")
@@ -723,9 +715,7 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     # Plot 3: Goodput
     ax3 = axes[2]
     if gp_times_with and gp_counts_with:
-        ax3.plot(
-            gp_times_with, gp_counts_with, "r-", linewidth=1.5, label="With Retries"
-        )
+        ax3.plot(gp_times_with, gp_counts_with, "r-", linewidth=1.5, label="With Retries")
     if gp_times_without and gp_counts_without:
         ax3.plot(
             gp_times_without,
@@ -814,7 +804,11 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     timeout_ms = with_r.client.timeout_s * 1000
     ax2.axvline(
-        x=timeout_ms, color="orange", linestyle="--", alpha=0.7, label=f"Timeout ({timeout_ms:.0f}ms)"
+        x=timeout_ms,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        label=f"Timeout ({timeout_ms:.0f}ms)",
     )
     ax2.set_xlabel("Latency (ms)")
     ax2.set_ylabel("Count")
@@ -860,18 +854,13 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     # Calculate statistics
     success_rate_with = (
-        with_r.client.stats_completions / max(1, with_r.client.stats_requests_received)
-        * 100
+        with_r.client.stats_completions / max(1, with_r.client.stats_requests_received) * 100
     )
     success_rate_without = (
-        without_r.client.stats_completions
-        / max(1, without_r.client.stats_requests_received)
-        * 100
+        without_r.client.stats_completions / max(1, without_r.client.stats_requests_received) * 100
     )
 
-    amp_with = with_r.client.stats_attempts_sent / max(
-        1, with_r.client.stats_requests_received
-    )
+    amp_with = with_r.client.stats_attempts_sent / max(1, with_r.client.stats_requests_received)
     amp_without = without_r.client.stats_attempts_sent / max(
         1, without_r.client.stats_requests_received
     )
@@ -886,7 +875,9 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     avg_lat_without = lat_data_without.mean() * 1000 if lat_data_without.count() > 0 else 0
 
     p99_lat_with = lat_data_with.percentile(0.99) * 1000 if lat_data_with.count() > 0 else 0
-    p99_lat_without = lat_data_without.percentile(0.99) * 1000 if lat_data_without.count() > 0 else 0
+    p99_lat_without = (
+        lat_data_without.percentile(0.99) * 1000 if lat_data_without.count() > 0 else 0
+    )
 
     summary = f"""
 Summary Statistics
@@ -919,7 +910,7 @@ Key Insight:
         fontsize=10,
         verticalalignment="top",
         fontfamily="monospace",
-        bbox=dict(boxstyle="round", facecolor="lightgray", alpha=0.8),
+        bbox={"boxstyle": "round", "facecolor": "lightgray", "alpha": 0.8},
     )
 
     fig.tight_layout()
@@ -952,16 +943,23 @@ def analyze_gc_impact(result: ComparisonResult) -> None:
     post_gc_30s = qd.between(gc_end + 20, gc_end + 30)
 
     print("\n  Queue Depth by Phase (Data.between):")
-    print(f"    Pre-GC    [0, {gc_start:.0f}s):     "
-          f"mean={pre_gc.mean():.1f}, max={pre_gc.max():.0f}")
+    print(
+        f"    Pre-GC    [0, {gc_start:.0f}s):     mean={pre_gc.mean():.1f}, max={pre_gc.max():.0f}"
+    )
     if during_gc.count() > 0:
-        print(f"    During GC [{gc_start:.0f}, {gc_end:.0f}s):  "
-              f"mean={during_gc.mean():.1f}, max={during_gc.max():.0f}")
-    print(f"    Post-GC   [{gc_end:.0f}, {gc_end+5:.0f}s):  "
-          f"mean={post_gc_5s.mean():.1f}, max={post_gc_5s.max():.0f}")
+        print(
+            f"    During GC [{gc_start:.0f}, {gc_end:.0f}s):  "
+            f"mean={during_gc.mean():.1f}, max={during_gc.max():.0f}"
+        )
+    print(
+        f"    Post-GC   [{gc_end:.0f}, {gc_end + 5:.0f}s):  "
+        f"mean={post_gc_5s.mean():.1f}, max={post_gc_5s.max():.0f}"
+    )
     if post_gc_30s.count() > 0:
-        print(f"    Late       [{gc_end+20:.0f}, {gc_end+30:.0f}s): "
-              f"mean={post_gc_30s.mean():.1f}, max={post_gc_30s.max():.0f}")
+        print(
+            f"    Late       [{gc_end + 20:.0f}, {gc_end + 30:.0f}s): "
+            f"mean={post_gc_30s.mean():.1f}, max={post_gc_30s.max():.0f}"
+        )
 
     # --- Time-sliced latency comparison ---
     lat_pre = latency_data.between(0, gc_start)
@@ -970,22 +968,30 @@ def analyze_gc_impact(result: ComparisonResult) -> None:
 
     print("\n  Latency by Phase (Data.between):")
     if lat_pre.count() > 0:
-        print(f"    Pre-GC:  p50={lat_pre.percentile(0.50)*1000:.0f}ms, "
-              f"p99={lat_pre.percentile(0.99)*1000:.0f}ms, n={lat_pre.count()}")
+        print(
+            f"    Pre-GC:  p50={lat_pre.percentile(0.50) * 1000:.0f}ms, "
+            f"p99={lat_pre.percentile(0.99) * 1000:.0f}ms, n={lat_pre.count()}"
+        )
     if lat_post_5s.count() > 0:
-        print(f"    Post-GC (0-5s):  p50={lat_post_5s.percentile(0.50)*1000:.0f}ms, "
-              f"p99={lat_post_5s.percentile(0.99)*1000:.0f}ms, n={lat_post_5s.count()}")
+        print(
+            f"    Post-GC (0-5s):  p50={lat_post_5s.percentile(0.50) * 1000:.0f}ms, "
+            f"p99={lat_post_5s.percentile(0.99) * 1000:.0f}ms, n={lat_post_5s.count()}"
+        )
     if lat_post_30s.count() > 0:
-        print(f"    Post-GC (20-30s): p50={lat_post_30s.percentile(0.50)*1000:.0f}ms, "
-              f"p99={lat_post_30s.percentile(0.99)*1000:.0f}ms, n={lat_post_30s.count()}")
+        print(
+            f"    Post-GC (20-30s): p50={lat_post_30s.percentile(0.50) * 1000:.0f}ms, "
+            f"p99={lat_post_30s.percentile(0.99) * 1000:.0f}ms, n={lat_post_30s.count()}"
+        )
 
     # --- Phase detection on queue depth ---
     print("\n  Phase Detection (detect_phases on queue depth):")
     phases = detect_phases(qd, window_s=5.0)
     if phases:
         for p in phases:
-            print(f"    [{p.label:>10}] {p.start_s:.0f}s - {p.end_s:.0f}s  "
-                  f"mean={p.mean:.1f}  std={p.std:.1f}")
+            print(
+                f"    [{p.label:>10}] {p.start_s:.0f}s - {p.end_s:.0f}s  "
+                f"mean={p.mean:.1f}  std={p.std:.1f}"
+            )
     else:
         print("    No phases detected.")
 
@@ -1017,7 +1023,7 @@ def analyze_gc_impact(result: ComparisonResult) -> None:
     times = bucketed.times()
     if len(means) >= 2:
         # Find the bucket right after GC and measure growth
-        post_gc_buckets = [(t, m) for t, m in zip(times, means) if t >= gc_end]
+        post_gc_buckets = [(t, m) for t, m in zip(times, means, strict=False) if t >= gc_end]
         if len(post_gc_buckets) >= 2:
             t0, m0 = post_gc_buckets[0]
             t1, m1 = post_gc_buckets[min(3, len(post_gc_buckets) - 1)]
@@ -1043,9 +1049,13 @@ def print_summary(result: ComparisonResult) -> None:
     gc_timeout_ratio = with_r.server.gc_duration_s / with_r.client.timeout_s
 
     print("\nConfiguration:")
-    print(f"  Service capacity: {svc_rate:.0f} req/s (service time = {with_r.server.service_time_s * 1000:.0f}ms)")
+    print(
+        f"  Service capacity: {svc_rate:.0f} req/s (service time = {with_r.server.service_time_s * 1000:.0f}ms)"
+    )
     print(f"  Client timeout: {with_r.client.timeout_s * 1000:.0f}ms")
-    print(f"  GC pause: {with_r.server.gc_duration_s}s at t={with_r.server.gc_start_time_s}s ({gc_timeout_ratio:.1f}x timeout)")
+    print(
+        f"  GC pause: {with_r.server.gc_duration_s}s at t={with_r.server.gc_start_time_s}s ({gc_timeout_ratio:.1f}x timeout)"
+    )
     print(f"  Max retries: {with_r.client.max_retries}")
     print(f"  Retry delay: {with_r.client.retry_delay_s * 1000:.0f}ms")
 
@@ -1060,33 +1070,26 @@ def print_summary(result: ComparisonResult) -> None:
     _print_scenario_stats(without_r)
 
     # Analysis
-    amp_with = with_r.client.stats_attempts_sent / max(
-        1, with_r.client.stats_requests_received
-    )
+    amp_with = with_r.client.stats_attempts_sent / max(1, with_r.client.stats_requests_received)
 
     print("\n" + "-" * 75)
     print("ANALYSIS")
     print("-" * 75)
 
-    print("""
+    print(f"""
 The GC-induced collapse demonstrates how retries amplify transient
 failures into sustained metastable failure:
 
-1. With retries: {:.2f}x request amplification caused queue to compound
+1. With retries: {amp_with:.2f}x request amplification caused queue to compound
    after each GC, never recovering to steady state.
 
 2. Without retries: System experiences brief latency spikes during GC
    but returns to steady state between GC events.
 
-3. Recovery would require reducing load to ~{:.0f}% utilization ({:.0f}%
+3. Recovery would require reducing load to ~{70 / amp_with:.0f}% utilization ({(1 - 1 / amp_with) * 100:.0f}%
    reduction from normal), matching the theoretical requirement
-   to overcome {:.2f}x amplification.
-""".format(
-        amp_with,
-        70 / amp_with,
-        (1 - 1 / amp_with) * 100,
-        amp_with,
-    ))
+   to overcome {amp_with:.2f}x amplification.
+""")
 
     # Detailed GC impact analysis using new observability APIs
     analyze_gc_impact(result)
@@ -1099,9 +1102,7 @@ def _print_scenario_stats(scenario: ScenarioResult) -> None:
     client = scenario.client
     latency_data = _build_latency_data(client)
 
-    success_rate = (
-        client.stats_completions / max(1, client.stats_requests_received) * 100
-    )
+    success_rate = client.stats_completions / max(1, client.stats_requests_received) * 100
     amp = client.stats_attempts_sent / max(1, client.stats_requests_received)
     final_q = get_final_queue_depth(scenario.queue_depth_data)
 
@@ -1128,48 +1129,22 @@ def _print_scenario_stats(scenario: ScenarioResult) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="GC-induced metastable collapse simulation"
-    )
-    parser.add_argument(
-        "--duration", type=float, default=60.0, help="Simulation duration (s)"
-    )
-    parser.add_argument(
-        "--drain", type=float, default=10.0, help="Drain time after load stops (s)"
-    )
-    parser.add_argument(
-        "--arrival-rate", type=float, default=7.0, help="Arrival rate (req/s)"
-    )
-    parser.add_argument(
-        "--service-time", type=float, default=0.1, help="Constant service time (s)"
-    )
-    parser.add_argument(
-        "--timeout", type=float, default=0.5, help="Client timeout (s)"
-    )
-    parser.add_argument(
-        "--max-retries", type=int, default=3, help="Max retries per request"
-    )
-    parser.add_argument(
-        "--retry-delay", type=float, default=0.05, help="Retry delay (s)"
-    )
+    parser = argparse.ArgumentParser(description="GC-induced metastable collapse simulation")
+    parser.add_argument("--duration", type=float, default=60.0, help="Simulation duration (s)")
+    parser.add_argument("--drain", type=float, default=10.0, help="Drain time after load stops (s)")
+    parser.add_argument("--arrival-rate", type=float, default=7.0, help="Arrival rate (req/s)")
+    parser.add_argument("--service-time", type=float, default=0.1, help="Constant service time (s)")
+    parser.add_argument("--timeout", type=float, default=0.5, help="Client timeout (s)")
+    parser.add_argument("--max-retries", type=int, default=3, help="Max retries per request")
+    parser.add_argument("--retry-delay", type=float, default=0.05, help="Retry delay (s)")
     parser.add_argument(
         "--gc-interval", type=float, default=999.0, help="GC interval (s, 999=single GC)"
     )
-    parser.add_argument(
-        "--gc-duration", type=float, default=1.0, help="GC duration (s)"
-    )
-    parser.add_argument(
-        "--gc-start", type=float, default=30.0, help="GC start time (s)"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed (-1 for random)"
-    )
-    parser.add_argument(
-        "--output", type=str, default="output/gc_collapse", help="Output directory"
-    )
-    parser.add_argument(
-        "--no-viz", action="store_true", help="Skip visualization generation"
-    )
+    parser.add_argument("--gc-duration", type=float, default=1.0, help="GC duration (s)")
+    parser.add_argument("--gc-start", type=float, default=30.0, help="GC start time (s)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument("--output", type=str, default="output/gc_collapse", help="Output directory")
+    parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
     seed = None if args.seed == -1 else args.seed

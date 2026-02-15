@@ -19,13 +19,13 @@ Example:
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.components.load_balancer.strategies import (
+    LeastResponseTime,
     LoadBalancingStrategy,
     RoundRobin,
-    LeastResponseTime,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -149,20 +149,12 @@ class LoadBalancer(Entity):
     @property
     def healthy_backends(self) -> list[Entity]:
         """Only healthy backends available for routing."""
-        return [
-            info.backend
-            for info in self._backends.values()
-            if info.is_healthy
-        ]
+        return [info.backend for info in self._backends.values() if info.is_healthy]
 
     @property
     def unhealthy_backends(self) -> list[Entity]:
         """Backends currently marked as unhealthy."""
-        return [
-            info.backend
-            for info in self._backends.values()
-            if not info.is_healthy
-        ]
+        return [info.backend for info in self._backends.values() if not info.is_healthy]
 
     @property
     def backend_count(self) -> int:
@@ -206,11 +198,11 @@ class LoadBalancer(Entity):
         )
 
         # Update strategy weights if applicable
-        if hasattr(self._strategy, 'set_weight'):
+        if hasattr(self._strategy, "set_weight"):
             self._strategy.set_weight(backend, weight)
 
         # Add to consistent hash ring if applicable
-        if hasattr(self._strategy, 'add_backend'):
+        if hasattr(self._strategy, "add_backend"):
             self._strategy.add_backend(backend)
 
         logger.debug(
@@ -237,7 +229,7 @@ class LoadBalancer(Entity):
         del self._backends[backend.name]
 
         # Remove from consistent hash ring if applicable
-        if hasattr(self._strategy, 'remove_backend'):
+        if hasattr(self._strategy, "remove_backend"):
             self._strategy.remove_backend(backend)
 
         logger.debug(
@@ -475,4 +467,4 @@ class LoadBalancer(Entity):
             response_time,
         )
 
-        return None
+        return

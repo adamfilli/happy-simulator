@@ -4,11 +4,11 @@ Complete graph of agents starting with varied opinions. Verify
 convergence to consensus within a bounded number of rounds.
 """
 
-from happysimulator import Simulation, Instant, Event
+from happysimulator import Event, Instant, Simulation
 from happysimulator.components.behavior.agent import Agent
 from happysimulator.components.behavior.environment import Environment
-from happysimulator.components.behavior.social_network import SocialGraph
 from happysimulator.components.behavior.influence import DeGrootModel
+from happysimulator.components.behavior.social_network import SocialGraph
 
 
 class TestOpinionDynamics:
@@ -34,19 +34,21 @@ class TestOpinionDynamics:
         )
 
         # Schedule 20 rounds of influence propagation
-        all_entities = [env] + agents
+        all_entities = [env, *agents]
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=25.0,
             entities=all_entities,
         )
         for t in range(1, 21):
-            sim.schedule(Event(
-                time=Instant.from_seconds(float(t)),
-                event_type="InfluencePropagation",
-                target=env,
-                context={"metadata": {"topic": "policy"}},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(float(t)),
+                    event_type="InfluencePropagation",
+                    target=env,
+                    context={"metadata": {"topic": "policy"}},
+                )
+            )
         sim.run()
 
         # After 20 rounds, opinions should be near consensus
@@ -82,19 +84,21 @@ class TestOpinionDynamics:
             seed=42,
         )
 
-        all_entities = [env] + agents
+        all_entities = [env, *agents]
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=15.0,
             entities=all_entities,
         )
         for t in range(1, 11):
-            sim.schedule(Event(
-                time=Instant.from_seconds(float(t)),
-                event_type="InfluencePropagation",
-                target=env,
-                context={"metadata": {"topic": "issue"}},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(float(t)),
+                    event_type="InfluencePropagation",
+                    target=env,
+                    context={"metadata": {"topic": "issue"}},
+                )
+            )
         sim.run()
 
         # Opinions should still be clustered (epsilon=0.3 < |0.8-0.2|=0.6)

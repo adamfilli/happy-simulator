@@ -42,7 +42,6 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 from happysimulator import (
     Entity,
@@ -53,13 +52,11 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.storage import (
-    LSMTree,
-    TransactionManager,
-    StorageTransaction,
     IsolationLevel,
+    LSMTree,
     SizeTieredCompaction,
+    TransactionManager,
 )
-
 
 # =============================================================================
 # Custom Entity: TransactionWorkloadDriver
@@ -120,6 +117,7 @@ class TransactionWorkloadDriver(Entity):
                 self._tx_manager._store.put_sync(key, value)
             self._tx_manager._version += 1
             from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
             entry = _CommitLogEntry(
                 tx_id=tx_a._tx_id,
                 version=self._tx_manager._version,
@@ -349,11 +347,7 @@ def print_summary(result: SimulationResult) -> None:
     # Transaction manager stats
     print(f"\n{'TransactionManager Stats':}")
     tm_header = (
-        f"{'Isolation Level':<25} "
-        f"{'Started':>8} "
-        f"{'Committed':>10} "
-        f"{'Aborted':>8} "
-        f"{'Detected':>10}"
+        f"{'Isolation Level':<25} {'Started':>8} {'Committed':>10} {'Aborted':>8} {'Detected':>10}"
     )
     print(f"{tm_header}")
     print("-" * len(tm_header))
@@ -372,39 +366,36 @@ def print_summary(result: SimulationResult) -> None:
     print("INTERPRETATION:")
     print("-" * 72)
 
-    rc = next((r for r in result.results
-               if r.isolation == IsolationLevel.READ_COMMITTED), None)
-    si = next((r for r in result.results
-               if r.isolation == IsolationLevel.SNAPSHOT_ISOLATION), None)
-    sr = next((r for r in result.results
-               if r.isolation == IsolationLevel.SERIALIZABLE), None)
+    rc = next((r for r in result.results if r.isolation == IsolationLevel.READ_COMMITTED), None)
+    si = next((r for r in result.results if r.isolation == IsolationLevel.SNAPSHOT_ISOLATION), None)
+    sr = next((r for r in result.results if r.isolation == IsolationLevel.SERIALIZABLE), None)
 
     if rc:
-        print(f"\n  READ_COMMITTED:")
+        print("\n  READ_COMMITTED:")
         print(f"    All {rc.driver.commits} transactions committed (0 conflicts).")
-        print(f"    No conflict detection means lost updates are possible.")
+        print("    No conflict detection means lost updates are possible.")
 
     if si:
-        print(f"\n  SNAPSHOT_ISOLATION:")
+        print("\n  SNAPSHOT_ISOLATION:")
         print(f"    {si.driver.commits} commits, {si.driver.aborts} aborts.")
-        print(f"    Write-write conflicts detected: when two transactions")
-        print(f"    write the same key, the second to commit is aborted.")
+        print("    Write-write conflicts detected: when two transactions")
+        print("    write the same key, the second to commit is aborted.")
 
     if sr:
-        print(f"\n  SERIALIZABLE:")
+        print("\n  SERIALIZABLE:")
         print(f"    {sr.driver.commits} commits, {sr.driver.aborts} aborts.")
-        print(f"    Read-write + write-write conflicts detected.")
-        print(f"    Highest abort rate, but strongest consistency guarantee.")
+        print("    Read-write + write-write conflicts detected.")
+        print("    Highest abort rate, but strongest consistency guarantee.")
 
     if si and sr:
         si_abort_pct = si.driver.aborts / max(si.driver.commits + si.driver.aborts, 1) * 100
         sr_abort_pct = sr.driver.aborts / max(sr.driver.commits + sr.driver.aborts, 1) * 100
-        print(f"\n  Abort rate comparison:")
+        print("\n  Abort rate comparison:")
         print(f"    SNAPSHOT_ISOLATION: {si_abort_pct:.1f}%")
         print(f"    SERIALIZABLE:      {sr_abort_pct:.1f}%")
         if sr_abort_pct > si_abort_pct:
             print(f"    Serializable has {sr_abort_pct - si_abort_pct:.1f}pp higher abort rate")
-            print(f"    due to additional read-write conflict detection.")
+            print("    due to additional read-write conflict detection.")
 
     print("\n" + "=" * 72)
 
@@ -418,6 +409,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate stacked bar chart of commits vs aborts per isolation level."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -435,21 +427,37 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # --- Chart 1: Stacked bar chart of commits vs aborts ---
     ax = axes[0]
     x = range(len(levels))
-    bars_commits = ax.bar(x, commits, label="Commits", color="#55A868",
-                          edgecolor="black", alpha=0.85)
-    bars_aborts = ax.bar(x, aborts, bottom=commits, label="Aborts",
-                         color="#C44E52", edgecolor="black", alpha=0.85)
+    ax.bar(x, commits, label="Commits", color="#55A868", edgecolor="black", alpha=0.85)
+    ax.bar(
+        x, aborts, bottom=commits, label="Aborts", color="#C44E52", edgecolor="black", alpha=0.85
+    )
 
     # Add value labels
-    for i, (c, a) in enumerate(zip(commits, aborts)):
+    for i, (c, a) in enumerate(zip(commits, aborts, strict=False)):
         # Commit label
         if c > 0:
-            ax.text(i, c / 2, str(c), ha="center", va="center",
-                    fontsize=10, fontweight="bold", color="white")
+            ax.text(
+                i,
+                c / 2,
+                str(c),
+                ha="center",
+                va="center",
+                fontsize=10,
+                fontweight="bold",
+                color="white",
+            )
         # Abort label
         if a > 0:
-            ax.text(i, c + a / 2, str(a), ha="center", va="center",
-                    fontsize=10, fontweight="bold", color="white")
+            ax.text(
+                i,
+                c + a / 2,
+                str(a),
+                ha="center",
+                va="center",
+                fontsize=10,
+                fontweight="bold",
+                color="white",
+            )
 
     ax.set_xticks(list(x))
     ax.set_xticklabels(levels, fontsize=9)
@@ -467,18 +475,40 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         commit_pcts.append(r.driver.commits / total * 100 if total > 0 else 0)
         abort_pcts.append(r.driver.aborts / total * 100 if total > 0 else 0)
 
-    bars_c = ax.bar(x, commit_pcts, label="Commit %", color="#55A868",
-                    edgecolor="black", alpha=0.85)
-    bars_a = ax.bar(x, abort_pcts, bottom=commit_pcts, label="Abort %",
-                    color="#C44E52", edgecolor="black", alpha=0.85)
+    ax.bar(x, commit_pcts, label="Commit %", color="#55A868", edgecolor="black", alpha=0.85)
+    ax.bar(
+        x,
+        abort_pcts,
+        bottom=commit_pcts,
+        label="Abort %",
+        color="#C44E52",
+        edgecolor="black",
+        alpha=0.85,
+    )
 
-    for i, (cp, ap) in enumerate(zip(commit_pcts, abort_pcts)):
+    for i, (cp, ap) in enumerate(zip(commit_pcts, abort_pcts, strict=False)):
         if cp > 5:
-            ax.text(i, cp / 2, f"{cp:.0f}%", ha="center", va="center",
-                    fontsize=10, fontweight="bold", color="white")
+            ax.text(
+                i,
+                cp / 2,
+                f"{cp:.0f}%",
+                ha="center",
+                va="center",
+                fontsize=10,
+                fontweight="bold",
+                color="white",
+            )
         if ap > 5:
-            ax.text(i, cp + ap / 2, f"{ap:.0f}%", ha="center", va="center",
-                    fontsize=10, fontweight="bold", color="white")
+            ax.text(
+                i,
+                cp + ap / 2,
+                f"{ap:.0f}%",
+                ha="center",
+                va="center",
+                fontsize=10,
+                fontweight="bold",
+                color="white",
+            )
 
     ax.set_xticks(list(x))
     ax.set_xticklabels(levels, fontsize=9)
@@ -494,9 +524,16 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     colors = ["#4C72B0", "#DD8452", "#C44E52"]
     bars = ax.bar(x, conflicts, color=colors, edgecolor="black", alpha=0.85)
 
-    for bar, val in zip(bars, conflicts):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                str(val), ha="center", va="bottom", fontsize=11, fontweight="bold")
+    for bar, val in zip(bars, conflicts, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            str(val),
+            ha="center",
+            va="bottom",
+            fontsize=11,
+            fontweight="bold",
+        )
 
     ax.set_xticks(list(x))
     ax.set_xticklabels(levels, fontsize=9)
@@ -526,14 +563,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Transaction isolation level comparison simulation"
     )
-    parser.add_argument("--duration", type=float, default=10.0,
-                        help="Simulation duration in seconds")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/transaction_isolation",
-                        help="Output directory for visualizations")
-    parser.add_argument("--no-viz", action="store_true",
-                        help="Skip visualization generation")
+    parser.add_argument(
+        "--duration", type=float, default=10.0, help="Simulation duration in seconds"
+    )
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="output/transaction_isolation",
+        help="Output directory for visualizations",
+    )
+    parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
     seed = None if args.seed == -1 else args.seed

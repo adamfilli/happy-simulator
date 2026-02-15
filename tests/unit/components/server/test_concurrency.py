@@ -6,8 +6,8 @@ import pytest
 
 from happysimulator.components.server.concurrency import (
     ConcurrencyModel,
-    FixedConcurrency,
     DynamicConcurrency,
+    FixedConcurrency,
     WeightedConcurrency,
 )
 

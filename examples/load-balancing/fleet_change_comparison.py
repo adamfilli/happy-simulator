@@ -51,9 +51,11 @@ only shifts ~1/N keys.
 from __future__ import annotations
 
 import random
+
+# Import from common (sibling module)
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -66,21 +68,21 @@ from happysimulator import (
 )
 from happysimulator.components.datastore.kv_store import KVStore
 from happysimulator.components.load_balancer.load_balancer import LoadBalancer
-from happysimulator.components.load_balancer.strategies import ConsistentHash, IPHash
 from happysimulator.distributions.uniform import UniformDistribution
 
-# Import from common (sibling module)
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
+from typing import TYPE_CHECKING
+
 from common import (
     CachingServer,
     CustomerRequestProvider,
     collect_aggregate_metrics,
     create_customer_consistent_hash,
     create_customer_ip_hash,
-    customer_id_key_extractor,
 )
 
+if TYPE_CHECKING:
+    from happysimulator.components.load_balancer.strategies import ConsistentHash, IPHash
 
 # =============================================================================
 # Configuration
@@ -192,8 +194,9 @@ def create_fleet_change_callback(
         tracker_for_key_shift["after"] = after_dist
 
         # Calculate shift
-        shifted = sum(1 for c in tracker_for_key_shift["customers"]
-                     if before_dist.get(c) != after_dist.get(c))
+        shifted = sum(
+            1 for c in tracker_for_key_shift["customers"] if before_dist.get(c) != after_dist.get(c)
+        )
         tracker_for_key_shift["shifted"] = shifted
         tracker_for_key_shift["shift_pct"] = shifted / len(tracker_for_key_shift["customers"])
 
@@ -312,7 +315,7 @@ def run_scenario(
     # Create hit rate tracker
     tracker = PeriodicHitRateTracker(
         name=f"Tracker_{strategy_name}",
-        servers=servers + [new_server],  # Include new server for post-change tracking
+        servers=[*servers, new_server],  # Include new server for post-change tracking
         interval_s=config.probe_interval_s,
         end_time_s=config.duration_s,
     )
@@ -340,7 +343,7 @@ def run_scenario(
     sim.run()
 
     # Calculate final metrics
-    all_servers = servers + [new_server]
+    all_servers = [*servers, new_server]
     final_metrics = collect_aggregate_metrics(all_servers)
 
     return FleetChangeResult(
@@ -408,10 +411,15 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     mod_times = [t for t, _ in result.modulo_hash.hit_rate_history]
     mod_rates = [r for _, r in result.modulo_hash.hit_rate_history]
 
-    ax.plot(ch_times, ch_rates, 'b-', linewidth=2, label='Consistent Hash')
-    ax.plot(mod_times, mod_rates, 'r-', linewidth=2, label='Modulo Hash (IPHash)')
-    ax.axvline(x=change_time, color='green', linestyle='--', linewidth=2,
-               label=f'Add Server (t={change_time}s)')
+    ax.plot(ch_times, ch_rates, "b-", linewidth=2, label="Consistent Hash")
+    ax.plot(mod_times, mod_rates, "r-", linewidth=2, label="Modulo Hash (IPHash)")
+    ax.axvline(
+        x=change_time,
+        color="green",
+        linestyle="--",
+        linewidth=2,
+        label=f"Add Server (t={change_time}s)",
+    )
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Interval Hit Rate")
@@ -421,70 +429,95 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_ylim(0, 1.0)
 
     # Annotate the impact
-    ax.annotate('Modulo: ALL keys\nreshuffle!',
-                xy=(change_time + 2, 0.1),
-                fontsize=9,
-                color='red',
-                bbox=dict(boxstyle='round', facecolor='mistyrose', alpha=0.8))
+    ax.annotate(
+        "Modulo: ALL keys\nreshuffle!",
+        xy=(change_time + 2, 0.1),
+        fontsize=9,
+        color="red",
+        bbox={"boxstyle": "round", "facecolor": "mistyrose", "alpha": 0.8},
+    )
 
-    ax.annotate(f'Consistent: ~{1/(result.config.initial_servers+1):.0%}\nkeys shift',
-                xy=(change_time + 2, 0.7),
-                fontsize=9,
-                color='blue',
-                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+    ax.annotate(
+        f"Consistent: ~{1 / (result.config.initial_servers + 1):.0%}\nkeys shift",
+        xy=(change_time + 2, 0.7),
+        fontsize=9,
+        color="blue",
+        bbox={"boxstyle": "round", "facecolor": "lightblue", "alpha": 0.8},
+    )
 
     # Top-right: Keys shifted comparison
     ax = axes[0, 1]
-    strategies = ['Consistent Hash', 'Modulo Hash']
+    strategies = ["Consistent Hash", "Modulo Hash"]
     shifted_pcts = [
         result.consistent_hash.keys_shifted_pct * 100,
         result.modulo_hash.keys_shifted_pct * 100,
     ]
-    colors = ['steelblue', 'coral']
+    colors = ["steelblue", "coral"]
     bars = ax.bar(strategies, shifted_pcts, color=colors, alpha=0.8)
 
-    for bar, pct in zip(bars, shifted_pcts):
+    for bar, pct in zip(bars, shifted_pcts, strict=False):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 2,
             f"{pct:.1f}%",
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             fontsize=12,
-            fontweight='bold',
+            fontweight="bold",
         )
 
     # Add theoretical line for consistent hash
     theoretical_ch = 100 / (result.config.initial_servers + 1)
-    ax.axhline(y=theoretical_ch, color='blue', linestyle=':',
-               label=f'Theoretical CH ({theoretical_ch:.1f}%)')
+    ax.axhline(
+        y=theoretical_ch,
+        color="blue",
+        linestyle=":",
+        label=f"Theoretical CH ({theoretical_ch:.1f}%)",
+    )
 
     ax.set_ylabel("Keys Shifted (%)")
     ax.set_title("Key Redistribution on Fleet Change")
     ax.set_ylim(0, 100)
     ax.legend(loc="upper left")
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Bottom-left: Zoomed view around fleet change
     ax = axes[1, 0]
     zoom_start = change_time - 5
     zoom_end = change_time + 5
 
-    ch_zoom = [(t, r) for t, r in result.consistent_hash.hit_rate_history
-               if zoom_start <= t <= zoom_end]
-    mod_zoom = [(t, r) for t, r in result.modulo_hash.hit_rate_history
-                if zoom_start <= t <= zoom_end]
+    ch_zoom = [
+        (t, r) for t, r in result.consistent_hash.hit_rate_history if zoom_start <= t <= zoom_end
+    ]
+    mod_zoom = [
+        (t, r) for t, r in result.modulo_hash.hit_rate_history if zoom_start <= t <= zoom_end
+    ]
 
     if ch_zoom:
-        ax.plot([t for t, _ in ch_zoom], [r for _, r in ch_zoom],
-                'b-', linewidth=2, marker='o', markersize=4, label='Consistent Hash')
+        ax.plot(
+            [t for t, _ in ch_zoom],
+            [r for _, r in ch_zoom],
+            "b-",
+            linewidth=2,
+            marker="o",
+            markersize=4,
+            label="Consistent Hash",
+        )
     if mod_zoom:
-        ax.plot([t for t, _ in mod_zoom], [r for _, r in mod_zoom],
-                'r-', linewidth=2, marker='s', markersize=4, label='Modulo Hash')
+        ax.plot(
+            [t for t, _ in mod_zoom],
+            [r for _, r in mod_zoom],
+            "r-",
+            linewidth=2,
+            marker="s",
+            markersize=4,
+            label="Modulo Hash",
+        )
 
-    ax.axvline(x=change_time, color='green', linestyle='--', linewidth=2)
-    ax.fill_between([change_time, change_time + 2], 0, 1,
-                    alpha=0.1, color='yellow', label='Recovery period')
+    ax.axvline(x=change_time, color="green", linestyle="--", linewidth=2)
+    ax.fill_between(
+        [change_time, change_time + 2], 0, 1, alpha=0.1, color="yellow", label="Recovery period"
+    )
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Interval Hit Rate")
@@ -512,16 +545,23 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     mod_stats = get_post_change_stats(result.modulo_hash.hit_rate_history)
 
     x = [0, 1, 2]
-    labels = ['Pre-Change\n(t=20-30s)', 'Immediate\n(t=30-32s)', 'Recovered\n(t=40-50s)']
+    labels = ["Pre-Change\n(t=20-30s)", "Immediate\n(t=30-32s)", "Recovered\n(t=40-50s)"]
     width = 0.35
 
     ch_vals = [ch_stats["pre_avg"], ch_stats["immediate_avg"], ch_stats["recovery_avg"]]
     mod_vals = [mod_stats["pre_avg"], mod_stats["immediate_avg"], mod_stats["recovery_avg"]]
 
-    ax.bar([i - width/2 for i in x], ch_vals, width, label='Consistent Hash',
-           color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], mod_vals, width, label='Modulo Hash',
-           color='coral', alpha=0.8)
+    ax.bar(
+        [i - width / 2 for i in x],
+        ch_vals,
+        width,
+        label="Consistent Hash",
+        color="steelblue",
+        alpha=0.8,
+    )
+    ax.bar(
+        [i + width / 2 for i in x], mod_vals, width, label="Modulo Hash", color="coral", alpha=0.8
+    )
 
     ax.set_ylabel("Average Hit Rate")
     ax.set_title("Hit Rate: Before, During, and After Fleet Change")
@@ -529,7 +569,7 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_xticklabels(labels)
     ax.legend(loc="upper right")
     ax.set_ylim(0, 1.0)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     fig.tight_layout()
     fig.savefig(output_dir / "fleet_change_comparison.png", dpi=150)
@@ -544,7 +584,7 @@ def print_summary(result: ComparisonResult) -> None:
     print("=" * 70)
 
     config = result.config
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Initial servers: {config.initial_servers}")
     print(f"  Fleet change: Add 1 server at t={config.fleet_change_time_s}s")
     print(f"  Total customers: {config.num_customers}")
@@ -552,27 +592,29 @@ def print_summary(result: ComparisonResult) -> None:
     ch = result.consistent_hash
     mod = result.modulo_hash
 
-    print(f"\nKey Redistribution on Fleet Change:")
+    print("\nKey Redistribution on Fleet Change:")
     print(f"  Consistent Hash: {ch.keys_shifted} keys ({ch.keys_shifted_pct:.1%})")
     print(f"  Modulo Hash:     {mod.keys_shifted} keys ({mod.keys_shifted_pct:.1%})")
 
     theoretical = 1 / (config.initial_servers + 1)
     print(f"\n  Theoretical (Consistent Hash): ~{theoretical:.1%} keys should shift")
-    print(f"  Theoretical (Modulo Hash): ~{1 - config.initial_servers/(config.initial_servers+1):.1%} to ~80% keys shift")
+    print(
+        f"  Theoretical (Modulo Hash): ~{1 - config.initial_servers / (config.initial_servers + 1):.1%} to ~80% keys shift"
+    )
 
-    print(f"\nFinal Hit Rates:")
+    print("\nFinal Hit Rates:")
     print(f"  Consistent Hash: {ch.final_hit_rate:.1%}")
     print(f"  Modulo Hash:     {mod.final_hit_rate:.1%}")
 
     print("\n" + "=" * 70)
     print("KEY INSIGHT:")
     print("-" * 70)
-    print(f"\nModulo hashing (hash % N) causes catastrophic cache invalidation")
+    print("\nModulo hashing (hash % N) causes catastrophic cache invalidation")
     print(f"when N changes. With {config.initial_servers} -> {config.initial_servers + 1} servers:")
     print(f"  - Modulo: {mod.keys_shifted_pct:.1%} of keys changed servers (cache miss storm)")
     print(f"  - Consistent: {ch.keys_shifted_pct:.1%} of keys changed (minimal impact)")
-    print(f"\nThis is why consistent hashing is essential for distributed caches,")
-    print(f"especially in auto-scaling environments where fleet size changes frequently.")
+    print("\nThis is why consistent hashing is essential for distributed caches,")
+    print("especially in auto-scaling environments where fleet size changes frequently.")
     print("=" * 70)
 
 
@@ -589,14 +631,16 @@ if __name__ == "__main__":
     )
     parser.add_argument("--rate", type=float, default=500.0, help="Arrival rate (req/s)")
     parser.add_argument("--duration", type=float, default=60.0, help="Simulation duration (s)")
-    parser.add_argument("--change-time", type=float, default=30.0,
-                        help="Time to add new server (s)")
+    parser.add_argument(
+        "--change-time", type=float, default=30.0, help="Time to add new server (s)"
+    )
     parser.add_argument("--customers", type=int, default=1000, help="Number of unique customers")
     parser.add_argument("--servers", type=int, default=5, help="Initial number of servers")
     parser.add_argument("--cache-capacity", type=int, default=100, help="Cache capacity per server")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/load-balancing",
-                        help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/load-balancing", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
 
     args = parser.parse_args()

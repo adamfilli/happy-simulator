@@ -2,11 +2,8 @@
 
 import random
 
-import pytest
-
 from happysimulator import (
     ConstantArrivalTimeProvider,
-    ConstantLatency,
     ConstantRateProfile,
     Entity,
     Event,
@@ -20,7 +17,6 @@ from happysimulator.components.scheduling import (
     JobScheduler,
     WorkStealingPool,
 )
-from happysimulator.components.server import Server
 from happysimulator.load import EventProvider
 
 
@@ -46,18 +42,35 @@ class TestJobSchedulerEndToEnd:
         load_worker = SimpleWorker("load_worker", delay=0.2)
 
         scheduler = JobScheduler(name="cron", tick_interval=1.0)
-        scheduler.add_job(JobDefinition(
-            name="extract", target=extract_worker, event_type="Extract",
-            interval=5.0, priority=10,
-        ))
-        scheduler.add_job(JobDefinition(
-            name="transform", target=transform_worker, event_type="Transform",
-            interval=5.0, priority=5, depends_on=["extract"],
-        ))
-        scheduler.add_job(JobDefinition(
-            name="load", target=load_worker, event_type="Load",
-            interval=5.0, priority=1, depends_on=["transform"],
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="extract",
+                target=extract_worker,
+                event_type="Extract",
+                interval=5.0,
+                priority=10,
+            )
+        )
+        scheduler.add_job(
+            JobDefinition(
+                name="transform",
+                target=transform_worker,
+                event_type="Transform",
+                interval=5.0,
+                priority=5,
+                depends_on=["extract"],
+            )
+        )
+        scheduler.add_job(
+            JobDefinition(
+                name="load",
+                target=load_worker,
+                event_type="Load",
+                interval=5.0,
+                priority=1,
+                depends_on=["transform"],
+            )
+        )
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -82,10 +95,14 @@ class TestJobSchedulerEndToEnd:
         worker = SimpleWorker("worker", delay=0.01)
 
         scheduler = JobScheduler(name="cron", tick_interval=0.5)
-        scheduler.add_job(JobDefinition(
-            name="fast_job", target=worker, event_type="Work",
-            interval=2.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="fast_job",
+                target=worker,
+                event_type="Work",
+                interval=2.0,
+            )
+        )
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -108,13 +125,17 @@ class TaskEventProvider(EventProvider):
 
     def get_events(self, time: Instant) -> list[Event]:
         self._count += 1
-        return [Event(
-            time=time, event_type="Task", target=self._target,
-            context={
-                "created_at": time,
-                "metadata": {"processing_time": 0.05, "task_id": self._count},
-            },
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Task",
+                target=self._target,
+                context={
+                    "created_at": time,
+                    "metadata": {"processing_time": 0.05, "task_id": self._count},
+                },
+            )
+        ]
 
 
 class TestWorkStealingPoolEndToEnd:
@@ -124,14 +145,19 @@ class TestWorkStealingPoolEndToEnd:
 
         sink = Sink()
         pool = WorkStealingPool(
-            name="pool", num_workers=4, downstream=sink,
+            name="pool",
+            num_workers=4,
+            downstream=sink,
             default_processing_time=0.05,
         )
 
         provider = TaskEventProvider(pool)
-        arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate=50.0), start_time=Instant.Epoch)
+        arrival = ConstantArrivalTimeProvider(
+            ConstantRateProfile(rate=50.0), start_time=Instant.Epoch
+        )
         source = Source(
-            name="tasks", event_provider=provider,
+            name="tasks",
+            event_provider=provider,
             arrival_time_provider=arrival,
         )
 
@@ -139,7 +165,7 @@ class TestWorkStealingPoolEndToEnd:
             start_time=Instant.Epoch,
             duration=5.0,
             sources=[source],
-            entities=[pool] + pool.workers + [sink],
+            entities=[pool, *pool.workers, sink],
         )
         sim.run()
 
@@ -154,14 +180,19 @@ class TestWorkStealingPoolEndToEnd:
 
         sink = Sink()
         pool = WorkStealingPool(
-            name="pool", num_workers=4, downstream=sink,
+            name="pool",
+            num_workers=4,
+            downstream=sink,
             default_processing_time=0.01,
         )
 
         provider = TaskEventProvider(pool)
-        arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate=100.0), start_time=Instant.Epoch)
+        arrival = ConstantArrivalTimeProvider(
+            ConstantRateProfile(rate=100.0), start_time=Instant.Epoch
+        )
         source = Source(
-            name="tasks", event_provider=provider,
+            name="tasks",
+            event_provider=provider,
             arrival_time_provider=arrival,
         )
 
@@ -169,7 +200,7 @@ class TestWorkStealingPoolEndToEnd:
             start_time=Instant.Epoch,
             duration=3.0,
             sources=[source],
-            entities=[pool] + pool.workers + [sink],
+            entities=[pool, *pool.workers, sink],
         )
         sim.run()
 

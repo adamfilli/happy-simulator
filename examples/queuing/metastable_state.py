@@ -81,7 +81,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -98,6 +98,8 @@ from happysimulator import (
     Source,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Load Profile for Metastable Failure
@@ -123,8 +125,8 @@ class MetastableLoadProfile(Profile):
     step_down_3_start: float = 90.0  # Third step down
 
     # Rates (requests per second) - server capacity is 10 req/s
-    moderate_rate: float = 9.0    # 90% utilization - vulnerable but stable
-    spike_rate: float = 20.0      # 200% - severe overload to trigger failure
+    moderate_rate: float = 9.0  # 90% utilization - vulnerable but stable
+    spike_rate: float = 20.0  # 200% - severe overload to trigger failure
     step_down_1_rate: float = 7.0  # 70% - may not be enough to recover
     step_down_2_rate: float = 5.0  # 50% - should allow recovery
     step_down_3_rate: float = 3.0  # 30% - definitely recovers
@@ -223,6 +225,7 @@ class QueuedServer(QueuedResource):
 @dataclass
 class InFlightRequest:
     """Tracks state for an in-flight request."""
+
     request_id: int
     created_at: Instant
     attempt: int
@@ -324,9 +327,9 @@ class RetryingClient(Entity):
 
         if event_type == "NewRequest":
             return self._handle_new_request(event)
-        elif event_type == "Completion":
+        if event_type == "Completion":
             return self._handle_completion(event)
-        elif event_type == "Timeout":
+        if event_type == "Timeout":
             return self._handle_timeout(event)
 
         return []
@@ -461,6 +464,7 @@ class ClientRequestProvider(EventProvider):
 @dataclass
 class SimulationResult:
     """Results from the metastable failure simulation."""
+
     client: RetryingClient
     server: QueuedServer
     queue_depth_data: Data
@@ -544,7 +548,6 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     client = result.client
-    server = result.server
     profile = result.profile
 
     # Key time markers
@@ -558,18 +561,18 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # 1. Load profile
     ax = axes[0, 0]
-    time_points = list(range(0, 110))
+    time_points = list(range(110))
     rates = [profile.get_rate(Instant.from_seconds(t)) for t in time_points]
-    ax.plot(time_points, rates, 'b-', linewidth=2, label='External Load')
-    ax.axhline(y=10, color='r', linestyle='--', label='Server Capacity (10 req/s)')
-    ax.fill_between([spike_start, spike_end], 0, 15, alpha=0.3, color='red', label='Spike')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Rate (req/s)')
-    ax.set_title('External Load Profile')
-    ax.legend(loc='upper right')
+    ax.plot(time_points, rates, "b-", linewidth=2, label="External Load")
+    ax.axhline(y=10, color="r", linestyle="--", label="Server Capacity (10 req/s)")
+    ax.fill_between([spike_start, spike_end], 0, 15, alpha=0.3, color="red", label="Spike")
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Rate (req/s)")
+    ax.set_title("External Load Profile")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, 25)
 
@@ -577,15 +580,16 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[0, 1]
     q_times = [t for (t, _) in result.queue_depth_data.values]
     q_depths = [v for (_, v) in result.queue_depth_data.values]
-    ax.plot(q_times, q_depths, 'b-', linewidth=1)
-    ax.fill_between([spike_start, spike_end], 0, max(q_depths) if q_depths else 10,
-                    alpha=0.3, color='red')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Queue Depth')
-    ax.set_title('Queue Depth Over Time (Metastable Failure Visible)')
+    ax.plot(q_times, q_depths, "b-", linewidth=1)
+    ax.fill_between(
+        [spike_start, spike_end], 0, max(q_depths) if q_depths else 10, alpha=0.3, color="red"
+    )
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Queue Depth")
+    ax.set_title("Queue Depth Over Time (Metastable Failure Visible)")
     ax.grid(True, alpha=0.3)
 
     # 3. Client latency over time (binned)
@@ -593,83 +597,111 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     client_times_s, client_latencies_s = client.latency_time_series_seconds()
 
     latency_buckets: dict[int, list[float]] = defaultdict(list)
-    for t, lat in zip(client_times_s, client_latencies_s):
+    for t, lat in zip(client_times_s, client_latencies_s, strict=False):
         bucket = int(t)
         latency_buckets[bucket].append(lat)
 
     bucket_times = sorted(latency_buckets.keys())
-    bucket_avg_latencies = [sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000
-                           for b in bucket_times]
+    bucket_avg_latencies = [
+        sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000 for b in bucket_times
+    ]
 
-    ax.plot(bucket_times, bucket_avg_latencies, 'b-', linewidth=1.5, marker='o', markersize=3)
-    ax.axhline(y=result.client.timeout_s * 1000, color='r', linestyle='--',
-               label=f'Timeout ({result.client.timeout_s * 1000:.0f}ms)')
-    ax.fill_between([spike_start, spike_end], 0, max(bucket_avg_latencies) if bucket_avg_latencies else 1000,
-                    alpha=0.3, color='red')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Avg Latency (ms)')
-    ax.set_title('Client End-to-End Latency Over Time (1s avg)')
+    ax.plot(bucket_times, bucket_avg_latencies, "b-", linewidth=1.5, marker="o", markersize=3)
+    ax.axhline(
+        y=result.client.timeout_s * 1000,
+        color="r",
+        linestyle="--",
+        label=f"Timeout ({result.client.timeout_s * 1000:.0f}ms)",
+    )
+    ax.fill_between(
+        [spike_start, spike_end],
+        0,
+        max(bucket_avg_latencies) if bucket_avg_latencies else 1000,
+        alpha=0.3,
+        color="red",
+    )
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Avg Latency (ms)")
+    ax.set_title("Client End-to-End Latency Over Time (1s avg)")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     # 4. Goodput over time
     ax = axes[1, 1]
     goodput_times, goodput_counts = client.goodput_time_series(bucket_size_s=1.0)
-    ax.plot(goodput_times, goodput_counts, 'g-', linewidth=1.5, marker='o', markersize=3)
-    ax.axhline(y=10, color='r', linestyle='--', label='Server Capacity')
-    ax.fill_between([spike_start, spike_end], 0, max(goodput_counts) if goodput_counts else 10,
-                    alpha=0.3, color='red')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Completions / second')
-    ax.set_title('Goodput Over Time')
+    ax.plot(goodput_times, goodput_counts, "g-", linewidth=1.5, marker="o", markersize=3)
+    ax.axhline(y=10, color="r", linestyle="--", label="Server Capacity")
+    ax.fill_between(
+        [spike_start, spike_end],
+        0,
+        max(goodput_counts) if goodput_counts else 10,
+        alpha=0.3,
+        color="red",
+    )
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Completions / second")
+    ax.set_title("Goodput Over Time")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
     # 5. Timeout rate over time (THE KEY METRIC)
     ax = axes[2, 0]
     timeout_times, timeout_counts = client.timeout_time_series(bucket_size_s=1.0)
-    ax.plot(timeout_times, timeout_counts, 'r-', linewidth=1.5, marker='o', markersize=3)
-    ax.fill_between([spike_start, spike_end], 0, max(timeout_counts) if timeout_counts else 10,
-                    alpha=0.3, color='red')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Timeouts / second')
-    ax.set_title('Timeout Rate Over Time (Feedback Loop Indicator)')
+    ax.plot(timeout_times, timeout_counts, "r-", linewidth=1.5, marker="o", markersize=3)
+    ax.fill_between(
+        [spike_start, spike_end],
+        0,
+        max(timeout_counts) if timeout_counts else 10,
+        alpha=0.3,
+        color="red",
+    )
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Timeouts / second")
+    ax.set_title("Timeout Rate Over Time (Feedback Loop Indicator)")
     ax.grid(True, alpha=0.3)
 
     # 6. Retry rate over time (THE FEEDBACK)
     ax = axes[2, 1]
     retry_times, retry_counts = client.retry_time_series(bucket_size_s=1.0)
-    ax.plot(retry_times, retry_counts, 'orange', linewidth=1.5, marker='o', markersize=3)
-    ax.fill_between([spike_start, spike_end], 0, max(retry_counts) if retry_counts else 10,
-                    alpha=0.3, color='red')
-    ax.axvline(x=step1, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step2, color='green', linestyle=':', alpha=0.7)
-    ax.axvline(x=step3, color='green', linestyle=':', alpha=0.7)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Retries / second')
-    ax.set_title('Retry Rate Over Time (Additional Load from Retries)')
+    ax.plot(retry_times, retry_counts, "orange", linewidth=1.5, marker="o", markersize=3)
+    ax.fill_between(
+        [spike_start, spike_end],
+        0,
+        max(retry_counts) if retry_counts else 10,
+        alpha=0.3,
+        color="red",
+    )
+    ax.axvline(x=step1, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step2, color="green", linestyle=":", alpha=0.7)
+    ax.axvline(x=step3, color="green", linestyle=":", alpha=0.7)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Retries / second")
+    ax.set_title("Retry Rate Over Time (Additional Load from Retries)")
     ax.grid(True, alpha=0.3)
 
     # 7. Latency distribution
     ax = axes[3, 0]
-    ax.hist([lat * 1000 for lat in client_latencies_s], bins=50,
-            edgecolor='black', alpha=0.7)
-    ax.axvline(x=result.client.timeout_s * 1000, color='r', linestyle='--',
-               label=f'Timeout ({result.client.timeout_s * 1000:.0f}ms)')
-    ax.set_xlabel('Latency (ms)')
-    ax.set_ylabel('Count')
-    ax.set_title('Latency Distribution')
+    ax.hist([lat * 1000 for lat in client_latencies_s], bins=50, edgecolor="black", alpha=0.7)
+    ax.axvline(
+        x=result.client.timeout_s * 1000,
+        color="r",
+        linestyle="--",
+        label=f"Timeout ({result.client.timeout_s * 1000:.0f}ms)",
+    )
+    ax.set_xlabel("Latency (ms)")
+    ax.set_ylabel("Count")
+    ax.set_title("Latency Distribution")
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # 8. Attempts per successful request
     ax = axes[3, 1]
@@ -679,13 +711,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     attempts_list = sorted(attempt_counts.keys())
     counts = [attempt_counts[a] for a in attempts_list]
-    ax.bar(attempts_list, counts, edgecolor='black', alpha=0.7)
-    ax.set_xlabel('Number of Attempts')
-    ax.set_ylabel('Successful Requests')
-    ax.set_title('Attempts per Successful Request')
+    ax.bar(attempts_list, counts, edgecolor="black", alpha=0.7)
+    ax.set_xlabel("Number of Attempts")
+    ax.set_ylabel("Successful Requests")
+    ax.set_title("Attempts per Successful Request")
     if attempts_list:
         ax.set_xticks(attempts_list)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     fig.tight_layout()
     fig.savefig(output_dir / "metastable_state_results.png", dpi=150)
@@ -703,17 +735,23 @@ def print_summary(result: SimulationResult) -> None:
     print("METASTABLE FAILURE SIMULATION RESULTS")
     print("=" * 70)
 
-    print(f"\nConfiguration:")
-    print(f"  Server capacity: 10 req/s (mean service time = 100ms)")
+    print("\nConfiguration:")
+    print("  Server capacity: 10 req/s (mean service time = 100ms)")
     print(f"  Client timeout: {client.timeout_s * 1000:.0f}ms")
     print(f"  Max retries: {client.max_retries}")
 
-    print(f"\nLoad Profile:")
-    print(f"  Moderate load: {profile.moderate_rate} req/s ({profile.moderate_rate/10*100:.0f}% utilization)")
-    print(f"  Spike load: {profile.spike_rate} req/s ({profile.spike_rate/10*100:.0f}% utilization)")
-    print(f"  Step-down rates: {profile.step_down_1_rate}, {profile.step_down_2_rate}, {profile.step_down_3_rate} req/s")
+    print("\nLoad Profile:")
+    print(
+        f"  Moderate load: {profile.moderate_rate} req/s ({profile.moderate_rate / 10 * 100:.0f}% utilization)"
+    )
+    print(
+        f"  Spike load: {profile.spike_rate} req/s ({profile.spike_rate / 10 * 100:.0f}% utilization)"
+    )
+    print(
+        f"  Step-down rates: {profile.step_down_1_rate}, {profile.step_down_2_rate}, {profile.step_down_3_rate} req/s"
+    )
 
-    print(f"\nRequest Flow:")
+    print("\nRequest Flow:")
     print(f"  External requests generated: {result.requests_generated}")
     print(f"  Total attempts sent to server: {client.stats_attempts_sent}")
     print(f"  Server processed: {server.stats_processed}")
@@ -725,7 +763,7 @@ def print_summary(result: SimulationResult) -> None:
     if client.stats_attempts_sent > 0:
         retry_amplification = client.stats_attempts_sent / result.requests_generated
         timeout_rate = client.stats_timeouts / client.stats_attempts_sent
-        print(f"\nKey Metrics:")
+        print("\nKey Metrics:")
         print(f"  Retry amplification: {retry_amplification:.2f}x")
         print(f"  Overall timeout rate: {timeout_rate * 100:.1f}%")
 
@@ -734,10 +772,10 @@ def print_summary(result: SimulationResult) -> None:
     q_depths = [v for (_, v) in result.queue_depth_data.values]
 
     def avg_depth_in_range(start: float, end: float) -> float:
-        depths = [d for t, d in zip(q_times, q_depths) if start <= t < end]
+        depths = [d for t, d in zip(q_times, q_depths, strict=False) if start <= t < end]
         return sum(depths) / len(depths) if depths else 0.0
 
-    print(f"\nQueue Depth by Phase:")
+    print("\nQueue Depth by Phase:")
     print(f"  Pre-spike (10-20s):         {avg_depth_in_range(10, 20):.1f}")
     print(f"  During spike (20-30s):      {avg_depth_in_range(20, 30):.1f}")
     print(f"  Post-spike at 9.9 req/s (35-60s): {avg_depth_in_range(35, 60):.1f}")
@@ -752,7 +790,7 @@ def print_summary(result: SimulationResult) -> None:
         count = sum(1 for t in timeout_times_s if start <= t < end)
         return count / (end - start)
 
-    print(f"\nTimeout Rate by Phase (timeouts/sec):")
+    print("\nTimeout Rate by Phase (timeouts/sec):")
     print(f"  Pre-spike (10-20s):         {timeout_rate_in_range(10, 20):.1f}")
     print(f"  During spike (20-30s):      {timeout_rate_in_range(20, 30):.1f}")
     print(f"  Post-spike at 9.9 req/s (35-60s): {timeout_rate_in_range(35, 60):.1f}")

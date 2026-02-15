@@ -26,12 +26,15 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.components.queue_policy import FIFOQueue
-from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
+
+if TYPE_CHECKING:
+    from happysimulator.core.clock import Clock
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +150,9 @@ class Inductor(Entity):
             self._queued += 1
             logger.debug(
                 "[%.3f][%s] Queued request; queue_depth=%d",
-                now.to_seconds(), self.name, len(self._queue),
+                now.to_seconds(),
+                self.name,
+                len(self._queue),
             )
             return self._ensure_poll_scheduled(now)
 
@@ -156,7 +161,9 @@ class Inductor(Entity):
         self.dropped_times.append(now)
         logger.debug(
             "[%.3f][%s] Dropped request; queue full (%d)",
-            now.to_seconds(), self.name, len(self._queue),
+            now.to_seconds(),
+            self.name,
+            len(self._queue),
         )
         return []
 
@@ -196,9 +203,7 @@ class Inductor(Entity):
             self._smoothed_interval = dt
         else:
             alpha = 1.0 - math.exp(-dt / tau) if tau > 0 else 1.0
-            self._smoothed_interval = (
-                alpha * dt + (1.0 - alpha) * self._smoothed_interval
-            )
+            self._smoothed_interval = alpha * dt + (1.0 - alpha) * self._smoothed_interval
 
         self.rate_history.append((now, self.estimated_rate))
 
@@ -221,7 +226,8 @@ class Inductor(Entity):
         self._last_output_time = now
         logger.debug(
             "[%.3f][%s] Forwarded request",
-            now.to_seconds(), self.name,
+            now.to_seconds(),
+            self.name,
         )
         forward_event = Event(
             time=now,

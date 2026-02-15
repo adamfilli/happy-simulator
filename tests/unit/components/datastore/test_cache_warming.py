@@ -2,7 +2,7 @@
 
 import pytest
 
-from happysimulator.components.datastore import CacheWarmer, KVStore, CachedStore, LRUEviction
+from happysimulator.components.datastore import CachedStore, CacheWarmer, KVStore, LRUEviction
 
 
 class TestCacheWarmerCreation:

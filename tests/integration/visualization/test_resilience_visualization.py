@@ -14,18 +14,15 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Generator, List
-
-import pytest
+from typing import TYPE_CHECKING
 
 from happysimulator.components.resilience import (
+    Bulkhead,
     CircuitBreaker,
     CircuitState,
-    Bulkhead,
-    TimeoutWrapper,
     Fallback,
     Hedge,
+    TimeoutWrapper,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -35,6 +32,9 @@ from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,7 @@ class ReliableServer(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -73,7 +73,7 @@ class FailingServer(Entity):
     requests_received: int = field(default=0, init=False)
     failures: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         if self.now.to_seconds() > self.fail_after_seconds:
             self.failures += 1
@@ -96,7 +96,7 @@ class IntermittentServer(Entity):
     successes: int = field(default=0, init=False)
     failures: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         self._request_count += 1
 
@@ -121,7 +121,7 @@ class VariableLatencyServer(Entity):
     requests_received: int = field(default=0, init=False)
     _counter: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         self._counter += 1
 
@@ -140,7 +140,7 @@ class ResilienceRequestProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -169,7 +169,6 @@ class TestResilienceVisualization:
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
 
         # Server that always responds
         server = ReliableServer(name="server", response_time=0.010)
@@ -263,9 +262,7 @@ class TestResilienceVisualization:
         ax4 = axes[1, 1]
         ax4.axis("off")
 
-        rejection_rate = (
-            cb.stats.rejected_requests / max(1, cb.stats.total_requests) * 100
-        )
+        rejection_rate = cb.stats.rejected_requests / max(1, cb.stats.total_requests) * 100
 
         summary = f"""
 Circuit Breaker Summary
@@ -294,7 +291,7 @@ to illustrate circuit breaker state transitions.
             fontsize=11,
             verticalalignment="center",
             fontfamily="monospace",
-            bbox=dict(boxstyle="round", facecolor="lightblue", alpha=0.8),
+            bbox={"boxstyle": "round", "facecolor": "lightblue", "alpha": 0.8},
         )
 
         plt.tight_layout()
@@ -718,7 +715,7 @@ to illustrate circuit breaker state transitions.
         plt.close(fig)
 
         # Save data to CSV
-        with open(test_output_dir / "resilience_stats.csv", "w", newline="") as f:
+        with (test_output_dir / "resilience_stats.csv").open("w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["Component", "Metric", "Value"])
             writer.writerow(["Bulkhead", "Accepted", bulkhead.stats.accepted_requests])

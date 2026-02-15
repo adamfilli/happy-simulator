@@ -1,6 +1,5 @@
 """Tests for Reservoir Sampling."""
 
-import random
 from collections import Counter
 
 import pytest

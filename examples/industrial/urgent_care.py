@@ -41,17 +41,15 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
@@ -64,6 +62,8 @@ from happysimulator.components.industrial import (
     RenegingQueuedResource,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -74,7 +74,7 @@ from happysimulator.components.industrial import (
 class UrgentCareConfig:
     """Configuration for the urgent care simulation."""
 
-    duration_s: float = 28800.0       # 8 hours
+    duration_s: float = 28800.0  # 8 hours
     arrival_rate_per_min: float = 0.5
     critical_pct: float = 0.20
     reception_time: float = 60.0
@@ -82,9 +82,9 @@ class UrgentCareConfig:
     num_trauma_bays: int = 2
     trauma_treatment_time: float = 1200.0  # 20 min
     num_exam_rooms: int = 4
-    exam_time: float = 600.0          # 10 min
-    treatment_time: float = 300.0     # 5 min
-    renege_patience_s: float = 5400.0 # 90 min
+    exam_time: float = 600.0  # 10 min
+    treatment_time: float = 300.0  # 5 min
+    renege_patience_s: float = 5400.0  # 90 min
     seed: int = 42
 
 
@@ -96,8 +96,13 @@ class UrgentCareConfig:
 class PatientProvider(EventProvider):
     """Generates patient arrival events."""
 
-    def __init__(self, target: Entity, critical_pct: float,
-                 patience_s: float, stop_after: Instant | None = None):
+    def __init__(
+        self,
+        target: Entity,
+        critical_pct: float,
+        patience_s: float,
+        stop_after: Instant | None = None,
+    ):
         self._target = target
         self._critical_pct = critical_pct
         self._patience_s = patience_s
@@ -147,16 +152,15 @@ class Station(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 class TraumaBays(Entity):
     """Trauma bays using PreemptibleResource. Critical gets high priority."""
 
-    def __init__(self, name: str, resource: PreemptibleResource,
-                 treatment_time: float, downstream: Entity):
+    def __init__(
+        self, name: str, resource: PreemptibleResource, treatment_time: float, downstream: Entity
+    ):
         super().__init__(name)
         self.resource = resource
         self.treatment_time = treatment_time
@@ -174,7 +178,10 @@ class TraumaBays(Entity):
             preempted_flag[0] = True
 
         grant = yield self.resource.acquire(
-            amount=1, priority=priority, preempt=True, on_preempt=on_preempt,
+            amount=1,
+            priority=priority,
+            preempt=True,
+            on_preempt=on_preempt,
         )
 
         if grant.preempted:
@@ -186,17 +193,21 @@ class TraumaBays(Entity):
         grant.release()
         self._treated += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Treated")
-        ]
+        return [self.forward(event, self.downstream, event_type="Treated")]
 
 
 class ExamRooms(RenegingQueuedResource):
     """Exam rooms where non-critical patients may renege."""
 
-    def __init__(self, name: str, num_rooms: int, exam_time: float,
-                 downstream: Entity, reneged_target: Entity | None = None,
-                 default_patience_s: float = float("inf")):
+    def __init__(
+        self,
+        name: str,
+        num_rooms: int,
+        exam_time: float,
+        downstream: Entity,
+        reneged_target: Entity | None = None,
+        default_patience_s: float = float("inf"),
+    ):
         super().__init__(
             name,
             reneged_target=reneged_target,
@@ -224,9 +235,7 @@ class ExamRooms(RenegingQueuedResource):
             self._active -= 1
 
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="Examined")
-        ]
+        return [self.forward(event, self.downstream, event_type="Examined")]
 
 
 # =============================================================================
@@ -294,11 +303,14 @@ def run_urgent_care_simulation(config: UrgentCareConfig | None = None) -> Urgent
 
     stop_after = Instant.from_seconds(config.duration_s)
     patient_provider = PatientProvider(
-        reception, config.critical_pct, config.renege_patience_s, stop_after,
+        reception,
+        config.critical_pct,
+        config.renege_patience_s,
+        stop_after,
     )
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Patients",
@@ -316,10 +328,15 @@ def run_urgent_care_simulation(config: UrgentCareConfig | None = None) -> Urgent
         end_time=end_time,
         sources=[source],
         entities=[
-            reception, triage, router,
-            trauma_resource, trauma_bays,
-            exam_rooms, treatment,
-            reneged_counter, sink,
+            reception,
+            triage,
+            router,
+            trauma_resource,
+            trauma_bays,
+            exam_rooms,
+            treatment,
+            reneged_counter,
+            sink,
         ],
     )
 
@@ -354,7 +371,7 @@ def print_summary(result: UrgentCareResult) -> None:
     print("URGENT CARE SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f}/min")
     print(f"  Critical rate:       {config.critical_pct:.0%}")
@@ -364,29 +381,29 @@ def print_summary(result: UrgentCareResult) -> None:
 
     total = result.patient_provider.generated
 
-    print(f"\nPatient Flow:")
+    print("\nPatient Flow:")
     print(f"  Arrived:             {total}")
     print(f"  Reception:           {result.reception.processed}")
     print(f"  Triage:              {result.triage.processed}")
     for name, count in result.router.routed_counts.items():
         print(f"  Routed to {name:12s} {count}")
 
-    print(f"\nTrauma Bays:")
+    print("\nTrauma Bays:")
     ts = result.trauma_resource.stats
     print(f"  Treated:             {result.trauma_bays._treated}")
     print(f"  Preempted:           {result.trauma_bays._preempted}")
     print(f"  Total preemptions:   {ts.preemptions}")
 
-    print(f"\nExam Rooms:")
+    print("\nExam Rooms:")
     print(f"  Examined:            {result.exam_rooms.processed}")
     print(f"  Reneged:             {result.exam_rooms.reneged}")
 
-    print(f"\nTreatment:")
+    print("\nTreatment:")
     print(f"  Treated:             {result.treatment.processed}")
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.1f} min")
         print(f"  p50:     {result.sink.p50() / 60:.1f} min")

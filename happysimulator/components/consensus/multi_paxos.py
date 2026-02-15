@@ -8,16 +8,15 @@ optimization to skip Phase 1 when a leader is established.
 from __future__ import annotations
 
 import logging
-import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
+from happysimulator.components.consensus.log import Log, LogEntry
+from happysimulator.components.consensus.paxos import Ballot
+from happysimulator.components.consensus.raft_state_machine import KVStateMachine, StateMachine
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.consensus.log import Log, LogEntry
-from happysimulator.components.consensus.paxos import Ballot
-from happysimulator.components.consensus.raft_state_machine import StateMachine, KVStateMachine
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +33,7 @@ class MultiPaxosStats:
         commands_committed: Total commands committed.
         leader_changes: Number of leader changes observed.
     """
+
     is_leader: bool = False
     current_ballot: int = 0
     log_length: int = 0
@@ -170,10 +170,12 @@ class MultiPaxosNode(Entity):
             events.append(msg)
 
         # Self-promise
-        self._phase1_responses[ballot.number].append({
-            "from": self.name,
-            "log_entries": [],
-        })
+        self._phase1_responses[ballot.number].append(
+            {
+                "from": self.name,
+                "log_entries": [],
+            }
+        )
 
         if len(self._phase1_responses[ballot.number]) >= self.quorum_size:
             events.extend(self._become_leader())
@@ -246,11 +248,13 @@ class MultiPaxosNode(Entity):
         if ballot_number not in self._phase1_responses:
             return []
 
-        self._phase1_responses[ballot_number].append({
-            "from": metadata.get("from"),
-            "log_entries": metadata.get("log_entries", []),
-            "commit_index": metadata.get("commit_index", 0),
-        })
+        self._phase1_responses[ballot_number].append(
+            {
+                "from": metadata.get("from"),
+                "log_entries": metadata.get("log_entries", []),
+                "commit_index": metadata.get("commit_index", 0),
+            }
+        )
 
         if len(self._phase1_responses[ballot_number]) >= self.quorum_size:
             return self._become_leader()
@@ -340,11 +344,9 @@ class MultiPaxosNode(Entity):
             self._slot_acks[slot] = 0
         self._slot_acks[slot] += 1
 
-        if self._slot_acks[slot] >= self.quorum_size:
-            # Commit this slot
-            if slot > self._log.commit_index:
-                newly_committed = self._log.advance_commit(slot)
-                self._apply_committed(newly_committed)
+        if self._slot_acks[slot] >= self.quorum_size and slot > self._log.commit_index:
+            newly_committed = self._log.advance_commit(slot)
+            self._apply_committed(newly_committed)
         return []
 
     def _handle_heartbeat(self, event: Event) -> None:
@@ -361,7 +363,7 @@ class MultiPaxosNode(Entity):
             if leader_commit > self._log.commit_index:
                 newly_committed = self._log.advance_commit(leader_commit)
                 self._apply_committed(newly_committed)
-        return None
+        return
 
     def _handle_forward(self, event: Event) -> list[Event]:
         metadata = event.context.get("metadata", {})
@@ -431,12 +433,14 @@ class MultiPaxosNode(Entity):
             event_type="MultiPaxosHeartbeat",
             target=self,
             daemon=True,
-            context={"metadata": {
-                "ballot_number": self._current_ballot.number,
-                "ballot_node": self._current_ballot.node_id,
-                "commit_index": self._log.commit_index,
-                "self_heartbeat": True,
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": self._current_ballot.number,
+                    "ballot_node": self._current_ballot.node_id,
+                    "commit_index": self._log.commit_index,
+                    "self_heartbeat": True,
+                }
+            },
         )
         if self._heartbeat_event:
             self._heartbeat_event.cancel()
@@ -477,7 +481,5 @@ class MultiPaxosNode(Entity):
 
     def __repr__(self) -> str:
         return (
-            f"MultiPaxosNode({self.name}, "
-            f"leader={self._is_leader}, "
-            f"ballot={self._current_ballot})"
+            f"MultiPaxosNode({self.name}, leader={self._is_leader}, ballot={self._current_ballot})"
         )

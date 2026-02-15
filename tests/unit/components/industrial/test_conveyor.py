@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
-from happysimulator.components.industrial.conveyor import ConveyorBelt
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.conveyor import ConveyorBelt
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestConveyorBasics:
-
     def test_creates_with_parameters(self):
         sink = Sink()
         belt = ConveyorBelt("belt", downstream=sink, transit_time=1.0)
@@ -77,7 +74,6 @@ class TestConveyorBasics:
 
 
 class TestConveyorCapacity:
-
     def test_unlimited_capacity_by_default(self):
         sink = Sink()
         belt = ConveyorBelt("belt", downstream=sink, transit_time=1.0)
@@ -93,10 +89,8 @@ class TestConveyorCapacity:
             entities=[belt, sink],
         )
         # Schedule 4 items at same time, only 2 should fit
-        for i in range(4):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=belt)
-            )
+        for _i in range(4):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=belt))
         sim.run()
 
         assert belt.items_transported == 2
@@ -111,10 +105,8 @@ class TestConveyorCapacity:
             end_time=Instant.from_seconds(2.0),
             entities=[belt, sink],
         )
-        for i in range(5):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Item", target=belt)
-            )
+        for _i in range(5):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=belt))
         sim.run()
 
         stats = belt.stats

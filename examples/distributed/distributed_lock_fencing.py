@@ -40,19 +40,17 @@ This example demonstrates a distributed lock manager:
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
-from happysimulator.core.event import Event
 from happysimulator.components.consensus.distributed_lock import (
     DistributedLock,
-    DistributedLockStats,
     LockGrant,
 )
-
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
 
 # =============================================================================
 # Lock Client Entity
@@ -62,6 +60,7 @@ from happysimulator.components.consensus.distributed_lock import (
 @dataclass
 class LockEvent:
     """Record of a lock lifecycle event."""
+
     time_s: float
     client: str
     action: str
@@ -108,9 +107,13 @@ class LockClient(Entity):
     def _handle_try_acquire(self, event: Event):
         """Initiate a lock acquire request."""
         now_s = self.now.to_seconds()
-        self.events_log.append(LockEvent(
-            time_s=now_s, client=self.name, action="acquire_request",
-        ))
+        self.events_log.append(
+            LockEvent(
+                time_s=now_s,
+                client=self.name,
+                action="acquire_request",
+            )
+        )
 
         # Use the lock manager's direct API
         future = self._lock_manager.acquire(self._lock_name, self.name)
@@ -149,24 +152,32 @@ class LockClient(Entity):
         """Handle receiving a lock grant."""
         if grant is None:
             now_s = self.now.to_seconds()
-            self.events_log.append(LockEvent(
-                time_s=now_s, client=self.name, action="rejected",
-            ))
+            self.events_log.append(
+                LockEvent(
+                    time_s=now_s,
+                    client=self.name,
+                    action="rejected",
+                )
+            )
             return None
 
         self._grant = grant
         now_s = self.now.to_seconds()
-        self.events_log.append(LockEvent(
-            time_s=now_s, client=self.name, action="acquired",
-            fencing_token=grant.fencing_token,
-            detail=f"lease={grant.lease_duration}s",
-        ))
+        self.events_log.append(
+            LockEvent(
+                time_s=now_s,
+                client=self.name,
+                action="acquired",
+                fencing_token=grant.fencing_token,
+                detail=f"lease={grant.lease_duration}s",
+            )
+        )
 
         events: list[Event] = []
 
         # Schedule the lease expiry event from the lock manager
-        if hasattr(self._lock_manager, '_pending_expiry'):
-            expiry_evt = getattr(self._lock_manager, '_pending_expiry', None)
+        if hasattr(self._lock_manager, "_pending_expiry"):
+            expiry_evt = getattr(self._lock_manager, "_pending_expiry", None)
             if expiry_evt is not None:
                 events.append(expiry_evt)
                 self._lock_manager._pending_expiry = None
@@ -197,13 +208,16 @@ class LockClient(Entity):
 
         released = self._lock_manager.release(self._lock_name, token)
         now_s = self.now.to_seconds()
-        self.events_log.append(LockEvent(
-            time_s=now_s, client=self.name,
-            action="released" if released else "release_failed",
-            fencing_token=token,
-        ))
+        self.events_log.append(
+            LockEvent(
+                time_s=now_s,
+                client=self.name,
+                action="released" if released else "release_failed",
+                fencing_token=token,
+            )
+        )
         self._grant = None
-        return None
+        return
 
 
 # =============================================================================
@@ -214,6 +228,7 @@ class LockClient(Entity):
 @dataclass
 class SimulationResult:
     """Results from the distributed lock simulation."""
+
     lock_manager: DistributedLock
     clients: list[LockClient]
     all_events: list[LockEvent]
@@ -259,7 +274,7 @@ def run(args=None) -> SimulationResult:
         name="client-B",
         lock_manager=lock_mgr,
         hold_duration=1.0,
-        simulate_expiry=True,   # will let the lease expire
+        simulate_expiry=True,  # will let the lease expire
     )
     client_c = LockClient(
         name="client-C",
@@ -338,7 +353,7 @@ def print_summary(result: SimulationResult) -> None:
     print("=" * 70)
 
     stats = result.lock_manager.stats
-    print(f"\nLock Manager Statistics:")
+    print("\nLock Manager Statistics:")
     print(f"  Total acquires:    {stats.total_acquires}")
     print(f"  Total releases:    {stats.total_releases}")
     print(f"  Total expirations: {stats.total_expirations}")
@@ -346,19 +361,21 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Active locks:      {stats.active_locks}")
     print(f"  Queued waiters:    {stats.total_waiters}")
 
-    print(f"\nEvent Timeline:")
+    print("\nEvent Timeline:")
     print(f"  {'Time':<8} {'Client':<12} {'Action':<18} {'Token':<8} {'Detail'}")
     print(f"  {'-' * 60}")
 
     for evt in result.all_events:
         token_str = str(evt.fencing_token) if evt.fencing_token is not None else "-"
-        print(f"  {evt.time_s:<8.2f} {evt.client:<12} {evt.action:<18} "
-              f"{token_str:<8} {evt.detail}")
+        print(f"  {evt.time_s:<8.2f} {evt.client:<12} {evt.action:<18} {token_str:<8} {evt.detail}")
 
     # Verify fencing token monotonicity
-    tokens = [e.fencing_token for e in result.all_events
-              if e.fencing_token is not None and e.action == "acquired"]
-    print(f"\nFencing Token Analysis:")
+    tokens = [
+        e.fencing_token
+        for e in result.all_events
+        if e.fencing_token is not None and e.action == "acquired"
+    ]
+    print("\nFencing Token Analysis:")
     print(f"  Tokens granted: {tokens}")
     if tokens:
         is_monotonic = all(tokens[i] < tokens[i + 1] for i in range(len(tokens) - 1))
@@ -367,7 +384,7 @@ def print_summary(result: SimulationResult) -> None:
         print(f"  Max token: {max(tokens)}")
 
     # Per-client summary
-    print(f"\nPer-Client Summary:")
+    print("\nPer-Client Summary:")
     for client in result.clients:
         acquires = [e for e in client.events_log if e.action == "acquired"]
         releases = [e for e in client.events_log if e.action == "released"]
@@ -396,15 +413,20 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     for evt in result.all_events:
         if evt.action == "acquired" and evt.fencing_token is not None:
             color = client_colors.get(evt.client, "gray")
-            ax.scatter(evt.time_s, evt.fencing_token, color=color, s=100, zorder=5,
-                       label=evt.client)
-            ax.annotate(f"T={evt.fencing_token}",
-                        (evt.time_s, evt.fencing_token),
-                        textcoords="offset points", xytext=(5, 10), fontsize=9)
+            ax.scatter(
+                evt.time_s, evt.fencing_token, color=color, s=100, zorder=5, label=evt.client
+            )
+            ax.annotate(
+                f"T={evt.fencing_token}",
+                (evt.time_s, evt.fencing_token),
+                textcoords="offset points",
+                xytext=(5, 10),
+                fontsize=9,
+            )
 
     # Remove duplicate labels
     handles, labels = ax.get_legend_handles_labels()
-    unique = dict(zip(labels, handles))
+    unique = dict(zip(labels, handles, strict=False))
     ax.legend(unique.values(), unique.keys())
 
     ax.set_xlabel("Simulation Time (s)")
@@ -416,17 +438,27 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[1]
     stats = result.lock_manager.stats
     categories = ["Acquires", "Releases", "Expirations", "Rejections"]
-    values = [stats.total_acquires, stats.total_releases,
-              stats.total_expirations, stats.total_rejections]
+    values = [
+        stats.total_acquires,
+        stats.total_releases,
+        stats.total_expirations,
+        stats.total_rejections,
+    ]
     colors = ["seagreen", "steelblue", "gold", "indianred"]
 
     bars = ax.bar(categories, values, color=colors)
     ax.set_ylabel("Count")
     ax.set_title("Lock Manager Statistics")
-    for bar, val in zip(bars, values):
+    for bar, val in zip(bars, values, strict=False):
         if val > 0:
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.1,
-                    str(val), ha="center", va="bottom", fontweight="bold")
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height() + 0.1,
+                str(val),
+                ha="center",
+                va="bottom",
+                fontweight="bold",
+            )
     ax.grid(True, alpha=0.3, axis="y")
 
     fig.suptitle("Distributed Lock with Fencing Tokens", fontsize=14, fontweight="bold")
@@ -445,14 +477,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Distributed lock with fencing tokens")
-    parser.add_argument("--duration", type=float, default=10.0,
-                        help="Simulation duration (s)")
-    parser.add_argument("--lease", type=float, default=2.0,
-                        help="Lock lease duration (s)")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/distributed_lock",
-                        help="Output directory")
+    parser.add_argument("--duration", type=float, default=10.0, help="Simulation duration (s)")
+    parser.add_argument("--lease", type=float, default=2.0, help="Lock lease duration (s)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument(
+        "--output", type=str, default="output/distributed_lock", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()
 
@@ -470,6 +500,7 @@ if __name__ == "__main__":
     if not args.no_viz:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             output_dir = Path(args.output)
             visualize_results(result, output_dir)

@@ -68,10 +68,14 @@ class RequestProvider(EventProvider):
         if time > self._stop_after:
             return []
         self._count += 1
-        return [Event(
-            time=time, event_type="Request", target=self._target,
-            context={"created_at": time},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._target,
+                context={"created_at": time},
+            )
+        ]
 
 
 def make_server(name: str) -> Server:
@@ -108,7 +112,8 @@ def run_auto_scaler_demo(
     provider = RequestProvider(lb, stop_after=duration_s - 10.0)
     arrival = PoissonArrivalTimeProvider(profile, start_time=Instant.Epoch)
     source = Source(
-        name="Traffic", event_provider=provider,
+        name="Traffic",
+        event_provider=provider,
         arrival_time_provider=arrival,
     )
 
@@ -116,7 +121,7 @@ def run_auto_scaler_demo(
         start_time=Instant.Epoch,
         duration=duration_s,
         sources=[source],
-        entities=[lb, scaler, sink] + servers,
+        entities=[lb, scaler, sink, *servers],
     )
     sim.schedule(scaler.start())
     summary = sim.run()
@@ -125,21 +130,23 @@ def run_auto_scaler_demo(
     print("=" * 60)
     print("AUTO-SCALER SIMULATION RESULTS")
     print("=" * 60)
-    print(f"\nTraffic profile:")
+    print("\nTraffic profile:")
     print(f"  Base rate: {profile.base_rate} req/s")
     print(f"  Spike: {profile.spike_rate} req/s ({profile.spike_start}-{profile.spike_end}s)")
 
-    print(f"\nScaler stats:")
+    print("\nScaler stats:")
     print(f"  Evaluations: {scaler.stats.evaluations}")
     print(f"  Scale-out: {scaler.stats.scale_out_count} ({scaler.stats.instances_added} added)")
     print(f"  Scale-in: {scaler.stats.scale_in_count} ({scaler.stats.instances_removed} removed)")
     print(f"  Cooldown blocks: {scaler.stats.cooldown_blocks}")
     print(f"  Final backend count: {len(lb.all_backends)}")
 
-    print(f"\nScaling history:")
+    print("\nScaling history:")
     for event in scaler.scaling_history:
-        print(f"  t={event.time.to_seconds():.1f}s: {event.action} "
-              f"{event.from_count}->{event.to_count} ({event.reason})")
+        print(
+            f"  t={event.time.to_seconds():.1f}s: {event.action} "
+            f"{event.from_count}->{event.to_count} ({event.reason})"
+        )
 
     print(f"\n{summary}")
     print("=" * 60)

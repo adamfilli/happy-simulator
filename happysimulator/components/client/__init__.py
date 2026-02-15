@@ -12,11 +12,11 @@ from happysimulator.components.client.connection_pool import (
 )
 from happysimulator.components.client.pooled_client import PooledClient, PooledClientStats
 from happysimulator.components.client.retry import (
-    RetryPolicy,
-    NoRetry,
-    FixedRetry,
-    ExponentialBackoff,
     DecorrelatedJitter,
+    ExponentialBackoff,
+    FixedRetry,
+    NoRetry,
+    RetryPolicy,
 )
 
 __all__ = [
@@ -25,11 +25,11 @@ __all__ = [
     "Connection",
     "ConnectionPool",
     "ConnectionPoolStats",
+    "DecorrelatedJitter",
+    "ExponentialBackoff",
+    "FixedRetry",
+    "NoRetry",
     "PooledClient",
     "PooledClientStats",
     "RetryPolicy",
-    "NoRetry",
-    "FixedRetry",
-    "ExponentialBackoff",
-    "DecorrelatedJitter",
 ]

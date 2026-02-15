@@ -27,25 +27,26 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
     Instant,
     Network,
-    Simulation,
     SimFuture,
+    Simulation,
     Source,
     datacenter_network,
 )
 from happysimulator.components.datastore import KVStore
 from happysimulator.components.replication.chain_replication import (
     ChainNode,
-    ChainNodeRole,
     build_chain,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Client entities
@@ -61,13 +62,17 @@ class ChainWriter(Entity):
         self._count = 0
         self.latencies: list[tuple[float, float]] = []
 
-    def handle_event(self, event: Event) -> Generator[float | SimFuture | tuple[float, list[Event]], None, None]:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]]]:
         self._count += 1
         key = f"key-{self._count % 50}"
 
         reply = SimFuture()
         write = Event(
-            time=self.now, event_type="Write", target=self.head,
+            time=self.now,
+            event_type="Write",
+            target=self.head,
             context={"metadata": {"key": key, "value": self._count, "reply_future": reply}},
         )
         start = self.now
@@ -106,7 +111,8 @@ def run_chain(
     names = [f"node-{i}" for i in range(chain_length)]
 
     nodes = build_chain(
-        names, network,
+        names,
+        network,
         store_factory=lambda n: KVStore(n, write_latency=0.001, read_latency=0.001),
         craq_enabled=craq,
     )
@@ -114,26 +120,29 @@ def run_chain(
     # Wire network links between adjacent nodes + head↔tail for acks
     for i in range(len(nodes) - 1):
         network.add_bidirectional_link(
-            nodes[i], nodes[i + 1],
-            datacenter_network(f"link-{i}-{i+1}"),
+            nodes[i],
+            nodes[i + 1],
+            datacenter_network(f"link-{i}-{i + 1}"),
         )
     # Head ↔ tail direct link for ack path
     if len(nodes) > 2:
         network.add_bidirectional_link(
-            nodes[0], nodes[-1],
+            nodes[0],
+            nodes[-1],
             datacenter_network("link-head-tail"),
         )
 
     writer = ChainWriter("writer", head=nodes[0])
 
     source = Source.constant(
-        rate=write_rate, target=writer,
-        event_type="NewWrite", stop_after=duration_s,
+        rate=write_rate,
+        target=writer,
+        event_type="NewWrite",
+        stop_after=duration_s,
     )
 
     all_entities: list = [writer, network, *nodes]
-    for n in nodes:
-        all_entities.append(n.store)
+    all_entities.extend(n.store for n in nodes)
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -144,8 +153,10 @@ def run_chain(
     sim.run()
 
     return ChainResult(
-        chain_length=chain_length, craq=craq,
-        nodes=nodes, writer=writer,
+        chain_length=chain_length,
+        craq=craq,
+        nodes=nodes,
+        writer=writer,
     )
 
 
@@ -190,6 +201,7 @@ def print_summary(results: list[ChainResult]) -> None:
 def visualize_results(results: list[ChainResult], output_dir: Path) -> None:
     """Generate latency comparison chart."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 

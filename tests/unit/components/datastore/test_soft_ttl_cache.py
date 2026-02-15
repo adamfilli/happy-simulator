@@ -3,10 +3,10 @@
 import pytest
 
 from happysimulator.components.datastore import (
+    CacheEntry,
     KVStore,
     SoftTTLCache,
     SoftTTLCacheStats,
-    CacheEntry,
 )
 from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Duration, Instant
@@ -143,7 +143,7 @@ class TestSoftTTLCacheCreation:
         """SoftTTLCache rejects soft_ttl > hard_ttl."""
         backing = KVStore(name="backing")
 
-        with pytest.raises(ValueError, match="soft_ttl.*must be <= hard_ttl"):
+        with pytest.raises(ValueError, match=r"soft_ttl.*must be <= hard_ttl"):
             SoftTTLCache(
                 name="cache",
                 backing_store=backing,
@@ -483,7 +483,7 @@ class TestSoftTTLCachePut:
 
         # Should now be fresh again
         gen = cache.get("key1")
-        latency, side_effects = get_yield_with_side_effects(gen)
+        _latency, side_effects = get_yield_with_side_effects(gen)
 
         assert side_effects is None  # No refresh needed
         assert cache.stats.fresh_hits == 1

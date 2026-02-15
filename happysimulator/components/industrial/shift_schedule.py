@@ -8,13 +8,17 @@ boundaries by scheduling self-check events.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Generator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
-from happysimulator.core.entity import Entity
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.entity import Entity
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +137,7 @@ class ShiftedServer(QueuedResource):
             next_event = self._schedule_next_shift()
             result = super().handle_event(event)
             if next_event and isinstance(result, list):
-                return result + [next_event]
+                return [*result, next_event]
             return result
 
         return super().handle_event(event)
@@ -146,7 +150,10 @@ class ShiftedServer(QueuedResource):
 
         logger.debug(
             "[%s] Shift change at t=%.1f: capacity %d -> %d",
-            self.name, time_s, old_capacity, new_capacity,
+            self.name,
+            time_s,
+            old_capacity,
+            new_capacity,
         )
 
         # Schedule the next shift change (self-perpetuating)

@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.microservice import (
     OutboxRelay,
     OutboxRelayStats,
-    OutboxEntry,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass
@@ -96,7 +98,7 @@ class TestOutboxRelayWriting:
         outbox = OutboxRelay(name="outbox", downstream=collector)
 
         # Need a clock for write() to work
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(0.01),
             sources=[],
@@ -114,7 +116,7 @@ class TestOutboxRelayWriting:
         collector = MessageCollector(name="downstream")
         outbox = OutboxRelay(name="outbox", downstream=collector)
 
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(0.01),
             sources=[],

@@ -25,13 +25,12 @@ import csv
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
 import pytest
 
-from happysimulator.components.server.thread_pool import ThreadPool, ThreadPoolStats
 from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue
+from happysimulator.components.server.thread_pool import ThreadPool
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
@@ -41,6 +40,8 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # --- Profiles ---
 
@@ -48,6 +49,7 @@ from happysimulator.load.source import Source
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -57,6 +59,7 @@ class ConstantRateProfile(Profile):
 @dataclass(frozen=True)
 class BurstProfile(Profile):
     """Profile with periodic burst patterns."""
+
     base_rate: float
     burst_rate: float
     burst_duration_s: float
@@ -73,6 +76,7 @@ class BurstProfile(Profile):
 @dataclass(frozen=True)
 class RampProfile(Profile):
     """Linear ramp from start to end rate."""
+
     start_rate: float
     end_rate: float
     ramp_duration_s: float
@@ -91,6 +95,7 @@ class RampProfile(Profile):
 @dataclass
 class MetricsCollector(Entity):
     """Collects time-series metrics from a thread pool."""
+
     name: str
     pool: ThreadPool
     sample_interval_s: float = 0.1
@@ -141,6 +146,7 @@ class MetricsCollector(Entity):
 @dataclass
 class TaskCompletionTracker(Entity):
     """Tracks individual task completion times."""
+
     name: str
 
     completion_times: list[float] = field(default_factory=list, init=False)
@@ -188,19 +194,17 @@ class VariableTaskProvider(EventProvider):
         """Generate a random processing time based on distribution."""
         if self.distribution == "uniform":
             return random.uniform(self.min_time, self.max_time)
-        elif self.distribution == "bimodal":
+        if self.distribution == "bimodal":
             # 70% fast tasks, 30% slow tasks
             if random.random() < 0.7:
                 return random.uniform(self.min_time, self.min_time * 2)
-            else:
-                return random.uniform(self.max_time * 0.5, self.max_time)
-        elif self.distribution == "exponential":
+            return random.uniform(self.max_time * 0.5, self.max_time)
+        if self.distribution == "exponential":
             mean = (self.min_time + self.max_time) / 2
             return max(self.min_time, min(self.max_time, random.expovariate(1 / mean)))
-        else:
-            return (self.min_time + self.max_time) / 2
+        return (self.min_time + self.max_time) / 2
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -217,6 +221,7 @@ class VariableTaskProvider(EventProvider):
 
         # Add completion hook if tracker is configured
         if self.completion_tracker is not None:
+
             def on_complete(finish_time: Instant):
                 return Event(
                     time=finish_time,
@@ -227,6 +232,7 @@ class VariableTaskProvider(EventProvider):
                         "created_at": time,
                     },
                 )
+
             event.add_completion_hook(on_complete)
 
         return [event]
@@ -237,7 +243,7 @@ class VariableTaskProvider(EventProvider):
 
 def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
     """Write data to a CSV file."""
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
@@ -260,7 +266,9 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
     return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
 
 
-def _bin_data(times: list[float], values: list[float], bin_size: float) -> tuple[list[float], list[float]]:
+def _bin_data(
+    times: list[float], values: list[float], bin_size: float
+) -> tuple[list[float], list[float]]:
     """Bin time series data."""
     if not times or not values:
         return [], []
@@ -269,7 +277,7 @@ def _bin_data(times: list[float], values: list[float], bin_size: float) -> tuple
     n_bins = int(max_time / bin_size) + 1
 
     bins = defaultdict(list)
-    for t, v in zip(times, values):
+    for t, v in zip(times, values, strict=False):
         idx = int(t / bin_size)
         bins[idx].append(v)
 
@@ -289,6 +297,7 @@ def _bin_data(times: list[float], values: list[float], bin_size: float) -> tuple
 @dataclass
 class ThreadPoolScenarioResult:
     """Results from a thread pool simulation scenario."""
+
     pool: ThreadPool
     metrics: MetricsCollector
     tracker: TaskCompletionTracker
@@ -377,7 +386,6 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
 
     metrics = result.metrics
     pool = result.pool
-    tracker = result.tracker
 
     # --- Write CSV files ---
 
@@ -393,6 +401,7 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
                 metrics.active_workers,
                 metrics.utilizations,
                 metrics.tasks_completed,
+                strict=False,
             )
         ],
     )
@@ -416,8 +425,12 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
         "p90_processing_time_s": _percentile_sorted(sorted_proc, 0.90),
         "p99_processing_time_s": _percentile_sorted(sorted_proc, 0.99),
         "max_queue_depth": max(metrics.queue_depths) if metrics.queue_depths else 0,
-        "avg_queue_depth": sum(metrics.queue_depths) / len(metrics.queue_depths) if metrics.queue_depths else 0,
-        "avg_utilization": sum(metrics.utilizations) / len(metrics.utilizations) if metrics.utilizations else 0,
+        "avg_queue_depth": sum(metrics.queue_depths) / len(metrics.queue_depths)
+        if metrics.queue_depths
+        else 0,
+        "avg_utilization": sum(metrics.utilizations) / len(metrics.utilizations)
+        if metrics.utilizations
+        else 0,
     }
 
     _write_csv(
@@ -434,8 +447,20 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
     ax = axes[0, 0]
     if proc_times:
         ax.hist(proc_times, bins=40, alpha=0.7, color="steelblue", edgecolor="black")
-        ax.axvline(_percentile_sorted(sorted_proc, 0.50), color="orange", linestyle="--", linewidth=2, label=f"p50: {_percentile_sorted(sorted_proc, 0.50)*1000:.1f}ms")
-        ax.axvline(_percentile_sorted(sorted_proc, 0.99), color="red", linestyle="--", linewidth=2, label=f"p99: {_percentile_sorted(sorted_proc, 0.99)*1000:.1f}ms")
+        ax.axvline(
+            _percentile_sorted(sorted_proc, 0.50),
+            color="orange",
+            linestyle="--",
+            linewidth=2,
+            label=f"p50: {_percentile_sorted(sorted_proc, 0.50) * 1000:.1f}ms",
+        )
+        ax.axvline(
+            _percentile_sorted(sorted_proc, 0.99),
+            color="red",
+            linestyle="--",
+            linewidth=2,
+            label=f"p99: {_percentile_sorted(sorted_proc, 0.99) * 1000:.1f}ms",
+        )
         ax.legend()
     ax.set_title("Processing Time Distribution")
     ax.set_xlabel("Processing Time (s)")
@@ -455,8 +480,18 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
     # Plot 3: Worker Utilization Over Time
     ax = axes[0, 2]
     if metrics.timestamps and metrics.utilizations:
-        ax.fill_between(metrics.timestamps, [u * 100 for u in metrics.utilizations], alpha=0.5, color="forestgreen")
-        ax.plot(metrics.timestamps, [u * 100 for u in metrics.utilizations], color="forestgreen", linewidth=1)
+        ax.fill_between(
+            metrics.timestamps,
+            [u * 100 for u in metrics.utilizations],
+            alpha=0.5,
+            color="forestgreen",
+        )
+        ax.plot(
+            metrics.timestamps,
+            [u * 100 for u in metrics.utilizations],
+            color="forestgreen",
+            linewidth=1,
+        )
         ax.axhline(100, color="red", linestyle="--", alpha=0.5, label="100% utilization")
         ax.legend()
     ax.set_title("Worker Utilization Over Time")
@@ -470,8 +505,12 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
     throughput = metrics.get_throughput_per_interval()
     if throughput and metrics.timestamps:
         # Use timestamps starting from index 1 (since throughput is delta)
-        ax.plot(metrics.timestamps[1:len(throughput)+1], throughput, color="purple", linewidth=1)
-        ax.fill_between(metrics.timestamps[1:len(throughput)+1], throughput, alpha=0.3, color="purple")
+        ax.plot(
+            metrics.timestamps[1 : len(throughput) + 1], throughput, color="purple", linewidth=1
+        )
+        ax.fill_between(
+            metrics.timestamps[1 : len(throughput) + 1], throughput, alpha=0.3, color="purple"
+        )
     ax.set_title("Throughput Over Time")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Tasks/second")
@@ -481,8 +520,20 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
     ax = axes[1, 1]
     if metrics.timestamps:
         ax2 = ax.twinx()
-        line1, = ax.plot(metrics.timestamps, metrics.active_workers, color="blue", linewidth=1.5, label="Active Workers")
-        line2, = ax2.plot(metrics.timestamps, metrics.queue_depths, color="coral", linewidth=1.5, label="Queue Depth")
+        (line1,) = ax.plot(
+            metrics.timestamps,
+            metrics.active_workers,
+            color="blue",
+            linewidth=1.5,
+            label="Active Workers",
+        )
+        (line2,) = ax2.plot(
+            metrics.timestamps,
+            metrics.queue_depths,
+            color="coral",
+            linewidth=1.5,
+            label="Queue Depth",
+        )
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Active Workers", color="blue")
         ax2.set_ylabel("Queue Depth", color="coral")
@@ -502,14 +553,25 @@ def generate_visualizations(result: ThreadPoolScenarioResult, output_dir: Path) 
         if pool.num_workers > 0 and pool.average_processing_time > 0:
             max_rate = pool.num_workers / pool.average_processing_time
             theoretical = [min(t * max_rate, result.tasks_generated) for t in metrics.timestamps]
-            ax.plot(metrics.timestamps, theoretical, color="gray", linestyle="--", alpha=0.5, label=f"Theoretical max (~{max_rate:.0f}/s)")
+            ax.plot(
+                metrics.timestamps,
+                theoretical,
+                color="gray",
+                linestyle="--",
+                alpha=0.5,
+                label=f"Theoretical max (~{max_rate:.0f}/s)",
+            )
             ax.legend()
     ax.set_title("Cumulative Tasks Completed")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Tasks Completed")
     ax.grid(True, alpha=0.3)
 
-    fig.suptitle(f"Thread Pool Analysis (Workers: {pool.num_workers}, Tasks: {pool.stats.tasks_completed})", fontsize=14, fontweight="bold")
+    fig.suptitle(
+        f"Thread Pool Analysis (Workers: {pool.num_workers}, Tasks: {pool.stats.tasks_completed})",
+        fontsize=14,
+        fontweight="bold",
+    )
     fig.tight_layout()
     fig.savefig(output_dir / "thread_pool_analysis.png", dpi=150)
     plt.close(fig)
@@ -611,7 +673,7 @@ class TestThreadPoolVisualization:
         early_samples = result.metrics.utilizations[:20]  # First 2 seconds
         # Take mid-simulation samples (around 15-20s mark, during high load)
         mid_start = min(150, n_samples - 30)  # ~15s into simulation
-        mid_end = min(200, n_samples - 10)    # ~20s into simulation
+        mid_end = min(200, n_samples - 10)  # ~20s into simulation
         mid_samples = result.metrics.utilizations[mid_start:mid_end] if mid_start < mid_end else []
 
         if early_samples and mid_samples:
@@ -635,7 +697,9 @@ class TestThreadPoolVisualization:
         # Should have variable processing times
         proc_times = result.pool._processing_times
         if len(proc_times) > 10:
-            variance = sum((t - result.pool.average_processing_time) ** 2 for t in proc_times) / len(proc_times)
+            variance = sum(
+                (t - result.pool.average_processing_time) ** 2 for t in proc_times
+            ) / len(proc_times)
             assert variance > 0.0001, "Should have significant variance in processing times"
 
     def test_fifo_vs_lifo_comparison(self, test_output_dir: Path):
@@ -645,15 +709,15 @@ class TestThreadPoolVisualization:
         import matplotlib.pyplot as plt
 
         # Common parameters
-        params = dict(
-            num_workers=2,
-            duration_s=20.0,
-            profile=ConstantRateProfile(rate_per_s=30.0),  # Slight overload
-            task_distribution="uniform",
-            min_task_time=0.050,
-            max_task_time=0.100,
-            random_seed=42,
-        )
+        params = {
+            "num_workers": 2,
+            "duration_s": 20.0,
+            "profile": ConstantRateProfile(rate_per_s=30.0),  # Slight overload
+            "task_distribution": "uniform",
+            "min_task_time": 0.050,
+            "max_task_time": 0.100,
+            "random_seed": 42,
+        }
 
         # Run both scenarios
         result_fifo = run_thread_pool_scenario(**params, queue_policy="fifo")
@@ -664,8 +728,20 @@ class TestThreadPoolVisualization:
 
         # Plot 1: Queue Depth Comparison
         ax = axes[0, 0]
-        ax.plot(result_fifo.metrics.timestamps, result_fifo.metrics.queue_depths, label="FIFO", color="blue", alpha=0.7)
-        ax.plot(result_lifo.metrics.timestamps, result_lifo.metrics.queue_depths, label="LIFO", color="red", alpha=0.7)
+        ax.plot(
+            result_fifo.metrics.timestamps,
+            result_fifo.metrics.queue_depths,
+            label="FIFO",
+            color="blue",
+            alpha=0.7,
+        )
+        ax.plot(
+            result_lifo.metrics.timestamps,
+            result_lifo.metrics.queue_depths,
+            label="LIFO",
+            color="red",
+            alpha=0.7,
+        )
         ax.set_title("Queue Depth: FIFO vs LIFO")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Queue Depth")
@@ -675,9 +751,13 @@ class TestThreadPoolVisualization:
         # Plot 2: Processing Time Distribution Comparison
         ax = axes[0, 1]
         if result_fifo.pool._processing_times:
-            ax.hist(result_fifo.pool._processing_times, bins=30, alpha=0.5, label="FIFO", color="blue")
+            ax.hist(
+                result_fifo.pool._processing_times, bins=30, alpha=0.5, label="FIFO", color="blue"
+            )
         if result_lifo.pool._processing_times:
-            ax.hist(result_lifo.pool._processing_times, bins=30, alpha=0.5, label="LIFO", color="red")
+            ax.hist(
+                result_lifo.pool._processing_times, bins=30, alpha=0.5, label="LIFO", color="red"
+            )
         ax.set_title("Processing Time Distribution")
         ax.set_xlabel("Processing Time (s)")
         ax.set_ylabel("Count")
@@ -689,9 +769,21 @@ class TestThreadPoolVisualization:
         fifo_throughput = result_fifo.metrics.get_throughput_per_interval()
         lifo_throughput = result_lifo.metrics.get_throughput_per_interval()
         if fifo_throughput:
-            ax.plot(result_fifo.metrics.timestamps[1:len(fifo_throughput)+1], fifo_throughput, label="FIFO", color="blue", alpha=0.7)
+            ax.plot(
+                result_fifo.metrics.timestamps[1 : len(fifo_throughput) + 1],
+                fifo_throughput,
+                label="FIFO",
+                color="blue",
+                alpha=0.7,
+            )
         if lifo_throughput:
-            ax.plot(result_lifo.metrics.timestamps[1:len(lifo_throughput)+1], lifo_throughput, label="LIFO", color="red", alpha=0.7)
+            ax.plot(
+                result_lifo.metrics.timestamps[1 : len(lifo_throughput) + 1],
+                lifo_throughput,
+                label="LIFO",
+                color="red",
+                alpha=0.7,
+            )
         ax.set_title("Throughput Over Time")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Tasks/second")
@@ -719,15 +811,19 @@ class TestThreadPoolVisualization:
 
         x = range(len(categories))
         width = 0.35
-        ax.bar([i - width/2 for i in x], fifo_values, width, label="FIFO", color="blue", alpha=0.7)
-        ax.bar([i + width/2 for i in x], lifo_values, width, label="LIFO", color="red", alpha=0.7)
+        ax.bar(
+            [i - width / 2 for i in x], fifo_values, width, label="FIFO", color="blue", alpha=0.7
+        )
+        ax.bar([i + width / 2 for i in x], lifo_values, width, label="LIFO", color="red", alpha=0.7)
         ax.set_title("Summary Statistics Comparison")
         ax.set_xticks(x)
         ax.set_xticklabels(categories)
         ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
 
-        fig.suptitle("Thread Pool: FIFO vs LIFO Queue Policy Comparison", fontsize=14, fontweight="bold")
+        fig.suptitle(
+            "Thread Pool: FIFO vs LIFO Queue Policy Comparison", fontsize=14, fontweight="bold"
+        )
         fig.tight_layout()
         fig.savefig(test_output_dir / "fifo_vs_lifo_comparison.png", dpi=150)
         plt.close(fig)
@@ -737,7 +833,11 @@ class TestThreadPoolVisualization:
             test_output_dir / "fifo_vs_lifo_summary.csv",
             header=["metric", "fifo", "lifo"],
             rows=[
-                ["tasks_completed", result_fifo.pool.stats.tasks_completed, result_lifo.pool.stats.tasks_completed],
+                [
+                    "tasks_completed",
+                    result_fifo.pool.stats.tasks_completed,
+                    result_lifo.pool.stats.tasks_completed,
+                ],
                 ["avg_queue_depth", fifo_values[1], lifo_values[1]],
                 ["p50_processing_ms", fifo_values[2], lifo_values[2]],
                 ["p99_processing_ms", fifo_values[3], lifo_values[3]],
@@ -783,7 +883,9 @@ class TestThreadPoolVisualization:
 
         # Plot 2: Average Queue Depth vs Workers
         ax = axes[0, 1]
-        avg_queues = [sum(r[1].metrics.queue_depths) / len(r[1].metrics.queue_depths) for r in results]
+        avg_queues = [
+            sum(r[1].metrics.queue_depths) / len(r[1].metrics.queue_depths) for r in results
+        ]
         ax.bar(workers, avg_queues, color="coral", alpha=0.7)
         ax.set_title("Average Queue Depth vs Worker Count")
         ax.set_xlabel("Number of Workers")
@@ -794,8 +896,14 @@ class TestThreadPoolVisualization:
         # Plot 3: Queue Depth Over Time for All Configurations
         ax = axes[1, 0]
         colors = ["red", "orange", "green", "blue"]
-        for (num_w, result), color in zip(results, colors):
-            ax.plot(result.metrics.timestamps, result.metrics.queue_depths, label=f"{num_w} workers", color=color, alpha=0.7)
+        for (num_w, result), color in zip(results, colors, strict=False):
+            ax.plot(
+                result.metrics.timestamps,
+                result.metrics.queue_depths,
+                label=f"{num_w} workers",
+                color=color,
+                alpha=0.7,
+            )
         ax.set_title("Queue Depth Over Time")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Queue Depth")
@@ -804,7 +912,9 @@ class TestThreadPoolVisualization:
 
         # Plot 4: Average Utilization vs Workers
         ax = axes[1, 1]
-        avg_utils = [sum(r[1].metrics.utilizations) / len(r[1].metrics.utilizations) * 100 for r in results]
+        avg_utils = [
+            sum(r[1].metrics.utilizations) / len(r[1].metrics.utilizations) * 100 for r in results
+        ]
         ax.bar(workers, avg_utils, color="forestgreen", alpha=0.7)
         ax.axhline(100, color="red", linestyle="--", alpha=0.5)
         ax.set_title("Average Utilization vs Worker Count")
@@ -825,7 +935,7 @@ class TestThreadPoolVisualization:
             header=["workers", "tasks_completed", "avg_queue_depth", "avg_utilization_pct"],
             rows=[
                 [w, c, q, u]
-                for (w, _), c, q, u in zip(results, completed, avg_queues, avg_utils)
+                for (w, _), c, q, u in zip(results, completed, avg_queues, avg_utils, strict=False)
             ],
         )
 

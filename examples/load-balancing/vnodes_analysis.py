@@ -21,20 +21,16 @@ but at the cost of memory and lookup time.
 
 from __future__ import annotations
 
-import hashlib
+# Import from common (sibling module)
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from happysimulator import Entity, Event, Instant
 from happysimulator.components.load_balancer.strategies import ConsistentHash
 
-# Import from common (sibling module)
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from common import customer_id_key_extractor
-
 
 # =============================================================================
 # Configuration
@@ -126,12 +122,12 @@ def analyze_distribution(
     values = list(counts.values())
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
-    std = variance ** 0.5
+    std = variance**0.5
     cov = std / mean if mean > 0 else 0
 
     max_count = max(values)
     min_count = min(values)
-    max_min_ratio = max_count / min_count if min_count > 0 else float('inf')
+    max_min_ratio = max_count / min_count if min_count > 0 else float("inf")
 
     max_server = max(counts, key=counts.get)
     min_server = min(counts, key=counts.get)
@@ -177,16 +173,18 @@ def run_analysis(config: VNodesConfig) -> list[DistributionStats]:
         final_keys = list(range(config.num_keys))
         final_stats = analyze_distribution(vnode_count, config.num_servers, final_keys)
 
-        results.append(DistributionStats(
-            vnode_count=vnode_count,
-            counts=final_stats.counts,
-            mean=final_stats.mean,
-            std=final_stats.std,
-            cov=avg_cov,
-            max_min_ratio=avg_ratio,
-            max_server=final_stats.max_server,
-            min_server=final_stats.min_server,
-        ))
+        results.append(
+            DistributionStats(
+                vnode_count=vnode_count,
+                counts=final_stats.counts,
+                mean=final_stats.mean,
+                std=final_stats.std,
+                cov=avg_cov,
+                max_min_ratio=avg_ratio,
+                max_server=final_stats.max_server,
+                min_server=final_stats.min_server,
+            )
+        )
 
     return results
 
@@ -196,7 +194,9 @@ def run_analysis(config: VNodesConfig) -> list[DistributionStats]:
 # =============================================================================
 
 
-def visualize_results(results: list[DistributionStats], config: VNodesConfig, output_dir: Path) -> None:
+def visualize_results(
+    results: list[DistributionStats], config: VNodesConfig, output_dir: Path
+) -> None:
     """Generate virtual nodes analysis visualizations."""
     import matplotlib.pyplot as plt
 
@@ -209,30 +209,30 @@ def visualize_results(results: list[DistributionStats], config: VNodesConfig, ou
     vnodes = [r.vnode_count for r in results]
     covs = [r.cov for r in results]
 
-    ax.plot(vnodes, covs, 'b-o', linewidth=2, markersize=8)
-    ax.set_xscale('log')
+    ax.plot(vnodes, covs, "b-o", linewidth=2, markersize=8)
+    ax.set_xscale("log")
     ax.set_xlabel("Virtual Nodes per Server")
     ax.set_ylabel("Coefficient of Variation (lower = better)")
     ax.set_title("Distribution Uniformity vs Virtual Nodes")
     ax.grid(True, alpha=0.3)
 
     # Add threshold line for "good enough"
-    ax.axhline(y=0.1, color='green', linestyle='--', alpha=0.7, label='Good (CoV < 0.1)')
+    ax.axhline(y=0.1, color="green", linestyle="--", alpha=0.7, label="Good (CoV < 0.1)")
     ax.legend(loc="upper right")
 
     # Top-right: Max/Min ratio vs V-nodes
     ax = axes[0, 1]
     ratios = [r.max_min_ratio for r in results]
 
-    ax.plot(vnodes, ratios, 'r-o', linewidth=2, markersize=8)
-    ax.set_xscale('log')
+    ax.plot(vnodes, ratios, "r-o", linewidth=2, markersize=8)
+    ax.set_xscale("log")
     ax.set_xlabel("Virtual Nodes per Server")
     ax.set_ylabel("Max/Min Key Count Ratio")
     ax.set_title("Load Imbalance vs Virtual Nodes")
     ax.grid(True, alpha=0.3)
 
     # Add threshold line
-    ax.axhline(y=1.2, color='green', linestyle='--', alpha=0.7, label='Good (ratio < 1.2)')
+    ax.axhline(y=1.2, color="green", linestyle="--", alpha=0.7, label="Good (ratio < 1.2)")
     ax.legend(loc="upper right")
 
     # Bottom-left: Key distribution for low vnode count
@@ -241,28 +241,29 @@ def visualize_results(results: list[DistributionStats], config: VNodesConfig, ou
     servers = list(low_vnode.counts.keys())
     counts = list(low_vnode.counts.values())
 
-    bars = ax.bar(servers, counts, color='coral', alpha=0.8)
-    ax.axhline(y=low_vnode.mean, color='blue', linestyle='--',
-               label=f'Mean ({low_vnode.mean:.0f})')
+    bars = ax.bar(servers, counts, color="coral", alpha=0.8)
+    ax.axhline(y=low_vnode.mean, color="blue", linestyle="--", label=f"Mean ({low_vnode.mean:.0f})")
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Number of Keys")
-    ax.set_title(f"Key Distribution with {low_vnode.vnode_count} Virtual Node(s)\n"
-                 f"CoV={low_vnode.cov:.3f}, Max/Min={low_vnode.max_min_ratio:.2f}")
+    ax.set_title(
+        f"Key Distribution with {low_vnode.vnode_count} Virtual Node(s)\n"
+        f"CoV={low_vnode.cov:.3f}, Max/Min={low_vnode.max_min_ratio:.2f}"
+    )
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Highlight imbalance
-    for bar, count in zip(bars, counts):
+    for bar, count in zip(bars, counts, strict=False):
         deviation = (count - low_vnode.mean) / low_vnode.mean * 100
-        color = 'red' if abs(deviation) > 20 else 'black'
+        color = "red" if abs(deviation) > 20 else "black"
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + low_vnode.mean * 0.02,
             f"{deviation:+.0f}%",
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             fontsize=9,
             color=color,
         )
@@ -273,27 +274,30 @@ def visualize_results(results: list[DistributionStats], config: VNodesConfig, ou
     servers = list(high_vnode.counts.keys())
     counts = list(high_vnode.counts.values())
 
-    bars = ax.bar(servers, counts, color='steelblue', alpha=0.8)
-    ax.axhline(y=high_vnode.mean, color='blue', linestyle='--',
-               label=f'Mean ({high_vnode.mean:.0f})')
+    bars = ax.bar(servers, counts, color="steelblue", alpha=0.8)
+    ax.axhline(
+        y=high_vnode.mean, color="blue", linestyle="--", label=f"Mean ({high_vnode.mean:.0f})"
+    )
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Number of Keys")
-    ax.set_title(f"Key Distribution with {high_vnode.vnode_count} Virtual Nodes\n"
-                 f"CoV={high_vnode.cov:.3f}, Max/Min={high_vnode.max_min_ratio:.2f}")
+    ax.set_title(
+        f"Key Distribution with {high_vnode.vnode_count} Virtual Nodes\n"
+        f"CoV={high_vnode.cov:.3f}, Max/Min={high_vnode.max_min_ratio:.2f}"
+    )
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Highlight (much smaller) imbalance
-    for bar, count in zip(bars, counts):
+    for bar, count in zip(bars, counts, strict=False):
         deviation = (count - high_vnode.mean) / high_vnode.mean * 100
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + high_vnode.mean * 0.02,
             f"{deviation:+.1f}%",
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             fontsize=9,
         )
 
@@ -308,9 +312,15 @@ def visualize_results(results: list[DistributionStats], config: VNodesConfig, ou
     x = list(range(len(results)))
     width = 0.35
 
-    ax.bar([i - width/2 for i in x], covs, width, label='CoV', color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], [r - 1 for r in ratios], width,
-           label='Max/Min - 1', color='coral', alpha=0.8)
+    ax.bar([i - width / 2 for i in x], covs, width, label="CoV", color="steelblue", alpha=0.8)
+    ax.bar(
+        [i + width / 2 for i in x],
+        [r - 1 for r in ratios],
+        width,
+        label="Max/Min - 1",
+        color="coral",
+        alpha=0.8,
+    )
 
     ax.set_xlabel("Virtual Nodes per Server")
     ax.set_ylabel("Value (lower = better)")
@@ -318,7 +328,7 @@ def visualize_results(results: list[DistributionStats], config: VNodesConfig, ou
     ax.set_xticks(x)
     ax.set_xticklabels([str(v) for v in vnodes])
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     fig.tight_layout()
     fig.savefig(output_dir / "vnodes_metrics_comparison.png", dpi=150)
@@ -332,12 +342,12 @@ def print_summary(results: list[DistributionStats], config: VNodesConfig) -> Non
     print("VIRTUAL NODES ANALYSIS FOR CONSISTENT HASHING")
     print("=" * 70)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Servers: {config.num_servers}")
     print(f"  Keys: {config.num_keys}")
     print(f"  Trials per vnode count: {config.num_trials}")
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  {'V-Nodes':>10} | {'CoV':>8} | {'Max/Min':>8} | {'Recommendation':>20}")
     print(f"  {'-' * 10} | {'-' * 8} | {'-' * 8} | {'-' * 20}")
 
@@ -360,18 +370,20 @@ def print_summary(results: list[DistributionStats], config: VNodesConfig) -> Non
     if good_vnodes:
         sweet_spot = min(good_vnodes, key=lambda r: r.vnode_count)
         print(f"\nSweet Spot: {sweet_spot.vnode_count} virtual nodes")
-        print(f"  - Achieves CoV < 0.10 (good uniformity)")
-        print(f"  - Minimal memory overhead")
+        print("  - Achieves CoV < 0.10 (good uniformity)")
+        print("  - Minimal memory overhead")
 
     print("\n" + "=" * 70)
     print("KEY INSIGHTS:")
     print("-" * 70)
-    print(f"\n1. With 1 virtual node per server, distribution is highly uneven")
-    print(f"   ({results[0].max_server} has {results[0].max_min_ratio:.1f}x more keys than {results[0].min_server})")
+    print("\n1. With 1 virtual node per server, distribution is highly uneven")
+    print(
+        f"   ({results[0].max_server} has {results[0].max_min_ratio:.1f}x more keys than {results[0].min_server})"
+    )
     print(f"\n2. With {results[-1].vnode_count} virtual nodes, distribution is nearly uniform")
     print(f"   (variance is only {results[-1].cov:.1%} of the mean)")
-    print(f"\n3. Industry standard: 100-200 virtual nodes provides good balance")
-    print(f"   of uniformity vs memory/computation overhead")
+    print("\n3. Industry standard: 100-200 virtual nodes provides good balance")
+    print("   of uniformity vs memory/computation overhead")
     print("=" * 70)
 
 
@@ -389,8 +401,9 @@ if __name__ == "__main__":
     parser.add_argument("--servers", type=int, default=5, help="Number of servers")
     parser.add_argument("--keys", type=int, default=10000, help="Number of keys to distribute")
     parser.add_argument("--trials", type=int, default=5, help="Number of trials per vnode count")
-    parser.add_argument("--output", type=str, default="output/load-balancing",
-                        help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/load-balancing", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
 
     args = parser.parse_args()

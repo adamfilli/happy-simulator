@@ -19,32 +19,44 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Entity, Event, Instant, LatencyTracker, QueuedResource, FIFOQueue,
-    PriorityQueue, Resource, Simulation, SimulationSummary, Source,
+    Entity,
+    Event,
+    FIFOQueue,
+    Instant,
+    LatencyTracker,
+    PriorityQueue,
+    QueuedResource,
+    Resource,
+    Simulation,
+    SimulationSummary,
+    Source,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True)
 class ERConfig:
     duration_s: float = 28800.0  # 8 hours
-    arrival_rate: float = 0.02   # patients per second (~72/hr)
+    arrival_rate: float = 0.02  # patients per second (~72/hr)
     num_doctors: int = 3
     num_nurses: int = 6
     num_beds: int = 10
-    triage_time: float = 120.0   # 2 minutes
+    triage_time: float = 120.0  # 2 minutes
     seed: int = 42
 
 
 # Treatment times by priority (1=critical, 5=minor)
 TREATMENT_TIMES = {
-    1: 3600.0,   # 60 min (critical)
-    2: 1800.0,   # 30 min
-    3: 900.0,    # 15 min
-    4: 600.0,    # 10 min
-    5: 300.0,    # 5 min
+    1: 3600.0,  # 60 min (critical)
+    2: 1800.0,  # 30 min
+    3: 900.0,  # 15 min
+    4: 600.0,  # 10 min
+    5: 300.0,  # 5 min
 }
 
 PRIORITY_WEIGHTS = {1: 0.05, 2: 0.15, 3: 0.30, 4: 0.30, 5: 0.20}
@@ -76,17 +88,15 @@ class TriageNurse(QueuedResource):
         ctx["priority"] = priority
         ctx["treatment_time"] = random.expovariate(1.0 / TREATMENT_TIMES[priority])
 
-        return [
-            Event(time=self.now, event_type="Treatment",
-                  target=self.downstream, context=ctx)
-        ]
+        return [Event(time=self.now, event_type="Treatment", target=self.downstream, context=ctx)]
 
 
 class TreatmentRoom(QueuedResource):
     """Treats patients using shared doctor and bed resources."""
 
-    def __init__(self, name: str, doctors: Resource, beds: Resource,
-                 downstream: Entity, concurrency: int = 3):
+    def __init__(
+        self, name: str, doctors: Resource, beds: Resource, downstream: Entity, concurrency: int = 3
+    ):
         super().__init__(
             name,
             policy=PriorityQueue(key=lambda e: e.context.get("priority", 5)),
@@ -116,9 +126,7 @@ class TreatmentRoom(QueuedResource):
         self._active -= 1
         self.treated += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Discharged")
-        ]
+        return [self.forward(event, self.downstream, event_type="Discharged")]
 
 
 @dataclass
@@ -142,14 +150,19 @@ def run_er_simulation(config: ERConfig | None = None) -> ERResult:
     beds = Resource("Beds", capacity=config.num_beds)
 
     treatment = TreatmentRoom(
-        "Treatment", doctors=doctors, beds=beds,
-        downstream=sink, concurrency=config.num_doctors,
+        "Treatment",
+        doctors=doctors,
+        beds=beds,
+        downstream=sink,
+        concurrency=config.num_doctors,
     )
     triage = TriageNurse("Triage", downstream=treatment)
 
     source = Source.poisson(
-        rate=config.arrival_rate, target=triage,
-        event_type="Patient", name="Arrivals",
+        rate=config.arrival_rate,
+        target=triage,
+        event_type="Patient",
+        name="Arrivals",
         stop_after=config.duration_s,
     )
 
@@ -162,8 +175,13 @@ def run_er_simulation(config: ERConfig | None = None) -> ERResult:
     summary = sim.run()
 
     return ERResult(
-        sink=sink, triage=triage, treatment=treatment,
-        doctors=doctors, beds=beds, config=config, summary=summary,
+        sink=sink,
+        triage=triage,
+        treatment=treatment,
+        doctors=doctors,
+        beds=beds,
+        config=config,
+        summary=summary,
     )
 
 
@@ -172,25 +190,25 @@ def print_summary(result: ERResult) -> None:
     print("EMERGENCY ROOM SIMULATION RESULTS")
     print("=" * 60)
 
-    print(f"\nConfiguration:")
-    print(f"  Duration: {result.config.duration_s/3600:.0f} hours")
+    print("\nConfiguration:")
+    print(f"  Duration: {result.config.duration_s / 3600:.0f} hours")
     print(f"  Doctors: {result.config.num_doctors}, Beds: {result.config.num_beds}")
 
-    print(f"\nPatient Flow:")
+    print("\nPatient Flow:")
     print(f"  Triaged: {result.triage.triaged}")
     print(f"  Treated: {result.treatment.treated}")
     print(f"  Discharged: {result.sink.count}")
 
-    print(f"\nResource Utilization:")
+    print("\nResource Utilization:")
     ds = result.doctors.stats
     bs = result.beds.stats
-    print(f"  Doctors: {ds.peak_utilization*100:.0f}% peak, {ds.contentions} contentions")
-    print(f"  Beds: {bs.peak_utilization*100:.0f}% peak, {bs.contentions} contentions")
+    print(f"  Doctors: {ds.peak_utilization * 100:.0f}% peak, {ds.contentions} contentions")
+    print(f"  Beds: {bs.peak_utilization * 100:.0f}% peak, {bs.contentions} contentions")
 
     if result.sink.count > 0:
-        print(f"\nLatency:")
-        print(f"  Avg: {result.sink.mean_latency()/60:.1f} min")
-        print(f"  p99: {result.sink.p99()/60:.1f} min")
+        print("\nLatency:")
+        print(f"  Avg: {result.sink.mean_latency() / 60:.1f} min")
+        print(f"  p99: {result.sink.p99() / 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 60)

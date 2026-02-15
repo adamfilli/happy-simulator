@@ -51,7 +51,6 @@ from pathlib import Path
 
 from happysimulator.components.storage import SSTable
 
-
 # =============================================================================
 # Analysis
 # =============================================================================
@@ -147,19 +146,21 @@ def run_bloom_filter_analysis(
 
         actual_fp_rate = false_positives / num_test_keys if num_test_keys > 0 else 0.0
 
-        results.append(BloomFilterResult(
-            configured_fp_rate=fp_rate,
-            actual_fp_rate=actual_fp_rate,
-            bloom_size_bits=sst.bloom_filter.size_bits,
-            num_entries=num_entries,
-            existing_keys_tested=existing_tested,
-            missing_keys_tested=num_test_keys,
-            false_positives=false_positives,
-            true_negatives=true_negatives,
-            page_reads_with_bloom=page_reads_with_bloom,
-            page_reads_without_bloom=page_reads_without_bloom,
-            page_reads_saved=page_reads_without_bloom - page_reads_with_bloom,
-        ))
+        results.append(
+            BloomFilterResult(
+                configured_fp_rate=fp_rate,
+                actual_fp_rate=actual_fp_rate,
+                bloom_size_bits=sst.bloom_filter.size_bits,
+                num_entries=num_entries,
+                existing_keys_tested=existing_tested,
+                missing_keys_tested=num_test_keys,
+                false_positives=false_positives,
+                true_negatives=true_negatives,
+                page_reads_with_bloom=page_reads_with_bloom,
+                page_reads_without_bloom=page_reads_without_bloom,
+                page_reads_saved=page_reads_without_bloom - page_reads_with_bloom,
+            )
+        )
 
     return ComparisonResult(
         results=results,
@@ -180,7 +181,7 @@ def print_summary(comparison: ComparisonResult) -> None:
     print("SSTABLE BLOOM FILTER ANALYSIS")
     print("=" * 90)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  SSTable entries:     {comparison.num_entries:,}")
     print(f"  Existing keys tested: {comparison.num_existing_tested:,}")
     print(f"  Missing keys tested:  {comparison.num_missing_tested:,}")
@@ -218,14 +219,20 @@ def print_summary(comparison: ComparisonResult) -> None:
         best = min(comparison.results, key=lambda r: r.actual_fp_rate)
         worst = max(comparison.results, key=lambda r: r.actual_fp_rate)
         print("Observations:")
-        print(f"  - Tightest filter (fp={best.configured_fp_rate}) saved {best.page_reads_saved:,} page reads")
+        print(
+            f"  - Tightest filter (fp={best.configured_fp_rate}) saved {best.page_reads_saved:,} page reads"
+        )
         print(f"    but used {best.bloom_size_bits / 8 / 1024:.1f} KB of memory")
-        print(f"  - Loosest filter (fp={worst.configured_fp_rate}) saved {worst.page_reads_saved:,} page reads")
+        print(
+            f"  - Loosest filter (fp={worst.configured_fp_rate}) saved {worst.page_reads_saved:,} page reads"
+        )
         print(f"    using only {worst.bloom_size_bits / 8 / 1024:.1f} KB of memory")
         if best.bloom_size_bits > 0 and worst.bloom_size_bits > 0:
             memory_ratio = best.bloom_size_bits / worst.bloom_size_bits
             reads_diff = best.page_reads_saved - worst.page_reads_saved
-            print(f"  - The tightest filter uses {memory_ratio:.1f}x more memory for {reads_diff:,} additional page reads saved")
+            print(
+                f"  - The tightest filter uses {memory_ratio:.1f}x more memory for {reads_diff:,} additional page reads saved"
+            )
 
     print("\n" + "=" * 90)
 
@@ -239,6 +246,7 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     """Generate bar charts of bloom filter effectiveness."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -259,10 +267,24 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     ax = axes[0]
     x = range(len(labels))
     width = 0.35
-    bars1 = ax.bar([i - width / 2 for i in x], configured_rates, width,
-                   label="Configured", color="#3498db", edgecolor="black", alpha=0.85)
-    bars2 = ax.bar([i + width / 2 for i in x], actual_rates, width,
-                   label="Actual", color="#e74c3c", edgecolor="black", alpha=0.85)
+    ax.bar(
+        [i - width / 2 for i in x],
+        configured_rates,
+        width,
+        label="Configured",
+        color="#3498db",
+        edgecolor="black",
+        alpha=0.85,
+    )
+    ax.bar(
+        [i + width / 2 for i in x],
+        actual_rates,
+        width,
+        label="Actual",
+        color="#e74c3c",
+        edgecolor="black",
+        alpha=0.85,
+    )
     ax.set_xticks(list(x))
     ax.set_xticklabels(labels)
     ax.set_ylabel("False Positive Rate")
@@ -273,22 +295,42 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     # Chart 2: Page reads saved
     ax = axes[1]
     colors = ["#2ecc71", "#27ae60", "#1e8449"]
-    bars = ax.bar(labels, page_reads_saved, color=colors[:len(labels)],
-                  edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, page_reads_saved):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 50,
-                f"{val:,}", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    bars = ax.bar(
+        labels, page_reads_saved, color=colors[: len(labels)], edgecolor="black", alpha=0.85
+    )
+    for bar, val in zip(bars, page_reads_saved, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 50,
+            f"{val:,}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
     ax.set_ylabel("Page Reads Saved")
     ax.set_title("Page Reads Saved (missing key lookups)")
     ax.grid(True, alpha=0.3, axis="y")
 
     # Chart 3: Memory overhead
     ax = axes[2]
-    bars = ax.bar(labels, bloom_kb, color=["#9b59b6", "#8e44ad", "#6c3483"][:len(labels)],
-                  edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, bloom_kb):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.1,
-                f"{val:.1f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    bars = ax.bar(
+        labels,
+        bloom_kb,
+        color=["#9b59b6", "#8e44ad", "#6c3483"][: len(labels)],
+        edgecolor="black",
+        alpha=0.85,
+    )
+    for bar, val in zip(bars, bloom_kb, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.1,
+            f"{val:.1f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
     ax.set_ylabel("Bloom Filter Size (KB)")
     ax.set_title("Memory Overhead")
     ax.grid(True, alpha=0.3, axis="y")
@@ -316,9 +358,13 @@ if __name__ == "__main__":
         description="SSTable bloom filter analysis: page reads saved for missing keys"
     )
     parser.add_argument("--entries", type=int, default=10_000, help="Number of SSTable entries")
-    parser.add_argument("--test-keys", type=int, default=10_000, help="Number of test keys (existing and missing)")
+    parser.add_argument(
+        "--test-keys", type=int, default=10_000, help="Number of test keys (existing and missing)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/sstable_bloom_filter", help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/sstable_bloom_filter", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
@@ -327,7 +373,7 @@ if __name__ == "__main__":
     print("Running SSTable bloom filter analysis...")
     print(f"  Entries: {args.entries:,}")
     print(f"  Test keys: {args.test_keys:,} existing + {args.test_keys:,} missing")
-    print(f"  FP rates: 0.001, 0.01, 0.1")
+    print("  FP rates: 0.001, 0.01, 0.1")
 
     comparison = run_bloom_filter_analysis(
         num_entries=args.entries,

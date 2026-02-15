@@ -1,7 +1,5 @@
 """Tests for Log and LogEntry."""
 
-import pytest
-
 from happysimulator.components.consensus import Log, LogEntry
 
 

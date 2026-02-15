@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.faults.fault import FaultContext
+
+if TYPE_CHECKING:
+    from happysimulator.faults.fault import FaultContext
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +46,17 @@ class ReduceCapacity:
 
         def activate(e: Event) -> None:
             new_capacity = original_capacity * factor
-            reduction = resource._capacity - new_capacity
+            resource._capacity - new_capacity
             resource._capacity = new_capacity
             # Clamp available to not exceed new capacity
             if resource._available > new_capacity:
                 resource._available = new_capacity
             logger.info(
                 "[FaultInjection] Reduced '%s' capacity to %.1f (factor=%.2f) at %s",
-                resource_name, new_capacity, factor, e.time,
+                resource_name,
+                new_capacity,
+                factor,
+                e.time,
             )
 
         def deactivate(e: Event) -> None:
@@ -60,7 +66,9 @@ class ReduceCapacity:
             resource._available += capacity_increase
             logger.info(
                 "[FaultInjection] Restored '%s' capacity to %.1f at %s",
-                resource_name, original_capacity, e.time,
+                resource_name,
+                original_capacity,
+                e.time,
             )
 
         return [

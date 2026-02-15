@@ -2,8 +2,6 @@
 
 import math
 
-import pytest
-
 from happysimulator.numerics.integration import integrate_adaptive_simpson
 
 
@@ -89,6 +87,7 @@ class TestAdaptiveSimpson:
 
     def test_piecewise_constant_approximation(self):
         """Integration of step function (requires adaptation)."""
+
         # Step function: 0 for x < 0.5, 1 for x >= 0.5
         def step(x: float) -> float:
             return 1.0 if x >= 0.5 else 0.0
@@ -109,6 +108,7 @@ class TestIntegrationRateProfiles:
 
     def test_linear_ramp_integral(self):
         """Integral of linear ramp from 10 to 100 over 10s at early time."""
+
         # rate(t) = 10 + 9*t for t in [0, 10]
         def ramp(t: float) -> float:
             return 10.0 + 9.0 * t
@@ -121,6 +121,7 @@ class TestIntegrationRateProfiles:
 
     def test_varying_rate_integral(self):
         """Integration of time-varying rate profile."""
+
         # Sinusoidal rate: rate(t) = 50 + 20*sin(2*pi*t)
         def sinusoidal_rate(t: float) -> float:
             return 50.0 + 20.0 * math.sin(2 * math.pi * t)

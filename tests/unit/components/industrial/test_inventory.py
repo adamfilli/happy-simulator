@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from happysimulator.components.industrial.inventory import InventoryBuffer
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.inventory import InventoryBuffer
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestInventoryBasics:
-
     def test_creates_with_defaults(self):
         inv = InventoryBuffer("inv")
         assert inv.stock == 100
@@ -28,9 +27,7 @@ class TestInventoryBasics:
             end_time=Instant.from_seconds(1.0),
             entities=[inv],
         )
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="Consume", target=inv)
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="Consume", target=inv))
         sim.run()
 
         assert inv.stock == 9
@@ -38,7 +35,8 @@ class TestInventoryBasics:
     def test_stockout_when_empty(self):
         stockout_sink = Sink("stockouts")
         inv = InventoryBuffer(
-            "inv", initial_stock=0,
+            "inv",
+            initial_stock=0,
             stockout_target=stockout_sink,
             reorder_point=10,
         )
@@ -48,9 +46,7 @@ class TestInventoryBasics:
             end_time=Instant.from_seconds(100.0),
             entities=[inv, stockout_sink],
         )
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="Consume", target=inv)
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="Consume", target=inv))
         sim.run()
 
         assert inv.stats.stockouts == 1
@@ -88,7 +84,9 @@ class TestInventoryBasics:
     def test_downstream_gets_fulfilled_events(self):
         downstream = Sink("downstream")
         inv = InventoryBuffer(
-            "inv", initial_stock=5, downstream=downstream,
+            "inv",
+            initial_stock=5,
+            downstream=downstream,
             reorder_point=0,
         )
 
@@ -97,10 +95,8 @@ class TestInventoryBasics:
             end_time=Instant.from_seconds(1.0),
             entities=[inv, downstream],
         )
-        for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type="Consume", target=inv)
-            )
+        for _i in range(3):
+            sim.schedule(Event(time=Instant.Epoch, event_type="Consume", target=inv))
         sim.run()
 
         assert downstream.events_received == 3

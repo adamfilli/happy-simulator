@@ -34,7 +34,9 @@ class ExponentialLatency(LatencyDistribution):
         """
         super().__init__(mean_latency)
         self._lambda = 1 / self._mean_latency
-        logger.debug("ExponentialLatency created: mean=%.6fs lambda=%.6f", self._mean_latency, self._lambda)
+        logger.debug(
+            "ExponentialLatency created: mean=%.6fs lambda=%.6f", self._mean_latency, self._lambda
+        )
 
     def get_latency(self, current_time: Instant) -> Duration:
         """Sample a random latency from the exponential distribution."""

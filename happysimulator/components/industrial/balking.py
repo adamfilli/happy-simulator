@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Optional, TypeVar
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
 
@@ -53,21 +53,20 @@ class BalkingQueue(QueuePolicy[T]):
         return self._inner
 
     def push(self, item: T) -> bool:
-        if len(self._inner) >= self.balk_threshold:
-            if random.random() < self.balk_probability:
-                self.balked += 1
-                logger.debug(
-                    "BalkingQueue: item balked (depth=%d >= threshold=%d)",
-                    len(self._inner),
-                    self.balk_threshold,
-                )
-                return False
+        if len(self._inner) >= self.balk_threshold and random.random() < self.balk_probability:
+            self.balked += 1
+            logger.debug(
+                "BalkingQueue: item balked (depth=%d >= threshold=%d)",
+                len(self._inner),
+                self.balk_threshold,
+            )
+            return False
         return self._inner.push(item)
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         return self._inner.pop()
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         return self._inner.peek()
 
     def is_empty(self) -> bool:

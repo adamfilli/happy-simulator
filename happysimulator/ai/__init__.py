@@ -4,13 +4,13 @@ Provides rich result wrappers, comparison tools, and recommendations
 for simulation output analysis.
 """
 
+from happysimulator.ai.insights import Recommendation, generate_recommendations
 from happysimulator.ai.result import (
     MetricDiff,
     SimulationComparison,
     SimulationResult,
     SweepResult,
 )
-from happysimulator.ai.insights import Recommendation, generate_recommendations
 
 __all__ = [
     "MetricDiff",

@@ -18,11 +18,11 @@ from happysimulator.visual.dashboard import Chart
 if TYPE_CHECKING:
     from happysimulator.core.simulation import Simulation
 
-__all__ = ["serve", "Chart"]
+__all__ = ["Chart", "serve"]
 
 
 def serve(
-    sim: "Simulation",
+    sim: Simulation,
     *,
     charts: list[Chart] | None = None,
     host: str = "127.0.0.1",
@@ -42,7 +42,7 @@ def serve(
         open_browser: Whether to open the default browser automatically.
     """
     try:
-        import uvicorn  # noqa: F811
+        import uvicorn
     except ImportError:
         raise ImportError(
             "The visual debugger requires extra dependencies.\n"

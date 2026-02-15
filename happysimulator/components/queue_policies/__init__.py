@@ -29,48 +29,48 @@ Example:
     fair = FairQueue(get_flow_id=lambda e: e.context["tenant_id"])
 """
 
+from happysimulator.components.queue_policies.adaptive_lifo import (
+    AdaptiveLIFO,
+    AdaptiveLIFOStats,
+)
 from happysimulator.components.queue_policies.codel import (
     CoDelQueue,
     CoDelStats,
-)
-from happysimulator.components.queue_policies.red import (
-    REDQueue,
-    REDStats,
-)
-from happysimulator.components.queue_policies.fair_queue import (
-    FairQueue,
-    FairQueueStats,
-)
-from happysimulator.components.queue_policies.weighted_fair_queue import (
-    WeightedFairQueue,
-    WeightedFairQueueStats,
 )
 from happysimulator.components.queue_policies.deadline_queue import (
     DeadlineQueue,
     DeadlineQueueStats,
 )
-from happysimulator.components.queue_policies.adaptive_lifo import (
-    AdaptiveLIFO,
-    AdaptiveLIFOStats,
+from happysimulator.components.queue_policies.fair_queue import (
+    FairQueue,
+    FairQueueStats,
+)
+from happysimulator.components.queue_policies.red import (
+    REDQueue,
+    REDStats,
+)
+from happysimulator.components.queue_policies.weighted_fair_queue import (
+    WeightedFairQueue,
+    WeightedFairQueueStats,
 )
 
 __all__ = [
-    # CoDel
-    "CoDelQueue",
-    "CoDelStats",
-    # RED
-    "REDQueue",
-    "REDStats",
-    # Fair Queue
-    "FairQueue",
-    "FairQueueStats",
-    # Weighted Fair Queue
-    "WeightedFairQueue",
-    "WeightedFairQueueStats",
-    # Deadline Queue
-    "DeadlineQueue",
-    "DeadlineQueueStats",
     # Adaptive LIFO
     "AdaptiveLIFO",
     "AdaptiveLIFOStats",
+    # CoDel
+    "CoDelQueue",
+    "CoDelStats",
+    # Deadline Queue
+    "DeadlineQueue",
+    "DeadlineQueueStats",
+    # Fair Queue
+    "FairQueue",
+    "FairQueueStats",
+    # RED
+    "REDQueue",
+    "REDStats",
+    # Weighted Fair Queue
+    "WeightedFairQueue",
+    "WeightedFairQueueStats",
 ]

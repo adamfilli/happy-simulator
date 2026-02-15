@@ -1,16 +1,14 @@
 """Unit tests for LSMTree."""
 
-import pytest
-
 from happysimulator.components.storage.lsm_tree import (
+    FIFOCompaction,
+    LeveledCompaction,
     LSMTree,
     LSMTreeStats,
     SizeTieredCompaction,
-    LeveledCompaction,
-    FIFOCompaction,
 )
-from happysimulator.components.storage.wal import WriteAheadLog
 from happysimulator.components.storage.sstable import SSTable
+from happysimulator.components.storage.wal import WriteAheadLog
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
@@ -83,29 +81,29 @@ class TestLSMTree:
         return lsm, sim
 
     def test_put_sync_and_get_sync(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         lsm.put_sync("key1", "value1")
         assert lsm.get_sync("key1") == "value1"
 
     def test_get_sync_missing(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         assert lsm.get_sync("missing") is None
 
     def test_multiple_puts_and_gets(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         for i in range(50):
             lsm.put_sync(f"key_{i:03d}", i)
         for i in range(50):
             assert lsm.get_sync(f"key_{i:03d}") == i
 
     def test_overwrite_key(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         lsm.put_sync("key", "old")
         lsm.put_sync("key", "new")
         assert lsm.get_sync("key") == "new"
 
     def test_flush_on_full_memtable(self):
-        lsm, sim = self._make_lsm(memtable_size=5)
+        lsm, _sim = self._make_lsm(memtable_size=5)
         for i in range(6):
             lsm.put_sync(f"key_{i}", i)
         # After 5 puts, memtable should have flushed
@@ -113,7 +111,7 @@ class TestLSMTree:
         assert len(lsm._levels[0]) >= 1
 
     def test_data_survives_flush(self):
-        lsm, sim = self._make_lsm(memtable_size=3)
+        lsm, _sim = self._make_lsm(memtable_size=3)
         lsm.put_sync("a", 1)
         lsm.put_sync("b", 2)
         lsm.put_sync("c", 3)  # triggers flush
@@ -123,7 +121,7 @@ class TestLSMTree:
         assert lsm.get_sync("d") == 4
 
     def test_compaction_triggered(self):
-        lsm, sim = self._make_lsm(
+        lsm, _sim = self._make_lsm(
             memtable_size=5,
             compaction_strategy=SizeTieredCompaction(min_sstables=2),
         )
@@ -135,7 +133,7 @@ class TestLSMTree:
         assert lsm._total_compactions >= 1
 
     def test_data_survives_compaction(self):
-        lsm, sim = self._make_lsm(
+        lsm, _sim = self._make_lsm(
             memtable_size=5,
             compaction_strategy=SizeTieredCompaction(min_sstables=2),
         )
@@ -149,25 +147,26 @@ class TestLSMTree:
             assert lsm.get_sync(key) == value
 
     def test_delete(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         lsm.put_sync("key", "value")
         assert lsm.get_sync("key") == "value"
         # Delete via put_sync with tombstone (using internal API for sync delete)
         from happysimulator.components.storage.lsm_tree import _TOMBSTONE
+
         lsm._memtable.put_sync("key", _TOMBSTONE)
         lsm._total_writes += 1
         assert lsm.get_sync("key") is None
 
     def test_with_wal(self):
         wal = WriteAheadLog("test_wal")
-        lsm, sim = self._make_lsm(wal=wal)
+        lsm, _sim = self._make_lsm(wal=wal)
         lsm.put_sync("key", "value")
         assert lsm.get_sync("key") == "value"
         assert wal.size >= 0  # WAL may have been truncated
         assert lsm.stats.wal_writes >= 1
 
     def test_stats(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         lsm.put_sync("a", 1)
         lsm.get_sync("a")
         lsm.get_sync("missing")
@@ -180,7 +179,7 @@ class TestLSMTree:
         assert stats.read_misses >= 1
 
     def test_level_summary(self):
-        lsm, sim = self._make_lsm(memtable_size=3)
+        lsm, _sim = self._make_lsm(memtable_size=3)
         for i in range(10):
             lsm.put_sync(f"key_{i}", i)
 
@@ -191,7 +190,7 @@ class TestLSMTree:
             assert len(summary) > 0
 
     def test_bloom_filter_saves(self):
-        lsm, sim = self._make_lsm(memtable_size=5)
+        lsm, _sim = self._make_lsm(memtable_size=5)
         # Put data and flush to SSTables
         for i in range(10):
             lsm.put_sync(f"key_{i}", i)
@@ -203,11 +202,11 @@ class TestLSMTree:
         assert lsm.stats.bloom_filter_saves > 0
 
     def test_repr(self):
-        lsm, sim = self._make_lsm()
+        lsm, _sim = self._make_lsm()
         assert "test_lsm" in repr(lsm)
 
     def test_leveled_compaction_integration(self):
-        lsm, sim = self._make_lsm(
+        lsm, _sim = self._make_lsm(
             memtable_size=5,
             compaction_strategy=LeveledCompaction(level_0_max=2, base_size_keys=10),
         )
@@ -219,7 +218,7 @@ class TestLSMTree:
             assert lsm.get_sync(f"key_{i:03d}") == i
 
     def test_fifo_compaction_integration(self):
-        lsm, sim = self._make_lsm(
+        lsm, _sim = self._make_lsm(
             memtable_size=3,
             compaction_strategy=FIFOCompaction(max_total_sstables=3),
         )

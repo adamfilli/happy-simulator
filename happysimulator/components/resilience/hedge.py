@@ -20,8 +20,8 @@ Example:
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -213,7 +213,9 @@ class Hedge(Entity):
 
         return events
 
-    def _create_request_event(self, request_id: int, original_event: Event, is_hedge: bool) -> Event:
+    def _create_request_event(
+        self, request_id: int, original_event: Event, is_hedge: bool
+    ) -> Event:
         """Create a request event to send to target."""
         forwarded = Event(
             time=self.now,
@@ -321,7 +323,7 @@ class Hedge(Entity):
                 self.name,
                 request_id,
             )
-            return None
+            return
 
         request_info = self._in_flight[request_id]
         request_info["responses_received"] += 1
@@ -354,4 +356,4 @@ class Hedge(Entity):
         if request_info["responses_received"] >= expected:
             del self._in_flight[request_id]
 
-        return None
+        return

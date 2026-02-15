@@ -27,9 +27,9 @@ steps in reverse order.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -41,8 +41,10 @@ from happysimulator import (
     Simulation,
     Source,
 )
-from happysimulator.components.microservice import Saga, SagaStep, SagaState
+from happysimulator.components.microservice import Saga, SagaState, SagaStep
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Components
@@ -58,7 +60,7 @@ class ReliableService(Entity):
         self.actions = 0
         self.compensations = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         metadata = event.context.get("metadata", {})
         if metadata.get("_saga_compensation"):
             self.compensations += 1
@@ -70,8 +72,13 @@ class ReliableService(Entity):
 class UnreliableService(Entity):
     """Service that is sometimes very slow (simulating failures)."""
 
-    def __init__(self, name: str, normal_latency: float = 0.01,
-                 slow_latency: float = 100.0, failure_rate: float = 0.5):
+    def __init__(
+        self,
+        name: str,
+        normal_latency: float = 0.01,
+        slow_latency: float = 100.0,
+        failure_rate: float = 0.5,
+    ):
         super().__init__(name)
         self.normal_latency = normal_latency
         self.slow_latency = slow_latency
@@ -79,7 +86,7 @@ class UnreliableService(Entity):
         self.actions = 0
         self.compensations = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         metadata = event.context.get("metadata", {})
         if metadata.get("_saga_compensation"):
             self.compensations += 1
@@ -104,12 +111,14 @@ class OrderProvider(EventProvider):
         if self._stop_after and time > self._stop_after:
             return []
         self._order_id += 1
-        return [Event(
-            time=time,
-            event_type="start_order",
-            target=self._saga,
-            context={"payload": {"order_id": self._order_id}},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="start_order",
+                target=self._saga,
+                context={"payload": {"order_id": self._order_id}},
+            )
+        ]
 
 
 # =============================================================================
@@ -157,12 +166,18 @@ def run_saga_simulation(
     saga = Saga(
         name="OrderSaga",
         steps=[
-            SagaStep("reserve_inventory", inventory, "reserve",
-                     inventory, "release", timeout=step_timeout),
-            SagaStep("charge_payment", payment, "charge",
-                     payment, "refund", timeout=step_timeout),
-            SagaStep("ship_order", shipping, "ship",
-                     shipping, "cancel_shipment", timeout=step_timeout),
+            SagaStep(
+                "reserve_inventory",
+                inventory,
+                "reserve",
+                inventory,
+                "release",
+                timeout=step_timeout,
+            ),
+            SagaStep("charge_payment", payment, "charge", payment, "refund", timeout=step_timeout),
+            SagaStep(
+                "ship_order", shipping, "ship", shipping, "cancel_shipment", timeout=step_timeout
+            ),
         ],
         on_complete=on_complete,
     )
@@ -201,24 +216,30 @@ def print_summary(result: SimulationResult) -> None:
     print("SAGA FAILURE CASCADE — RESULTS")
     print("=" * 60)
 
-    completed = sum(1 for _, st in result.saga_outcomes if st == SagaState.COMPLETED)
-    compensated = sum(1 for _, st in result.saga_outcomes if st == SagaState.COMPENSATED)
+    sum(1 for _, st in result.saga_outcomes if st == SagaState.COMPLETED)
+    sum(1 for _, st in result.saga_outcomes if st == SagaState.COMPENSATED)
 
-    print(f"\nSagas:")
+    print("\nSagas:")
     print(f"  Started:       {s.sagas_started}")
     print(f"  Completed:     {s.sagas_completed}")
     print(f"  Compensated:   {s.sagas_compensated}")
     print(f"  Failed:        {s.sagas_failed}")
 
-    print(f"\nSteps:")
+    print("\nSteps:")
     print(f"  Executed:      {s.steps_executed}")
     print(f"  Failed:        {s.steps_failed}")
     print(f"  Compensated:   {s.compensations_executed}")
 
-    print(f"\nServices:")
-    print(f"  Inventory: {result.inventory.actions} actions, {result.inventory.compensations} compensations")
-    print(f"  Payment:   {result.payment.actions} actions, {result.payment.compensations} compensations")
-    print(f"  Shipping:  {result.shipping.actions} actions, {result.shipping.compensations} compensations")
+    print("\nServices:")
+    print(
+        f"  Inventory: {result.inventory.actions} actions, {result.inventory.compensations} compensations"
+    )
+    print(
+        f"  Payment:   {result.payment.actions} actions, {result.payment.compensations} compensations"
+    )
+    print(
+        f"  Shipping:  {result.shipping.actions} actions, {result.shipping.compensations} compensations"
+    )
 
     if s.sagas_started > 0:
         success_rate = s.sagas_completed / s.sagas_started * 100
@@ -230,6 +251,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate saga outcome visualization."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -252,8 +274,11 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[1]
     services = ["Inventory", "Payment", "Shipping"]
     actions = [result.inventory.actions, result.payment.actions, result.shipping.actions]
-    comps = [result.inventory.compensations, result.payment.compensations,
-             result.shipping.compensations]
+    comps = [
+        result.inventory.compensations,
+        result.payment.compensations,
+        result.shipping.compensations,
+    ]
     x = range(len(services))
     w = 0.35
     ax.bar([i - w / 2 for i in x], actions, w, label="Actions", color="#3498db", alpha=0.8)

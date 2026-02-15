@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +98,7 @@ class BatchProcessor(Entity):
             timeouts=self._timeouts,
         )
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]] | list[Event]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event]:
         if event.event_type == _BATCH_TIMEOUT:
             return self._handle_timeout()
 
@@ -141,14 +142,13 @@ class BatchProcessor(Entity):
         self._items_processed += len(batch)
 
         # Forward all batch items downstream
-        result: list[Event] = []
-        for item in batch:
-            result.append(
-                Event(
-                    time=self.now,
-                    event_type=item.event_type,
-                    target=self.downstream,
-                    context=item.context,
-                )
+        result: list[Event] = [
+            Event(
+                time=self.now,
+                event_type=item.event_type,
+                target=self.downstream,
+                context=item.context,
             )
+            for item in batch
+        ]
         return result

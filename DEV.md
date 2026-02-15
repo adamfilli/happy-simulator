@@ -119,6 +119,34 @@ pip install -e ".[visual]"
 python -m examples.visual.visual_debugger
 ```
 
+#### Frontend Build Pipeline
+
+The visual debugger has a two-directory architecture:
+
+- **`visual-frontend/`** — React + TypeScript source code (Vite project). This is where you edit components, write TSX, and install npm dependencies. Not shipped in the Python package.
+- **`happysimulator/visual/`** — Python server (FastAPI + WebSocket). The `static/` subdirectory holds the **built output** from `npm run build` — the minified JS/CSS/HTML that the server serves to the browser.
+
+```
+visual-frontend/src/*.tsx  →  npm run build  →  happysimulator/visual/static/  →  served by FastAPI
+```
+
+After editing frontend code, rebuild and restart:
+
+```bash
+cd visual-frontend && npm run build    # compiles TSX → static/
+python -m examples.visual.visual_debugger  # restart server
+```
+
+If the browser shows stale UI, do a clean rebuild:
+
+```bash
+rm -rf happysimulator/visual/static/*      # delete old build output
+rm visual-frontend/tsconfig.tsbuildinfo    # delete TS incremental cache
+cd visual-frontend && npm run build        # rebuild from scratch
+```
+
+Then hard-refresh the browser with Ctrl+Shift+R.
+
 ### Debugging
 
 Set the logging level via environment variable:

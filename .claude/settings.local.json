@@ -41,7 +41,11 @@
       "WebSearch",
       "Bash(npm install:*)",
       "Bash(node -e:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(git checkout:*)",
+      "Bash(git rm:*)"
     ]
   },
   "hooks": {

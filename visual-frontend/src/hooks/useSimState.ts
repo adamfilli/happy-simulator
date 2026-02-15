@@ -7,6 +7,10 @@ import type {
   TopologyEdge,
   DashboardPanelConfig,
   EdgeStats,
+  CodePanelConfig,
+  CodeTrace,
+  CodePausedState,
+  CodeBreakpointInfo,
 } from "../types";
 
 interface SimStore {
@@ -23,6 +27,13 @@ interface SimStore {
   dashboardTimeRange: { start: number | null; end: number | null };
   edgeStats: EdgeStats;
 
+  // Code debug state
+  codePanels: Map<string, CodePanelConfig>;
+  codeTraces: Map<string, CodeTrace>;
+  codePausedEntity: string | null;
+  codePausedState: CodePausedState | null;
+  codeBreakpoints: CodeBreakpointInfo[];
+
   setTopology: (t: Topology) => void;
   setState: (s: SimState) => void;
   addEvents: (events: RecordedEvent[]) => void;
@@ -38,6 +49,16 @@ interface SimStore {
   setActiveView: (view: "graph" | "dashboard") => void;
   setDashboardTimeRange: (range: { start: number | null; end: number | null }) => void;
   setEdgeStats: (stats: EdgeStats) => void;
+
+  // Code debug actions
+  openCodePanel: (entityName: string, config: CodePanelConfig) => void;
+  closeCodePanel: (entityName: string) => void;
+  setCodeTrace: (entityName: string, trace: CodeTrace) => void;
+  setCodePaused: (state: CodePausedState | null) => void;
+  clearCodePaused: () => void;
+  addCodeBreakpoint: (bp: CodeBreakpointInfo) => void;
+  removeCodeBreakpoint: (bpId: string) => void;
+
   reset: () => void;
 }
 
@@ -57,6 +78,13 @@ export const useSimStore = create<SimStore>((set) => ({
   activeView: "graph",
   dashboardTimeRange: { start: null, end: null },
   edgeStats: {},
+
+  // Code debug state
+  codePanels: new Map(),
+  codeTraces: new Map(),
+  codePausedEntity: null,
+  codePausedState: null,
+  codeBreakpoints: [],
 
   setTopology: (t) => set({ topology: t }),
   setState: (s) => set({ state: s }),
@@ -98,5 +126,41 @@ export const useSimStore = create<SimStore>((set) => ({
   setActiveView: (view) => set({ activeView: view }),
   setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
   setEdgeStats: (stats) => set({ edgeStats: stats }),
-  reset: () => set({ eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null, dashboardTimeRange: { start: null, end: null }, edgeStats: {} }),
+
+  // Code debug actions
+  openCodePanel: (entityName, config) =>
+    set((prev) => {
+      const panels = new Map(prev.codePanels);
+      panels.set(entityName, config);
+      return { codePanels: panels };
+    }),
+  closeCodePanel: (entityName) =>
+    set((prev) => {
+      const panels = new Map(prev.codePanels);
+      panels.delete(entityName);
+      const traces = new Map(prev.codeTraces);
+      traces.delete(entityName);
+      return { codePanels: panels, codeTraces: traces };
+    }),
+  setCodeTrace: (entityName, trace) =>
+    set((prev) => {
+      const traces = new Map(prev.codeTraces);
+      traces.set(entityName, trace);
+      return { codeTraces: traces };
+    }),
+  setCodePaused: (state) =>
+    set({ codePausedEntity: state?.entity_name ?? null, codePausedState: state }),
+  clearCodePaused: () =>
+    set({ codePausedEntity: null, codePausedState: null }),
+  addCodeBreakpoint: (bp) =>
+    set((prev) => ({ codeBreakpoints: [...prev.codeBreakpoints, bp] })),
+  removeCodeBreakpoint: (bpId) =>
+    set((prev) => ({ codeBreakpoints: prev.codeBreakpoints.filter((b) => b.id !== bpId) })),
+
+  reset: () => set({
+    eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null,
+    dashboardTimeRange: { start: null, end: null }, edgeStats: {},
+    codePanels: new Map(), codeTraces: new Map(),
+    codePausedEntity: null, codePausedState: null, codeBreakpoints: [],
+  }),
 }));

@@ -91,7 +91,51 @@ export interface DashboardPanelConfig {
   chartConfig?: ChartConfig;
 }
 
+// --- Code Debug Types ---
+
+export interface CodeTraceRecord {
+  line_number: number;
+  locals?: Record<string, unknown>;
+}
+
+export interface CodeTrace {
+  entity_name: string;
+  method_name: string;
+  start_line: number;
+  lines: CodeTraceRecord[];
+}
+
+export interface CodePausedState {
+  entity_name: string;
+  line_number: number;
+  locals: Record<string, unknown> | null;
+}
+
+export interface EntitySource {
+  entity_name: string;
+  class_name: string;
+  method_name: string;
+  source_lines: string[];
+  start_line: number;
+}
+
+export interface CodeBreakpointInfo {
+  id: string;
+  entity_name: string;
+  line_number: number;
+}
+
+export interface CodePanelConfig {
+  entityName: string;
+  source: EntitySource;
+}
+
 export type WSMessage =
-  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[]; edge_stats?: EdgeStats }
+  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[]; edge_stats?: EdgeStats; code_traces?: CodeTrace[] }
   | { type: "simulation_complete" }
-  | { type: "breakpoint_hit" };
+  | { type: "breakpoint_hit" }
+  | { type: "code_debug_activated"; entity_name: string; source: EntitySource | null; debug_state: Record<string, unknown> }
+  | { type: "code_debug_deactivated"; entity_name: string; debug_state: Record<string, unknown> }
+  | { type: "code_paused"; paused_state: CodePausedState }
+  | { type: "code_breakpoint_set"; id: string; entity_name: string; line_number: number }
+  | { type: "code_breakpoint_removed"; breakpoint_id: string; removed: boolean };

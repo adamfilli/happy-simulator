@@ -80,6 +80,39 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
     ) -> JSONResponse:
         return JSONResponse(bridge.get_chart_data(chart_id, start_s=start_s, end_s=end_s))
 
+    # --- Code Debug REST endpoints ---
+
+    @app.get("/api/entity/{name}/source")
+    def get_entity_source(name: str) -> JSONResponse:
+        source = bridge.get_entity_source(name)
+        if source is None:
+            return JSONResponse({"error": "Source not found"}, status_code=404)
+        return JSONResponse(source)
+
+    @app.post("/api/debug/code/activate")
+    def post_activate_code_debug(entity_name: str) -> JSONResponse:
+        state = bridge.activate_code_debug(entity_name)
+        return JSONResponse(state)
+
+    @app.post("/api/debug/code/deactivate")
+    def post_deactivate_code_debug(entity_name: str) -> JSONResponse:
+        state = bridge.deactivate_code_debug(entity_name)
+        return JSONResponse(state)
+
+    @app.post("/api/debug/code/breakpoints")
+    def post_code_breakpoint(entity_name: str, line_number: int) -> JSONResponse:
+        result = bridge.set_code_breakpoint(entity_name, line_number)
+        return JSONResponse(result)
+
+    @app.delete("/api/debug/code/breakpoints/{bp_id}")
+    def delete_code_breakpoint(bp_id: str) -> JSONResponse:
+        removed = bridge.remove_code_breakpoint(bp_id)
+        return JSONResponse({"removed": removed})
+
+    @app.get("/api/debug/code/state")
+    def get_code_debug_state() -> JSONResponse:
+        return JSONResponse(bridge.get_code_debug_state())
+
     # --- WebSocket for play mode ---
 
     @app.websocket("/api/ws")
@@ -169,6 +202,71 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
 
                 await asyncio.sleep(0.05 if speed != 0 else 0.01)
 
+        async def _step_with_code_debug(ws: WebSocket, count: int) -> None:
+            """Step that handles code breakpoint blocking.
+
+            When code debugging is active, gen.send() may block the sim thread
+            at a code breakpoint.  We run step in a background thread and poll
+            for pauses.  While paused, we read WebSocket messages inline so the
+            user can send code_continue / code_step / etc. without deadlocking
+            the receive loop.
+
+            Returns the set of WS actions consumed so the caller knows not to
+            re-process them.
+            """
+            step_done = asyncio.Event()
+            result_holder: list[dict] = []
+
+            async def do_step():
+                r = await asyncio.to_thread(bridge.step, count)
+                result_holder.append(r)
+                step_done.set()
+
+            step_task = asyncio.create_task(do_step())
+            pause_notified = False
+
+            while not step_done.is_set():
+                # Check if sim thread is paused at a code breakpoint
+                if bridge._code_debugger.is_code_paused():
+                    if not pause_notified:
+                        paused_state = bridge._code_debugger.get_paused_state()
+                        try:
+                            await ws.send_json({"type": "code_paused", "paused_state": paused_state})
+                        except Exception:
+                            break
+                        pause_notified = True
+
+                    # While paused, read WS messages so user can resume
+                    try:
+                        raw = await asyncio.wait_for(ws.receive_text(), timeout=0.1)
+                        msg = json.loads(raw)
+                        action = msg.get("action")
+                        if action == "code_continue":
+                            bridge.code_continue()
+                            pause_notified = False
+                        elif action == "code_step":
+                            bridge.code_step()
+                            pause_notified = False
+                        elif action == "code_step_over":
+                            bridge.code_step_over()
+                            pause_notified = False
+                        elif action == "code_step_out":
+                            bridge.code_step_out()
+                            pause_notified = False
+                        # Ignore other actions while paused
+                    except asyncio.TimeoutError:
+                        pass
+                else:
+                    pause_notified = False
+                    await asyncio.sleep(0.05)
+
+            await step_task
+            if result_holder:
+                try:
+                    await ws.send_json({"type": "state_update", **result_holder[0]})
+                except Exception:
+                    pass
+
         try:
             while True:
                 raw = await ws.receive_text()
@@ -208,8 +306,12 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
 
                 elif action == "step":
                     count = msg.get("count", 1)
-                    result = await asyncio.to_thread(bridge.step, count)
-                    await ws.send_json({"type": "state_update", **result})
+                    has_active = len(bridge._code_debugger._active_entities) > 0
+                    if has_active:
+                        await _step_with_code_debug(ws, count)
+                    else:
+                        result = await asyncio.to_thread(bridge.step, count)
+                        await ws.send_json({"type": "state_update", **result})
 
                 elif action == "run_to":
                     if play_task and not play_task.done():
@@ -241,6 +343,42 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                             "new_logs": [],
                         }
                     )
+
+                # --- Code Debug WS actions ---
+
+                elif action == "activate_code_debug":
+                    entity_name = msg.get("entity_name", "")
+                    state = await asyncio.to_thread(bridge.activate_code_debug, entity_name)
+                    source = await asyncio.to_thread(bridge.get_entity_source, entity_name)
+                    await ws.send_json({"type": "code_debug_activated", "entity_name": entity_name, "source": source, "debug_state": state})
+
+                elif action == "deactivate_code_debug":
+                    entity_name = msg.get("entity_name", "")
+                    state = await asyncio.to_thread(bridge.deactivate_code_debug, entity_name)
+                    await ws.send_json({"type": "code_debug_deactivated", "entity_name": entity_name, "debug_state": state})
+
+                elif action == "set_code_breakpoint":
+                    entity_name = msg.get("entity_name", "")
+                    line_number = msg.get("line_number", 0)
+                    result = await asyncio.to_thread(bridge.set_code_breakpoint, entity_name, line_number)
+                    await ws.send_json({"type": "code_breakpoint_set", **result})
+
+                elif action == "remove_code_breakpoint":
+                    bp_id = msg.get("breakpoint_id", "")
+                    removed = await asyncio.to_thread(bridge.remove_code_breakpoint, bp_id)
+                    await ws.send_json({"type": "code_breakpoint_removed", "breakpoint_id": bp_id, "removed": removed})
+
+                elif action == "code_continue":
+                    bridge.code_continue()
+
+                elif action == "code_step":
+                    bridge.code_step()
+
+                elif action == "code_step_over":
+                    bridge.code_step_over()
+
+                elif action == "code_step_out":
+                    bridge.code_step_out()
 
         except WebSocketDisconnect:
             if play_task and not play_task.done():

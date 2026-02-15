@@ -83,12 +83,7 @@ class DataSender(Entity):
         self._sends += 1
 
         if self._downstream:
-            return [Event(
-                time=self.now,
-                event_type="Sent",
-                target=self._downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self._downstream, event_type="Sent")]
         return []
 
 
@@ -134,18 +129,11 @@ def _run_algorithm(
         stop_after=Instant.from_seconds(duration_s),
     )
 
-    cwnd_data = Data()
-    cwnd_probe = Probe(
-        target=tcp,
-        metric="cwnd",
-        data=cwnd_data,
-        interval=0.1,
-        start_time=Instant.Epoch,
-    )
+    cwnd_probe, cwnd_data = Probe.on(tcp, "cwnd", interval=0.1)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[tcp, sender, sink],
         probes=[cwnd_probe],

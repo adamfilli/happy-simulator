@@ -49,7 +49,7 @@ def main():
     # --- Simulation ---
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(30.0),
+        duration=30.0,
         sources=[],
         entities=[store_a, store_b, network],
     )

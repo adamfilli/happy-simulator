@@ -5,7 +5,6 @@ from typing import Generator, List
 
 import pytest
 
-from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
 from happysimulator.core.entity import Entity
 from happysimulator.components.queue_policy import FIFOQueue
@@ -61,12 +60,7 @@ class FixedTimeResource(QueuedResource):
             return []
 
         return [
-            Event(
-                time=self.now,
-                event_type="Completed",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Completed")
         ]
 
 
@@ -82,20 +76,13 @@ def test_queued_resource_processes_work_end_to_end() -> None:
         downstream=sink,
     )
 
-    depth_data = Data()
-    depth_probe = Probe(
-        target=resource,
-        metric="depth",
-        data=depth_data,
-        interval=0.05,
-        start_time=Instant.Epoch,
-    )
+    depth_probe, depth_data = Probe.on(resource, "depth", interval=0.05)
 
     source = Source.constant(rate=5.0, target=resource, stop_after=duration_s)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=[resource, sink],
         probes=[depth_probe],
@@ -127,7 +114,7 @@ def test_queued_resource_fifo_preserves_order_when_single_threaded() -> None:
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=[resource, sink],
         probes=[],

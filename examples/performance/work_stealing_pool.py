@@ -93,7 +93,7 @@ def run_work_stealing_demo(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 2.0),
+        duration=duration_s + 2.0,
         sources=[source],
         entities=[pool] + pool.workers + [sink],
     )

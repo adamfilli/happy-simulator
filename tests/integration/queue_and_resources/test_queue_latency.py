@@ -65,12 +65,7 @@ class ConcurrencyLimitedServer(Entity):
             return []
 
         # Use current simulation time (self.now) as the completion time.
-        completed = Event(
-            time=self.now,
-            event_type="Completed",
-            target=self.downstream,
-            context=event.context,
-        )
+        completed = self.forward(event, self.downstream, event_type="Completed")
         return [completed]
 
 
@@ -140,14 +135,7 @@ def run_queue_latency_scenario(
     queue = Queue(name="RequestQueue", egress=driver, policy=queue_policy)
     driver.queue = queue
 
-    queue_depth_data = Data()
-    queue_depth_probe = Probe(
-        target=queue,
-        metric="depth",
-        data=queue_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+    queue_depth_probe, queue_depth_data = Probe.on(queue, "depth", interval=probe_interval_s)
 
     source = Source.with_profile(
         profile=profile, target=queue,
@@ -156,7 +144,7 @@ def run_queue_latency_scenario(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=[queue, driver, server, sink],
         probes=[queue_depth_probe],

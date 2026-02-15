@@ -59,7 +59,7 @@ class TestRaftConsensus:
         network, nodes = _build_raft_cluster(3)
 
         sim = Simulation(
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[network, *nodes],
         )
         for node in nodes:
@@ -95,7 +95,7 @@ class TestRaftConsensus:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             entities=[network, *nodes],
         )
         for node in nodes:
@@ -117,7 +117,7 @@ class TestRaftConsensus:
         network, nodes = _build_raft_cluster(3)
 
         sim = Simulation(
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             entities=[network, *nodes],
         )
         for node in nodes:
@@ -164,7 +164,7 @@ class TestRaftConsensus:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=[network, *nodes],
         )
         for node in nodes:
@@ -226,7 +226,7 @@ class TestRaftConsensus:
         network, nodes = _build_raft_cluster(5)
 
         sim = Simulation(
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             entities=[network, *nodes],
         )
         for node in nodes:
@@ -271,7 +271,7 @@ class TestRaftConsensus:
             state_machines.append(sm)
 
         sim = Simulation(
-            end_time=Instant.from_seconds(25.0),
+            duration=25.0,
             entities=[network, *nodes],
         )
         for node in nodes:

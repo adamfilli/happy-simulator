@@ -240,7 +240,7 @@ def run_simulation(config: CohortConfig = CohortConfig()) -> SimulationResult:
     # Run
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 1.0),
+        duration=config.duration_s + 1.0,
         sources=[source],
         entities=[client, cache, db],
     )

@@ -151,12 +151,7 @@ class OrderCounter(QueuedResource):
         yield self.order_time
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="Order",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Order")
         ]
 
 
@@ -173,12 +168,7 @@ class CoffeeStation(QueuedResource):
         yield self.service_time
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="Served",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Served")
         ]
 
 

@@ -150,12 +150,7 @@ class WasherStation(RenegingQueuedResource):
 
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="Washed",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Washed")
         ]
 
 
@@ -175,12 +170,7 @@ class FoldingArea(Entity):
         grant.release()
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="Done",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Done")
         ]
 
 

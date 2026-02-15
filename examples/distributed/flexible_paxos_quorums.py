@@ -187,7 +187,7 @@ def _run_cluster(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        duration=duration_s,
         entities=[network] + nodes,
     )
     sim.schedule(start_evt)

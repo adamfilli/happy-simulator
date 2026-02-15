@@ -150,7 +150,7 @@ def run_single_scenario(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=[source],
         entities=[order_svc, outbox, collector],
     )

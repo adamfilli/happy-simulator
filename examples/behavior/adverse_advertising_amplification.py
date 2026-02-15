@@ -220,7 +220,7 @@ def run_essay_scenario(duration_months: int = 24) -> AAAResult:
 
     sim = Simulation(
         entities=[platform, advertiser],
-        end_time=Instant.from_seconds(duration_months + 1),
+        duration=duration_months + 1,
     )
 
     for e in advertiser.start_events():
@@ -262,7 +262,7 @@ def run_extended_scenario(duration_months: int = 36) -> AAAResult:
 
     sim = Simulation(
         entities=[platform, advertiser],
-        end_time=Instant.from_seconds(duration_months + 1),
+        duration=duration_months + 1,
     )
 
     for e in advertiser.start_events():

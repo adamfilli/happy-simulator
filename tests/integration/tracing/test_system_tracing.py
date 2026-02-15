@@ -263,7 +263,7 @@ class TestSimulationTracing:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -295,7 +295,7 @@ class TestSimulationTracing:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -319,7 +319,7 @@ class TestSimulationTracing:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -343,7 +343,7 @@ class TestSimulationTracing:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -371,7 +371,7 @@ class TestSystemTracingIntegration:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -410,7 +410,7 @@ class TestSystemTracingIntegration:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(4.0),
+            duration=4.0,
             trace_recorder=recorder,
         )
         sim.run()
@@ -437,7 +437,7 @@ class TestSystemTracingIntegration:
             sources=[source],
             entities=[entity],
             probes=[],
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
         )
 
         # Should run without errors

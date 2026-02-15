@@ -178,7 +178,7 @@ def run_power_outage_demo(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(crash_time_s + 10.0),
+        duration=crash_time_s + 10.0,
         sources=[source],
         entities=[writer, wal_durable, wal_fast, lsm_durable, lsm_fast],
     )

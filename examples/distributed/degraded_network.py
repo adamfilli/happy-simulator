@@ -249,14 +249,8 @@ def run_simulation(
     schedule.add(InjectPacketLoss("Server", "Client", loss_rate=0.10, start=60.0, end=80.0))
 
     # -- Probe: track in-flight requests --
-    pending_data = Data()
-    probe = Probe(
-        target=client,
-        metric="pending_count",
-        data=pending_data,
-        interval=0.5,
-        start_time=Instant.Epoch,
-    )
+
+    probe, pending_data = Probe.on(client, "pending_count", interval=0.5)
 
     # -- Source --
     source = Source.constant(
@@ -269,7 +263,7 @@ def run_simulation(
     # -- Run --
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=[source],
         entities=[client, server, network],
         probes=[probe],

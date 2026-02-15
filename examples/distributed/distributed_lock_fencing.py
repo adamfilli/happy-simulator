@@ -302,7 +302,7 @@ def run(args=None) -> SimulationResult:
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        duration=duration_s,
         entities=[lock_mgr, client_a, client_b, client_c],
     )
     sim.schedule(acquire_a)

@@ -490,7 +490,7 @@ def run_quorum_scenario(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),  # Extra time to complete
+        duration=duration_s + 1.0,  # Extra time to complete
         sources=[source],
         entities=[network, coordinator, client, replica_a, replica_b, replica_c],
     )
@@ -817,7 +817,7 @@ class TestNetworkPartitionScenario:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(6.0),
+            duration=6.0,
             sources=[source],
             entities=[network, coordinator, client] + replicas,
         )

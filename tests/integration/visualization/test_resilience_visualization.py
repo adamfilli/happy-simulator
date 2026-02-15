@@ -206,7 +206,7 @@ class TestResilienceVisualization:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             sources=[source],
             entities=[server, cb],
         )
@@ -348,7 +348,7 @@ to illustrate circuit breaker state transitions.
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(2.0),
+                duration=2.0,
                 sources=[source],
                 entities=entities,
             )
@@ -447,7 +447,7 @@ to illustrate circuit breaker state transitions.
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(2.5),
+                duration=2.5,
                 sources=[source],
                 entities=entities,
             )
@@ -542,7 +542,7 @@ to illustrate circuit breaker state transitions.
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(4.0),
+            duration=4.0,
             sources=[source],
             entities=[primary, fallback_server, fallback],
         )
@@ -634,7 +634,7 @@ to illustrate circuit breaker state transitions.
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(6.0),
+            duration=6.0,
             sources=[source],
             entities=[server, timeout, cb, bulkhead],
         )

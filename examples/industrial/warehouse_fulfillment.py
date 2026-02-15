@@ -164,8 +164,7 @@ class PickStation(QueuedResource):
         self.orders_picked += 1
 
         return [
-            Event(time=self.now, event_type="Picked",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Picked")
         ]
 
 
@@ -204,8 +203,7 @@ class PackStation(QueuedResource):
         self.orders_packed += 1
 
         return [
-            Event(time=self.now, event_type="Packed",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Packed")
         ]
 
 
@@ -240,8 +238,7 @@ class ShipStation(QueuedResource):
         self.orders_shipped += 1
 
         return [
-            Event(time=self.now, event_type="Shipped",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Shipped")
         ]
 
 
@@ -321,7 +318,7 @@ def run_warehouse_simulation(config: WarehouseConfig | None = None) -> Warehouse
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 1800),  # 30min drain
+        duration=config.duration_s + 1800,  # 30min drain
         sources=[source],
         entities=entities,
     )

@@ -117,12 +117,7 @@ class DualEngineDriver(Entity):
         self._ops_completed += 1
 
         if self._downstream is not None:
-            return [Event(
-                time=self.now,
-                event_type="Completed",
-                target=self._downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self._downstream, event_type="Completed")]
         return []
 
     def _do_write_phase(self) -> None:
@@ -242,18 +237,12 @@ def run_btree_vs_lsm_simulation(
     )
 
     # Probe tracks which phase we are in
-    phase_data = Data()
-    phase_probe = Probe(
-        target=driver,
-        metric="phase_number",
-        data=phase_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+
+    phase_probe, phase_data = Probe.on(driver, "phase_number", interval=probe_interval_s)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[btree, lsm, driver, sink],
         probes=[phase_probe],

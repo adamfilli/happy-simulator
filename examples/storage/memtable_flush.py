@@ -112,12 +112,7 @@ class MemtableWorker(Entity):
             self.flush_times.append(self.now.to_seconds())
 
         return [
-            Event(
-                time=self.now,
-                event_type="WriteComplete",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="WriteComplete")
         ]
 
 
@@ -178,14 +173,8 @@ def run_memtable_flush_simulation(
     )
 
     # Probe memtable size over time for visualization
-    memtable_size_data = Data()
-    size_probe = Probe(
-        target=memtable,
-        metric="size",
-        data=memtable_size_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+
+    size_probe, memtable_size_data = Probe.on(memtable, "size", interval=probe_interval_s)
 
     source = Source.constant(
         rate=write_rate,
@@ -196,7 +185,7 @@ def run_memtable_flush_simulation(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[memtable, worker, tracker],
         probes=[size_probe],

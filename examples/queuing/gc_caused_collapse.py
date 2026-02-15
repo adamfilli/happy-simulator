@@ -206,12 +206,7 @@ class GCServer(QueuedResource):
                 return []
 
             # Forward completion to downstream
-            completed = Event(
-                time=self.now,
-                event_type="Completion",
-                target=self.downstream,
-                context=event.context,
-            )
+            completed = self.forward(event, self.downstream, event_type="Completion")
             return [completed]
         finally:
             self._in_flight -= 1
@@ -568,14 +563,8 @@ def run_gc_collapse_simulation(
     server.downstream = client
 
     # Create queue depth probe
-    queue_depth_data = Data()
-    queue_probe = Probe(
-        target=server,
-        metric="depth",
-        data=queue_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+
+    queue_probe, queue_depth_data = Probe.on(server, "depth", interval=probe_interval_s)
 
     # Create source (constant arrivals for deterministic pre-GC stability)
     stop_after = Instant.from_seconds(duration_s)
@@ -587,7 +576,7 @@ def run_gc_collapse_simulation(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=[client, server],
         probes=[queue_probe],

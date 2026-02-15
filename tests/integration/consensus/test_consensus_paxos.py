@@ -45,7 +45,7 @@ class TestPaxosConsensus:
         proposer = nodes[0]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[network, *nodes],
         )
 
@@ -77,7 +77,7 @@ class TestPaxosConsensus:
         proposer_b = nodes[1]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[network, *nodes],
         )
 
@@ -127,7 +127,7 @@ class TestPaxosConsensus:
         majority = [nodes[1], nodes[2]]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[network, *nodes],
         )
 
@@ -164,7 +164,7 @@ class TestPaxosConsensus:
         majority = [nodes[1], nodes[2]]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[network, *nodes],
         )
 
@@ -212,7 +212,7 @@ class TestPaxosConsensus:
         proposer = nodes[2]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[network, *nodes],
         )
 
@@ -243,7 +243,7 @@ class TestPaxosConsensus:
         high_proposer = nodes[1]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[network, *nodes],
         )
 

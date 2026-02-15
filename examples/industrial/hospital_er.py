@@ -117,8 +117,7 @@ class TreatmentRoom(QueuedResource):
         self.treated += 1
 
         return [
-            Event(time=self.now, event_type="Discharged",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Discharged")
         ]
 
 
@@ -156,7 +155,7 @@ def run_er_simulation(config: ERConfig | None = None) -> ERResult:
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 7200),
+        duration=config.duration_s + 7200,
         sources=[source],
         entities=[triage, treatment, doctors, beds, sink],
     )

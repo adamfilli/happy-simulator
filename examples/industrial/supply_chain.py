@@ -94,8 +94,7 @@ class DemandTap(Entity):
         self.event_times.append(self.now.to_seconds())
         self.event_quantities.append(event.context.get("quantity", 1))
         return [
-            Event(time=self.now, event_type=event.event_type,
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream)
         ]
 
     @property
@@ -294,7 +293,7 @@ def run_supply_chain_simulation(config: SupplyChainConfig | None = None) -> Supp
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 43200),  # 12hr drain
+        duration=config.duration_s + 43200,  # 12hr drain
         sources=[source],
         entities=entities,
     )

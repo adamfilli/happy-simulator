@@ -5,7 +5,7 @@ import TimeSeriesChart from "./TimeSeriesChart";
 import { toRate, toBucketed, type Series } from "./sparklineTransforms";
 
 type DisplayMode = "total" | "rate" | "avg" | "p99";
-const MODE_CYCLE: DisplayMode[] = ["total", "rate", "avg", "p99"];
+const ALL_MODES: DisplayMode[] = ["total", "rate", "avg", "p99"];
 const MODE_LABELS: Record<DisplayMode, string> = {
   total: "total",
   rate: "/s",
@@ -94,11 +94,6 @@ function ChartNode({ data }: NodeProps<ChartNodeType>) {
   const hasData = displayTimes.length > 0;
   const chartColor = kind === "entity_metric" ? "#22c55e" : "#3b82f6";
 
-  const cycleMode = () => {
-    const next = MODE_CYCLE[(MODE_CYCLE.indexOf(displayMode) + 1) % MODE_CYCLE.length];
-    updatePinnedChartMode(chartId, next);
-  };
-
   return (
     <div
       className="bg-gray-900 border border-gray-700 rounded-lg shadow-lg overflow-hidden"
@@ -111,14 +106,23 @@ function ChartNode({ data }: NodeProps<ChartNodeType>) {
         <span className="text-[10px] font-semibold text-gray-300 truncate flex-1 mr-1">
           {label}
         </span>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center shrink-0">
           {kind === "entity_metric" && (
-            <button
-              onClick={(e) => { e.stopPropagation(); cycleMode(); }}
-              className="nodrag text-[9px] text-gray-500 hover:text-gray-300 px-1 rounded hover:bg-gray-800"
-            >
-              {MODE_LABELS[displayMode]}
-            </button>
+            <div className="nodrag flex items-center mr-1">
+              {ALL_MODES.map((m) => (
+                <button
+                  key={m}
+                  onClick={(e) => { e.stopPropagation(); updatePinnedChartMode(chartId, m); }}
+                  className={`text-[9px] px-1 rounded ${
+                    m === displayMode
+                      ? "text-gray-200 bg-gray-700"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+                  }`}
+                >
+                  {MODE_LABELS[m]}
+                </button>
+              ))}
+            </div>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); removePinnedChart(chartId); }}

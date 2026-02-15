@@ -1,7 +1,0 @@
-{
-  "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["tests"],
-"python.testing.autoTestDiscoverOnSaveEnabled": true,
-"editor.rename.enablePreview": true,
-"workbench.editor.enablePreview": false
-}

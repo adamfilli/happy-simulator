@@ -538,6 +538,12 @@ Create design docs for major features/architecture decisions. Template: Overview
 
 | Skill | Description |
 |-------|-------------|
+| `/scaffold` | Generate a complete simulation from a high-level description |
+| `/diagnose` | Troubleshoot a broken or misbehaving simulation |
+| `/add-instrumentation` | Add observability (probes, trackers, charts) to a simulation |
+| `/explain-example` | Walk through a library example with detailed explanation |
+| `/component-guide` | Help choose the right components for a use case |
+| `/analyze` | Analyze simulation results and provide insights |
 | `/commit` | Create a git commit |
 | `/commit-push-pr` | Commit, push, and open a PR |
 | `/code-review` | Review a PR |

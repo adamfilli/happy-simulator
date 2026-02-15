@@ -2,6 +2,16 @@ import { useEffect, useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 import TimeSeriesChart from "./TimeSeriesChart";
 import MiniSparkline from "./MiniSparkline";
+import { toRate, toBucketed, type Series } from "./sparklineTransforms";
+
+type MetricMode = "total" | "rate" | "avg" | "p99";
+const MODE_CYCLE: MetricMode[] = ["total", "rate", "avg", "p99"];
+const MODE_LABELS: Record<MetricMode, string> = {
+  total: "total",
+  rate: "/s",
+  avg: "avg",
+  p99: "p99",
+};
 
 interface TimeSeriesData {
   name: string;
@@ -25,14 +35,24 @@ export default function InspectorPanel() {
   const setActiveView = useSimStore((s) => s.setActiveView);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
   const [historyData, setHistoryData] = useState<EntityHistoryData | null>(null);
+  const [metricModes, setMetricModes] = useState<Record<string, MetricMode>>({});
   const lastFetchedRef = useRef<{ name: string; events: number } | null>(null);
   const lastHistoryFetchRef = useRef<{ name: string; events: number } | null>(null);
+  const prevEntityRef = useRef<string | null>(null);
 
   const entityName = selectedEntity;
   const entityData = entityName ? state?.entities[entityName] : null;
   const nodeInfo = topology?.nodes.find((n) => n.id === entityName);
   const isProbe = nodeInfo?.category === "probe";
   const sourceProfile = nodeInfo?.profile;
+
+  // Reset metric display modes when entity changes
+  useEffect(() => {
+    if (entityName !== prevEntityRef.current) {
+      prevEntityRef.current = entityName;
+      setMetricModes({});
+    }
+  }, [entityName]);
 
   // Fetch time series when a probe is selected or state updates
   useEffect(() => {
@@ -102,16 +122,52 @@ export default function InspectorPanel() {
           <div className="space-y-1">
             {Object.entries(entityData).map(([key, value]) => {
               const history = historyData?.metrics[key];
+              const hasSparkline = typeof value === "number" && history && history.values.length >= 2;
+              const mode = metricModes[key] ?? "total";
+              let sparklineValues: number[] | undefined;
+              if (hasSparkline) {
+                const raw: Series = { times: history.times, values: history.values };
+                let transformed: Series;
+                switch (mode) {
+                  case "rate":
+                    transformed = toRate(raw);
+                    break;
+                  case "avg":
+                    transformed = toBucketed(raw, 1.0, "avg");
+                    break;
+                  case "p99":
+                    transformed = toBucketed(raw, 1.0, "p99");
+                    break;
+                  default:
+                    transformed = raw;
+                }
+                sparklineValues = transformed.values;
+              }
               return (
                 <div key={key}>
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-400">{key}</span>
+                    <span className="text-gray-400">
+                      {key}
+                      {hasSparkline && (
+                        <span
+                          className="ml-1 text-gray-500 hover:text-gray-300 cursor-pointer select-none"
+                          onClick={() =>
+                            setMetricModes((prev) => ({
+                              ...prev,
+                              [key]: MODE_CYCLE[(MODE_CYCLE.indexOf(mode) + 1) % MODE_CYCLE.length],
+                            }))
+                          }
+                        >
+                          {MODE_LABELS[mode]}
+                        </span>
+                      )}
+                    </span>
                     <span className="text-white font-mono">
                       {formatValue(value)}
                     </span>
                   </div>
-                  {typeof value === "number" && history && history.values.length >= 2 && (
-                    <MiniSparkline values={history.values} />
+                  {sparklineValues && sparklineValues.length >= 2 && (
+                    <MiniSparkline values={sparklineValues} />
                   )}
                 </div>
               );

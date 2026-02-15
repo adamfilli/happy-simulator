@@ -37,6 +37,8 @@ class BalkingQueue(QueuePolicy[T]):
         balk_threshold: int = 5,
         balk_probability: float = 1.0,
     ):
+        if not (0.0 <= balk_probability <= 1.0):
+            raise ValueError(f"balk_probability must be in [0.0, 1.0], got {balk_probability}")
         self._inner = inner
         self.balk_threshold = balk_threshold
         self.balk_probability = balk_probability

@@ -27,7 +27,7 @@ from happysimulator.core.temporal import Instant, Duration
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(frozen=True)
 class CoDelStats:
     """Statistics tracked by CoDelQueue."""
 
@@ -108,7 +108,22 @@ class CoDelQueue(QueuePolicy[T]):
         self._last_count = 0  # Count from last dropping interval
 
         # Statistics
-        self.stats = CoDelStats()
+        self._enqueued = 0
+        self._dequeued = 0
+        self._dropped = 0
+        self._capacity_rejected = 0
+        self._drop_intervals = 0
+
+    @property
+    def stats(self) -> CoDelStats:
+        """Return a frozen snapshot of queue statistics."""
+        return CoDelStats(
+            enqueued=self._enqueued,
+            dequeued=self._dequeued,
+            dropped=self._dropped,
+            capacity_rejected=self._capacity_rejected,
+            drop_intervals=self._drop_intervals,
+        )
 
     @property
     def target_delay(self) -> float:
@@ -150,12 +165,12 @@ class CoDelQueue(QueuePolicy[T]):
             True if accepted, False if capacity exceeded.
         """
         if len(self._queue) >= self._capacity:
-            self.stats.capacity_rejected += 1
+            self._capacity_rejected += 1
             return False
 
         queued = _QueuedItem(item=item, enqueue_time=self._now())
         self._queue.append(queued)
-        self.stats.enqueued += 1
+        self._enqueued += 1
         return True
 
     def pop(self) -> Optional[T]:
@@ -178,7 +193,7 @@ class CoDelQueue(QueuePolicy[T]):
         # Apply CoDel algorithm
         self._codel_dequeue(now, sojourn_time)
 
-        self.stats.dequeued += 1
+        self._dequeued += 1
         return queued.item
 
     def _codel_dequeue(self, now: Instant, sojourn_time: float) -> None:
@@ -202,7 +217,7 @@ class CoDelQueue(QueuePolicy[T]):
             # Enter dropping state
             self._drop()
             self._dropping = True
-            self.stats.drop_intervals += 1
+            self._drop_intervals += 1
 
             # If we were recently dropping, start faster
             delta = self._count - self._last_count
@@ -235,7 +250,7 @@ class CoDelQueue(QueuePolicy[T]):
         """Drop the head-of-line packet."""
         if self._queue:
             self._queue.popleft()
-            self.stats.dropped += 1
+            self._dropped += 1
 
     def peek(self) -> Optional[T]:
         """Return the next item without removing it."""

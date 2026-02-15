@@ -53,17 +53,17 @@ class ResourceStats:
         peak_waiters: Maximum concurrent waiters observed.
     """
 
-    name: str
-    capacity: int | float
-    available: int | float
-    utilization: float
-    acquisitions: int
-    releases: int
-    contentions: int
-    waiters: int
-    total_wait_time_ns: int
-    peak_utilization: float
-    peak_waiters: int
+    name: str = ""
+    capacity: int | float = 0
+    available: int | float = 0
+    utilization: float = 0.0
+    acquisitions: int = 0
+    releases: int = 0
+    contentions: int = 0
+    waiters: int = 0
+    total_wait_time_ns: int = 0
+    peak_utilization: float = 0.0
+    peak_waiters: int = 0
 
 
 class Grant:

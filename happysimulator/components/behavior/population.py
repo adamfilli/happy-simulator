@@ -7,7 +7,10 @@ social graphs.
 
 from __future__ import annotations
 
+import logging
 import random
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -69,14 +72,22 @@ class Population:
 
     @property
     def stats(self) -> PopulationStats:
-        """Aggregate statistics across all agents."""
-        s = PopulationStats(size=self.size)
+        """Frozen snapshot of aggregate statistics across all agents."""
+        total_events = 0
+        total_decisions = 0
+        total_actions: dict[str, int] = {}
         for agent in self.agents:
-            s.total_events += agent.stats.events_received
-            s.total_decisions += agent.stats.decisions_made
-            for action, count in agent.stats.actions_by_type.items():
-                s.total_actions[action] = s.total_actions.get(action, 0) + count
-        return s
+            agent_stats = agent.stats
+            total_events += agent_stats.events_received
+            total_decisions += agent_stats.decisions_made
+            for action, count in agent_stats.actions_by_type.items():
+                total_actions[action] = total_actions.get(action, 0) + count
+        return PopulationStats(
+            size=self.size,
+            total_events=total_events,
+            total_decisions=total_decisions,
+            total_actions=total_actions,
+        )
 
     @classmethod
     def uniform(

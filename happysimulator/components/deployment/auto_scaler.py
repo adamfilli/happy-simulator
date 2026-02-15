@@ -19,7 +19,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
@@ -184,7 +184,7 @@ class ScalingEvent:
     reason: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class AutoScalerStats:
     """Statistics tracked by AutoScaler."""
 
@@ -205,7 +205,7 @@ class AutoScaler(Entity):
 
     Attributes:
         name: Scaler identifier.
-        stats: Mutable statistics dataclass.
+        stats: Frozen statistics snapshot.
         scaling_history: List of scaling events.
     """
 
@@ -251,12 +251,29 @@ class AutoScaler(Entity):
         self._next_instance_id = 0
         self._managed_servers: list[Entity] = []
 
-        self.stats = AutoScalerStats()
+        self._evaluations = 0
+        self._scale_out_count = 0
+        self._scale_in_count = 0
+        self._instances_added = 0
+        self._instances_removed = 0
+        self._cooldown_blocks = 0
         self.scaling_history: list[ScalingEvent] = []
 
         logger.debug(
             "[%s] AutoScaler initialized: min=%d, max=%d, interval=%.1fs",
             name, min_instances, max_instances, evaluation_interval,
+        )
+
+    @property
+    def stats(self) -> AutoScalerStats:
+        """Return a frozen snapshot of current statistics."""
+        return AutoScalerStats(
+            evaluations=self._evaluations,
+            scale_out_count=self._scale_out_count,
+            scale_in_count=self._scale_in_count,
+            instances_added=self._instances_added,
+            instances_removed=self._instances_removed,
+            cooldown_blocks=self._cooldown_blocks,
         )
 
     @property
@@ -308,7 +325,7 @@ class AutoScaler(Entity):
         if not self._is_running:
             return []
 
-        self.stats.evaluations += 1
+        self._evaluations += 1
 
         backends = self._load_balancer.all_backends
         current_count = len(backends)
@@ -345,7 +362,7 @@ class AutoScaler(Entity):
     def _try_scale_out(self, count: int) -> None:
         """Attempt to add instances."""
         if self._in_cooldown("scale_out"):
-            self.stats.cooldown_blocks += 1
+            self._cooldown_blocks += 1
             return
 
         current = len(self._load_balancer.all_backends)
@@ -369,8 +386,8 @@ class AutoScaler(Entity):
         new_count = len(self._load_balancer.all_backends)
         self._last_scale_time = self.now
         self._last_scale_action = "scale_out"
-        self.stats.scale_out_count += 1
-        self.stats.instances_added += to_add
+        self._scale_out_count += 1
+        self._instances_added += to_add
 
         event = ScalingEvent(
             time=self.now, action="scale_out",
@@ -387,7 +404,7 @@ class AutoScaler(Entity):
     def _try_scale_in(self, count: int) -> None:
         """Attempt to remove instances."""
         if self._in_cooldown("scale_in"):
-            self.stats.cooldown_blocks += 1
+            self._cooldown_blocks += 1
             return
 
         current = len(self._load_balancer.all_backends)
@@ -405,8 +422,8 @@ class AutoScaler(Entity):
         new_count = len(self._load_balancer.all_backends)
         self._last_scale_time = self.now
         self._last_scale_action = "scale_in"
-        self.stats.scale_in_count += 1
-        self.stats.instances_removed += to_remove
+        self._scale_in_count += 1
+        self._instances_removed += to_remove
 
         event = ScalingEvent(
             time=self.now, action="scale_in",

@@ -209,15 +209,15 @@ class TCPStats:
         algorithm: Name of the congestion control algorithm.
     """
 
-    segments_sent: int
-    segments_acked: int
-    retransmissions: int
-    cwnd: float
-    ssthresh: float
-    rtt_s: float
-    throughput_segments_per_s: float
-    total_bytes_sent: int
-    algorithm: str
+    segments_sent: int = 0
+    segments_acked: int = 0
+    retransmissions: int = 0
+    cwnd: float = 0.0
+    ssthresh: float = 0.0
+    rtt_s: float = 0.0
+    throughput_segments_per_s: float = 0.0
+    total_bytes_sent: int = 0
+    algorithm: str = ""
 
 
 # ---------------------------------------------------------------------------

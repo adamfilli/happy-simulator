@@ -25,7 +25,7 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Generator
 
@@ -45,7 +45,7 @@ class ReplicationMode(Enum):
     SYNC = "sync"
 
 
-@dataclass
+@dataclass(frozen=True)
 class PrimaryBackupStats:
     """Statistics for PrimaryNode.
 
@@ -64,7 +64,7 @@ class PrimaryBackupStats:
     write_latency_sum: float = 0.0
 
 
-@dataclass
+@dataclass(frozen=True)
 class BackupStats:
     """Statistics for BackupNode.
 
@@ -109,7 +109,22 @@ class PrimaryNode(Entity):
         self._mode = mode
         self._seq: int = 0
         self._backup_lag: dict[str, int] = {b.name: 0 for b in backups}
-        self.stats = PrimaryBackupStats()
+        self._writes = 0
+        self._reads = 0
+        self._replications_sent = 0
+        self._acks_received = 0
+        self._write_latency_sum = 0.0
+
+    @property
+    def stats(self) -> PrimaryBackupStats:
+        """Frozen snapshot of primary node statistics."""
+        return PrimaryBackupStats(
+            writes=self._writes,
+            reads=self._reads,
+            replications_sent=self._replications_sent,
+            acks_received=self._acks_received,
+            write_latency_sum=self._write_latency_sum,
+        )
 
     @property
     def mode(self) -> ReplicationMode:
@@ -148,7 +163,7 @@ class PrimaryNode(Entity):
         value = metadata.get("value")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.writes += 1
+        self._writes += 1
         self._seq += 1
         seq = self._seq
 
@@ -168,7 +183,7 @@ class PrimaryNode(Entity):
                     self, backup, "Replicate",
                     payload={"key": key, "value": value, "seq": seq},
                 ))
-                self.stats.replications_sent += 1
+                self._replications_sent += 1
             if events:
                 yield 0.0, events
             if reply_future is not None:
@@ -189,7 +204,7 @@ class PrimaryNode(Entity):
                     },
                 ))
                 ack_futures.append(ack_future)
-                self.stats.replications_sent += 1
+                self._replications_sent += 1
             yield 0.0, events
 
             # Wait for first ack (any_of requires 2+, handle edge case)
@@ -217,7 +232,7 @@ class PrimaryNode(Entity):
                     },
                 ))
                 ack_futures.append(ack_future)
-                self.stats.replications_sent += 1
+                self._replications_sent += 1
             yield 0.0, events
 
             if len(ack_futures) >= 2:
@@ -237,7 +252,7 @@ class PrimaryNode(Entity):
         key = metadata.get("key")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.reads += 1
+        self._reads += 1
         value = yield from self._store.get(key)
 
         if reply_future is not None:
@@ -250,7 +265,7 @@ class PrimaryNode(Entity):
         backup_name = metadata.get("source")
         seq = metadata.get("seq", 0)
 
-        self.stats.acks_received += 1
+        self._acks_received += 1
         acked_key = f"_acked_{backup_name}"
         prev = self._backup_lag.get(acked_key, 0)
         if seq > prev:
@@ -285,7 +300,18 @@ class BackupNode(Entity):
         self._network = network
         self._primary = primary
         self._serve_reads = serve_reads
-        self.stats = BackupStats()
+        self._replications_applied = 0
+        self._backup_reads = 0
+        self._last_applied_seq = 0
+
+    @property
+    def stats(self) -> BackupStats:
+        """Frozen snapshot of backup node statistics."""
+        return BackupStats(
+            replications_applied=self._replications_applied,
+            reads=self._backup_reads,
+            last_applied_seq=self._last_applied_seq,
+        )
 
     @property
     def store(self) -> KVStore:
@@ -295,7 +321,7 @@ class BackupNode(Entity):
     @property
     def last_applied_seq(self) -> int:
         """Last applied sequence number."""
-        return self.stats.last_applied_seq
+        return self._last_applied_seq
 
     def handle_event(
         self, event: Event
@@ -320,8 +346,8 @@ class BackupNode(Entity):
         # Apply locally
         yield from self._store.put(key, value)
 
-        self.stats.replications_applied += 1
-        self.stats.last_applied_seq = seq
+        self._replications_applied += 1
+        self._last_applied_seq = seq
 
         # Resolve ack future if present (for SEMI_SYNC/SYNC)
         if ack_future is not None:
@@ -330,7 +356,7 @@ class BackupNode(Entity):
         # Also send ack event for lag tracking (ASYNC mode)
         ack_event = self._network.send(
             self, self._primary, "ReplicationAck",
-            payload={"seq": seq},
+            payload={"source": self.name, "seq": seq},
         )
         yield 0.0, [ack_event]
         return None
@@ -343,7 +369,7 @@ class BackupNode(Entity):
         key = metadata.get("key")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.reads += 1
+        self._backup_reads += 1
         value = yield from self._store.get(key)
 
         if reply_future is not None:
@@ -351,6 +377,6 @@ class BackupNode(Entity):
                 "status": "ok",
                 "value": value,
                 "stale": True,
-                "seq": self.stats.last_applied_seq,
+                "seq": self._last_applied_seq,
             })
         return None

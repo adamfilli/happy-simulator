@@ -648,9 +648,9 @@ class TestCacheWarmingVisualization:
             list(cache_warm.get(key))
 
         # Reset stats after warming
-        cache_warm.stats.hits = 0
-        cache_warm.stats.misses = 0
-        cache_warm.stats.reads = 0
+        cache_warm._hits = 0
+        cache_warm._misses = 0
+        cache_warm._reads = 0
 
         warm_hit_rates = []
         for i, key in enumerate(hot_keys):

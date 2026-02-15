@@ -182,14 +182,14 @@ class DiskIOStats:
         peak_queue_depth: Maximum concurrent I/O observed.
     """
 
-    reads: int
-    writes: int
-    bytes_read: int
-    bytes_written: int
-    total_read_latency_s: float
-    total_write_latency_s: float
-    current_queue_depth: int
-    peak_queue_depth: int
+    reads: int = 0
+    writes: int = 0
+    bytes_read: int = 0
+    bytes_written: int = 0
+    total_read_latency_s: float = 0.0
+    total_write_latency_s: float = 0.0
+    current_queue_depth: int = 0
+    peak_queue_depth: int = 0
 
     @property
     def avg_read_latency_s(self) -> float:

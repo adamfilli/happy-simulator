@@ -34,12 +34,12 @@ class MultiPaxosStats:
         commands_committed: Total commands committed.
         leader_changes: Number of leader changes observed.
     """
-    is_leader: bool
-    current_ballot: int
-    log_length: int
-    commit_index: int
-    commands_committed: int
-    leader_changes: int
+    is_leader: bool = False
+    current_ballot: int = 0
+    log_length: int = 0
+    commit_index: int = 0
+    commands_committed: int = 0
+    leader_changes: int = 0
 
 
 class MultiPaxosNode(Entity):

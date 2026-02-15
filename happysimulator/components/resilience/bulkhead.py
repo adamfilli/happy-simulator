@@ -21,9 +21,10 @@ Example:
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -31,9 +32,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class BulkheadStats:
-    """Statistics tracked by Bulkhead."""
+    """Frozen snapshot of Bulkhead statistics."""
 
     total_requests: int = 0
     accepted_requests: int = 0
@@ -115,7 +116,13 @@ class Bulkhead(Entity):
         self._in_flight: dict[int, dict] = {}
 
         # Statistics
-        self.stats = BulkheadStats()
+        self._total_requests = 0
+        self._accepted_requests = 0
+        self._rejected_requests = 0
+        self._timed_out_requests = 0
+        self._queued_requests = 0
+        self._peak_concurrent = 0
+        self._peak_queue_depth = 0
 
         logger.debug(
             "[%s] Bulkhead initialized: target=%s, max_concurrent=%d, max_queue=%d",
@@ -160,6 +167,24 @@ class Bulkhead(Entity):
         """Number of available concurrent slots."""
         return max(0, self._max_concurrent - self._active_count)
 
+    @property
+    def stats(self) -> BulkheadStats:
+        """Frozen snapshot of bulkhead statistics."""
+        return BulkheadStats(
+            total_requests=self._total_requests,
+            accepted_requests=self._accepted_requests,
+            rejected_requests=self._rejected_requests,
+            timed_out_requests=self._timed_out_requests,
+            queued_requests=self._queued_requests,
+            peak_concurrent=self._peak_concurrent,
+            peak_queue_depth=self._peak_queue_depth,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to target."""
+        super().set_clock(clock)
+        self._target.set_clock(clock)
+
     def handle_event(
         self, event: Event
     ) -> Generator[float, None, list[Event] | Event | None] | list[Event] | Event | None:
@@ -182,7 +207,7 @@ class Bulkhead(Entity):
         if event_type == "_bh_timeout":
             return self._handle_timeout(event)
 
-        self.stats.total_requests += 1
+        self._total_requests += 1
 
         # Check if we have capacity
         if self._active_count < self._max_concurrent:
@@ -193,7 +218,7 @@ class Bulkhead(Entity):
             return self._enqueue_request(event)
 
         # Reject - no capacity and queue is full
-        self.stats.rejected_requests += 1
+        self._rejected_requests += 1
         logger.debug(
             "[%s] Request rejected (no capacity, queue full)",
             self.name,
@@ -206,11 +231,11 @@ class Bulkhead(Entity):
         request_id = self._next_request_id
 
         self._active_count += 1
-        self.stats.accepted_requests += 1
+        self._accepted_requests += 1
 
         # Track peak
-        if self._active_count > self.stats.peak_concurrent:
-            self.stats.peak_concurrent = self._active_count
+        if self._active_count > self._peak_concurrent:
+            self._peak_concurrent = self._active_count
 
         self._in_flight[request_id] = {
             "start_time": self.now,
@@ -273,12 +298,12 @@ class Bulkhead(Entity):
             request_id=request_id,
         )
         self._wait_queue.append(waiting)
-        self.stats.queued_requests += 1
+        self._queued_requests += 1
 
         # Track peak queue depth
         queue_depth = len(self._wait_queue)
-        if queue_depth > self.stats.peak_queue_depth:
-            self.stats.peak_queue_depth = queue_depth
+        if queue_depth > self._peak_queue_depth:
+            self._peak_queue_depth = queue_depth
 
         logger.debug(
             "[%s] Request %d queued (queue_depth=%d/%d)",
@@ -342,7 +367,7 @@ class Bulkhead(Entity):
         for i, waiting in enumerate(self._wait_queue):
             if waiting.request_id == request_id:
                 del self._wait_queue[i]
-                self.stats.timed_out_requests += 1
+                self._timed_out_requests += 1
                 logger.debug(
                     "[%s] Request %d timed out in queue",
                     self.name,
@@ -369,7 +394,7 @@ class Bulkhead(Entity):
             wait_time = (self.now - waiting.enqueue_time).to_seconds()
             if wait_time > self._max_wait_time:
                 # Skip expired request, try next
-                self.stats.timed_out_requests += 1
+                self._timed_out_requests += 1
                 return self._try_process_queued()
 
         logger.debug(

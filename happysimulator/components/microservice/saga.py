@@ -20,7 +20,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Generator
 
@@ -73,7 +73,7 @@ class SagaStepResult:
     completed_at: Instant | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class SagaStats:
     """Statistics tracked by Saga."""
 
@@ -142,13 +142,32 @@ class Saga(Entity):
         self._instances: dict[int, _SagaInstance] = {}
         self._next_saga_id = 0
 
-        self.stats = SagaStats()
+        self._sagas_started = 0
+        self._sagas_completed = 0
+        self._sagas_compensated = 0
+        self._sagas_failed = 0
+        self._steps_executed = 0
+        self._steps_failed = 0
+        self._compensations_executed = 0
 
         logger.debug(
             "[%s] Saga initialized with %d steps: %s",
             name,
             len(steps),
             [s.name for s in steps],
+        )
+
+    @property
+    def stats(self) -> SagaStats:
+        """Return a frozen snapshot of current statistics."""
+        return SagaStats(
+            sagas_started=self._sagas_started,
+            sagas_completed=self._sagas_completed,
+            sagas_compensated=self._sagas_compensated,
+            sagas_failed=self._sagas_failed,
+            steps_executed=self._steps_executed,
+            steps_failed=self._steps_failed,
+            compensations_executed=self._compensations_executed,
         )
 
     @property
@@ -201,7 +220,7 @@ class Saga(Entity):
             started_at=self.now,
         )
         self._instances[saga_id] = instance
-        self.stats.sagas_started += 1
+        self._sagas_started += 1
 
         logger.info("[%s] Saga %d started", self.name, saga_id)
 
@@ -212,7 +231,7 @@ class Saga(Entity):
         step_idx = instance.current_step
         step = self._steps[step_idx]
 
-        self.stats.steps_executed += 1
+        self._steps_executed += 1
 
         result = SagaStepResult(
             step_name=step.name,
@@ -334,7 +353,7 @@ class Saga(Entity):
         if step_idx != instance.current_step:
             return None
 
-        self.stats.steps_failed += 1
+        self._steps_failed += 1
 
         logger.info(
             "[%s] Saga %d: step %d (%s) timed out, compensating",
@@ -360,7 +379,7 @@ class Saga(Entity):
         step_idx = instance.current_step
         step = self._steps[step_idx]
 
-        self.stats.compensations_executed += 1
+        self._compensations_executed += 1
 
         logger.debug(
             "[%s] Saga %d: compensating step %d (%s)",
@@ -435,13 +454,13 @@ class Saga(Entity):
         instance.state = final_state
 
         if final_state == SagaState.COMPLETED:
-            self.stats.sagas_completed += 1
+            self._sagas_completed += 1
             logger.info("[%s] Saga %d completed successfully", self.name, instance.saga_id)
         elif final_state == SagaState.COMPENSATED:
-            self.stats.sagas_compensated += 1
+            self._sagas_compensated += 1
             logger.info("[%s] Saga %d compensated", self.name, instance.saga_id)
         else:
-            self.stats.sagas_failed += 1
+            self._sagas_failed += 1
             logger.warning("[%s] Saga %d failed", self.name, instance.saga_id)
 
         if self._on_complete:

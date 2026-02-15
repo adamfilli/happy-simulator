@@ -25,7 +25,7 @@ Example:
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
@@ -36,7 +36,7 @@ from happysimulator.distributions.latency_distribution import LatencyDistributio
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class AsyncServerStats:
     """Statistics tracked by AsyncServer."""
 
@@ -99,7 +99,10 @@ class AsyncServer(Entity):
         self._cpu_busy = False
 
         # Statistics
-        self.stats = AsyncServerStats()
+        self._requests_completed = 0
+        self._requests_rejected = 0
+        self._total_cpu_time = 0.0
+        self._total_io_time = 0.0
 
         # Time series for analysis
         self._cpu_times: list[float] = []
@@ -135,6 +138,16 @@ class AsyncServer(Entity):
     def is_cpu_busy(self) -> bool:
         """Whether CPU is currently processing a request."""
         return self._cpu_busy
+
+    @property
+    def stats(self) -> AsyncServerStats:
+        """Frozen snapshot of current statistics."""
+        return AsyncServerStats(
+            requests_completed=self._requests_completed,
+            requests_rejected=self._requests_rejected,
+            total_cpu_time=self._total_cpu_time,
+            total_io_time=self._total_io_time,
+        )
 
     @property
     def utilization(self) -> float:
@@ -190,7 +203,7 @@ class AsyncServer(Entity):
                 self._active_connections,
                 self._max_connections,
             )
-            self.stats.requests_rejected += 1
+            self._requests_rejected += 1
             return None
 
         # Accept connection
@@ -271,7 +284,7 @@ class AsyncServer(Entity):
 
         # Record CPU time
         self._cpu_times.append(cpu_time)
-        self.stats.total_cpu_time += cpu_time
+        self._total_cpu_time += cpu_time
 
         logger.debug(
             "[%s] CPU work complete: type=%s cpu_time=%.4fs",
@@ -306,7 +319,7 @@ class AsyncServer(Entity):
                         result = yield from io_result
                         io_time = self.now.to_seconds() - io_start
                         self._io_times.append(io_time)
-                        self.stats.total_io_time += io_time
+                        self._total_io_time += io_time
 
                         # Complete the request
                         self._complete_request(original_event)
@@ -347,7 +360,7 @@ class AsyncServer(Entity):
     def _complete_request(self, event: Event) -> None:
         """Mark a request as complete and release the connection."""
         self._active_connections = max(0, self._active_connections - 1)
-        self.stats.requests_completed += 1
+        self._requests_completed += 1
 
         logger.debug(
             "[%s] Request completed: type=%s active=%d/%d",

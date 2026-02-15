@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 class SplitMergeStats:
     """Snapshot of split-merge statistics."""
 
-    splits_initiated: int
-    merges_completed: int
-    fan_out: int
+    splits_initiated: int = 0
+    merges_completed: int = 0
+    fan_out: int = 0
 
 
 class SplitMerge(Entity):

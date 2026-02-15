@@ -23,7 +23,7 @@ from happysimulator.components.queue_policy import QueuePolicy
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(frozen=True)
 class REDStats:
     """Statistics tracked by REDQueue."""
 
@@ -108,7 +108,22 @@ class REDQueue(QueuePolicy[T]):
         self._count_since_last_drop = 0  # Packets since last drop
 
         # Statistics
-        self.stats = REDStats()
+        self._enqueued = 0
+        self._dequeued = 0
+        self._dropped_probabilistic = 0
+        self._dropped_forced = 0
+        self._capacity_rejected = 0
+
+    @property
+    def stats(self) -> REDStats:
+        """Return a frozen snapshot of queue statistics."""
+        return REDStats(
+            enqueued=self._enqueued,
+            dequeued=self._dequeued,
+            dropped_probabilistic=self._dropped_probabilistic,
+            dropped_forced=self._dropped_forced,
+            capacity_rejected=self._capacity_rejected,
+        )
 
     @property
     def min_threshold(self) -> int:
@@ -149,7 +164,7 @@ class REDQueue(QueuePolicy[T]):
 
         # Check hard capacity
         if len(self._queue) >= self._capacity:
-            self.stats.capacity_rejected += 1
+            self._capacity_rejected += 1
             return False
 
         # Apply RED algorithm
@@ -170,15 +185,15 @@ class REDQueue(QueuePolicy[T]):
                 # Drop this packet
                 self._count_since_last_drop = 0
                 if self._avg_queue >= self._max_threshold:
-                    self.stats.dropped_forced += 1
+                    self._dropped_forced += 1
                 else:
-                    self.stats.dropped_probabilistic += 1
+                    self._dropped_probabilistic += 1
                 return False
 
         # Accept packet
         self._queue.append(item)
         self._count_since_last_drop += 1
-        self.stats.enqueued += 1
+        self._enqueued += 1
         return True
 
     def _update_avg(self) -> None:
@@ -209,7 +224,7 @@ class REDQueue(QueuePolicy[T]):
             return None
 
         item = self._queue.popleft()
-        self.stats.dequeued += 1
+        self._dequeued += 1
         return item
 
     def peek(self) -> Optional[T]:

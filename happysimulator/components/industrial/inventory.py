@@ -23,11 +23,11 @@ _REPLENISH = "_InventoryReplenish"
 class InventoryStats:
     """Snapshot of inventory statistics."""
 
-    current_stock: int
-    stockouts: int
-    reorders: int
-    items_consumed: int
-    items_replenished: int
+    current_stock: int = 0
+    stockouts: int = 0
+    reorders: int = 0
+    items_consumed: int = 0
+    items_replenished: int = 0
 
     @property
     def fill_rate(self) -> float:

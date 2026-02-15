@@ -38,13 +38,13 @@ class FlexiblePaxosStats:
         phase1_quorum: Phase 1 quorum size.
         phase2_quorum: Phase 2 quorum size.
     """
-    is_leader: bool
-    current_ballot: int
-    log_length: int
-    commit_index: int
-    commands_committed: int
-    phase1_quorum: int
-    phase2_quorum: int
+    is_leader: bool = False
+    current_ballot: int = 0
+    log_length: int = 0
+    commit_index: int = 0
+    commands_committed: int = 0
+    phase1_quorum: int = 0
+    phase2_quorum: int = 0
 
 
 class FlexiblePaxosNode(Entity):

@@ -35,6 +35,7 @@ import logging
 from dataclasses import dataclass
 from typing import Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
@@ -42,17 +43,17 @@ from happysimulator.core.temporal import Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class DistributedRateLimiterStats:
-    """Statistics tracked by DistributedRateLimiter."""
+    """Frozen snapshot of DistributedRateLimiter statistics."""
 
     requests_received: int = 0
     requests_forwarded: int = 0
     requests_dropped: int = 0
     store_reads: int = 0
     store_writes: int = 0
-    local_rejections: int = 0  # Rejected by local pre-check
-    global_rejections: int = 0  # Rejected by global counter
+    local_rejections: int = 0
+    global_rejections: int = 0
 
 
 @dataclass
@@ -137,7 +138,13 @@ class DistributedRateLimiter(Entity):
         self._last_known_global_count: int = 0
 
         # Statistics
-        self.stats = DistributedRateLimiterStats()
+        self._requests_received = 0
+        self._requests_forwarded = 0
+        self._requests_dropped = 0
+        self._store_reads = 0
+        self._store_writes = 0
+        self._local_rejections = 0
+        self._global_rejections = 0
 
         # Time series for visualization
         self.received_times: list[Instant] = []
@@ -169,6 +176,25 @@ class DistributedRateLimiter(Entity):
     def local_count(self) -> int:
         """Local request count for current window."""
         return self._local_count
+
+    @property
+    def stats(self) -> DistributedRateLimiterStats:
+        """Frozen snapshot of distributed rate limiter statistics."""
+        return DistributedRateLimiterStats(
+            requests_received=self._requests_received,
+            requests_forwarded=self._requests_forwarded,
+            requests_dropped=self._requests_dropped,
+            store_reads=self._store_reads,
+            store_writes=self._store_writes,
+            local_rejections=self._local_rejections,
+            global_rejections=self._global_rejections,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to downstream and backing store."""
+        super().set_clock(clock)
+        self._downstream.set_clock(clock)
+        self._backing_store.set_clock(clock)
 
     def _get_window_id(self, now: Instant) -> int:
         """Calculate the window ID for the given time."""
@@ -209,14 +235,14 @@ class DistributedRateLimiter(Entity):
         # Quick local rejection if we know we're over limit
         # Use only last_known_global_count since that includes all requests
         if self._last_known_global_count >= self._global_limit:
-            self.stats.local_rejections += 1
+            self._local_rejections += 1
             return False
 
         # Sync with backing store
         key = self._get_counter_key(window_id)
 
         # Read current global count
-        self.stats.store_reads += 1
+        self._store_reads += 1
         read_gen = self._backing_store.get(key)
         try:
             while True:
@@ -229,13 +255,13 @@ class DistributedRateLimiter(Entity):
 
         # Check if over limit
         if current_count >= self._global_limit:
-            self.stats.global_rejections += 1
+            self._global_rejections += 1
             self.global_counts.append((now, current_count))
             return False
 
         # Increment counter
         new_count = current_count + 1
-        self.stats.store_writes += 1
+        self._store_writes += 1
         write_gen = self._backing_store.put(key, new_count)
         try:
             while True:
@@ -267,14 +293,14 @@ class DistributedRateLimiter(Entity):
         now = event.time
 
         # Record received
-        self.stats.requests_received += 1
+        self._requests_received += 1
         self.received_times.append(now)
 
         # Check rate limit (this yields for store access)
         allowed = yield from self.check_and_increment(now)
 
         if allowed:
-            self.stats.requests_forwarded += 1
+            self._requests_forwarded += 1
             self.forwarded_times.append(now)
 
             logger.debug(
@@ -295,7 +321,7 @@ class DistributedRateLimiter(Entity):
             return [forward_event]
 
         # Rate limited
-        self.stats.requests_dropped += 1
+        self._requests_dropped += 1
         self.dropped_times.append(now)
 
         logger.debug(

@@ -20,14 +20,14 @@ Example:
         yield from store.put("user:123", {"name": "Alice"})
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator, Optional
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 
 
-@dataclass
+@dataclass(frozen=True)
 class KVStoreStats:
     """Statistics tracked by KVStore."""
 
@@ -90,7 +90,24 @@ class KVStore(Entity):
         self._insertion_order: list[str] = []  # For FIFO eviction
 
         # Statistics
-        self.stats = KVStoreStats()
+        self._reads = 0
+        self._writes = 0
+        self._deletes = 0
+        self._hits = 0
+        self._misses = 0
+        self._evictions = 0
+
+    @property
+    def stats(self) -> KVStoreStats:
+        """Frozen snapshot of KVStore statistics."""
+        return KVStoreStats(
+            reads=self._reads,
+            writes=self._writes,
+            deletes=self._deletes,
+            hits=self._hits,
+            misses=self._misses,
+            evictions=self._evictions,
+        )
 
     @property
     def read_latency(self) -> float:
@@ -126,13 +143,13 @@ class KVStore(Entity):
         """
         yield self._read_latency
 
-        self.stats.reads += 1
+        self._reads += 1
 
         if key in self._data:
-            self.stats.hits += 1
+            self._hits += 1
             return self._data[key]
         else:
-            self.stats.misses += 1
+            self._misses += 1
             return None
 
     def get_sync(self, key: str) -> Optional[Any]:
@@ -158,7 +175,7 @@ class KVStore(Entity):
         """
         yield self._write_latency
 
-        self.stats.writes += 1
+        self._writes += 1
 
         # Check capacity and evict if needed
         if self._capacity is not None and key not in self._data:
@@ -199,7 +216,7 @@ class KVStore(Entity):
         """
         yield self._delete_latency
 
-        self.stats.deletes += 1
+        self._deletes += 1
 
         if key in self._data:
             del self._data[key]
@@ -251,7 +268,7 @@ class KVStore(Entity):
         if self._insertion_order:
             oldest_key = self._insertion_order.pop(0)
             del self._data[oldest_key]
-            self.stats.evictions += 1
+            self._evictions += 1
 
     def handle_event(self, event: Event) -> None:
         """KVStore can handle events for get/put operations."""

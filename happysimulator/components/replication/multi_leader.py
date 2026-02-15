@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator
 
 from happysimulator.core.entity import Entity
@@ -43,7 +43,7 @@ from happysimulator.sketching.merkle_tree import MerkleTree
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MultiLeaderStats:
     """Statistics for a LeaderNode.
 
@@ -113,7 +113,28 @@ class LeaderNode(Entity):
         # VectorClock (initialized lazily when peers are known)
         self._vclock: VectorClock | None = None
 
-        self.stats = MultiLeaderStats()
+        self._writes = 0
+        self._reads = 0
+        self._replications_sent = 0
+        self._replications_received = 0
+        self._conflicts_detected = 0
+        self._conflicts_resolved = 0
+        self._anti_entropy_syncs = 0
+        self._anti_entropy_keys_repaired = 0
+
+    @property
+    def stats(self) -> MultiLeaderStats:
+        """Frozen snapshot of leader node statistics."""
+        return MultiLeaderStats(
+            writes=self._writes,
+            reads=self._reads,
+            replications_sent=self._replications_sent,
+            replications_received=self._replications_received,
+            conflicts_detected=self._conflicts_detected,
+            conflicts_resolved=self._conflicts_resolved,
+            anti_entropy_syncs=self._anti_entropy_syncs,
+            anti_entropy_keys_repaired=self._anti_entropy_keys_repaired,
+        )
 
     @property
     def store(self) -> KVStore:
@@ -190,7 +211,7 @@ class LeaderNode(Entity):
         value = metadata.get("value")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.writes += 1
+        self._writes += 1
 
         # Tick vector clock
         if self._vclock is not None:
@@ -225,7 +246,7 @@ class LeaderNode(Entity):
                     "vector_clock": vc_snapshot,
                 },
             ))
-            self.stats.replications_sent += 1
+            self._replications_sent += 1
 
         if events:
             yield 0.0, events
@@ -242,7 +263,7 @@ class LeaderNode(Entity):
         key = metadata.get("key")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.reads += 1
+        self._reads += 1
         value = yield from self._store.get(key)
 
         if reply_future is not None:
@@ -260,7 +281,7 @@ class LeaderNode(Entity):
         writer_id = metadata.get("writer_id", "unknown")
         remote_vc = metadata.get("vector_clock", {})
 
-        self.stats.replications_received += 1
+        self._replications_received += 1
 
         # Update local vector clock
         if self._vclock is not None and remote_vc:
@@ -295,9 +316,9 @@ class LeaderNode(Entity):
                 pass
             else:
                 # Concurrent — conflict!
-                self.stats.conflicts_detected += 1
+                self._conflicts_detected += 1
                 winner = self._resolver.resolve(key, [existing, incoming])
-                self.stats.conflicts_resolved += 1
+                self._conflicts_resolved += 1
 
                 if winner is not existing:
                     yield from self._store.put(key, winner.value)
@@ -313,7 +334,7 @@ class LeaderNode(Entity):
         if not self._peers:
             return None
 
-        self.stats.anti_entropy_syncs += 1
+        self._anti_entropy_syncs += 1
         peer = random.choice(self._peers)
 
         # Send our root hash AND our versioned data so the peer can reconcile
@@ -369,7 +390,7 @@ class LeaderNode(Entity):
                 yield from self._store.put(key, remote_vv.value)
                 self._versions[key] = remote_vv
                 self._merkle.update(key, remote_vv.value)
-                self.stats.anti_entropy_keys_repaired += 1
+                self._anti_entropy_keys_repaired += 1
             else:
                 existing_vc = existing.vector_clock or {}
                 remote_vc = remote_vv.vector_clock or {}
@@ -377,16 +398,16 @@ class LeaderNode(Entity):
                     yield from self._store.put(key, remote_vv.value)
                     self._versions[key] = remote_vv
                     self._merkle.update(key, remote_vv.value)
-                    self.stats.anti_entropy_keys_repaired += 1
+                    self._anti_entropy_keys_repaired += 1
                 elif not _vc_dominates(existing_vc, remote_vc):
-                    self.stats.conflicts_detected += 1
+                    self._conflicts_detected += 1
                     winner = self._resolver.resolve(key, [existing, remote_vv])
-                    self.stats.conflicts_resolved += 1
+                    self._conflicts_resolved += 1
                     if winner is not existing:
                         yield from self._store.put(key, winner.value)
                         self._versions[key] = winner
                         self._merkle.update(key, winner.value)
-                        self.stats.anti_entropy_keys_repaired += 1
+                        self._anti_entropy_keys_repaired += 1
 
         if remote_hash == self._merkle.root_hash:
             # After reconciliation, if hashes match, no need to respond
@@ -440,7 +461,7 @@ class LeaderNode(Entity):
                 yield from self._store.put(key, remote_vv.value)
                 self._versions[key] = remote_vv
                 self._merkle.update(key, remote_vv.value)
-                self.stats.anti_entropy_keys_repaired += 1
+                self._anti_entropy_keys_repaired += 1
             else:
                 existing_vc = existing.vector_clock or {}
                 remote_vc = remote_vv.vector_clock or {}
@@ -449,17 +470,17 @@ class LeaderNode(Entity):
                     yield from self._store.put(key, remote_vv.value)
                     self._versions[key] = remote_vv
                     self._merkle.update(key, remote_vv.value)
-                    self.stats.anti_entropy_keys_repaired += 1
+                    self._anti_entropy_keys_repaired += 1
                 elif not _vc_dominates(existing_vc, remote_vc):
                     # Concurrent — resolve
-                    self.stats.conflicts_detected += 1
+                    self._conflicts_detected += 1
                     winner = self._resolver.resolve(key, [existing, remote_vv])
-                    self.stats.conflicts_resolved += 1
+                    self._conflicts_resolved += 1
                     if winner is not existing:
                         yield from self._store.put(key, winner.value)
                         self._versions[key] = winner
                         self._merkle.update(key, winner.value)
-                        self.stats.anti_entropy_keys_repaired += 1
+                        self._anti_entropy_keys_repaired += 1
 
         return None
 

@@ -36,13 +36,13 @@ class MemtableStats:
         total_bytes_written: Estimated total bytes written.
     """
 
-    writes: int
-    reads: int
-    hits: int
-    misses: int
-    flushes: int
-    current_size: int
-    total_bytes_written: int
+    writes: int = 0
+    reads: int = 0
+    hits: int = 0
+    misses: int = 0
+    flushes: int = 0
+    current_size: int = 0
+    total_bytes_written: int = 0
 
 
 class Memtable(Entity):

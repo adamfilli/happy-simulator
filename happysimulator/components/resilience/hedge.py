@@ -23,6 +23,7 @@ import logging
 from dataclasses import dataclass
 from typing import Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -30,9 +31,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class HedgeStats:
-    """Statistics tracked by Hedge."""
+    """Frozen snapshot of Hedge statistics."""
 
     total_requests: int = 0
     primary_wins: int = 0
@@ -95,7 +96,11 @@ class Hedge(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = HedgeStats()
+        self._total_requests = 0
+        self._primary_wins = 0
+        self._hedge_wins = 0
+        self._hedges_sent = 0
+        self._hedges_cancelled = 0
 
         logger.debug(
             "[%s] Hedge initialized: target=%s, delay=%.3fs, max_hedges=%d",
@@ -125,6 +130,22 @@ class Hedge(Entity):
         """Number of requests currently in flight."""
         return len(self._in_flight)
 
+    @property
+    def stats(self) -> HedgeStats:
+        """Frozen snapshot of hedge statistics."""
+        return HedgeStats(
+            total_requests=self._total_requests,
+            primary_wins=self._primary_wins,
+            hedge_wins=self._hedge_wins,
+            hedges_sent=self._hedges_sent,
+            hedges_cancelled=self._hedges_cancelled,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to target."""
+        super().set_clock(clock)
+        self._target.set_clock(clock)
+
     def handle_event(
         self, event: Event
     ) -> Generator[float, None, list[Event] | Event | None] | list[Event] | Event | None:
@@ -146,7 +167,7 @@ class Hedge(Entity):
         if event_type == "_hg_send_hedge":
             return self._send_hedge(event)
 
-        self.stats.total_requests += 1
+        self._total_requests += 1
         return self._forward_primary(event)
 
     def _forward_primary(self, event: Event) -> list[Event]:
@@ -245,7 +266,7 @@ class Hedge(Entity):
 
         # Check if already completed
         if request_info["completed"]:
-            self.stats.hedges_cancelled += 1
+            self._hedges_cancelled += 1
             return None
 
         # Check if we've sent max hedges
@@ -254,7 +275,7 @@ class Hedge(Entity):
 
         # Send hedge
         request_info["hedges_sent"] += 1
-        self.stats.hedges_sent += 1
+        self._hedges_sent += 1
 
         original_event = request_info["original_event"]
 
@@ -312,7 +333,7 @@ class Hedge(Entity):
             response_time = (self.now - request_info["start_time"]).to_seconds()
 
             if is_hedge:
-                self.stats.hedge_wins += 1
+                self._hedge_wins += 1
                 logger.debug(
                     "[%s] Request %d completed by hedge in %.3fs",
                     self.name,
@@ -320,7 +341,7 @@ class Hedge(Entity):
                     response_time,
                 )
             else:
-                self.stats.primary_wins += 1
+                self._primary_wins += 1
                 logger.debug(
                     "[%s] Request %d completed by primary in %.3fs",
                     self.name,

@@ -17,7 +17,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
@@ -38,7 +38,7 @@ class DeploymentState:
     current_batch: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class RollingDeployerStats:
     """Statistics tracked by RollingDeployer."""
 
@@ -62,7 +62,7 @@ class RollingDeployer(Entity):
 
     Attributes:
         name: Deployer identifier.
-        stats: Mutable statistics dataclass.
+        stats: Frozen statistics snapshot.
         state: Current deployment state.
     """
 
@@ -104,7 +104,13 @@ class RollingDeployer(Entity):
         self._health_fail_count: int = 0
         self._next_instance_id = 0
 
-        self.stats = RollingDeployerStats()
+        self._deployments_started = 0
+        self._deployments_completed = 0
+        self._deployments_rolled_back = 0
+        self._instances_replaced = 0
+        self._health_checks_performed = 0
+        self._health_checks_passed = 0
+        self._health_checks_failed = 0
         self.state = DeploymentState()
 
         logger.debug(
@@ -112,6 +118,19 @@ class RollingDeployer(Entity):
             "health_interval=%.1fs, healthy_threshold=%d, max_failures=%d",
             name, batch_size, health_check_interval,
             healthy_threshold, max_failures,
+        )
+
+    @property
+    def stats(self) -> RollingDeployerStats:
+        """Return a frozen snapshot of current statistics."""
+        return RollingDeployerStats(
+            deployments_started=self._deployments_started,
+            deployments_completed=self._deployments_completed,
+            deployments_rolled_back=self._deployments_rolled_back,
+            instances_replaced=self._instances_replaced,
+            health_checks_performed=self._health_checks_performed,
+            health_checks_passed=self._health_checks_passed,
+            health_checks_failed=self._health_checks_failed,
         )
 
     def deploy(self) -> Event:
@@ -157,7 +176,7 @@ class RollingDeployer(Entity):
             status="in_progress",
             total_instances=len(self._old_backends),
         )
-        self.stats.deployments_started += 1
+        self._deployments_started += 1
 
         logger.info(
             "[%s] Starting rolling deployment: %d instances to replace",
@@ -226,7 +245,7 @@ class RollingDeployer(Entity):
 
         events = []
         for new_server in self._current_batch_new:
-            self.stats.health_checks_performed += 1
+            self._health_checks_performed += 1
 
             # Send probe with completion hook
             probe = Event(
@@ -270,7 +289,7 @@ class RollingDeployer(Entity):
             return []
 
         self._health_pass_count[server_name] += 1
-        self.stats.health_checks_passed += 1
+        self._health_checks_passed += 1
 
         logger.debug(
             "[%s] Health pass for %s (%d/%d)",
@@ -290,7 +309,7 @@ class RollingDeployer(Entity):
             for old_server in self._current_batch_old:
                 self._load_balancer.remove_backend(old_server)
                 self.state.replaced += 1
-                self.stats.instances_replaced += 1
+                self._instances_replaced += 1
 
             logger.info(
                 "[%s] Batch %d complete: %d instances replaced",
@@ -325,7 +344,7 @@ class RollingDeployer(Entity):
             return []  # Already healthy, ignore timeout
 
         self._health_fail_count += 1
-        self.stats.health_checks_failed += 1
+        self._health_checks_failed += 1
         self.state.failed += 1
 
         logger.warning(
@@ -346,7 +365,7 @@ class RollingDeployer(Entity):
     def _rollback(self) -> list[Event]:
         """Roll back the deployment: remove new, restore old."""
         self.state.status = "rolled_back"
-        self.stats.deployments_rolled_back += 1
+        self._deployments_rolled_back += 1
 
         # Remove all new instances
         for new_server in self._new_backends:
@@ -365,7 +384,7 @@ class RollingDeployer(Entity):
     def _complete(self) -> list[Event]:
         """Mark deployment as completed."""
         self.state.status = "completed"
-        self.stats.deployments_completed += 1
+        self._deployments_completed += 1
         logger.info(
             "[%s] Deployment completed: %d instances replaced",
             self.name, self.state.replaced,

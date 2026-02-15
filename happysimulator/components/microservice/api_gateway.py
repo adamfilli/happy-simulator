@@ -57,7 +57,7 @@ class RouteConfig:
     timeout: float | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class APIGatewayStats:
     """Statistics tracked by APIGateway."""
 
@@ -131,13 +131,32 @@ class APIGateway(Entity):
         self._in_flight: dict[int, dict] = {}
         self._next_request_id = 0
 
-        self.stats = APIGatewayStats()
+        self._total_requests = 0
+        self._requests_routed = 0
+        self._requests_rejected_auth = 0
+        self._requests_rejected_rate_limit = 0
+        self._requests_no_route = 0
+        self._requests_no_backend = 0
+        self._per_route_requests: dict[str, int] = {}
 
         logger.debug(
             "[%s] APIGateway initialized with %d routes: %s",
             name,
             len(routes),
             list(routes.keys()),
+        )
+
+    @property
+    def stats(self) -> APIGatewayStats:
+        """Return a frozen snapshot of current statistics."""
+        return APIGatewayStats(
+            total_requests=self._total_requests,
+            requests_routed=self._requests_routed,
+            requests_rejected_auth=self._requests_rejected_auth,
+            requests_rejected_rate_limit=self._requests_rejected_rate_limit,
+            requests_no_route=self._requests_no_route,
+            requests_no_backend=self._requests_no_backend,
+            per_route_requests=dict(self._per_route_requests),
         )
 
     @property
@@ -171,20 +190,20 @@ class APIGateway(Entity):
 
     def _handle_request(self, event: Event) -> Generator[float, None, list[Event]] | list[Event] | None:
         """Process request through auth, rate limit, and routing."""
-        self.stats.total_requests += 1
+        self._total_requests += 1
 
         # 1. Extract route
         route_key = self._route_extractor(event)
         if route_key is None or route_key not in self._routes:
-            self.stats.requests_no_route += 1
+            self._requests_no_route += 1
             logger.debug("[%s] No route for key=%s", self.name, route_key)
             return None
 
         route = self._routes[route_key]
 
         # Track per-route requests
-        self.stats.per_route_requests[route_key] = (
-            self.stats.per_route_requests.get(route_key, 0) + 1
+        self._per_route_requests[route_key] = (
+            self._per_route_requests.get(route_key, 0) + 1
         )
 
         # 2. Auth check (needs generator for latency simulation)
@@ -204,7 +223,7 @@ class APIGateway(Entity):
 
         # Check auth failure
         if self._auth_failure_rate > 0 and random.random() < self._auth_failure_rate:
-            self.stats.requests_rejected_auth += 1
+            self._requests_rejected_auth += 1
             logger.debug("[%s] Auth rejected for route=%s", self.name, route_key)
             return []
 
@@ -219,13 +238,13 @@ class APIGateway(Entity):
         # Rate limit check
         if route.rate_limit_policy is not None:
             if not route.rate_limit_policy.try_acquire(self.now):
-                self.stats.requests_rejected_rate_limit += 1
+                self._requests_rejected_rate_limit += 1
                 logger.debug("[%s] Rate limited on route=%s", self.name, route_key)
                 return None
 
         # Select backend
         if not route.backends:
-            self.stats.requests_no_backend += 1
+            self._requests_no_backend += 1
             logger.debug("[%s] No backends for route=%s", self.name, route_key)
             return None
 
@@ -252,7 +271,7 @@ class APIGateway(Entity):
         self._next_request_id += 1
         request_id = self._next_request_id
 
-        self.stats.requests_routed += 1
+        self._requests_routed += 1
 
         self._in_flight[request_id] = {
             "start_time": self.now,

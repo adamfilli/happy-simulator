@@ -21,6 +21,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -28,9 +29,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class TimeoutStats:
-    """Statistics tracked by TimeoutWrapper."""
+    """Frozen snapshot of TimeoutWrapper statistics."""
 
     total_requests: int = 0
     successful_requests: int = 0
@@ -84,7 +85,9 @@ class TimeoutWrapper(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = TimeoutStats()
+        self._total_requests = 0
+        self._successful_requests = 0
+        self._timed_out_requests = 0
 
         logger.debug(
             "[%s] TimeoutWrapper initialized: target=%s, timeout=%.3fs",
@@ -108,6 +111,20 @@ class TimeoutWrapper(Entity):
         """Number of requests currently in flight."""
         return len(self._in_flight)
 
+    @property
+    def stats(self) -> TimeoutStats:
+        """Frozen snapshot of timeout wrapper statistics."""
+        return TimeoutStats(
+            total_requests=self._total_requests,
+            successful_requests=self._successful_requests,
+            timed_out_requests=self._timed_out_requests,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to target."""
+        super().set_clock(clock)
+        self._target.set_clock(clock)
+
     def handle_event(
         self, event: Event
     ) -> Generator[float, None, list[Event] | Event | None] | list[Event] | Event | None:
@@ -129,7 +146,7 @@ class TimeoutWrapper(Entity):
         if event_type == "_tw_timeout":
             return self._handle_timeout(event)
 
-        self.stats.total_requests += 1
+        self._total_requests += 1
         return self._forward_request(event)
 
     def _forward_request(self, event: Event) -> list[Event]:
@@ -227,7 +244,7 @@ class TimeoutWrapper(Entity):
         request_info["completed"] = True
         del self._in_flight[request_id]
 
-        self.stats.successful_requests += 1
+        self._successful_requests += 1
 
         response_time = (self.now - request_info["start_time"]).to_seconds()
         logger.debug(
@@ -258,7 +275,7 @@ class TimeoutWrapper(Entity):
         request_info["completed"] = True
         del self._in_flight[request_id]
 
-        self.stats.timed_out_requests += 1
+        self._timed_out_requests += 1
 
         logger.debug(
             "[%s] Request %d timed out after %.3fs",

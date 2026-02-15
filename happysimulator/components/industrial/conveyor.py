@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 class ConveyorStats:
     """Snapshot of conveyor belt statistics."""
 
-    items_transported: int
-    items_in_transit: int
-    items_rejected: int
+    items_transported: int = 0
+    items_in_transit: int = 0
+    items_rejected: int = 0
 
 
 class ConveyorBelt(Entity):

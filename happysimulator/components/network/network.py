@@ -32,11 +32,11 @@ class LinkStats:
         bytes_transmitted: Total bytes transmitted.
     """
 
-    source: str
-    destination: str
-    packets_sent: int
-    packets_dropped: int
-    bytes_transmitted: int
+    source: str = ""
+    destination: str = ""
+    packets_sent: int = 0
+    packets_dropped: int = 0
+    bytes_transmitted: int = 0
 
 
 @dataclass

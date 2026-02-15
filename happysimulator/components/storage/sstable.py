@@ -16,9 +16,12 @@ This is a pure data structure, NOT an Entity.
 from __future__ import annotations
 
 import bisect
+import logging
 import sys
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from happysimulator.sketching.bloom_filter import BloomFilter
 
@@ -35,11 +38,11 @@ class SSTableStats:
         bloom_filter_size_bits: Size of bloom filter bit array.
     """
 
-    key_count: int
-    size_bytes: int
-    index_entries: int
-    bloom_filter_fp_rate: float
-    bloom_filter_size_bits: int
+    key_count: int = 0
+    size_bytes: int = 0
+    index_entries: int = 0
+    bloom_filter_fp_rate: float = 0.0
+    bloom_filter_size_bits: int = 0
 
 
 class SSTable:

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(frozen=True)
 class AgentStats:
-    """Per-agent statistics tracked during simulation.
+    """Frozen snapshot of per-agent statistics.
 
     Attributes:
         events_received: Total events handled by this agent.
@@ -21,14 +24,10 @@ class AgentStats:
     actions_by_type: dict[str, int] = field(default_factory=dict)
     social_messages_received: int = 0
 
-    def record_action(self, action: str) -> None:
-        """Increment the count for the given action type."""
-        self.actions_by_type[action] = self.actions_by_type.get(action, 0) + 1
 
-
-@dataclass
+@dataclass(frozen=True)
 class PopulationStats:
-    """Aggregate statistics across a population of agents.
+    """Frozen snapshot of aggregate statistics across a population.
 
     Attributes:
         size: Number of agents in the population.
@@ -43,9 +42,9 @@ class PopulationStats:
     total_actions: dict[str, int] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(frozen=True)
 class EnvironmentStats:
-    """Statistics tracked by the Environment entity.
+    """Frozen snapshot of Environment entity statistics.
 
     Attributes:
         broadcasts_sent: Number of broadcast stimulus events dispatched.

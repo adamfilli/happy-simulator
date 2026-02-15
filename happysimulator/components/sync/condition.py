@@ -27,23 +27,27 @@ Example:
         return mutex.release() + events
 """
 
+import logging
 from collections import deque
 from dataclasses import dataclass
 from typing import Generator, Callable, Any
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.components.sync.mutex import Mutex
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(frozen=True)
 class ConditionStats:
-    """Statistics tracked by Condition."""
+    """Frozen snapshot of condition variable statistics."""
 
-    waits: int = 0  # Total wait() calls
-    notifies: int = 0  # Total notify() calls
-    notify_alls: int = 0  # Total notify_all() calls
-    wakeups: int = 0  # Total waiters woken
+    waits: int = 0
+    notifies: int = 0
+    notify_alls: int = 0
+    wakeups: int = 0
     total_wait_time_ns: int = 0
 
 
@@ -82,8 +86,28 @@ class Condition(Entity):
         self._lock = lock
         self._waiters: deque[_Waiter] = deque()
 
-        # Statistics
-        self.stats = ConditionStats()
+        # Statistics (private counters → frozen snapshot via @property)
+        self._waits = 0
+        self._notifies = 0
+        self._notify_alls = 0
+        self._wakeups = 0
+        self._total_wait_time_ns = 0
+
+    def set_clock(self, clock: Clock) -> None:
+        """Attach clock to this condition and its internal mutex."""
+        super().set_clock(clock)
+        self._lock.set_clock(clock)
+
+    @property
+    def stats(self) -> ConditionStats:
+        """Frozen snapshot of current condition variable statistics."""
+        return ConditionStats(
+            waits=self._waits,
+            notifies=self._notifies,
+            notify_alls=self._notify_alls,
+            wakeups=self._wakeups,
+            total_wait_time_ns=self._total_wait_time_ns,
+        )
 
     @property
     def lock(self) -> Mutex:
@@ -121,7 +145,7 @@ class Condition(Entity):
                 f"Condition {self.name}: wait() called without holding mutex"
             )
 
-        self.stats.waits += 1
+        self._waits += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
 
         # Set up wakeup callback
@@ -145,7 +169,7 @@ class Condition(Entity):
 
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_wait_time_ns += wait_time
+            self._total_wait_time_ns += wait_time
 
     def wait_for(
         self,
@@ -196,7 +220,7 @@ class Condition(Entity):
         Returns:
             Empty list (waking is handled internally).
         """
-        self.stats.notifies += 1
+        self._notifies += 1
 
         woken = 0
         while self._waiters and woken < n:
@@ -204,7 +228,7 @@ class Condition(Entity):
             waiter.callback()
             woken += 1
 
-        self.stats.wakeups += woken
+        self._wakeups += woken
         return []
 
     def notify_all(self) -> list[Event]:
@@ -213,7 +237,7 @@ class Condition(Entity):
         Returns:
             Empty list (waking is handled internally).
         """
-        self.stats.notify_alls += 1
+        self._notify_alls += 1
 
         woken = 0
         while self._waiters:
@@ -221,7 +245,7 @@ class Condition(Entity):
             waiter.callback()
             woken += 1
 
-        self.stats.wakeups += woken
+        self._wakeups += woken
         return []
 
     def handle_event(self, event: Event) -> None:

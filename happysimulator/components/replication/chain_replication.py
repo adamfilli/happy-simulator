@@ -27,7 +27,7 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Generator
 
@@ -47,7 +47,7 @@ class ChainNodeRole(Enum):
     TAIL = "tail"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ChainReplicationStats:
     """Statistics for a ChainNode.
 
@@ -113,7 +113,22 @@ class ChainNode(Entity):
         self._pending_writes: dict[int, SimFuture] = {}
         self._next_seq: int = 0
 
-        self.stats = ChainReplicationStats()
+        self._writes_received = 0
+        self._propagations_sent = 0
+        self._propagations_received = 0
+        self._acks_sent = 0
+        self._reads_served = 0
+
+    @property
+    def stats(self) -> ChainReplicationStats:
+        """Frozen snapshot of chain node statistics."""
+        return ChainReplicationStats(
+            writes_received=self._writes_received,
+            propagations_sent=self._propagations_sent,
+            propagations_received=self._propagations_received,
+            acks_sent=self._acks_sent,
+            reads_served=self._reads_served,
+        )
 
     @property
     def role(self) -> ChainNodeRole:
@@ -154,6 +169,10 @@ class ChainNode(Entity):
         """HEAD: accept write, apply locally, propagate to next."""
         if self._role != ChainNodeRole.HEAD:
             logger.warning("[%s] Write received by non-HEAD node", self.name)
+            metadata = event.context.get("metadata", {})
+            reply_future: SimFuture | None = metadata.get("reply_future")
+            if reply_future is not None:
+                reply_future.resolve({"status": "error", "reason": "not_head"})
             return None
 
         metadata = event.context.get("metadata", {})
@@ -161,7 +180,7 @@ class ChainNode(Entity):
         value = metadata.get("value")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.writes_received += 1
+        self._writes_received += 1
         self._next_seq += 1
         seq = self._next_seq
 
@@ -182,7 +201,7 @@ class ChainNode(Entity):
                 self, self.next_node, "Propagate",
                 payload={"key": key, "value": value, "seq": seq},
             )
-            self.stats.propagations_sent += 1
+            self._propagations_sent += 1
             yield 0.0, [prop_event]
 
             # Wait for ack from tail
@@ -210,7 +229,7 @@ class ChainNode(Entity):
         value = metadata.get("value")
         seq = metadata.get("seq", 0)
 
-        self.stats.propagations_received += 1
+        self._propagations_received += 1
 
         # Apply locally
         yield from self._store.put(key, value)
@@ -226,7 +245,7 @@ class ChainNode(Entity):
                     self, head, "WriteAck",
                     payload={"key": key, "seq": seq},
                 )
-                self.stats.acks_sent += 1
+                self._acks_sent += 1
                 yield 0.0, [ack_event]
 
             # CRAQ: key is now clean, notify chain
@@ -243,7 +262,7 @@ class ChainNode(Entity):
                 self, self.next_node, "Propagate",
                 payload={"key": key, "value": value, "seq": seq},
             )
-            self.stats.propagations_sent += 1
+            self._propagations_sent += 1
             yield 0.0, [prop_event]
 
         return None
@@ -291,7 +310,7 @@ class ChainNode(Entity):
                     return None
 
         # Serve locally
-        self.stats.reads_served += 1
+        self._reads_served += 1
         value = yield from self._store.get(key)
 
         if reply_future is not None:

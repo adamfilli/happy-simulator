@@ -7,7 +7,10 @@ and Voter Model (random adoption).
 
 from __future__ import annotations
 
+import logging
 import random
+
+logger = logging.getLogger(__name__)
 from typing import Protocol, runtime_checkable
 
 

@@ -16,7 +16,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
@@ -35,7 +35,7 @@ class _CachedResponse:
     ttl: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class IdempotencyStoreStats:
     """Statistics tracked by IdempotencyStore."""
 
@@ -102,7 +102,11 @@ class IdempotencyStore(Entity):
         self._cache: dict[str, _CachedResponse] = {}
         self._in_flight: set[str] = set()
 
-        self.stats = IdempotencyStoreStats()
+        self._total_requests = 0
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._entries_expired = 0
+        self._entries_stored = 0
 
         logger.debug(
             "[%s] IdempotencyStore initialized: target=%s, ttl=%.1fs, max_entries=%d",
@@ -110,6 +114,17 @@ class IdempotencyStore(Entity):
             target.name,
             ttl,
             max_entries,
+        )
+
+    @property
+    def stats(self) -> IdempotencyStoreStats:
+        """Return a frozen snapshot of current statistics."""
+        return IdempotencyStoreStats(
+            total_requests=self._total_requests,
+            cache_hits=self._cache_hits,
+            cache_misses=self._cache_misses,
+            entries_expired=self._entries_expired,
+            entries_stored=self._entries_stored,
         )
 
     @property
@@ -146,7 +161,7 @@ class IdempotencyStore(Entity):
 
     def _handle_request(self, event: Event) -> list[Event] | None:
         """Check idempotency and forward or suppress."""
-        self.stats.total_requests += 1
+        self._total_requests += 1
 
         key = self._key_extractor(event)
         if key is None:
@@ -155,17 +170,17 @@ class IdempotencyStore(Entity):
 
         # Check cache
         if key in self._cache:
-            self.stats.cache_hits += 1
+            self._cache_hits += 1
             logger.debug("[%s] Cache hit for key=%s (duplicate suppressed)", self.name, key)
             return None
 
         # Check if already in-flight
         if key in self._in_flight:
-            self.stats.cache_hits += 1
+            self._cache_hits += 1
             logger.debug("[%s] In-flight hit for key=%s (duplicate suppressed)", self.name, key)
             return None
 
-        self.stats.cache_misses += 1
+        self._cache_misses += 1
         return self._forward(event, key=key)
 
     def _forward(self, event: Event, *, key: str | None) -> list[Event]:
@@ -224,14 +239,14 @@ class IdempotencyStore(Entity):
         if len(self._cache) >= self._max_entries:
             oldest_key = next(iter(self._cache))
             del self._cache[oldest_key]
-            self.stats.entries_expired += 1
+            self._entries_expired += 1
 
         self._cache[key] = _CachedResponse(
             key=key,
             cached_at=self.now,
             ttl=self._ttl,
         )
-        self.stats.entries_stored += 1
+        self._entries_stored += 1
 
         logger.debug("[%s] Cached key=%s", self.name, key)
 
@@ -246,7 +261,7 @@ class IdempotencyStore(Entity):
 
         for key in expired_keys:
             del self._cache[key]
-            self.stats.entries_expired += 1
+            self._entries_expired += 1
 
         if expired_keys:
             logger.debug(

@@ -24,11 +24,11 @@ _REPLENISH = "_PerishableReplenish"
 class PerishableInventoryStats:
     """Snapshot of perishable inventory statistics."""
 
-    current_stock: int
-    total_consumed: int
-    total_spoiled: int
-    stockouts: int
-    reorders: int
+    current_stock: int = 0
+    total_consumed: int = 0
+    total_spoiled: int = 0
+    stockouts: int = 0
+    reorders: int = 0
 
     @property
     def waste_rate(self) -> float:

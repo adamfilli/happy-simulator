@@ -22,7 +22,7 @@ from happysimulator.components.queue_policy import QueuePolicy
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(frozen=True)
 class AdaptiveLIFOStats:
     """Statistics tracked by AdaptiveLIFO."""
 
@@ -78,7 +78,22 @@ class AdaptiveLIFO(QueuePolicy[T]):
         self._was_congested = False
 
         # Statistics
-        self.stats = AdaptiveLIFOStats()
+        self._enqueued = 0
+        self._dequeued_fifo = 0
+        self._dequeued_lifo = 0
+        self._capacity_rejected = 0
+        self._mode_switches = 0
+
+    @property
+    def stats(self) -> AdaptiveLIFOStats:
+        """Return a frozen snapshot of queue statistics."""
+        return AdaptiveLIFOStats(
+            enqueued=self._enqueued,
+            dequeued_fifo=self._dequeued_fifo,
+            dequeued_lifo=self._dequeued_lifo,
+            capacity_rejected=self._capacity_rejected,
+            mode_switches=self._mode_switches,
+        )
 
     @property
     def congestion_threshold(self) -> int:
@@ -110,11 +125,11 @@ class AdaptiveLIFO(QueuePolicy[T]):
             True if accepted, False if capacity exceeded.
         """
         if len(self._queue) >= self._capacity:
-            self.stats.capacity_rejected += 1
+            self._capacity_rejected += 1
             return False
 
         self._queue.append(item)
-        self.stats.enqueued += 1
+        self._enqueued += 1
         return True
 
     def pop(self) -> Optional[T]:
@@ -132,17 +147,17 @@ class AdaptiveLIFO(QueuePolicy[T]):
 
         # Track mode switches
         if is_congested != self._was_congested:
-            self.stats.mode_switches += 1
+            self._mode_switches += 1
             self._was_congested = is_congested
 
         if is_congested:
             # LIFO: pop from right (most recent)
             item = self._queue.pop()
-            self.stats.dequeued_lifo += 1
+            self._dequeued_lifo += 1
         else:
             # FIFO: pop from left (oldest)
             item = self._queue.popleft()
-            self.stats.dequeued_fifo += 1
+            self._dequeued_fifo += 1
 
         return item
 

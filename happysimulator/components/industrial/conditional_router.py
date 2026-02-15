@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from happysimulator.core.entity import Entity
@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 class RouterStats:
     """Snapshot of router statistics."""
 
-    total_routed: int
-    dropped: int
-    by_target: dict[str, int]
+    total_routed: int = 0
+    dropped: int = 0
+    by_target: dict[str, int] = field(default_factory=dict)
 
 
 class ConditionalRouter(Entity):

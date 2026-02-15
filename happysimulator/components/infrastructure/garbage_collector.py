@@ -184,13 +184,13 @@ class GCStats:
         strategy_name: Name of the active GC strategy.
     """
 
-    collections: int
-    total_pause_s: float
-    max_pause_s: float
-    min_pause_s: float
-    minor_collections: int
-    major_collections: int
-    strategy_name: str
+    collections: int = 0
+    total_pause_s: float = 0.0
+    max_pause_s: float = 0.0
+    min_pause_s: float = 0.0
+    minor_collections: int = 0
+    major_collections: int = 0
+    strategy_name: str = ""
 
     @property
     def avg_pause_s(self) -> float:

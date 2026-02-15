@@ -21,10 +21,11 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
@@ -40,9 +41,9 @@ class CircuitState(Enum):
     HALF_OPEN = "half_open"  # Testing recovery with limited requests
 
 
-@dataclass
+@dataclass(frozen=True)
 class CircuitBreakerStats:
-    """Statistics tracked by CircuitBreaker."""
+    """Frozen snapshot of CircuitBreaker statistics."""
 
     total_requests: int = 0
     successful_requests: int = 0
@@ -135,7 +136,13 @@ class CircuitBreaker(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = CircuitBreakerStats()
+        self._total_requests = 0
+        self._successful_requests = 0
+        self._failed_requests = 0
+        self._rejected_requests = 0
+        self._state_changes = 0
+        self._times_opened = 0
+        self._times_closed = 0
 
         logger.debug(
             "[%s] CircuitBreaker initialized: target=%s, failure_threshold=%d, timeout=%.1fs",
@@ -183,6 +190,24 @@ class CircuitBreaker(Entity):
         """Current consecutive success count (in half-open)."""
         return self._success_count
 
+    @property
+    def stats(self) -> CircuitBreakerStats:
+        """Frozen snapshot of circuit breaker statistics."""
+        return CircuitBreakerStats(
+            total_requests=self._total_requests,
+            successful_requests=self._successful_requests,
+            failed_requests=self._failed_requests,
+            rejected_requests=self._rejected_requests,
+            state_changes=self._state_changes,
+            times_opened=self._times_opened,
+            times_closed=self._times_closed,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to target."""
+        super().set_clock(clock)
+        self._target.set_clock(clock)
+
     def _should_attempt_reset(self) -> bool:
         """Check if enough time has passed to attempt reset."""
         # Can't check time without a clock or recorded failure time
@@ -198,19 +223,19 @@ class CircuitBreaker(Entity):
 
         old_state = self._state
         self._state = new_state
-        self.stats.state_changes += 1
+        self._state_changes += 1
 
         # Reset counters based on new state
         if new_state == CircuitState.CLOSED:
             self._failure_count = 0
             self._success_count = 0
-            self.stats.times_closed += 1
+            self._times_closed += 1
         elif new_state == CircuitState.OPEN:
             self._success_count = 0
             # Only record failure time if clock is available
             if self._clock is not None:
                 self._last_failure_time = self.now
-            self.stats.times_opened += 1
+            self._times_opened += 1
         elif new_state == CircuitState.HALF_OPEN:
             self._success_count = 0
             self._half_open_in_flight = 0
@@ -247,18 +272,18 @@ class CircuitBreaker(Entity):
         # Check current state (this also handles OPEN -> HALF_OPEN transition)
         current_state = self.state
 
-        self.stats.total_requests += 1
+        self._total_requests += 1
 
         if current_state == CircuitState.OPEN:
             # Fail fast
-            self.stats.rejected_requests += 1
+            self._rejected_requests += 1
             logger.debug("[%s] Request rejected (circuit OPEN)", self.name)
             return None
 
         if current_state == CircuitState.HALF_OPEN:
             # Only allow limited requests through
             if self._half_open_in_flight >= self._half_open_max_requests:
-                self.stats.rejected_requests += 1
+                self._rejected_requests += 1
                 logger.debug("[%s] Request rejected (half-open limit reached)", self.name)
                 return None
             self._half_open_in_flight += 1
@@ -351,7 +376,7 @@ class CircuitBreaker(Entity):
 
     def _on_success(self, state_when_sent: CircuitState) -> None:
         """Record a successful request."""
-        self.stats.successful_requests += 1
+        self._successful_requests += 1
 
         if state_when_sent == CircuitState.HALF_OPEN:
             self._half_open_in_flight = max(0, self._half_open_in_flight - 1)
@@ -365,7 +390,7 @@ class CircuitBreaker(Entity):
 
     def _on_failure(self, state_when_sent: CircuitState) -> None:
         """Record a failed request."""
-        self.stats.failed_requests += 1
+        self._failed_requests += 1
 
         if state_when_sent == CircuitState.HALF_OPEN:
             self._half_open_in_flight = max(0, self._half_open_in_flight - 1)

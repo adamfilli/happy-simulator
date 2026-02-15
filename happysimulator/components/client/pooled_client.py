@@ -31,6 +31,7 @@ from typing import Any, Callable, Generator
 
 from happysimulator.components.client.connection_pool import Connection, ConnectionPool
 from happysimulator.components.client.retry import NoRetry, RetryPolicy
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -38,9 +39,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class PooledClientStats:
-    """Statistics tracked by PooledClient."""
+    """Frozen snapshot of PooledClient statistics."""
 
     requests_sent: int = 0
     responses_received: int = 0
@@ -102,7 +103,12 @@ class PooledClient(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = PooledClientStats()
+        self._requests_sent = 0
+        self._responses_received = 0
+        self._timeouts = 0
+        self._retries = 0
+        self._failures = 0
+        self._connection_wait_timeouts = 0
 
         # Response times for analysis
         self._response_times: list[float] = []
@@ -141,6 +147,23 @@ class PooledClient(Entity):
         if not self._response_times:
             return 0.0
         return sum(self._response_times) / len(self._response_times)
+
+    @property
+    def stats(self) -> PooledClientStats:
+        """Frozen snapshot of pooled client statistics."""
+        return PooledClientStats(
+            requests_sent=self._requests_sent,
+            responses_received=self._responses_received,
+            timeouts=self._timeouts,
+            retries=self._retries,
+            failures=self._failures,
+            connection_wait_timeouts=self._connection_wait_timeouts,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to connection pool."""
+        super().set_clock(clock)
+        self._pool.set_clock(clock)
 
     def send_request(
         self,
@@ -233,8 +256,8 @@ class PooledClient(Entity):
             connection = yield from self._pool.acquire()
         except TimeoutError:
             # Failed to acquire connection
-            self.stats.connection_wait_timeouts += 1
-            self.stats.failures += 1
+            self._connection_wait_timeouts += 1
+            self._failures += 1
 
             logger.warning(
                 "[%s] Connection acquisition timeout: request_id=%s",
@@ -264,9 +287,9 @@ class PooledClient(Entity):
         }
 
         # Update stats
-        self.stats.requests_sent += 1
+        self._requests_sent += 1
         if attempt > 1:
-            self.stats.retries += 1
+            self._retries += 1
 
         # Create the actual request to target
         target = self._pool.target
@@ -353,7 +376,7 @@ class PooledClient(Entity):
         self._response_times.append(response_time)
 
         # Update stats
-        self.stats.responses_received += 1
+        self._responses_received += 1
 
         logger.debug(
             "[%s] Received response: id=%s response_time=%.4fs",
@@ -392,7 +415,7 @@ class PooledClient(Entity):
         release_events = self._pool.release(connection)
 
         # Update stats
-        self.stats.timeouts += 1
+        self._timeouts += 1
 
         logger.debug(
             "[%s] Request timeout: id=%s attempt=%d",
@@ -444,7 +467,7 @@ class PooledClient(Entity):
 
         # No more retries - fail the request
         self._in_flight.pop(flight_key)
-        self.stats.failures += 1
+        self._failures += 1
 
         logger.debug(
             "[%s] Request failed (max retries): id=%s attempts=%d",

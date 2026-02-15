@@ -65,13 +65,13 @@ class MembershipStats:
         acks_received: Total acks received.
         updates_disseminated: Total membership updates piggybacked.
     """
-    alive_count: int
-    suspect_count: int
-    dead_count: int
-    probes_sent: int
-    indirect_probes_sent: int
-    acks_received: int
-    updates_disseminated: int
+    alive_count: int = 0
+    suspect_count: int = 0
+    dead_count: int = 0
+    probes_sent: int = 0
+    indirect_probes_sent: int = 0
+    acks_received: int = 0
+    updates_disseminated: int = 0
 
 
 class MembershipProtocol(Entity):

@@ -19,7 +19,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator
 
 from happysimulator.core.entity import Entity
@@ -39,7 +39,7 @@ class OutboxEntry:
     relayed: bool = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class OutboxRelayStats:
     """Statistics tracked by OutboxRelay."""
 
@@ -111,7 +111,12 @@ class OutboxRelay(Entity):
         self._next_entry_id = 0
         self._poll_scheduled = False
 
-        self.stats = OutboxRelayStats()
+        self._entries_written = 0
+        self._entries_relayed = 0
+        self._relay_failures = 0
+        self._poll_cycles = 0
+        self._relay_lag_sum = 0.0
+        self._relay_lag_max = 0.0
 
         logger.debug(
             "[%s] OutboxRelay initialized: downstream=%s, poll_interval=%.3fs, batch_size=%d",
@@ -119,6 +124,18 @@ class OutboxRelay(Entity):
             downstream.name,
             poll_interval,
             batch_size,
+        )
+
+    @property
+    def stats(self) -> OutboxRelayStats:
+        """Return a frozen snapshot of current statistics."""
+        return OutboxRelayStats(
+            entries_written=self._entries_written,
+            entries_relayed=self._entries_relayed,
+            relay_failures=self._relay_failures,
+            poll_cycles=self._poll_cycles,
+            relay_lag_sum=self._relay_lag_sum,
+            relay_lag_max=self._relay_lag_max,
         )
 
     @property
@@ -157,7 +174,7 @@ class OutboxRelay(Entity):
             written_at=self.now,
         )
         self._entries.append(entry)
-        self.stats.entries_written += 1
+        self._entries_written += 1
 
         logger.debug("[%s] Entry written: id=%d", self.name, entry_id)
         return entry_id
@@ -184,7 +201,7 @@ class OutboxRelay(Entity):
     def _handle_poll(self, event: Event) -> Generator[float, None, list[Event]]:
         """Process a batch of pending outbox entries."""
         self._poll_scheduled = False
-        self.stats.poll_cycles += 1
+        self._poll_cycles += 1
 
         # Collect pending entries up to batch_size
         pending = [e for e in self._entries if not e.relayed][:self._batch_size]
@@ -192,13 +209,13 @@ class OutboxRelay(Entity):
         relay_events: list[Event] = []
         for entry in pending:
             entry.relayed = True
-            self.stats.entries_relayed += 1
+            self._entries_relayed += 1
 
             # Track relay lag
             lag = (self.now - entry.written_at).to_seconds()
-            self.stats.relay_lag_sum += lag
-            if lag > self.stats.relay_lag_max:
-                self.stats.relay_lag_max = lag
+            self._relay_lag_sum += lag
+            if lag > self._relay_lag_max:
+                self._relay_lag_max = lag
 
             relay_events.append(
                 Event(
@@ -228,7 +245,7 @@ class OutboxRelay(Entity):
 
         # Reschedule if there are more pending entries or keep polling
         result = relay_events
-        if self.pending_count > 0 or self.stats.entries_written > 0:
+        if self.pending_count > 0 or self._entries_written > 0:
             result.append(self._schedule_poll())
 
         return result

@@ -53,12 +53,12 @@ class DistributedLockStats:
         active_locks: Number of currently held locks.
         total_waiters: Total queued waiters across all locks.
     """
-    total_acquires: int
-    total_releases: int
-    total_expirations: int
-    total_rejections: int
-    active_locks: int
-    total_waiters: int
+    total_acquires: int = 0
+    total_releases: int = 0
+    total_expirations: int = 0
+    total_rejections: int = 0
+    active_locks: int = 0
+    total_waiters: int = 0
 
 
 @dataclass

@@ -8,7 +8,7 @@ Server extends QueuedResource to provide a complete server abstraction with:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.components.queued_resource import QueuedResource
@@ -24,7 +24,7 @@ from happysimulator.distributions.latency_distribution import LatencyDistributio
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ServerStats:
     """Statistics tracked by Server."""
 
@@ -100,7 +100,9 @@ class Server(QueuedResource):
         self._downstream = downstream
 
         # Statistics
-        self.stats = ServerStats()
+        self._requests_completed = 0
+        self._requests_rejected = 0
+        self._total_service_time = 0.0
 
         # Time series for analysis
         self._service_times: list[float] = []
@@ -165,6 +167,15 @@ class Server(QueuedResource):
             return 0.0
         return sum(self._service_times) / len(self._service_times)
 
+    @property
+    def stats(self) -> ServerStats:
+        """Frozen snapshot of current statistics."""
+        return ServerStats(
+            requests_completed=self._requests_completed,
+            requests_rejected=self._requests_rejected,
+            total_service_time=self._total_service_time,
+        )
+
     def has_capacity(self, weight: int = 1) -> bool:
         """Check if server can accept another request.
 
@@ -207,7 +218,7 @@ class Server(QueuedResource):
                 event.event_type,
                 weight,
             )
-            self.stats.requests_rejected += 1
+            self._requests_rejected += 1
             return None
 
         logger.debug(
@@ -233,8 +244,8 @@ class Server(QueuedResource):
         self._concurrency_model.release(weight)
 
         # Update statistics
-        self.stats.requests_completed += 1
-        self.stats.total_service_time += service_time_s
+        self._requests_completed += 1
+        self._total_service_time += service_time_s
 
         logger.debug(
             "[%s] Request completed: type=%s service_time=%.4fs active=%d/%d",

@@ -79,6 +79,7 @@ nav:
     - Fault Injection: guides/fault-injection.md
     - Logging: guides/logging.md
     - Testing Patterns: guides/testing-patterns.md
+    - Using with Claude Code: guides/claude-code.md
   - API Reference:
     - reference/index.md
     - Core:

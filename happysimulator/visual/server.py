@@ -206,8 +206,13 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
             """Step that handles code breakpoint blocking.
 
             When code debugging is active, gen.send() may block the sim thread
-            at a code breakpoint. We run step in a background thread and check
-            for code_paused state via polling.
+            at a code breakpoint.  We run step in a background thread and poll
+            for pauses.  While paused, we read WebSocket messages inline so the
+            user can send code_continue / code_step / etc. without deadlocking
+            the receive loop.
+
+            Returns the set of WS actions consumed so the caller knows not to
+            re-process them.
             """
             step_done = asyncio.Event()
             result_holder: list[dict] = []
@@ -218,19 +223,42 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                 step_done.set()
 
             step_task = asyncio.create_task(do_step())
+            pause_notified = False
 
-            # Poll for code_paused while step is running
             while not step_done.is_set():
-                await asyncio.sleep(0.05)
+                # Check if sim thread is paused at a code breakpoint
                 if bridge._code_debugger.is_code_paused():
-                    paused_state = bridge._code_debugger.get_paused_state()
+                    if not pause_notified:
+                        paused_state = bridge._code_debugger.get_paused_state()
+                        try:
+                            await ws.send_json({"type": "code_paused", "paused_state": paused_state})
+                        except Exception:
+                            break
+                        pause_notified = True
+
+                    # While paused, read WS messages so user can resume
                     try:
-                        await ws.send_json({"type": "code_paused", "paused_state": paused_state})
-                    except Exception:
-                        break
-                    # Wait for the step to complete (user sends code_continue/code_step)
-                    await step_done.wait()
-                    break
+                        raw = await asyncio.wait_for(ws.receive_text(), timeout=0.1)
+                        msg = json.loads(raw)
+                        action = msg.get("action")
+                        if action == "code_continue":
+                            bridge.code_continue()
+                            pause_notified = False
+                        elif action == "code_step":
+                            bridge.code_step()
+                            pause_notified = False
+                        elif action == "code_step_over":
+                            bridge.code_step_over()
+                            pause_notified = False
+                        elif action == "code_step_out":
+                            bridge.code_step_out()
+                            pause_notified = False
+                        # Ignore other actions while paused
+                    except asyncio.TimeoutError:
+                        pass
+                else:
+                    pause_notified = False
+                    await asyncio.sleep(0.05)
 
             await step_task
             if result_holder:

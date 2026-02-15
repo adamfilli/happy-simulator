@@ -16,17 +16,12 @@ interface Props {
   onReset: () => void;
   onRunTo: (time_s: number) => void;
   onRunToEvent: (n: number) => void;
-  onCodeStep?: () => void;
-  onCodeStepOver?: () => void;
-  onCodeStepOut?: () => void;
-  onCodeContinue?: () => void;
 }
 
-export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent, onCodeStep, onCodeStepOver, onCodeStepOut, onCodeContinue }: Props) {
+export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
-  const codePausedEntity = useSimStore((s) => s.codePausedEntity);
   const [speed, setSpeed] = useState(1);
   const debugModeRef = useRef(false);
   const [runToInput, setRunToInput] = useState("");
@@ -189,45 +184,6 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
             Run To #
           </button>
         </div>
-
-        {codePausedEntity && (
-          <>
-            <span className="text-gray-700">|</span>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-amber-400 font-mono mr-1">
-                {codePausedEntity}
-              </span>
-              <button
-                onClick={onCodeStep}
-                className="px-2 py-1 bg-amber-800 hover:bg-amber-700 rounded text-xs font-medium text-amber-200"
-                title="Step into (next line)"
-              >
-                Step
-              </button>
-              <button
-                onClick={onCodeStepOver}
-                className="px-2 py-1 bg-amber-800 hover:bg-amber-700 rounded text-xs font-medium text-amber-200"
-                title="Step over"
-              >
-                Over
-              </button>
-              <button
-                onClick={onCodeStepOut}
-                className="px-2 py-1 bg-amber-800 hover:bg-amber-700 rounded text-xs font-medium text-amber-200"
-                title="Step out"
-              >
-                Out
-              </button>
-              <button
-                onClick={onCodeContinue}
-                className="px-2 py-1 bg-emerald-800 hover:bg-emerald-700 rounded text-xs font-medium text-emerald-200"
-                title="Continue to next breakpoint"
-              >
-                Continue
-              </button>
-            </div>
-          </>
-        )}
 
         <span className="text-gray-700">|</span>
 

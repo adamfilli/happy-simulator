@@ -16,6 +16,7 @@ import { useWebSocket } from "../hooks/useWebSocket";
 import EntityNode from "./EntityNode";
 import AnimatedEdge from "./AnimatedEdge";
 import CodePanelNode from "./CodePanelNode";
+import { CodePanelCtx, type CodePanelContext } from "./CodePanelContext";
 
 const elk = new ELK();
 
@@ -39,7 +40,6 @@ export default function GraphView() {
   const selectEntity = useSimStore((s) => s.selectEntity);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
   const codePanels = useSimStore((s) => s.codePanels);
-  const codeBreakpoints = useSimStore((s) => s.codeBreakpoints);
   const { send } = useWebSocket();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -62,20 +62,6 @@ export default function GraphView() {
       send("deactivate_code_debug", { entity_name: entityName });
     },
     [send]
-  );
-
-  const handleToggleBreakpoint = useCallback(
-    (entityName: string, lineNumber: number) => {
-      const existing = codeBreakpoints.find(
-        (bp) => bp.entity_name === entityName && bp.line_number === lineNumber
-      );
-      if (existing) {
-        send("remove_code_breakpoint", { breakpoint_id: existing.id });
-      } else {
-        send("set_code_breakpoint", { entity_name: entityName, line_number: lineNumber });
-      }
-    },
-    [codeBreakpoints, send]
   );
 
   // Build edges from topology
@@ -191,7 +177,7 @@ export default function GraphView() {
     if (!state) return;
     setNodes((nds) =>
       nds.map((n) => {
-        if (n.type === "codePanel") return n; // Don't touch code panels here
+        if (n.type === "codePanel") return n;
         const entityState = state.entities[n.id];
         return {
           ...n,
@@ -199,13 +185,11 @@ export default function GraphView() {
             ...n.data,
             metrics: entityState || {},
             selected: n.id === selectedEntity,
-            onOpenCodePanel: handleOpenCodePanel,
-            hasCodePanel: codePanels.has(n.id),
           },
         };
       })
     );
-  }, [state, selectedEntity, codePanels, handleOpenCodePanel, setNodes]);
+  }, [state, selectedEntity, setNodes]);
 
   // Manage code panel nodes and edges
   useEffect(() => {
@@ -240,7 +224,6 @@ export default function GraphView() {
               sourceLines: config.source.source_lines,
               startLine: config.source.start_line,
               onClose: handleCloseCodePanel,
-              onToggleBreakpoint: handleToggleBreakpoint,
             },
             style: { width: 450, height: 350 },
             dragHandle: ".drag-handle",
@@ -268,7 +251,7 @@ export default function GraphView() {
       }
       return [...withoutCodeEdges, ...codeEdges];
     });
-  }, [codePanels, handleCloseCodePanel, handleToggleBreakpoint, setNodes, setEdges]);
+  }, [codePanels, handleCloseCodePanel, setNodes, setEdges]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
@@ -277,21 +260,28 @@ export default function GraphView() {
     [selectEntity]
   );
 
+  const codePanelCtx = useMemo<CodePanelContext>(
+    () => ({ onOpenCodePanel: handleOpenCodePanel, openPanels: new Set(codePanels.keys()) }),
+    [handleOpenCodePanel, codePanels]
+  );
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={onNodeClick}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      fitView
-      minZoom={0.3}
-      maxZoom={2}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background color="#1f2937" gap={20} size={1} />
-    </ReactFlow>
+    <CodePanelCtx.Provider value={codePanelCtx}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        minZoom={0.3}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color="#1f2937" gap={20} size={1} />
+      </ReactFlow>
+    </CodePanelCtx.Provider>
   );
 }

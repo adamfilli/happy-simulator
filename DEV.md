@@ -53,14 +53,6 @@ uv venv --python 3.13
 uv pip install -e ".[dev]"
 ```
 
-### Using pipx (isolated global install)
-
-For installing as a standalone tool without affecting your system Python:
-
-```bash
-pipx install git+https://github.com/adamfilli/happy-simulator.git
-```
-
 ## Development Commands
 
 ### Running Tests
@@ -73,7 +65,10 @@ pytest
 pytest -v
 
 # Run a specific test file
-pytest tests/integration/test_queue.py
+pytest tests/unit/test_event.py
+
+# Run a specific test directory
+pytest tests/integration/
 
 # Run with coverage
 pytest --cov=happysimulator --cov-report=html
@@ -97,45 +92,143 @@ ruff format .
 
 ### Running Examples
 
+Examples are organized into subdirectories by domain:
+
 ```bash
-python examples/basic_client_server.py
+python -m examples.queuing.m_m_1_queue
+python -m examples.distributed.chain_replication
+python -m examples.industrial.bank_branch
+```
+
+### Documentation
+
+```bash
+# Local preview at localhost:8000
+python -m mkdocs serve
+
+# Build docs to site/
+python -m mkdocs build
+```
+
+### Visual Debugger
+
+Requires optional dependencies:
+
+```bash
+pip install -e ".[visual]"
+python -m examples.visual.visual_debugger
 ```
 
 ### Debugging
 
 Set the logging level via environment variable:
 
+```bash
+# Bash
+HS_LOGGING=DEBUG python -m examples.queuing.m_m_1_queue
+```
+
 ```powershell
 # PowerShell
 $env:HS_LOGGING='DEBUG'
-python examples/basic_client_server.py
+python -m examples.queuing.m_m_1_queue
 ```
-
-```bash
-# Bash
-HS_LOGGING=DEBUG python examples/basic_client_server.py
-```
-
-Logs are written to `happysimulator.log` in the repository root.
 
 ## Project Structure
 
 ```
 happy-simulator/
-├── happysimulator/          # Main package
-│   ├── __init__.py          # Package exports and version
-│   ├── core/                # Core simulation engine
-│   ├── components/          # Reusable components (queues, resources)
-│   ├── distributions/       # Statistical distributions
-│   ├── instrumentation/     # Probes and data collection
-│   ├── load/                # Load generation (sources, providers)
-│   ├── modules/             # Higher-level modules
-│   └── utils/               # Utilities (Instant, etc.)
-├── examples/                # Example simulations
-├── tests/                   # Test suite
-├── pyproject.toml           # Package configuration
-└── DEV.md                   # This file
+├── happysimulator/              # Main package
+│   ├── __init__.py              # Package exports and version
+│   ├── core/                    # Simulation engine (event, entity, instant, sim_future)
+│   │   └── control/             # Pause/step/breakpoints
+│   ├── components/              # Reusable simulation building blocks
+│   │   ├── behavior/            # Agent-based behavioral modeling
+│   │   ├── client/              # Client entities
+│   │   ├── consensus/           # Consensus protocols (Raft, Paxos)
+│   │   ├── crdt/                # Conflict-free replicated data types
+│   │   ├── datastore/           # Storage engine components
+│   │   ├── deployment/          # Deployment strategies (canary, rolling)
+│   │   ├── industrial/          # Manufacturing/service industry components
+│   │   ├── infrastructure/      # CPU, disk, scheduling primitives
+│   │   ├── load_balancer/       # Load balancing strategies
+│   │   ├── messaging/           # Message queues and pub/sub
+│   │   ├── microservice/        # Microservice patterns
+│   │   ├── network/             # Network topology and partitions
+│   │   ├── queue_policies/      # FIFO, priority, etc.
+│   │   ├── rate_limiter/        # Rate limiting (token bucket, etc.)
+│   │   ├── replication/         # Replication protocols
+│   │   ├── resilience/          # Circuit breakers, retries, bulkheads
+│   │   ├── scheduling/          # Job/task scheduling
+│   │   ├── server/              # Server entities
+│   │   ├── sketching/           # Probabilistic data structures
+│   │   ├── storage/             # B-tree, LSM tree, WAL
+│   │   ├── streaming/           # Stream processing
+│   │   └── sync/                # Synchronization primitives
+│   ├── analysis/                # Post-run analysis utilities
+│   ├── distributions/           # Statistical distributions
+│   ├── faults/                  # Fault injection
+│   ├── instrumentation/         # Probes, trackers, data collection
+│   ├── load/                    # Load generation (sources, profiles)
+│   ├── numerics/                # Numerical utilities
+│   ├── sketching/               # Core sketching algorithms
+│   ├── visual/                  # Browser-based debugger (FastAPI + React)
+│   └── utils/                   # Shared utilities
+├── visual-frontend/             # React + TypeScript source for visual debugger
+├── examples/                    # Example simulations (organized by domain)
+│   ├── behavior/                # Agent-based modeling examples
+│   ├── deployment/              # Deployment simulation examples
+│   ├── distributed/             # Distributed systems examples
+│   ├── industrial/              # Manufacturing/service examples
+│   ├── infrastructure/          # Infrastructure simulation examples
+│   ├── load-balancing/          # Load balancing examples
+│   ├── performance/             # Performance analysis examples
+│   ├── queuing/                 # Queuing theory examples
+│   ├── storage/                 # Storage engine examples
+│   └── visual/                  # Visual debugger example
+├── tests/                       # Test suite
+│   ├── unit/                    # Unit tests
+│   ├── integration/             # Integration tests
+│   ├── regression/              # Regression tests
+│   └── perf/                    # Performance tests
+├── docs/                        # MkDocs Material documentation site
+│   ├── guides/                  # User guides
+│   ├── reference/               # Auto-generated API reference
+│   ├── examples/                # Example gallery
+│   └── design/                  # Design philosophy
+├── .github/workflows/           # CI/CD
+│   ├── tests.yml                # Daily test runs
+│   ├── docs.yml                 # Docs deployment to GitHub Pages
+│   └── publish-pypi.yml         # PyPI publish on GitHub release
+├── pyproject.toml               # Package configuration
+├── CLAUDE.md                    # AI assistant instructions
+└── DEV.md                       # This file
 ```
+
+## CI/CD
+
+### Tests
+
+Tests run daily via GitHub Actions and can be triggered manually. See `.github/workflows/tests.yml`.
+
+### Documentation
+
+Docs are auto-deployed to GitHub Pages on push to `main`. See `.github/workflows/docs.yml`.
+
+### PyPI Publishing
+
+Publishing is automated via GitHub Actions using trusted publishing (no API tokens needed):
+
+1. Create a GitHub release (or use the `/release` workflow)
+2. The `publish-pypi.yml` workflow builds and publishes to PyPI automatically
+
+Manual publishing with twine is no longer needed for normal releases.
+
+## Version Management
+
+The package version is defined in two places (keep them in sync):
+- `pyproject.toml`: `version = "..."` (used by PyPI)
+- `happysimulator/__init__.py`: `__version__ = "..."` (used at runtime)
 
 ## Building Distribution Packages
 
@@ -147,83 +240,4 @@ pip install build
 python -m build
 
 # Output will be in dist/
-#   dist/happy_simulator-0.1.0-py3-none-any.whl
-#   dist/happy_simulator-0.1.0.tar.gz
 ```
-
-## Version Management
-
-The package version is defined in two places (keep them in sync):
-- `pyproject.toml`: `version = "0.1.0"`
-- `happysimulator/__init__.py`: `__version__ = "0.1.0"`
-
-## Publishing to PyPI
-
-### Prerequisites
-
-```powershell
-# Install/upgrade build and twine
-pip install --upgrade build twine
-```
-
-### Step 1: Clean and Build
-
-```powershell
-# Remove old builds
-Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
-
-# Build wheel and sdist
-python -m build
-```
-
-### Step 2: Upload to TestPyPI (Optional but Recommended)
-
-Test the upload before publishing to production:
-
-```powershell
-python -m twine upload --repository testpypi dist/*
-```
-
-When prompted:
-- Username: `__token__`
-- Password: Your TestPyPI API token (starts with `pypi-`)
-
-Verify at: https://test.pypi.org/project/happysim/
-
-Test installation:
-```powershell
-pip install --index-url https://test.pypi.org/simple/ happysim
-```
-
-### Step 3: Upload to PyPI
-
-```powershell
-python -m twine upload dist/*
-```
-
-When prompted:
-- Username: `__token__`
-- Password: Your PyPI API token (starts with `pypi-`)
-
-Verify at: https://pypi.org/project/happysim/
-
-### API Token Setup
-
-1. Create accounts at https://pypi.org and https://test.pypi.org
-2. Go to Account Settings → API tokens
-3. Create a token scoped to this project (or account-wide for first upload)
-4. Store tokens securely (e.g., in a `.pypirc` file or password manager)
-
-Optional `.pypirc` for automated uploads (place in `$HOME`, **do not commit this file**):
-```ini
-[pypi]
-username = __token__
-password = pypi-<YOUR_TOKEN_HERE>
-
-[testpypi]
-repository = https://test.pypi.org/legacy/
-username = __token__
-password = pypi-<YOUR_TEST_TOKEN_HERE>
-```
-
-> **Warning**: Never commit `.pypirc` to version control — it contains secrets.

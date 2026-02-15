@@ -13,6 +13,7 @@ import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { useSimStore } from "../hooks/useSimState";
 import EntityNode from "./EntityNode";
+import AnimatedEdge from "./AnimatedEdge";
 
 const elk = new ELK();
 
@@ -28,6 +29,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const nodeTypes = { entity: EntityNode };
+const edgeTypes = { animated: AnimatedEdge };
 
 export default function GraphView() {
   const topology = useSimStore((s) => s.topology);
@@ -49,11 +51,10 @@ export default function GraphView() {
         target: e.target,
         sourceHandle: isProbe ? "bottom" : "right",
         targetHandle: isProbe ? "top" : "left",
-        animated: false,
-        style: {
-          stroke: isProbe ? "#06b6d4" : "#4b5563",
-          strokeWidth: isProbe ? 1.5 : 2,
-          strokeDasharray: isProbe ? "6 4" : undefined,
+        type: "animated",
+        data: {
+          isProbe,
+          statsKey: `${e.source}->${e.target}`,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -140,7 +141,7 @@ export default function GraphView() {
     });
   }, [topology, flowEdges, setNodes, setEdges]);
 
-  // Update edges when topology edges change (dynamic discovery)
+  // Update edges when topology edges or edge stats change (dynamic discovery)
   useEffect(() => {
     if (layoutDone) {
       setEdges(flowEdges);
@@ -180,6 +181,7 @@ export default function GraphView() {
       onEdgesChange={onEdgesChange}
       onNodeClick={onNodeClick}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
       minZoom={0.3}
       maxZoom={2}

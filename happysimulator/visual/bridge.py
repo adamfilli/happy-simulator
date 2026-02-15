@@ -116,6 +116,9 @@ class SimulationBridge:
         self._log_buffer: deque[RecordedLog] = deque(maxlen=self.MAX_LOG_BUFFER)
         self._new_logs_buffer: list[RecordedLog] = []
         self._event_counter: int = 0
+        self._edge_counts: dict[tuple[str, str], int] = {}
+        self._edge_timestamps: dict[tuple[str, str], deque] = {}
+        self._topology_node_ids: set[str] = {n.id for n in self._topology.nodes}
         self._lock = threading.Lock()
 
         # Install event hook
@@ -179,7 +182,33 @@ class SimulationBridge:
             self._event_log.append(recorded)
             self._new_events_buffer.append(recorded)
 
+        # Track edge flow (resolve sub-entity names to topology-level parents)
+        resolved_target = self._resolve_to_topology_node(target_name)
+        resolved_source = (
+            self._resolve_to_topology_node(self._last_handler_name)
+            if self._last_handler_name
+            else None
+        )
+        if resolved_source and resolved_source != resolved_target:
+            edge_key = (resolved_source, resolved_target)
+            self._edge_counts[edge_key] = self._edge_counts.get(edge_key, 0) + 1
+            if edge_key not in self._edge_timestamps:
+                self._edge_timestamps[edge_key] = deque(maxlen=1000)
+            self._edge_timestamps[edge_key].append(event.time.to_seconds())
+
         self._last_handler_name = target_name
+
+    def _resolve_to_topology_node(self, name: str) -> str:
+        """Map a sub-entity name (e.g. 'Server.worker') to its topology-level parent ('Server')."""
+        if name in self._topology_node_ids:
+            return name
+        # Walk up dotted segments: Server.driver.foo → Server.driver → Server
+        parts = name.split(".")
+        for i in range(len(parts) - 1, 0, -1):
+            candidate = ".".join(parts[:i])
+            if candidate in self._topology_node_ids:
+                return candidate
+        return name
 
     def get_current_time_s(self) -> float:
         """Return current simulation time in seconds."""
@@ -255,6 +284,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def run_to(self, time_s: float) -> dict[str, Any]:
@@ -275,6 +305,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def run_to_event(self, event_number: int) -> dict[str, Any]:
@@ -293,6 +324,7 @@ class SimulationBridge:
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
+            "edge_stats": self.get_edge_stats(),
         }
 
     def reset(self) -> dict[str, Any]:
@@ -302,7 +334,10 @@ class SimulationBridge:
         self._log_buffer.clear()
         self._event_counter = 0
         self._last_handler_name = None
+        self._edge_counts.clear()
+        self._edge_timestamps.clear()
         self._topology = discover(self._sim)
+        self._topology_node_ids = {n.id for n in self._topology.nodes}
         for chart in self._charts:
             chart.data.clear()
 
@@ -376,3 +411,22 @@ class SimulationBridge:
                 result["config"] = chart.to_config()
                 return result
         return {"chart_id": chart_id, "times": [], "values": [], "config": {}}
+
+    # --- Edge stats ---
+
+    def get_edge_stats(self) -> dict[str, Any]:
+        """Return per-edge throughput stats with 5s sliding window."""
+        current_time = self._sim._current_time.to_seconds()
+        window = 5.0
+        stats = {}
+        for (src, tgt), timestamps in self._edge_timestamps.items():
+            recent = sum(1 for t in timestamps if t >= current_time - window)
+            rate = recent / window if window > 0 else 0
+            key = f"{src}->{tgt}"
+            stats[key] = {
+                "source": src,
+                "target": tgt,
+                "count": self._edge_counts.get((src, tgt), 0),
+                "rate": round(rate, 2),
+            }
+        return stats

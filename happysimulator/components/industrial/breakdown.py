@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Generator, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -132,7 +132,10 @@ class BreakdownScheduler(Entity):
             repair_time = random.expovariate(1.0 / self.mean_repair_time)
             logger.debug(
                 "[%s] Breakdown #%d at t=%.2f, repair in %.2fs",
-                self.name, self._breakdown_count, now_s, repair_time,
+                self.name,
+                self._breakdown_count,
+                now_s,
+                repair_time,
             )
 
             return [
@@ -157,7 +160,9 @@ class BreakdownScheduler(Entity):
             ttf = random.expovariate(1.0 / self.mean_time_to_failure)
             logger.debug(
                 "[%s] Repair complete at t=%.2f, next failure in %.2fs",
-                self.name, now_s, ttf,
+                self.name,
+                now_s,
+                ttf,
             )
 
             return [

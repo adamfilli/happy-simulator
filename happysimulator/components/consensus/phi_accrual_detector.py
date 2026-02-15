@@ -12,7 +12,7 @@ monitored node has failed.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,7 @@ class PhiAccrualStats:
         std_interval: Standard deviation of inter-arrival times.
         is_suspected: Whether phi exceeds the threshold.
     """
+
     heartbeats_received: int = 0
     current_phi: float = 0.0
     mean_interval: float = 0.0
@@ -105,7 +106,7 @@ class PhiAccrualDetector:
         p = 0.5 * math.erfc(y / math.sqrt(2))
 
         if p <= 0:
-            return float('inf')
+            return float("inf")
 
         return -math.log10(p)
 

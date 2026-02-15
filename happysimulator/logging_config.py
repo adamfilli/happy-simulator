@@ -30,21 +30,21 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 from typing import Literal
 
 __all__ = [
+    "configure_from_env",
+    "disable_logging",
     "enable_console_logging",
     "enable_file_logging",
-    "enable_timed_file_logging",
-    "enable_json_logging",
     "enable_json_file_logging",
-    "configure_from_env",
+    "enable_json_logging",
+    "enable_timed_file_logging",
     "set_level",
     "set_module_level",
-    "disable_logging",
 ]
 
 # Default format strings
@@ -74,9 +74,7 @@ class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record as a JSON string."""
         log_data = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

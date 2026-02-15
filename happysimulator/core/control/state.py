@@ -9,11 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from happysimulator.core.temporal import Instant
-
 if TYPE_CHECKING:
     from happysimulator.core.event import Event
     from happysimulator.core.simulation import Simulation
+    from happysimulator.core.temporal import Instant
 
 
 @dataclass(frozen=True)
@@ -34,6 +33,7 @@ class SimulationState:
         last_event: The most recently processed event, or None.
         wall_clock_elapsed: Real-time seconds since the simulation started.
     """
+
     current_time: Instant
     events_processed: int
     heap_size: int
@@ -59,6 +59,7 @@ class BreakpointContext:
         last_event: The event that was just processed.
         simulation: Reference to the simulation for entity inspection.
     """
+
     current_time: Instant
     events_processed: int
     last_event: Event

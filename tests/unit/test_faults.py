@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Generator
-
-import pytest
+from typing import TYPE_CHECKING
 
 from happysimulator.components.common import Counter
 from happysimulator.components.network.conditions import datacenter_network
@@ -14,7 +12,6 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.distributions.constant import ConstantLatency
 from happysimulator.faults import (
     CrashNode,
     FaultSchedule,
@@ -27,6 +24,8 @@ from happysimulator.faults import (
 )
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Helpers
@@ -180,9 +179,7 @@ class TestInjectLatency:
         network.add_bidirectional_link(node_a, node_b, link)
 
         schedule = FaultSchedule()
-        schedule.add(
-            InjectLatency("a", "b", extra_ms=500, start=5.0, end=15.0)
-        )
+        schedule.add(InjectLatency("a", "b", extra_ms=500, start=5.0, end=15.0))
 
         sim = Simulation(
             end_time=Instant.from_seconds(20.0),
@@ -222,9 +219,7 @@ class TestInjectPacketLoss:
         original_loss = original_link.packet_loss_rate
 
         schedule = FaultSchedule()
-        schedule.add(
-            InjectPacketLoss("a", "b", loss_rate=0.5, start=5.0, end=15.0)
-        )
+        schedule.add(InjectPacketLoss("a", "b", loss_rate=0.5, start=5.0, end=15.0))
 
         sim = Simulation(
             end_time=Instant.from_seconds(20.0),
@@ -255,9 +250,7 @@ class TestNetworkPartition:
         network.add_bidirectional_link(node_a, node_b, link)
 
         schedule = FaultSchedule()
-        schedule.add(
-            NetworkPartition(["a"], ["b"], start=5.0, end=15.0)
-        )
+        schedule.add(NetworkPartition(["a"], ["b"], start=5.0, end=15.0))
 
         sim = Simulation(
             end_time=Instant.from_seconds(20.0),
@@ -279,9 +272,7 @@ class TestNetworkPartition:
 class TestRandomPartition:
     def test_random_partition_fires(self):
         """RandomPartition creates at least one fault/heal cycle."""
-        nodes = []
-        for name in ["n1", "n2", "n3"]:
-            nodes.append(SimpleServer(name))
+        nodes = [SimpleServer(name) for name in ["n1", "n2", "n3"]]
 
         network = Network(name="net")
         for i in range(len(nodes)):
@@ -322,9 +313,7 @@ class TestReduceCapacity:
         resource = Resource("cpu", capacity=8)
 
         schedule = FaultSchedule()
-        schedule.add(
-            ReduceCapacity("cpu", factor=0.5, start=5.0, end=15.0)
-        )
+        schedule.add(ReduceCapacity("cpu", factor=0.5, start=5.0, end=15.0))
 
         sim = Simulation(
             end_time=Instant.from_seconds(20.0),

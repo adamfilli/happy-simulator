@@ -24,6 +24,7 @@ class PercentileTarget:
         percentile: The percentile as a fraction (e.g., 0.50 for p50).
         value: The target latency value in seconds at this percentile.
     """
+
     percentile: float
     value: float
 

@@ -1,5 +1,7 @@
 """Tests for Semaphore."""
 
+import contextlib
+
 import pytest
 
 from happysimulator.components.sync import Semaphore
@@ -180,10 +182,8 @@ class TestSemaphoreContention:
         sem.release()
 
         # Continue - should be acquired now
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         assert sem.available == 0  # Waiter took the permit
 
@@ -203,10 +203,8 @@ class TestSemaphoreContention:
 
         # Release - first waiter should get permit
         sem.release()
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen1)
-        except StopIteration:
-            pass
 
         assert sem.waiters == 1
         assert sem.available == 0
@@ -225,10 +223,8 @@ class TestSemaphoreContention:
 
         # Release another - now enough
         sem.release(count=1)
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         assert sem.available == 0
 
@@ -264,10 +260,8 @@ class TestSemaphoreStatistics:
 
         # Release and let waiter through
         sem.release()
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         sem.release()
         sem.release()

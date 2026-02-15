@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 import pytest
 
-from happysimulator.components.server.server import Server, ServerStats
-from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue
-from happysimulator.core.entity import Entity
+from happysimulator.components.queue_policy import LIFOQueue
+from happysimulator.components.server.server import Server
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -25,6 +23,7 @@ from happysimulator.load.source import Source
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -39,7 +38,7 @@ class ServerRequestProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -115,9 +114,7 @@ class TestServerProcessing:
             service_time=ConstantLatency(0.100),
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(0.5)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(0.5))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=5.0),  # 5 requests in 0.5s
             start_time=Instant.Epoch,
@@ -152,9 +149,7 @@ class TestServerProcessing:
         )
 
         for i in range(4):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -199,9 +194,7 @@ class TestServerConcurrency:
 
         # Schedule 3 requests at the same time
         for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -220,9 +213,7 @@ class TestServerQueue:
             service_time=ConstantLatency(0.100),  # 10 req/s capacity
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(1.0)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(1.0))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=20.0),  # 20 req/s arrival
             start_time=Instant.Epoch,
@@ -353,9 +344,7 @@ class TestServerStatistics:
             service_time=ExponentialLatency(0.050),
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(5.0)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(5.0))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=10.0),
             start_time=Instant.Epoch,
@@ -443,9 +432,7 @@ class TestServerWithConcurrencyModels:
         )
 
         for i in range(4):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
         assert server.stats.requests_completed == 4
@@ -495,9 +482,7 @@ class TestServerWithLoad:
             service_time=ConstantLatency(0.010),  # 10ms
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(5.0)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(5.0))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=10.0),  # Well under capacity
             start_time=Instant.Epoch,
@@ -526,9 +511,7 @@ class TestServerWithLoad:
             service_time=ConstantLatency(0.100),
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(2.0)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(2.0))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=40.0),  # At capacity
             start_time=Instant.Epoch,
@@ -554,9 +537,7 @@ class TestServerWithLoad:
             service_time=ConstantLatency(0.100),  # Capacity: 20 req/s
         )
 
-        provider = ServerRequestProvider(
-            server, stop_after=Instant.from_seconds(1.0)
-        )
+        provider = ServerRequestProvider(server, stop_after=Instant.from_seconds(1.0))
         arrival = ConstantArrivalTimeProvider(
             ConstantRateProfile(rate_per_s=50.0),  # 2.5x capacity
             start_time=Instant.Epoch,

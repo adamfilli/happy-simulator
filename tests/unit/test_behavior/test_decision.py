@@ -2,18 +2,18 @@
 
 import random
 
-from happysimulator.components.behavior.traits import PersonalityTraits
-from happysimulator.components.behavior.state import AgentState
 from happysimulator.components.behavior.decision import (
+    BoundedRationalityModel,
     Choice,
+    CompositeModel,
     DecisionContext,
-    UtilityModel,
     Rule,
     RuleBasedModel,
-    BoundedRationalityModel,
     SocialInfluenceModel,
-    CompositeModel,
+    UtilityModel,
 )
+from happysimulator.components.behavior.state import AgentState
+from happysimulator.components.behavior.traits import PersonalityTraits
 
 
 def _make_context(choices, traits=None, social_context=None):
@@ -151,12 +151,8 @@ class TestSocialInfluenceModel:
 
 class TestCompositeModel:
     def test_weighted_voting(self):
-        model_a = UtilityModel(
-            utility_fn=lambda c, ctx: 1.0 if c.action == "a" else 0.0
-        )
-        model_b = UtilityModel(
-            utility_fn=lambda c, ctx: 1.0 if c.action == "b" else 0.0
-        )
+        model_a = UtilityModel(utility_fn=lambda c, ctx: 1.0 if c.action == "a" else 0.0)
+        model_b = UtilityModel(utility_fn=lambda c, ctx: 1.0 if c.action == "b" else 0.0)
         composite = CompositeModel([(model_a, 2.0), (model_b, 1.0)])
         choices = [Choice(action="a"), Choice(action="b")]
         ctx = _make_context(choices)

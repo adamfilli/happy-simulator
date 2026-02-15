@@ -28,17 +28,15 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     Instant,
     Network,
-    Probe,
-    Simulation,
     SimFuture,
+    Simulation,
     Source,
     datacenter_network,
 )
@@ -49,6 +47,8 @@ from happysimulator.components.replication.primary_backup import (
     ReplicationMode,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Writer entity (generates write events from source traffic)
@@ -69,7 +69,9 @@ class Writer(Entity):
     def write_count(self) -> int:
         return self._write_count
 
-    def handle_event(self, event: Event) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Event] | None]:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Event] | None]:
         self._write_count += 1
         key = f"key-{self._write_count % 100}"
         value = self._write_count
@@ -79,9 +81,13 @@ class Writer(Entity):
             time=self.now,
             event_type="Write",
             target=self.primary,
-            context={"metadata": {
-                "key": key, "value": value, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": key,
+                    "value": value,
+                    "reply_future": reply_future,
+                }
+            },
         )
         start = self.now
         yield 0.0, [write_event]
@@ -122,22 +128,21 @@ def run_mode(
 
     # Stores
     primary_store = KVStore("ps", write_latency=0.001, read_latency=0.001)
-    backup_stores = [
-        KVStore(f"bs{i}", write_latency=0.001, read_latency=0.001)
-        for i in range(2)
-    ]
+    backup_stores = [KVStore(f"bs{i}", write_latency=0.001, read_latency=0.001) for i in range(2)]
 
     # Network
     network = Network(name="net")
 
     # Nodes
     primary = PrimaryNode(
-        "primary", store=primary_store, backups=[],
-        network=network, mode=mode,
+        "primary",
+        store=primary_store,
+        backups=[],
+        network=network,
+        mode=mode,
     )
     backups = [
-        BackupNode(f"backup-{i}", store=backup_stores[i],
-                   network=network, primary=primary)
+        BackupNode(f"backup-{i}", store=backup_stores[i], network=network, primary=primary)
         for i in range(2)
     ]
     primary._backups = backups
@@ -222,6 +227,7 @@ def print_summary(results: list[ModeResult]) -> None:
 def visualize_results(results: list[ModeResult], output_dir: Path) -> None:
     """Generate a comparison chart of write latencies across modes."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -233,7 +239,7 @@ def visualize_results(results: list[ModeResult], output_dir: Path) -> None:
 
     colors = {"async": "steelblue", "semi_sync": "coral", "sync": "seagreen"}
 
-    for ax, r in zip(axes, results):
+    for ax, r in zip(axes, results, strict=False):
         if r.writer.latencies:
             times = [t for t, _ in r.writer.latencies]
             lats = [l * 1000 for _, l in r.writer.latencies]

@@ -8,12 +8,22 @@ Provides components that model how data moves between replicas:
 - **MultiLeaderReplication**: Any-node writes with vector clock conflicts
 """
 
+from happysimulator.components.replication.chain_replication import (
+    ChainNode,
+    ChainNodeRole,
+    ChainReplicationStats,
+    build_chain,
+)
 from happysimulator.components.replication.conflict_resolver import (
     ConflictResolver,
     CustomResolver,
     LastWriterWins,
     VectorClockMerge,
     VersionedValue,
+)
+from happysimulator.components.replication.multi_leader import (
+    LeaderNode,
+    MultiLeaderStats,
 )
 from happysimulator.components.replication.primary_backup import (
     BackupNode,
@@ -22,36 +32,26 @@ from happysimulator.components.replication.primary_backup import (
     PrimaryNode,
     ReplicationMode,
 )
-from happysimulator.components.replication.chain_replication import (
-    ChainNode,
-    ChainNodeRole,
-    ChainReplicationStats,
-    build_chain,
-)
-from happysimulator.components.replication.multi_leader import (
-    LeaderNode,
-    MultiLeaderStats,
-)
 
 __all__ = [
-    # Conflict resolution
-    "ConflictResolver",
-    "CustomResolver",
-    "LastWriterWins",
-    "VectorClockMerge",
-    "VersionedValue",
-    # Primary-backup
-    "PrimaryNode",
     "BackupNode",
-    "ReplicationMode",
-    "PrimaryBackupStats",
     "BackupStats",
     # Chain replication
     "ChainNode",
     "ChainNodeRole",
     "ChainReplicationStats",
-    "build_chain",
+    # Conflict resolution
+    "ConflictResolver",
+    "CustomResolver",
+    "LastWriterWins",
     # Multi-leader
     "LeaderNode",
     "MultiLeaderStats",
+    "PrimaryBackupStats",
+    # Primary-backup
+    "PrimaryNode",
+    "ReplicationMode",
+    "VectorClockMerge",
+    "VersionedValue",
+    "build_chain",
 ]

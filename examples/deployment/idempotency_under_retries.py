@@ -28,9 +28,9 @@ IdempotencyStore to show how duplicates are suppressed.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -44,6 +44,8 @@ from happysimulator import (
 )
 from happysimulator.components.microservice import IdempotencyStore
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Components
@@ -59,7 +61,7 @@ class PaymentService(Entity):
         self.requests_processed = 0
         self.unique_keys: set[str] = set()
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_processed += 1
         key = event.context.get("metadata", {}).get("idempotency_key")
         if key:
@@ -70,8 +72,7 @@ class PaymentService(Entity):
 class RetryingClient(Entity):
     """Client that retries on timeout."""
 
-    def __init__(self, name: str, target: Entity, timeout: float = 0.03,
-                 max_retries: int = 3):
+    def __init__(self, name: str, target: Entity, timeout: float = 0.03, max_retries: int = 3):
         super().__init__(name)
         self._target = target
         self._timeout = timeout
@@ -105,13 +106,16 @@ class RetryingClient(Entity):
         )
 
         def on_complete(t: Instant):
-            return Event(time=t, event_type="_rc_done", target=self,
-                         context={"metadata": {"key": key}})
+            return Event(
+                time=t, event_type="_rc_done", target=self, context={"metadata": {"key": key}}
+            )
+
         forward.add_completion_hook(on_complete)
 
         timeout = Event(
             time=self.now + Duration.from_seconds(self._timeout),
-            event_type="_rc_timeout", target=self,
+            event_type="_rc_timeout",
+            target=self,
             context={"metadata": {"key": key, "attempt": attempt}},
         )
         return [forward, timeout]
@@ -145,10 +149,14 @@ class RequestProvider(EventProvider):
         if self._stop_after and time > self._stop_after:
             return []
         self._next_id += 1
-        return [Event(
-            time=time, event_type="new_payment", target=self._client,
-            context={"metadata": {"idempotency_key": f"pay_{self._next_id}"}},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="new_payment",
+                target=self._client,
+                context={"metadata": {"idempotency_key": f"pay_{self._next_id}"}},
+            )
+        ]
 
 
 # =============================================================================
@@ -191,8 +199,9 @@ def run_idempotency_simulation(
         key_extractor=lambda e: e.context.get("metadata", {}).get("idempotency_key"),
         ttl=60.0,
     )
-    client_with = RetryingClient("ClientWith", target=store,
-                                  timeout=client_timeout, max_retries=max_retries)
+    client_with = RetryingClient(
+        "ClientWith", target=store, timeout=client_timeout, max_retries=max_retries
+    )
 
     stop = Instant.from_seconds(duration_s)
     provider_with = RequestProvider(client_with, stop_after=stop)
@@ -216,8 +225,9 @@ def run_idempotency_simulation(
         random.seed(seed)
 
     payment_without = PaymentService("PaymentWithout", mean_latency=mean_service_latency)
-    client_without = RetryingClient("ClientWithout", target=payment_without,
-                                     timeout=client_timeout, max_retries=max_retries)
+    client_without = RetryingClient(
+        "ClientWithout", target=payment_without, timeout=client_timeout, max_retries=max_retries
+    )
 
     provider_without = RequestProvider(client_without, stop_after=stop)
     source_without = Source(
@@ -252,14 +262,14 @@ def print_summary(result: SimulationResult) -> None:
     print("IDEMPOTENCY UNDER RETRIES — RESULTS")
     print("=" * 60)
 
-    print(f"\nWith IdempotencyStore:")
+    print("\nWith IdempotencyStore:")
     print(f"  Requests sent by client:  {result.total_requests_sent_with}")
     print(f"  Processed by service:     {result.with_store_processed}")
     print(f"  Unique keys processed:    {result.with_store_unique}")
     print(f"  Cache hits (suppressed):  {result.store_cache_hits}")
     print(f"  Cache misses (forwarded): {result.store_cache_misses}")
 
-    print(f"\nWithout IdempotencyStore:")
+    print("\nWithout IdempotencyStore:")
     print(f"  Requests sent by client:  {result.total_requests_sent_without}")
     print(f"  Processed by service:     {result.without_store_processed}")
     print(f"  Unique keys processed:    {result.without_store_unique}")
@@ -279,6 +289,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate comparison bar chart."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 

@@ -1,14 +1,12 @@
 """Tests for Data and BucketedData classes."""
 
-import math
-
 import pytest
 
 from happysimulator.core.temporal import Instant
-from happysimulator.instrumentation.data import Data, BucketedData
-
+from happysimulator.instrumentation.data import BucketedData, Data
 
 # === Helpers ===
+
 
 def _make_data(pairs: list[tuple[float, float]]) -> Data:
     """Create Data from (time_s, value) pairs."""
@@ -115,7 +113,9 @@ class TestDataAggregations:
         assert d.count() == 3
 
     def test_std(self):
-        d = _make_data([(0.0, 2), (1.0, 4), (2.0, 4), (3.0, 4), (4.0, 5), (5.0, 5), (6.0, 7), (7.0, 9)])
+        d = _make_data(
+            [(0.0, 2), (1.0, 4), (2.0, 4), (3.0, 4), (4.0, 5), (5.0, 5), (6.0, 7), (7.0, 9)]
+        )
         expected = 2.0  # known pstdev for this dataset
         assert abs(d.std() - expected) < 0.01
 
@@ -172,11 +172,16 @@ class TestDataPercentile:
 
 class TestDataBucket:
     def test_bucket_basic(self):
-        d = _make_data([
-            (0.1, 10), (0.5, 20), (0.9, 30),
-            (1.1, 40), (1.5, 50),
-            (2.3, 60),
-        ])
+        d = _make_data(
+            [
+                (0.1, 10),
+                (0.5, 20),
+                (0.9, 30),
+                (1.1, 40),
+                (1.5, 50),
+                (2.3, 60),
+            ]
+        )
         b = d.bucket(window_s=1.0)
         assert len(b) == 3
         assert b.times() == [0.0, 1.0, 2.0]
@@ -263,10 +268,16 @@ class TestDataConvenience:
 
     def test_combined_workflow(self):
         """Test a realistic workflow: slice, aggregate, bucket."""
-        d = _make_data([
-            (0.5, 100), (1.5, 200), (2.5, 150),
-            (10.5, 500), (11.5, 600), (12.5, 550),
-        ])
+        d = _make_data(
+            [
+                (0.5, 100),
+                (1.5, 200),
+                (2.5, 150),
+                (10.5, 500),
+                (11.5, 600),
+                (12.5, 550),
+            ]
+        )
         # Slice to first 5 seconds
         early = d.between(0.0, 5.0)
         assert early.count() == 3

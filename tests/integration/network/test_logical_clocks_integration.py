@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -34,6 +34,8 @@ from happysimulator.core.node_clock import FixedSkew, NodeClock
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Duration, Instant
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # =============================================================================
 # Entities
@@ -62,15 +64,9 @@ class CounterNode(Entity):
     node_clock: NodeClock | None = field(default=None, init=False)
 
     # History for assertions and visualization
-    lamport_history: list[tuple[float, int]] = field(
-        default_factory=list, init=False
-    )
-    vector_history: list[tuple[float, dict[str, int]]] = field(
-        default_factory=list, init=False
-    )
-    hlc_history: list[tuple[float, int, int]] = field(
-        default_factory=list, init=False
-    )
+    lamport_history: list[tuple[float, int]] = field(default_factory=list, init=False)
+    vector_history: list[tuple[float, dict[str, int]]] = field(default_factory=list, init=False)
+    hlc_history: list[tuple[float, int, int]] = field(default_factory=list, init=False)
 
     def set_clock(self, clock):
         super().set_clock(clock)
@@ -90,7 +86,7 @@ class CounterNode(Entity):
     def handle_event(self, event: Event) -> list[Event] | None:
         if event.event_type == "Tick":
             return self._handle_tick()
-        elif event.event_type == "Update":
+        if event.event_type == "Update":
             return self._handle_update(event)
         return None
 
@@ -159,7 +155,7 @@ class CounterNode(Entity):
         hlc_now = self.hlc._last
         self.hlc_history.append((t, hlc_now.physical_ns, hlc_now.logical))
 
-        return None
+        return
 
 
 # =============================================================================
@@ -174,9 +170,9 @@ def _build_cluster() -> tuple[Network, list[CounterNode]]:
 
     # Different clock skews per node
     skews = {
-        "A": Duration.from_seconds(0.0),     # Perfect clock
-        "B": Duration.from_seconds(0.05),     # 50ms ahead
-        "C": Duration.from_seconds(-0.03),    # 30ms behind
+        "A": Duration.from_seconds(0.0),  # Perfect clock
+        "B": Duration.from_seconds(0.05),  # 50ms ahead
+        "C": Duration.from_seconds(-0.03),  # 30ms behind
     }
 
     nodes = []
@@ -190,9 +186,7 @@ def _build_cluster() -> tuple[Network, list[CounterNode]]:
     # Set up vector clocks and HLCs (need all node names)
     for node in nodes:
         node.vector = VectorClock(node.name, node_names)
-        node.hlc = HybridLogicalClock(
-            node.name, physical_clock=node.node_clock
-        )
+        node.hlc = HybridLogicalClock(node.name, physical_clock=node.node_clock)
 
     # Wire peers
     for node in nodes:
@@ -237,20 +231,18 @@ class TestLogicalClocksIntegration:
             for i in range(1, len(times)):
                 assert times[i] >= times[i - 1], (
                     f"Node {node.name} Lamport not monotonic at index {i}: "
-                    f"{times[i-1]} -> {times[i]}"
+                    f"{times[i - 1]} -> {times[i]}"
                 )
 
         # All nodes should have non-zero Lamport timestamps
         for node in nodes:
-            assert node.lamport.time > 0, (
-                f"Node {node.name} Lamport is still 0"
-            )
+            assert node.lamport.time > 0, f"Node {node.name} Lamport is still 0"
 
     def test_vector_clock_concurrent_detection(self):
         """Concurrent events detected when nodes haven't communicated."""
         random.seed(123)
         network, nodes = _build_cluster()
-        node_map = {n.name: n for n in nodes}
+        {n.name: n for n in nodes}
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -276,12 +268,8 @@ class TestLogicalClocksIntegration:
         # (non-zero components for peers that sent messages)
         for node in nodes:
             snap = node.vector.snapshot()
-            has_peer_info = any(
-                v > 0 for k, v in snap.items() if k != node.name
-            )
-            assert has_peer_info, (
-                f"Node {node.name} has no peer info: {snap}"
-            )
+            has_peer_info = any(v > 0 for k, v in snap.items() if k != node.name)
+            assert has_peer_info, f"Node {node.name} has no peer info: {snap}"
 
     def test_hlc_monotonicity_despite_skew(self):
         """All HLC timestamps from same node are strictly monotonic despite clock skew."""
@@ -303,9 +291,7 @@ class TestLogicalClocksIntegration:
 
         for node in nodes:
             history = node.hlc_history
-            assert len(history) > 1, (
-                f"Node {node.name} has too few HLC entries"
-            )
+            assert len(history) > 1, f"Node {node.name} has too few HLC entries"
 
             for i in range(1, len(history)):
                 _, phys_prev, log_prev = history[i - 1]
@@ -406,6 +392,7 @@ def _generate_visualization(
 
     # Panel 3: HLC physical vs logical per node
     ax3 = axes[2]
+    ax3_twin = None
     for node in nodes:
         if node.hlc_history:
             times = [t for t, _, _ in node.hlc_history]

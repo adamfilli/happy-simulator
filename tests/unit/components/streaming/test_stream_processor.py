@@ -7,17 +7,13 @@ from happysimulator import (
     Event,
     Instant,
     Simulation,
-    SimFuture,
 )
-from happysimulator.components.common import Sink
 from happysimulator.components.streaming.stream_processor import (
     LateEventPolicy,
     SessionWindow,
     SlidingWindow,
     StreamProcessor,
-    StreamProcessorStats,
     TumblingWindow,
-    WindowState,
 )
 
 
@@ -30,7 +26,7 @@ class RecordingSink(Entity):
 
     def handle_event(self, event):
         self.events.append(event)
-        return None
+        return
 
 
 def _run_sim(entities, events, end_s=10.0):
@@ -143,15 +139,16 @@ class TestTumblingWindowProcessing:
             watermark_interval_s=1.0,
         )
 
-        events = []
         # Process events with event_time in window [0, 5)
-        for i in range(3):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.5 + i * 0.1),
                 event_type="Process",
                 target=proc,
                 context={"key": "k1", "value": 10, "event_time_s": float(i)},
-            ))
+            )
+            for i in range(3)
+        ]
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -177,13 +174,15 @@ class TestTumblingWindowProcessing:
 
         events = []
         for key in ["k1", "k2"]:
-            for i in range(2):
-                events.append(Event(
+            events.extend(
+                Event(
                     time=Instant.from_seconds(0.5 + i * 0.1),
                     event_type="Process",
                     target=proc,
                     context={"key": key, "value": 1, "event_time_s": float(i)},
-                ))
+                )
+                for i in range(2)
+            )
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -211,28 +210,34 @@ class TestLateEventHandling:
 
         events = []
         # First event establishes watermark
-        events.append(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1, "event_time_s": 10.0},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1, "event_time_s": 10.0},
+            )
+        )
 
         # Advance watermark
-        events.append(Event(
-            time=Instant.from_seconds(5.0),
-            event_type="Watermark",
-            target=proc,
-            context={"watermark_s": 12.0},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(5.0),
+                event_type="Watermark",
+                target=proc,
+                context={"watermark_s": 12.0},
+            )
+        )
 
         # Late event (event_time=2.0 < watermark=12.0)
-        events.append(Event(
-            time=Instant.from_seconds(6.0),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1, "event_time_s": 2.0},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(6.0),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1, "event_time_s": 2.0},
+            )
+        )
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -335,15 +340,16 @@ class TestSessionWindowProcessing:
             watermark_interval_s=1.0,
         )
 
-        events = []
         # Three events within 2s gap of each other
-        for i in range(3):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.5 + i * 0.1),
                 event_type="Process",
                 target=proc,
                 context={"key": "k1", "value": 1, "event_time_s": float(i)},
-            ))
+            )
+            for i in range(3)
+        ]
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -369,12 +375,14 @@ class TestSlidingWindowProcessing:
             watermark_interval_s=1.0,
         )
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1, "event_time_s": 7.0},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1, "event_time_s": 7.0},
+            )
+        ]
 
         _run_sim([proc, sink], events, end_s=25.0)
 
@@ -396,12 +404,14 @@ class TestStreamProcessorStats:
             watermark_interval_s=1.0,
         )
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1, "event_time_s": 1.0},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1, "event_time_s": 1.0},
+            )
+        ]
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -423,12 +433,14 @@ class TestEventTimeHandling:
             watermark_interval_s=1.0,
         )
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1, "event_time": Instant.from_seconds(5.0)},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1, "event_time": Instant.from_seconds(5.0)},
+            )
+        ]
 
         _run_sim([proc, sink], events, end_s=15.0)
 
@@ -445,12 +457,14 @@ class TestEventTimeHandling:
             watermark_interval_s=1.0,
         )
 
-        events = [Event(
-            time=Instant.from_seconds(5.0),
-            event_type="Process",
-            target=proc,
-            context={"key": "k1", "value": 1},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(5.0),
+                event_type="Process",
+                target=proc,
+                context={"key": "k1", "value": 1},
+            )
+        ]
 
         _run_sim([proc, sink], events, end_s=15.0)
 

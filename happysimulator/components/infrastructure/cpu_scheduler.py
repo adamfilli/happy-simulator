@@ -16,10 +16,14 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +220,7 @@ class CPUScheduler(Entity):
         task_id: str,
         cpu_time_s: float,
         priority: int = 0,
-    ) -> Generator[float, None, None]:
+    ) -> Generator[float]:
         """Submit a task for CPU execution, yielding until complete.
 
         The task will be time-sliced according to the scheduling policy
@@ -270,7 +274,6 @@ class CPUScheduler(Entity):
 
     def handle_event(self, event: Event) -> None:
         """CPUScheduler does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

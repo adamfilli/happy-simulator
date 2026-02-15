@@ -34,33 +34,29 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 from happysimulator.components.industrial import (
     ConditionalRouter,
     ConveyorBelt,
     PooledCycleResource,
-    Shift,
-    ShiftSchedule,
-    ShiftedServer,
 )
 from happysimulator.components.queue_policy import PriorityQueue
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -112,7 +108,7 @@ class PassengerProvider(EventProvider):
         r = random.random()
         cumulative = 0.0
         ticket_class = TICKET_CLASSES[-1]
-        for tc, weight in zip(TICKET_CLASSES, self._class_weights):
+        for tc, weight in zip(TICKET_CLASSES, self._class_weights, strict=False):
             cumulative += weight
             if r < cumulative:
                 ticket_class = tc
@@ -156,9 +152,7 @@ class Station(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 # =============================================================================
@@ -197,38 +191,40 @@ def run_airport_simulation(config: AirportConfig | None = None) -> AirportResult
     sink = LatencyTracker("Sink")
 
     boarding = PooledCycleResource(
-        "Boarding", config.boarding_seats, config.boarding_cycle_time, sink,
+        "Boarding",
+        config.boarding_seats,
+        config.boarding_cycle_time,
+        sink,
     )
 
     gate_lounge = Station("GateLounge", config.lounge_time, boarding)
 
     # Security with PreCheck priority
     security = Station(
-        "Security", config.security_time, gate_lounge,
-        policy=PriorityQueue(
-            key=lambda e: 0.0 if e.context.get("has_precheck") else 1.0
-        ),
+        "Security",
+        config.security_time,
+        gate_lounge,
+        policy=PriorityQueue(key=lambda e: 0.0 if e.context.get("has_precheck") else 1.0),
     )
 
     baggage_belt = ConveyorBelt("BaggageBelt", security, config.baggage_belt_time)
 
     # Check-in counters per class
     checkin_counters = {
-        tc: Station(f"CheckIn_{tc}", config.checkin_time, baggage_belt)
-        for tc in TICKET_CLASSES
+        tc: Station(f"CheckIn_{tc}", config.checkin_time, baggage_belt) for tc in TICKET_CLASSES
     }
 
     router = ConditionalRouter.by_context_field(
         "TicketRouter",
         "ticket_class",
-        {tc: counter for tc, counter in checkin_counters.items()},
+        dict(checkin_counters.items()),
     )
 
     stop_after = Instant.from_seconds(config.duration_s)
     pax_provider = PassengerProvider(router, config, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Passengers",
@@ -280,19 +276,19 @@ def print_summary(result: AirportResult) -> None:
     print("AIRPORT TERMINAL SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f}/min")
     print(f"  PreCheck rate:       {config.precheck_pct:.0%}")
 
     total = result.pax_provider.generated
 
-    print(f"\nPassenger Flow:")
+    print("\nPassenger Flow:")
     print(f"  Total passengers:    {total}")
     for name, count in result.router.routed_counts.items():
         print(f"  {name:20s} {count}")
 
-    print(f"\nStation Throughput:")
+    print("\nStation Throughput:")
     for tc, counter in result.checkin_counters.items():
         print(f"  CheckIn {tc:10s}   {counter.processed}")
     print(f"  Baggage belt:        {result.baggage_belt.items_transported}")
@@ -302,7 +298,7 @@ def print_summary(result: AirportResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.1f} min")
         print(f"  p50:     {result.sink.p50() / 60:.1f} min")

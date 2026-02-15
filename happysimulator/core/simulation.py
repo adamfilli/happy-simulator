@@ -7,21 +7,25 @@ resulting events are pushed back for future processing.
 
 import logging
 import time as _time
+from typing import TYPE_CHECKING
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.protocols import Simulatable
-from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event, _clear_active_code_debugger, _set_active_code_debugger
+from happysimulator.core.event_heap import EventHeap
+from happysimulator.core.protocols import Simulatable
+from happysimulator.core.sim_future import _clear_active_context, _set_active_context
 from happysimulator.core.temporal import Instant
-from happysimulator.core.sim_future import _set_active_context, _clear_active_context
-from happysimulator.core.event import _set_active_code_debugger, _clear_active_code_debugger
-from happysimulator.load.source import Source
-from happysimulator.faults.schedule import FaultSchedule
-from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
+from happysimulator.instrumentation.recorder import NullTraceRecorder, TraceRecorder
 from happysimulator.instrumentation.summary import (
-    SimulationSummary, EntitySummary, QueueStats,
+    EntitySummary,
+    QueueStats,
+    SimulationSummary,
 )
+from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from happysimulator.faults.schedule import FaultSchedule
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +57,16 @@ class Simulation:
         trace_recorder: Optional recorder for debugging/visualization.
         fault_schedule: Optional fault injection schedule.
     """
+
     def __init__(
         self,
         start_time: Instant = None,
         end_time: Instant = None,
-        sources: list[Source] = None,
-        entities: list[Simulatable] = None,
-        probes: list[Source] = None,
+        sources: list[Source] | None = None,
+        entities: list[Simulatable] | None = None,
+        probes: list[Source] | None = None,
         trace_recorder: TraceRecorder | None = None,
-        fault_schedule: 'FaultSchedule | None' = None,
+        fault_schedule: "FaultSchedule | None" = None,
         duration: float | None = None,
     ):
         if duration is not None and end_time is not None:
@@ -107,8 +112,11 @@ class Simulation:
 
         logger.info(
             "Simulation initialized: start=%r, end=%r, sources=%d, entities=%d, probes=%d",
-            self._start_time, self._end_time,
-            len(self._sources), len(self._entities), len(self._probes),
+            self._start_time,
+            self._end_time,
+            len(self._sources),
+            len(self._entities),
+            len(self._probes),
         )
 
         self._trace.record(
@@ -122,7 +130,9 @@ class Simulation:
         for source in self._sources:
             # The source calculates its first event and returns it
             initial_events = source.start(self._start_time)
-            logger.debug("Source '%s' produced %d initial event(s)", source.name, len(initial_events))
+            logger.debug(
+                "Source '%s' produced %d initial event(s)", source.name, len(initial_events)
+            )
 
             # We push it to the heap to prime the simulation
             for event in initial_events:
@@ -139,9 +149,7 @@ class Simulation:
         if self._fault_schedule is not None:
             self._fault_schedule.set_clock(self._clock)
             fault_events = self._fault_schedule.start(self._start_time, self)
-            logger.debug(
-                "FaultSchedule produced %d event(s)", len(fault_events)
-            )
+            logger.debug("FaultSchedule produced %d event(s)", len(fault_events))
             for event in fault_events:
                 self._event_heap.push(event)
 
@@ -155,6 +163,7 @@ class Simulation:
         """
         if self._control is None:
             from happysimulator.core.control import SimulationControl
+
             self._control = SimulationControl(self)
         return self._control
 
@@ -210,7 +219,8 @@ class Simulation:
 
             logger.info(
                 "Simulation starting at %r with %d event(s) in heap",
-                self._current_time, self._event_heap.size(),
+                self._current_time,
+                self._event_heap.size(),
             )
 
             if not self._event_heap.has_events():
@@ -225,14 +235,15 @@ class Simulation:
             # Resuming from pause
             logger.info(
                 "Simulation resuming at %r with %d event(s) in heap",
-                self._current_time, self._event_heap.size(),
+                self._current_time,
+                self._event_heap.size(),
             )
 
         # Set active context so SimFuture.resolve()/fail() can schedule events
         _set_active_context(self._event_heap, self._clock)
 
         # Set code debugger context if one has been injected by the visual bridge
-        _set_active_code_debugger(getattr(self, '_code_debugger', None))
+        _set_active_code_debugger(getattr(self, "_code_debugger", None))
 
         try:
             return self._run_loop()
@@ -243,11 +254,14 @@ class Simulation:
     def _run_loop(self) -> SimulationSummary:
         """Inner loop extracted for clean active-context scoping."""
         while self._event_heap.has_events() and self._end_time >= self._current_time:
-
             # CONTROL CHECK: should we pause before popping?
             if self._control is not None and self._control._should_pause():
                 self._is_paused = True
-                logger.info("Simulation paused at %r after %d events", self._current_time, self._events_processed)
+                logger.info(
+                    "Simulation paused at %r after %d events",
+                    self._current_time,
+                    self._events_processed,
+                )
                 return self._build_summary()
 
             # TERMINATION CHECK:
@@ -298,7 +312,8 @@ class Simulation:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
                     "Processing event #%d: %r",
-                    self._events_processed, event,
+                    self._events_processed,
+                    event,
                 )
 
             self._trace.record(
@@ -317,12 +332,14 @@ class Simulation:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(
                         "Event %r produced %d new event(s)",
-                        event.event_type, len(new_events),
+                        event.event_type,
+                        len(new_events),
                     )
                     for new_event in new_events:
                         logger.debug(
                             "  Scheduling %r for %r",
-                            new_event.event_type, new_event.time,
+                            new_event.event_type,
+                            new_event.time,
                         )
                 for new_event in new_events:
                     self._trace.record(
@@ -341,7 +358,8 @@ class Simulation:
                     self._is_paused = True
                     logger.info(
                         "Simulation paused by breakpoint at %r after %d events",
-                        self._current_time, self._events_processed,
+                        self._current_time,
+                        self._events_processed,
                     )
                     return self._build_summary()
 
@@ -355,12 +373,15 @@ class Simulation:
         elif self._end_time < self._current_time:
             logger.info(
                 "Simulation ended: current time %r exceeded end_time %r",
-                self._current_time, self._end_time,
+                self._current_time,
+                self._end_time,
             )
 
         logger.info(
             "Simulation complete: processed %d events, final time %r, %d event(s) remaining in heap",
-            self._events_processed, self._current_time, self._event_heap.size(),
+            self._events_processed,
+            self._current_time,
+            self._event_heap.size(),
         )
 
         if self._event_heap.size() > 0:

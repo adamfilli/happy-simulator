@@ -7,15 +7,6 @@ Provides Kafka-inspired streaming primitives:
 - **StreamProcessor**: Stateful windowed stream processing
 """
 
-from happysimulator.components.streaming.event_log import (
-    EventLog,
-    EventLogStats,
-    Partition,
-    Record,
-    RetentionPolicy,
-    SizeRetention,
-    TimeRetention,
-)
 from happysimulator.components.streaming.consumer_group import (
     ConsumerGroup,
     ConsumerGroupStats,
@@ -24,6 +15,15 @@ from happysimulator.components.streaming.consumer_group import (
     RangeAssignment,
     RoundRobinAssignment,
     StickyAssignment,
+)
+from happysimulator.components.streaming.event_log import (
+    EventLog,
+    EventLogStats,
+    Partition,
+    Record,
+    RetentionPolicy,
+    SizeRetention,
+    TimeRetention,
 )
 from happysimulator.components.streaming.stream_processor import (
     LateEventPolicy,
@@ -37,28 +37,28 @@ from happysimulator.components.streaming.stream_processor import (
 )
 
 __all__ = [
-    # Event log
-    "EventLog",
-    "EventLogStats",
-    "Partition",
-    "Record",
-    "RetentionPolicy",
-    "SizeRetention",
-    "TimeRetention",
     # Consumer group
     "ConsumerGroup",
     "ConsumerGroupStats",
     "ConsumerState",
-    "PartitionAssignment",
-    "RangeAssignment",
-    "RoundRobinAssignment",
-    "StickyAssignment",
+    # Event log
+    "EventLog",
+    "EventLogStats",
     # Stream processor
     "LateEventPolicy",
+    "Partition",
+    "PartitionAssignment",
+    "RangeAssignment",
+    "Record",
+    "RetentionPolicy",
+    "RoundRobinAssignment",
     "SessionWindow",
+    "SizeRetention",
     "SlidingWindow",
+    "StickyAssignment",
     "StreamProcessor",
     "StreamProcessorStats",
+    "TimeRetention",
     "TumblingWindow",
     "WindowState",
     "WindowType",

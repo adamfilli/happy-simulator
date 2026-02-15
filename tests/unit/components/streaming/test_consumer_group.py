@@ -1,22 +1,19 @@
 """Tests for ConsumerGroup."""
 
-import pytest
-
 from happysimulator import (
     Entity,
     Event,
     Instant,
-    Simulation,
     SimFuture,
+    Simulation,
 )
-from happysimulator.components.streaming.event_log import EventLog
 from happysimulator.components.streaming.consumer_group import (
     ConsumerGroup,
-    ConsumerGroupStats,
     RangeAssignment,
     RoundRobinAssignment,
     StickyAssignment,
 )
+from happysimulator.components.streaming.event_log import EventLog
 
 
 class DummyConsumer(Entity):
@@ -28,17 +25,17 @@ class DummyConsumer(Entity):
 
     def handle_event(self, event):
         self.received.append(event)
-        return None
+        return
 
 
 def _make_log(**kwargs) -> EventLog:
-    defaults = dict(name="log", num_partitions=4, append_latency=0.001, read_latency=0.0005)
+    defaults = {"name": "log", "num_partitions": 4, "append_latency": 0.001, "read_latency": 0.0005}
     defaults.update(kwargs)
     return EventLog(**defaults)
 
 
 def _make_group(log: EventLog, **kwargs) -> ConsumerGroup:
-    defaults = dict(name="group", event_log=log, rebalance_delay=0.01, poll_latency=0.001)
+    defaults = {"name": "group", "event_log": log, "rebalance_delay": 0.01, "poll_latency": 0.001}
     defaults.update(kwargs)
     return ConsumerGroup(**defaults)
 
@@ -145,16 +142,18 @@ class TestJoinAndLeave:
         consumer = DummyConsumer("c1")
 
         reply = SimFuture()
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Join",
-            target=group,
-            context={
-                "consumer_name": "c1",
-                "consumer_entity": consumer,
-                "reply_future": reply,
-            },
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": reply,
+                },
+            )
+        ]
 
         _run_sim([log, group, consumer], events)
 
@@ -245,31 +244,40 @@ class TestPollAndCommit:
 
         poll_reply = SimFuture()
 
-        events = []
         # Append records
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
         # Join
-        events.append(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="Join",
-            target=group,
-            context={"consumer_name": "c1", "consumer_entity": consumer, "reply_future": SimFuture()},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
         # Poll
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Poll",
-            target=group,
-            context={"consumer_name": "c1", "max_records": 10, "reply_future": poll_reply},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Poll",
+                target=group,
+                context={"consumer_name": "c1", "max_records": 10, "reply_future": poll_reply},
+            )
+        )
 
         _run_sim([log, group, consumer], events)
 
@@ -284,39 +292,50 @@ class TestPollAndCommit:
 
         poll_reply = SimFuture()
 
-        events = []
         # Append records
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
         # Join
-        events.append(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="Join",
-            target=group,
-            context={"consumer_name": "c1", "consumer_entity": consumer, "reply_future": SimFuture()},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
         # Commit offset 3
-        events.append(Event(
-            time=Instant.from_seconds(0.8),
-            event_type="Commit",
-            target=group,
-            context={"consumer_name": "c1", "offsets": {0: 3}},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.8),
+                event_type="Commit",
+                target=group,
+                context={"consumer_name": "c1", "offsets": {0: 3}},
+            )
+        )
 
         # Poll after commit
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Poll",
-            target=group,
-            context={"consumer_name": "c1", "max_records": 10, "reply_future": poll_reply},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Poll",
+                target=group,
+                context={"consumer_name": "c1", "max_records": 10, "reply_future": poll_reply},
+            )
+        )
 
         _run_sim([log, group, consumer], events)
 
@@ -330,12 +349,14 @@ class TestPollAndCommit:
         group = _make_group(log)
 
         poll_reply = SimFuture()
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Poll",
-            target=group,
-            context={"consumer_name": "unknown", "max_records": 10, "reply_future": poll_reply},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Poll",
+                target=group,
+                context={"consumer_name": "unknown", "max_records": 10, "reply_future": poll_reply},
+            )
+        ]
 
         _run_sim([log, group], events)
 
@@ -351,23 +372,30 @@ class TestConsumerLag:
         group = _make_group(log)
         consumer = DummyConsumer("c1")
 
-        events = []
         # Append records
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
         # Join
-        events.append(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="Join",
-            target=group,
-            context={"consumer_name": "c1", "consumer_entity": consumer, "reply_future": SimFuture()},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
         _run_sim([log, group, consumer], events)
 
@@ -380,28 +408,37 @@ class TestConsumerLag:
         group = _make_group(log)
         consumer = DummyConsumer("c1")
 
-        events = []
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
-        events.append(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="Join",
-            target=group,
-            context={"consumer_name": "c1", "consumer_entity": consumer, "reply_future": SimFuture()},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
-        events.append(Event(
-            time=Instant.from_seconds(0.8),
-            event_type="Commit",
-            target=group,
-            context={"consumer_name": "c1", "offsets": {0: 3}},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(0.8),
+                event_type="Commit",
+                target=group,
+                context={"consumer_name": "c1", "offsets": {0: 3}},
+            )
+        )
 
         _run_sim([log, group, consumer], events)
 
@@ -427,7 +464,11 @@ class TestConsumerGroupStats:
                 time=Instant.from_seconds(0.1),
                 event_type="Join",
                 target=group,
-                context={"consumer_name": "c1", "consumer_entity": consumer, "reply_future": SimFuture()},
+                context={
+                    "consumer_name": "c1",
+                    "consumer_entity": consumer,
+                    "reply_future": SimFuture(),
+                },
             ),
             Event(
                 time=Instant.from_seconds(0.5),

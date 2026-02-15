@@ -12,13 +12,13 @@ from pathlib import Path
 
 import pytest
 
-from happysimulator.instrumentation.probe import Probe
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.load.profile import Profile
-from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
 
 
 class ConcurrencyTrackerEntity(Entity):
@@ -60,14 +60,14 @@ class ConstantTwoPerSecondProfile(Profile):
     def get_rate(self, time: Instant) -> float:
         if time <= Instant.from_seconds(60):
             return 2.0
-        else:
-            return 0
+        return 0
 
 
 def _write_csv(path: Path, header: list[str], rows: list[tuple]) -> None:
     """Helper to write CSV files for test output."""
     import csv
-    with open(path, "w", newline="") as f:
+
+    with path.open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         for row in rows:
@@ -102,8 +102,10 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     # Create the event Source (generates 2 events/sec)
     profile = ConstantTwoPerSecondProfile()
     event_source = Source.with_profile(
-        profile=profile, target=tracker,
-        poisson=False, name="RequestSource",
+        profile=profile,
+        target=tracker,
+        poisson=False,
+        name="RequestSource",
     )
 
     # Create the Probe to measure concurrency
@@ -114,7 +116,7 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
         sources=[event_source],
         entities=[tracker],
         probes=[concurrency_probe],
-        duration=sim_duration
+        duration=sim_duration,
     )
 
     # C. EXECUTION
@@ -133,8 +135,9 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     assert all(v >= 0 for v in values), "Concurrency should never be negative"
 
     # We expect ~120 requests started (2/sec * 60 sec)
-    assert 118 <= tracker.requests_started <= 122, \
+    assert 118 <= tracker.requests_started <= 122, (
         f"Expected ~120 requests started, got {tracker.requests_started}"
+    )
 
     # Final concurrency should be around 60 (±5 for timing tolerance)
     # because we started 120 and completed ~60 (1/sec for 60 seconds)
@@ -142,8 +145,7 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     max_concurrency = max(values)
 
     # Allow some tolerance since the exact timing depends on event ordering
-    assert 50 <= max_concurrency <= 70, \
-        f"Expected max concurrency around 60, got {max_concurrency}"
+    assert 50 <= max_concurrency <= 70, f"Expected max concurrency around 60, got {max_concurrency}"
 
     # Verify concurrency increased over time (not flat)
     early_samples = [v for t, v in samples if t < 10]
@@ -152,8 +154,9 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     avg_early = sum(early_samples) / len(early_samples) if early_samples else 0
     avg_late = sum(late_samples) / len(late_samples) if late_samples else 0
 
-    assert avg_late > avg_early, \
+    assert avg_late > avg_early, (
         f"Concurrency should increase over time. Early avg: {avg_early:.1f}, Late avg: {avg_late:.1f}"
+    )
 
     # E. VISUALIZATION
 
@@ -161,7 +164,7 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     _write_csv(
         test_output_dir / "increasing_concurrency_samples.csv",
         header=["time_s", "concurrency"],
-        rows=[(t, v) for t, v in samples]
+        rows=[(t, v) for t, v in samples],
     )
 
     # Plot 1: Concurrency over time showing the growth
@@ -174,9 +177,15 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     # Add theoretical line: concurrency grows by ~1 per second
     theoretical_times = [0, sim_duration]
     theoretical_concurrency = [0, sim_duration]  # 1 extra request/sec accumulates
-    ax_conc.plot(theoretical_times, theoretical_concurrency,
-                 color="blue", linestyle="--", linewidth=2, alpha=0.7,
-                 label="Theoretical (arrival - completion rate)")
+    ax_conc.plot(
+        theoretical_times,
+        theoretical_concurrency,
+        color="blue",
+        linestyle="--",
+        linewidth=2,
+        alpha=0.7,
+        label="Theoretical (arrival - completion rate)",
+    )
 
     ax_conc.set_xlabel("Time (s)")
     ax_conc.set_ylabel("Concurrency")
@@ -200,18 +209,32 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     # Plot 2: Annotated version with key metrics
     fig2, ax2 = plt.subplots(figsize=(12, 6))
 
-    ax2.step(times, values, where="post", linewidth=1.5, color="crimson", label="Measured Concurrency")
+    ax2.step(
+        times, values, where="post", linewidth=1.5, color="crimson", label="Measured Concurrency"
+    )
     ax2.fill_between(times, values, step="post", alpha=0.2, color="crimson")
 
     # Annotations
-    ax2.axhline(y=max_concurrency, color="darkred", linestyle=":", alpha=0.7,
-                label=f"Max concurrency = {max_concurrency}")
-    ax2.axhline(y=avg_late, color="orange", linestyle="--", alpha=0.7,
-                label=f"Late avg (t>50s) = {avg_late:.1f}")
+    ax2.axhline(
+        y=max_concurrency,
+        color="darkred",
+        linestyle=":",
+        alpha=0.7,
+        label=f"Max concurrency = {max_concurrency}",
+    )
+    ax2.axhline(
+        y=avg_late,
+        color="orange",
+        linestyle="--",
+        alpha=0.7,
+        label=f"Late avg (t>50s) = {avg_late:.1f}",
+    )
 
     ax2.set_xlabel("Time (s)")
     ax2.set_ylabel("Concurrent Requests")
-    ax2.set_title(f"Overload Test: {tracker.requests_started} started, {tracker.requests_completed} completed")
+    ax2.set_title(
+        f"Overload Test: {tracker.requests_started} started, {tracker.requests_completed} completed"
+    )
     ax2.legend(loc="upper left")
     ax2.grid(True, alpha=0.3)
     ax2.set_xlim(0, sim_duration)
@@ -225,6 +248,8 @@ def test_increasing_concurrency_under_overload(test_output_dir: Path):
     print(f"  - Total samples collected: {len(samples)}")
     print(f"  - Max concurrency observed: {max_concurrency}")
     print(f"  - Final concurrency: {final_concurrency}")
-    print(f"  - Requests: {tracker.requests_started} started, {tracker.requests_completed} completed")
+    print(
+        f"  - Requests: {tracker.requests_started} started, {tracker.requests_completed} completed"
+    )
     print(f"  - Early avg concurrency (t<10s): {avg_early:.1f}")
     print(f"  - Late avg concurrency (t>50s): {avg_late:.1f}")

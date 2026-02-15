@@ -2,7 +2,7 @@
 
 import pytest
 
-from happysimulator.core.sim_future import SimFuture, any_of, all_of
+from happysimulator.core.sim_future import SimFuture, all_of, any_of
 
 
 class TestSimFutureBasics:

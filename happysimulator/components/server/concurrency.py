@@ -168,17 +168,11 @@ class DynamicConcurrency:
         if min_limit < 1:
             raise ValueError(f"min_limit must be >= 1, got {min_limit}")
         if max_limit is not None and max_limit < min_limit:
-            raise ValueError(
-                f"max_limit ({max_limit}) must be >= min_limit ({min_limit})"
-            )
+            raise ValueError(f"max_limit ({max_limit}) must be >= min_limit ({min_limit})")
         if initial < min_limit:
-            raise ValueError(
-                f"initial ({initial}) must be >= min_limit ({min_limit})"
-            )
+            raise ValueError(f"initial ({initial}) must be >= min_limit ({min_limit})")
         if max_limit is not None and initial > max_limit:
-            raise ValueError(
-                f"initial ({initial}) must be <= max_limit ({max_limit})"
-            )
+            raise ValueError(f"initial ({initial}) must be <= max_limit ({max_limit})")
 
         self._current_limit = initial
         self._min_limit = min_limit

@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from happysimulator.components.consensus.membership import (
     MembershipProtocol,
     MemberState,
@@ -86,18 +84,12 @@ class TestMembershipProtocol:
                 f"{node.name}: expected {len(nodes) - 1} alive members, "
                 f"got {len(alive)} (suspected={suspected}, dead={dead})"
             )
-            assert len(dead) == 0, (
-                f"{node.name}: unexpected dead members: {dead}"
-            )
+            assert len(dead) == 0, f"{node.name}: unexpected dead members: {dead}"
 
         # All nodes should have sent probes
         for node in nodes:
-            assert node.stats.probes_sent > 0, (
-                f"{node.name} sent no probes"
-            )
-            assert node.stats.acks_received > 0, (
-                f"{node.name} received no acks"
-            )
+            assert node.stats.probes_sent > 0, f"{node.name} sent no probes"
+            assert node.stats.acks_received > 0, f"{node.name} received no acks"
 
     def test_stopped_node_detected(self):
         """A node that stops responding is eventually detected as SUSPECT or DEAD."""
@@ -120,15 +112,13 @@ class TestMembershipProtocol:
         # Let the cluster stabilize first (run to t=5.0)
         from happysimulator.core.control.breakpoints import TimeBreakpoint
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(5.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(5.0)))
         sim.run()
 
         # Partition member-4 from ALL other nodes (simulates a stopped node)
         stopped = nodes[4]
         active_nodes = nodes[:4]
-        partition = network.partition([stopped], active_nodes)
+        network.partition([stopped], active_nodes)
 
         # Continue running to let failure detection kick in
         sim.control.resume()
@@ -166,9 +156,7 @@ class TestMembershipProtocol:
         # Let the cluster warm up
         from happysimulator.core.control.breakpoints import TimeBreakpoint
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(3.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(3.0)))
         sim.run()
 
         # Partition {member-0, member-1} from {member-2, member-3, member-4}
@@ -224,9 +212,7 @@ class TestMembershipProtocol:
         from happysimulator.core.control.breakpoints import TimeBreakpoint
 
         # Phase 1: Warm up (0-3s)
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(3.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(3.0)))
         sim.run()
 
         # Phase 2: Create partition (3-15s)
@@ -234,9 +220,7 @@ class TestMembershipProtocol:
         group_b = [nodes[2], nodes[3], nodes[4]]
         partition = network.partition(group_a, group_b)
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(15.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(15.0)))
         sim.control.resume()
 
         # Verify some suspicion/death developed

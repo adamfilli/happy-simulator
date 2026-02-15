@@ -6,8 +6,7 @@ according to the plugged-in policy when run inside a full simulation.
 
 from __future__ import annotations
 
-import pytest
-
+from happysimulator.components.common import Sink
 from happysimulator.components.rate_limiter.policy import (
     AdaptivePolicy,
     FixedWindowPolicy,
@@ -18,19 +17,16 @@ from happysimulator.components.rate_limiter.policy import (
 from happysimulator.components.rate_limiter.rate_limited_entity import (
     RateLimitedEntity,
 )
-from happysimulator.components.common import Sink
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
-
 
 # ---------------------------------------------------------------------------
 # Token Bucket
 # ---------------------------------------------------------------------------
 
-class TestRateLimitedEntityTokenBucket:
 
+class TestRateLimitedEntityTokenBucket:
     def test_low_load_all_forwarded(self):
         """With load well below the rate limit, all requests are forwarded."""
         sink = Sink()
@@ -56,7 +52,10 @@ class TestRateLimitedEntityTokenBucket:
         sink = Sink()
         policy = TokenBucketPolicy(capacity=5.0, refill_rate=5.0)
         limiter = RateLimitedEntity(
-            "limiter", downstream=sink, policy=policy, queue_capacity=1000,
+            "limiter",
+            downstream=sink,
+            policy=policy,
+            queue_capacity=1000,
         )
 
         source = Source.constant(rate=20.0, target=limiter, name="src")
@@ -79,7 +78,10 @@ class TestRateLimitedEntityTokenBucket:
         sink = Sink()
         policy = TokenBucketPolicy(capacity=1.0, refill_rate=1.0, initial_tokens=0.0)
         limiter = RateLimitedEntity(
-            "limiter", downstream=sink, policy=policy, queue_capacity=5,
+            "limiter",
+            downstream=sink,
+            policy=policy,
+            queue_capacity=5,
         )
 
         source = Source.constant(rate=100.0, target=limiter, name="src")
@@ -99,8 +101,8 @@ class TestRateLimitedEntityTokenBucket:
 # Leaky Bucket
 # ---------------------------------------------------------------------------
 
-class TestRateLimitedEntityLeakyBucket:
 
+class TestRateLimitedEntityLeakyBucket:
     def test_strict_output_rate(self):
         """Leaky bucket enforces strict output rate with no bursting."""
         sink = Sink()
@@ -126,8 +128,8 @@ class TestRateLimitedEntityLeakyBucket:
 # Sliding Window
 # ---------------------------------------------------------------------------
 
-class TestRateLimitedEntitySlidingWindow:
 
+class TestRateLimitedEntitySlidingWindow:
     def test_requests_within_window_limit(self):
         """Sliding window allows up to max_requests per window."""
         sink = Sink()
@@ -153,8 +155,8 @@ class TestRateLimitedEntitySlidingWindow:
 # Fixed Window
 # ---------------------------------------------------------------------------
 
-class TestRateLimitedEntityFixedWindow:
 
+class TestRateLimitedEntityFixedWindow:
     def test_window_counter_resets(self):
         """Fixed window resets counter at window boundaries."""
         sink = Sink()
@@ -180,14 +182,17 @@ class TestRateLimitedEntityFixedWindow:
 # Adaptive
 # ---------------------------------------------------------------------------
 
-class TestRateLimitedEntityAdaptive:
 
+class TestRateLimitedEntityAdaptive:
     def test_adaptive_with_feedback(self):
         """Adaptive policy adjusts rate based on success/failure feedback."""
         sink = Sink()
         policy = AdaptivePolicy(
-            initial_rate=50.0, min_rate=5.0, max_rate=200.0,
-            increase_step=5.0, decrease_factor=0.7,
+            initial_rate=50.0,
+            min_rate=5.0,
+            max_rate=200.0,
+            increase_step=5.0,
+            decrease_factor=0.7,
         )
         limiter = RateLimitedEntity("limiter", downstream=sink, policy=policy)
 
@@ -212,14 +217,17 @@ class TestRateLimitedEntityAdaptive:
 # Invariants
 # ---------------------------------------------------------------------------
 
-class TestInvariants:
 
+class TestInvariants:
     def test_received_equals_forwarded_plus_queued_plus_dropped(self):
         """received == forwarded + in_queue + dropped always holds."""
         sink = Sink()
         policy = TokenBucketPolicy(capacity=3.0, refill_rate=2.0)
         limiter = RateLimitedEntity(
-            "limiter", downstream=sink, policy=policy, queue_capacity=50,
+            "limiter",
+            downstream=sink,
+            policy=policy,
+            queue_capacity=50,
         )
 
         source = Source.constant(rate=15.0, target=limiter, name="src")

@@ -16,10 +16,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Generator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +164,7 @@ class StorageTransaction:
         value = yield from self._manager._store.get(key)
         return value
 
-    def write(self, key: str, value: Any) -> Generator[float, None, None]:
+    def write(self, key: str, value: Any) -> Generator[float]:
         """Buffer a write in the local write set.
 
         The write is not applied to the store until commit.
@@ -219,7 +223,9 @@ class StorageTransaction:
 
         logger.debug(
             "[tx-%d] Committed (wrote %d keys, read %d keys)",
-            self._tx_id, len(self._write_set), len(self._read_set),
+            self._tx_id,
+            len(self._write_set),
+            len(self._read_set),
         )
         return True
 
@@ -312,7 +318,9 @@ class TransactionManager(Entity):
         """Number of currently active transactions."""
         return len(self._active_txns)
 
-    def begin(self, isolation: IsolationLevel | None = None) -> Generator[float, None, StorageTransaction]:
+    def begin(
+        self, isolation: IsolationLevel | None = None
+    ) -> Generator[float, None, StorageTransaction]:
         """Begin a new transaction.
 
         Args:
@@ -398,7 +406,6 @@ class TransactionManager(Entity):
 
     def handle_event(self, event: Event) -> None:
         """TransactionManager does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

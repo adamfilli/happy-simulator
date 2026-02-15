@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from happysimulator.components.common import Sink, Counter
+from happysimulator.components.common import Counter, Sink
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
-
 
 # ---------------------------------------------------------------------------
 # Sink tests
@@ -18,7 +17,6 @@ from happysimulator.load.source import Source
 
 
 class TestSink:
-
     def test_default_name(self):
         sink = Sink()
         assert sink.name == "Sink"
@@ -35,11 +33,13 @@ class TestSink:
             entities=[sink],
         )
         for i in range(5):
-            sim.schedule(Event(
-                time=Instant.from_seconds(0.1 * (i + 1)),
-                event_type="ping",
-                target=sink,
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(0.1 * (i + 1)),
+                    event_type="ping",
+                    target=sink,
+                )
+            )
         sim.run()
         assert sink.events_received == 5
 
@@ -50,12 +50,14 @@ class TestSink:
             end_time=Instant.from_seconds(2.0),
             entities=[sink],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.5),
-            event_type="done",
-            target=sink,
-            context={"created_at": Instant.from_seconds(0.5)},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.5),
+                event_type="done",
+                target=sink,
+                context={"created_at": Instant.from_seconds(0.5)},
+            )
+        )
         sim.run()
 
         assert sink.events_received == 1
@@ -68,11 +70,13 @@ class TestSink:
             end_time=Instant.from_seconds(1.0),
             entities=[sink],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="ping",
-            target=sink,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="ping",
+                target=sink,
+            )
+        )
         sim.run()
 
         assert sink.latencies_s[0] == pytest.approx(0.0)
@@ -89,19 +93,23 @@ class TestSink:
             entities=[sink],
         )
         # Event with 1.0s latency
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="a",
-            target=sink,
-            context={"created_at": Instant.Epoch},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="a",
+                target=sink,
+                context={"created_at": Instant.Epoch},
+            )
+        )
         # Event with 2.0s latency
-        sim.schedule(Event(
-            time=Instant.from_seconds(2.0),
-            event_type="b",
-            target=sink,
-            context={"created_at": Instant.Epoch},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(2.0),
+                event_type="b",
+                target=sink,
+                context={"created_at": Instant.Epoch},
+            )
+        )
         sim.run()
 
         assert sink.average_latency() == pytest.approx(1.5)
@@ -113,18 +121,22 @@ class TestSink:
             end_time=Instant.from_seconds(3.0),
             entities=[sink],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="a",
-            target=sink,
-            context={"created_at": Instant.from_seconds(0.5)},
-        ))
-        sim.schedule(Event(
-            time=Instant.from_seconds(2.0),
-            event_type="b",
-            target=sink,
-            context={"created_at": Instant.from_seconds(1.0)},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="a",
+                target=sink,
+                context={"created_at": Instant.from_seconds(0.5)},
+            )
+        )
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(2.0),
+                event_type="b",
+                target=sink,
+                context={"created_at": Instant.from_seconds(1.0)},
+            )
+        )
         sim.run()
 
         times, latencies = sink.latency_time_series_seconds()
@@ -147,12 +159,14 @@ class TestSink:
         # Create events with latencies: 0.1, 0.2, 0.3, 0.4, 0.5
         for i in range(1, 6):
             latency = i * 0.1
-            sim.schedule(Event(
-                time=Instant.from_seconds(float(i)),
-                event_type="x",
-                target=sink,
-                context={"created_at": Instant.from_seconds(float(i) - latency)},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(float(i)),
+                    event_type="x",
+                    target=sink,
+                    context={"created_at": Instant.from_seconds(float(i) - latency)},
+                )
+            )
         sim.run()
 
         stats = sink.latency_stats()
@@ -187,11 +201,13 @@ class TestSink:
             end_time=Instant.from_seconds(1.0),
             entities=[sink],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.5),
-            event_type="x",
-            target=sink,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.5),
+                event_type="x",
+                target=sink,
+            )
+        )
         sim.run()
 
         assert len(sink.completion_times) == 1
@@ -204,7 +220,6 @@ class TestSink:
 
 
 class TestCounter:
-
     def test_default_name(self):
         counter = Counter()
         assert counter.name == "Counter"
@@ -221,11 +236,13 @@ class TestCounter:
             entities=[counter],
         )
         for i in range(3):
-            sim.schedule(Event(
-                time=Instant.from_seconds(0.1 * (i + 1)),
-                event_type="ping",
-                target=counter,
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(0.1 * (i + 1)),
+                    event_type="ping",
+                    target=counter,
+                )
+            )
         sim.run()
         assert counter.total == 3
 
@@ -275,11 +292,13 @@ class TestCounter:
             end_time=Instant.from_seconds(1.0),
             entities=[counter],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="x",
-            target=counter,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="x",
+                target=counter,
+            )
+        )
         sim.run()
         # If it returned events, the simulation would process them,
         # but counter.total should still be 1
@@ -292,14 +311,15 @@ class TestCounter:
 
 
 class TestExports:
-
     def test_importable_from_components(self):
-        from happysimulator.components import Sink, Counter
+        from happysimulator.components import Counter, Sink
+
         assert Sink is not None
         assert Counter is not None
 
     def test_importable_from_top_level(self):
-        from happysimulator import Sink, Counter
+        from happysimulator import Counter, Sink
+
         assert Sink is not None
         assert Counter is not None
 

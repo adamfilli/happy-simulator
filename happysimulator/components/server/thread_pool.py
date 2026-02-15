@@ -9,11 +9,11 @@ statistics for analysis.
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Callable, Generator
 
-from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.server.concurrency import FixedConcurrency
 from happysimulator.core.event import Event
 

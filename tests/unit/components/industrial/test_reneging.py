@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Generator
-
-import pytest
-
-from happysimulator.components.industrial.reneging import RenegingQueuedResource
 from happysimulator.components.common import Sink
-from happysimulator.core.entity import Entity
+from happysimulator.components.industrial.reneging import RenegingQueuedResource
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -46,7 +41,6 @@ class SimpleRenegingServer(RenegingQueuedResource):
 
 
 class TestRenegingBasics:
-
     def test_creates_with_defaults(self):
         server = SimpleRenegingServer("server")
         assert server.served == 0
@@ -56,7 +50,9 @@ class TestRenegingBasics:
     def test_serves_patient_items(self):
         sink = Sink()
         server = SimpleRenegingServer(
-            "server", service_time=0.01, downstream=sink,
+            "server",
+            service_time=0.01,
+            downstream=sink,
             default_patience_s=10.0,
         )
 
@@ -83,7 +79,9 @@ class TestRenegingBasics:
         sink = Sink()
         reneged_sink = Sink("reneged")
         server = SimpleRenegingServer(
-            "server", service_time=0.5, downstream=sink,
+            "server",
+            service_time=0.5,
+            downstream=sink,
             reneged_target=reneged_sink,
             default_patience_s=0.5,
         )
@@ -127,7 +125,9 @@ class TestRenegingBasics:
         sink = Sink()
         reneged_sink = Sink("reneged")
         server = SimpleRenegingServer(
-            "server", service_time=0.5, downstream=sink,
+            "server",
+            service_time=0.5,
+            downstream=sink,
             reneged_target=reneged_sink,
             default_patience_s=100.0,  # Very patient by default
         )

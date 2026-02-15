@@ -301,6 +301,7 @@ class _InfiniteInstant(Instant):
 
     def __init__(self):
         import sys
+
         # Use maxsize as the nanoseconds value. All comparisons and arithmetic
         # are overridden so this value is never used directly, but it satisfies
         # the int type requirement of Instant.__init__.
@@ -327,7 +328,7 @@ class _InfiniteInstant(Instant):
         return isinstance(other, _InfiniteInstant)
 
     def __hash__(self) -> int:
-        return hash(float('inf'))
+        return hash(float("inf"))
 
     def __lt__(self, other: Instant) -> bool:
         if not isinstance(other, Instant):
@@ -350,7 +351,7 @@ class _InfiniteInstant(Instant):
         return True
 
     def to_seconds(self) -> float:
-        return float('inf')
+        return float("inf")
 
     def __repr__(self) -> str:
         return "Instant.Infinity"

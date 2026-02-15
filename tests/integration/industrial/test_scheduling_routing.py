@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import random
 
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.appointment import AppointmentScheduler
 from happysimulator.components.industrial.conditional_router import ConditionalRouter
 from happysimulator.components.industrial.gate_controller import GateController
-from happysimulator.components.common import Sink
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -26,7 +26,8 @@ class TestAppointmentSchedulingWithNoShows:
         sink = Sink("clinic")
         appointments = [float(i) for i in range(1, 31)]
         scheduler = AppointmentScheduler(
-            "appointments", target=sink,
+            "appointments",
+            target=sink,
             appointments=appointments,
             no_show_rate=0.2,
         )
@@ -59,7 +60,8 @@ class TestConditionalRoutingByContextField:
         default_sink = Sink("default")
 
         router = ConditionalRouter.by_context_field(
-            "router", "tier",
+            "router",
+            "tier",
             {
                 "express": sink_express,
                 "standard": sink_standard,
@@ -74,15 +76,25 @@ class TestConditionalRoutingByContextField:
             entities=[router, sink_express, sink_standard, sink_economy, default_sink],
         )
 
-        tiers = ["express", "standard", "economy", "standard", "express",
-                 "economy", "economy", "unknown"]
+        tiers = [
+            "express",
+            "standard",
+            "economy",
+            "standard",
+            "express",
+            "economy",
+            "economy",
+            "unknown",
+        ]
         for i, tier in enumerate(tiers):
-            sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.1),
-                event_type="Order",
-                target=router,
-                context={"tier": tier},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.1),
+                    event_type="Order",
+                    target=router,
+                    context={"tier": tier},
+                )
+            )
         sim.run()
 
         assert sink_express.events_received == 2
@@ -98,7 +110,8 @@ class TestGateControllerWithSchedule:
     def test_items_queued_when_closed_flushed_when_opened(self):
         sink = Sink("output")
         gate = GateController(
-            "gate", downstream=sink,
+            "gate",
+            downstream=sink,
             schedule=[(2.0, 4.0), (6.0, 8.0)],
             initially_open=False,
         )
@@ -130,14 +143,16 @@ class TestCombinedRoutingAndGate:
     def test_end_to_end_flow(self):
         sink = Sink("completed")
         gate = GateController(
-            "gate", downstream=sink,
+            "gate",
+            downstream=sink,
             schedule=[(0.0, 20.0)],  # Open the whole time
             initially_open=False,
         )
 
         urgent_sink = Sink("urgent")
         router = ConditionalRouter.by_context_field(
-            "router", "priority",
+            "router",
+            "priority",
             {
                 "urgent": urgent_sink,
                 "normal": gate,
@@ -155,12 +170,14 @@ class TestCombinedRoutingAndGate:
         # Send 10 events — half urgent, half normal
         for i in range(10):
             priority = "urgent" if i % 2 == 0 else "normal"
-            sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.5 + 0.5),
-                event_type="Visit",
-                target=router,
-                context={"priority": priority},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.5 + 0.5),
+                    event_type="Visit",
+                    target=router,
+                    context={"priority": priority},
+                )
+            )
         sim.run()
 
         # Urgent goes direct to urgent_sink, normal goes through gate to sink

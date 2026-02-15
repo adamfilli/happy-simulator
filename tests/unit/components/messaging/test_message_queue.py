@@ -3,9 +3,8 @@
 import pytest
 
 from happysimulator.components.messaging import (
-    MessageQueue,
-    MessageState,
     DeadLetterQueue,
+    MessageQueue,
 )
 from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity

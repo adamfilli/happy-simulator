@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.components.storage.sstable import SSTable
+from happysimulator.core.entity import Entity
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -177,13 +181,14 @@ class Memtable(Entity):
         self._data.clear()
         logger.debug(
             "[%s] Flushed %d entries to SSTable(seq=%d)",
-            self.name, sstable.key_count, sstable.sequence,
+            self.name,
+            sstable.key_count,
+            sstable.sequence,
         )
         return sstable
 
     def handle_event(self, event: Event) -> None:
         """Memtable does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

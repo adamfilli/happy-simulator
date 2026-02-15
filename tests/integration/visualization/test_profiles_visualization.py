@@ -15,23 +15,26 @@ Output:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.common import Sink
-from happysimulator.load.profile import Profile
-from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
 
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     rate: float
 
-    def get_rate(self, time: Instant) -> float:  # noqa: ARG002
+    def get_rate(self, time: Instant) -> float:
         return float(self.rate)
 
 
@@ -87,14 +90,16 @@ def _linspace(start: float, stop: float, n: int) -> list[float]:
 def _write_csv(path: Path, header: Iterable[str], rows: Iterable[Iterable[object]]) -> None:
     import csv
 
-    with open(path, "w", newline="") as f:
+    with path.open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(list(header))
         for row in rows:
             writer.writerow(list(row))
 
 
-def _bin_counts(times_s: list[float], duration_s: float, bin_s: float) -> tuple[list[float], list[float]]:
+def _bin_counts(
+    times_s: list[float], duration_s: float, bin_s: float
+) -> tuple[list[float], list[float]]:
     """Returns (bin_centers, events_per_second)."""
     if duration_s <= 0 or bin_s <= 0:
         return [], []
@@ -123,7 +128,9 @@ def _bin_counts(times_s: list[float], duration_s: float, bin_s: float) -> tuple[
         ("sinusoid", SinusoidProfile(base=2.0, amplitude=1.0, period_s=20.0, min_rate=0.2)),
     ],
 )
-def test_profile_generates_expected_shape(profile_name: str, profile: Profile, test_output_dir: Path):
+def test_profile_generates_expected_shape(
+    profile_name: str, profile: Profile, test_output_dir: Path
+):
     """Generate event time series and plots for a given profile."""
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
@@ -134,11 +141,16 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
 
     counter = Sink("counter")
     source = Source.with_profile(
-        profile=profile, target=counter, event_type="Ping",
-        poisson=False, name=f"PingSource_{profile_name}",
+        profile=profile,
+        target=counter,
+        event_type="Ping",
+        poisson=False,
+        name=f"PingSource_{profile_name}",
     )
 
-    sim = Simulation(start_time=Instant.Epoch, end_time=end_time, sources=[source], entities=[counter])
+    sim = Simulation(
+        start_time=Instant.Epoch, end_time=end_time, sources=[source], entities=[counter]
+    )
     sim.run()
 
     times_s = [t.to_seconds() for t in counter.completion_times]
@@ -152,10 +164,7 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
     _write_csv(
         test_output_dir / "events.csv",
         header=["index", "time_s", "dt_s"],
-        rows=(
-            (i, t, (t - times_s[i - 1]) if i > 0 else t)
-            for i, t in enumerate(times_s)
-        ),
+        rows=((i, t, (t - times_s[i - 1]) if i > 0 else t) for i, t in enumerate(times_s)),
     )
 
     # --- Save expected profile samples
@@ -178,7 +187,7 @@ def test_profile_generates_expected_shape(profile_name: str, profile: Profile, t
 
     if times_s:
         # Step plot of cumulative count; include t=0 with count=0
-        ax_count.step([0.0] + times_s, [0] + list(range(1, len(times_s) + 1)), where="post")
+        ax_count.step([0.0, *times_s], [0, *list(range(1, len(times_s) + 1))], where="post")
     ax_count.set_xlabel("time (s)")
     ax_count.set_ylabel("cumulative events")
     ax_count.grid(True)

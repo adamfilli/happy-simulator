@@ -52,7 +52,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -84,6 +84,9 @@ from happysimulator.components.datastore import (
     SLRUEviction,
     TwoQueueEviction,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # Available cache eviction policies
 EVICTION_POLICIES: dict[str, type[CacheEvictionPolicy]] = {
@@ -272,9 +275,7 @@ class CachedServer(QueuedResource):
         if self.downstream is None:
             return []
 
-        return [
-            self.forward(event, self.downstream, event_type="Response")
-        ]
+        return [self.forward(event, self.downstream, event_type="Response")]
 
 
 class LatencyTrackingSink(Entity):
@@ -477,7 +478,7 @@ def bucket_latencies(
     """Bucket latencies by time and compute statistics."""
     buckets: dict[int, list[float]] = defaultdict(list)
     for t_s, latency_s in zip(times_s, latencies_s, strict=False):
-        bucket = int(math.floor(t_s / bucket_size_s))
+        bucket = math.floor(t_s / bucket_size_s)
         buckets[bucket].append(latency_s)
 
     result: dict[str, list[float]] = {
@@ -669,7 +670,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         _plot_all_charts(list(axes[1]), result, reset_time, xlim=zoom_xlim)
         # Add row labels
         axes[0, 0].set_ylabel("Full Timeline\n\nRate", fontsize=10)
-        axes[1, 0].set_ylabel(f"Zoomed (t={reset_time-5:.0f}s-{reset_time+5:.0f}s)\n\nRate", fontsize=10)
+        axes[1, 0].set_ylabel(
+            f"Zoomed (t={reset_time - 5:.0f}s-{reset_time + 5:.0f}s)\n\nRate", fontsize=10
+        )
     else:
         # No reset time - just duplicate full timeline
         _plot_all_charts(list(axes[1]), result, reset_time, xlim=full_xlim)
@@ -699,17 +702,24 @@ def print_summary(result: SimulationResult) -> None:
     config = result.config
     times_s, latencies_s = result.sink.latency_time_series_seconds()
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Arrival rate: {config.arrival_rate} req/s")
     print(f"  Customers: {config.num_customers}")
-    print(f"  Distribution: {config.distribution_type}" + (f" (s={config.zipf_s})" if config.distribution_type == "zipf" else ""))
+    print(
+        f"  Distribution: {config.distribution_type}"
+        + (f" (s={config.zipf_s})" if config.distribution_type == "zipf" else "")
+    )
     print(f"  Cache: {config.cache_capacity} entries ({config.cache_policy.upper()})")
     print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
     print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")
-    print(f"  Cache reset time: {config.cold_start_time_s}s" if config.cold_start_time_s else "  Cache reset: None")
+    print(
+        f"  Cache reset time: {config.cold_start_time_s}s"
+        if config.cold_start_time_s
+        else "  Cache reset: None"
+    )
     print(f"  Duration: {config.duration_s}s")
 
-    print(f"\nResults:")
+    print("\nResults:")
     print(f"  Requests completed: {result.sink.events_received}")
     print(f"  Final hit rate: {result.server.hit_rate:.1%}")
     print(f"  Final cache size: {result.server.cache_size}")
@@ -719,14 +729,14 @@ def print_summary(result: SimulationResult) -> None:
     reset_time = config.cold_start_time_s
 
     def avg_in_range(times: list[float], values: list[float], start: float, end: float) -> float:
-        vals = [v for t, v in zip(times, values) if start <= t < end]
+        vals = [v for t, v in zip(times, values, strict=False) if start <= t < end]
         return sum(vals) / len(vals) if vals else 0.0
 
     hr_times = [t for (t, _) in result.hit_rate_data.values]
     hr_values = [v for (_, v) in result.hit_rate_data.values]
 
     if reset_time is not None:
-        print(f"\nHit Rate Analysis:")
+        print("\nHit Rate Analysis:")
         # Early warmup (first 10 seconds)
         early_hr = avg_in_range(hr_times, hr_values, 0, 10)
         # Late warmup / steady state (before reset)
@@ -744,21 +754,35 @@ def print_summary(result: SimulationResult) -> None:
     # Latency analysis
     if latencies_s:
         sorted_latencies = sorted(latencies_s)
-        print(f"\nLatency (overall):")
+        print("\nLatency (overall):")
         print(f"  Average: {sum(latencies_s) / len(latencies_s) * 1000:.2f}ms")
         print(f"  p50:     {percentile_sorted(sorted_latencies, 0.50) * 1000:.2f}ms")
         print(f"  p99:     {percentile_sorted(sorted_latencies, 0.99) * 1000:.2f}ms")
         print(f"  Max:     {max(latencies_s) * 1000:.2f}ms")
 
         if reset_time is not None:
-            steady_lats = sorted([lat for t, lat in zip(times_s, latencies_s) if reset_time - 30 <= t < reset_time])
-            post_lats = sorted([lat for t, lat in zip(times_s, latencies_s) if reset_time <= t < reset_time + 30])
+            steady_lats = sorted(
+                [
+                    lat
+                    for t, lat in zip(times_s, latencies_s, strict=False)
+                    if reset_time - 30 <= t < reset_time
+                ]
+            )
+            post_lats = sorted(
+                [
+                    lat
+                    for t, lat in zip(times_s, latencies_s, strict=False)
+                    if reset_time <= t < reset_time + 30
+                ]
+            )
 
             if steady_lats and post_lats:
-                print(f"\nLatency comparison:")
+                print("\nLatency comparison:")
                 print(f"  Steady state avg: {sum(steady_lats) / len(steady_lats) * 1000:.2f}ms")
                 print(f"  Post-reset avg:   {sum(post_lats) / len(post_lats) * 1000:.2f}ms")
-                print(f"  Increase:         {(sum(post_lats) / len(post_lats)) / (sum(steady_lats) / len(steady_lats)):.1f}x")
+                print(
+                    f"  Increase:         {(sum(post_lats) / len(post_lats)) / (sum(steady_lats) / len(steady_lats)):.1f}x"
+                )
 
     print("\n" + "=" * 70)
 
@@ -784,14 +808,20 @@ if __name__ == "__main__":
         help="Cache eviction policy",
     )
     parser.add_argument(
-        "--distribution", choices=["zipf", "uniform"], default="zipf", help="Customer ID distribution"
+        "--distribution",
+        choices=["zipf", "uniform"],
+        default="zipf",
+        help="Customer ID distribution",
     )
     parser.add_argument("--zipf-s", type=float, default=1.5, help="Zipf exponent (if using zipf)")
     parser.add_argument(
         "--db-network-latency", type=float, default=0.010, help="DB network RTT in seconds"
     )
     parser.add_argument(
-        "--datastore-latency", type=float, default=0.001, help="Datastore processing latency in seconds"
+        "--datastore-latency",
+        type=float,
+        default=0.001,
+        help="Datastore processing latency in seconds",
     )
     parser.add_argument(
         "--reset-time", type=float, default=90.0, help="When to reset cache (use -1 for no reset)"
@@ -826,7 +856,11 @@ if __name__ == "__main__":
     print(f"  Distribution: {config.distribution_type}")
     print(f"  DB network latency: {config.db_network_latency_s * 1000:.1f}ms")
     print(f"  Datastore latency: {config.datastore_read_latency_s * 1000:.1f}ms")
-    print(f"  Reset time: {config.cold_start_time_s}s" if config.cold_start_time_s else "  Reset: disabled")
+    print(
+        f"  Reset time: {config.cold_start_time_s}s"
+        if config.cold_start_time_s
+        else "  Reset: disabled"
+    )
     print(f"  Duration: {config.duration_s}s")
     print(f"  Seed: {seed if seed is not None else 'random'}")
 

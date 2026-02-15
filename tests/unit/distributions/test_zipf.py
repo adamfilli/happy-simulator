@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from happysimulator.distributions import ZipfDistribution, UniformDistribution
+from happysimulator.distributions import UniformDistribution, ZipfDistribution
 
 
 class TestZipfDistributionCreation:
@@ -137,8 +137,9 @@ class TestZipfDistributionCharacteristics:
         mild_top10 = sum(1 for s in mild_samples if s < 10) / 10000
         extreme_top10 = sum(1 for s in extreme_samples if s < 10) / 10000
 
-        assert extreme_top10 > mild_top10, \
+        assert extreme_top10 > mild_top10, (
             f"s=2.0 top10% ({extreme_top10:.2f}) should be > s=0.5 top10% ({mild_top10:.2f})"
+        )
 
     def test_top_n_probability_increases_with_n(self):
         """top_n_probability should increase with n."""

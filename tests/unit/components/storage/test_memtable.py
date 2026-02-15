@@ -1,7 +1,5 @@
 """Unit tests for Memtable."""
 
-import pytest
-
 from happysimulator.components.storage.memtable import Memtable, MemtableStats
 from happysimulator.components.storage.sstable import SSTable
 from happysimulator.core.simulation import Simulation
@@ -19,22 +17,22 @@ class TestMemtable:
         return mem, sim
 
     def test_put_sync_and_get_sync(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("key1", "value1")
         assert mem.get_sync("key1") == "value1"
 
     def test_get_sync_missing(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         assert mem.get_sync("missing") is None
 
     def test_put_sync_returns_is_full(self):
-        mem, sim = self._make_memtable(size_threshold=3)
+        mem, _sim = self._make_memtable(size_threshold=3)
         assert not mem.put_sync("a", 1)
         assert not mem.put_sync("b", 2)
         assert mem.put_sync("c", 3)  # Now full
 
     def test_is_full(self):
-        mem, sim = self._make_memtable(size_threshold=2)
+        mem, _sim = self._make_memtable(size_threshold=2)
         assert not mem.is_full
         mem.put_sync("a", 1)
         assert not mem.is_full
@@ -42,7 +40,7 @@ class TestMemtable:
         assert mem.is_full
 
     def test_size(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         assert mem.size == 0
         mem.put_sync("a", 1)
         assert mem.size == 1
@@ -50,20 +48,20 @@ class TestMemtable:
         assert mem.size == 2
 
     def test_contains(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("a", 1)
         assert mem.contains("a")
         assert not mem.contains("b")
 
     def test_overwrite_key(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("a", 1)
         mem.put_sync("a", 2)
         assert mem.get_sync("a") == 2
         assert mem.size == 1  # Still one entry
 
     def test_flush_produces_sstable(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("c", 3)
         mem.put_sync("a", 1)
         mem.put_sync("b", 2)
@@ -77,14 +75,14 @@ class TestMemtable:
         assert sst.level == 0
 
     def test_flush_clears_memtable(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("a", 1)
         mem.flush()
         assert mem.size == 0
         assert mem.get_sync("a") is None
 
     def test_multiple_flushes_increment_sequence(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("a", 1)
         sst1 = mem.flush()
         mem.put_sync("b", 2)
@@ -93,12 +91,12 @@ class TestMemtable:
         assert sst2.sequence == 1
 
     def test_flush_empty_memtable(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         sst = mem.flush()
         assert sst.key_count == 0
 
     def test_stats(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         mem.put_sync("a", 1)
         mem.get_sync("a")
         mem.get_sync("missing")
@@ -114,13 +112,14 @@ class TestMemtable:
         assert stats.current_size == 0
 
     def test_repr(self):
-        mem, sim = self._make_memtable(size_threshold=100)
+        mem, _sim = self._make_memtable(size_threshold=100)
         assert "test_mem" in repr(mem)
         assert "100" in repr(mem)
 
     def test_handle_event_is_noop(self):
-        mem, sim = self._make_memtable()
+        mem, _sim = self._make_memtable()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",

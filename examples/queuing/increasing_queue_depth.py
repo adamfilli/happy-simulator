@@ -69,7 +69,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -86,6 +86,8 @@ from happysimulator import (
     Source,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Queued Server with Exponential Service Time
@@ -211,6 +213,7 @@ class RequestProvider(EventProvider):
 @dataclass
 class SimulationResult:
     """Results from the simulation."""
+
     sink: LatencyTrackingSink
     server: QueuedServer
     queue_depth_data: Data
@@ -298,7 +301,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # start + fraction * (end - start) = capacity
     # fraction = (capacity - start) / (end - start)
     if result.profile.end_rate > result.profile.start_rate:
-        crossover_fraction = (server_capacity - profile.start_rate) / (profile.end_rate - profile.start_rate)
+        crossover_fraction = (server_capacity - profile.start_rate) / (
+            profile.end_rate - profile.start_rate
+        )
         crossover_time = crossover_fraction * profile.duration_s
     else:
         crossover_time = None
@@ -307,21 +312,37 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # 1. Load profile with capacity line
     ax = axes[0, 0]
-    time_points = list(range(0, int(profile.duration_s) + 10))
+    time_points = list(range(int(profile.duration_s) + 10))
     rates = [profile.get_rate(Instant.from_seconds(t)) for t in time_points]
-    ax.plot(time_points, rates, 'b-', linewidth=2, label='Arrival Rate (λ)')
-    ax.axhline(y=server_capacity, color='r', linestyle='--', linewidth=2,
-               label=f'Server Capacity (μ = {server_capacity:.0f} req/s)')
+    ax.plot(time_points, rates, "b-", linewidth=2, label="Arrival Rate (λ)")
+    ax.axhline(
+        y=server_capacity,
+        color="r",
+        linestyle="--",
+        linewidth=2,
+        label=f"Server Capacity (μ = {server_capacity:.0f} req/s)",
+    )
     if crossover_time:
-        ax.axvline(x=crossover_time, color='orange', linestyle=':', linewidth=2,
-                   label=f'λ = μ at t={crossover_time:.0f}s')
-        ax.fill_between(time_points, rates, server_capacity,
-                        where=[r > server_capacity for r in rates],
-                        alpha=0.3, color='red', label='Overload (λ > μ)')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Rate (req/s)')
-    ax.set_title('Load Profile: Linear Ramp')
-    ax.legend(loc='upper left')
+        ax.axvline(
+            x=crossover_time,
+            color="orange",
+            linestyle=":",
+            linewidth=2,
+            label=f"λ = μ at t={crossover_time:.0f}s",
+        )
+        ax.fill_between(
+            time_points,
+            rates,
+            server_capacity,
+            where=[r > server_capacity for r in rates],
+            alpha=0.3,
+            color="red",
+            label="Overload (λ > μ)",
+        )
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Rate (req/s)")
+    ax.set_title("Load Profile: Linear Ramp")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, max(rates) * 1.1)
 
@@ -329,16 +350,26 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[0, 1]
     q_times = [t for (t, _) in result.queue_depth_data.values]
     q_depths = [v for (_, v) in result.queue_depth_data.values]
-    ax.plot(q_times, q_depths, 'b-', linewidth=1)
+    ax.plot(q_times, q_depths, "b-", linewidth=1)
     if crossover_time:
-        ax.axvline(x=crossover_time, color='orange', linestyle=':', linewidth=2,
-                   label=f'λ = μ at t={crossover_time:.0f}s')
-    ax.axvline(x=profile.duration_s, color='green', linestyle=':', linewidth=2,
-               label=f'Load stops at t={profile.duration_s:.0f}s')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Queue Depth')
-    ax.set_title('Queue Depth Over Time')
-    ax.legend(loc='upper left')
+        ax.axvline(
+            x=crossover_time,
+            color="orange",
+            linestyle=":",
+            linewidth=2,
+            label=f"λ = μ at t={crossover_time:.0f}s",
+        )
+    ax.axvline(
+        x=profile.duration_s,
+        color="green",
+        linestyle=":",
+        linewidth=2,
+        label=f"Load stops at t={profile.duration_s:.0f}s",
+    )
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Queue Depth")
+    ax.set_title("Queue Depth Over Time")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     # 3. End-to-end latency over time (binned)
@@ -346,24 +377,29 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     times_s, latencies_s = result.sink.latency_time_series_seconds()
 
     latency_buckets: dict[int, list[float]] = defaultdict(list)
-    for t, lat in zip(times_s, latencies_s):
+    for t, lat in zip(times_s, latencies_s, strict=False):
         bucket = int(t)
         latency_buckets[bucket].append(lat)
 
     bucket_times = sorted(latency_buckets.keys())
-    bucket_avg_latencies = [sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000
-                           for b in bucket_times]
+    bucket_avg_latencies = [
+        sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000 for b in bucket_times
+    ]
 
-    ax.plot(bucket_times, bucket_avg_latencies, 'b-', linewidth=1.5, marker='o', markersize=3)
-    ax.axhline(y=result.server.mean_service_time_s * 1000, color='g', linestyle='--',
-               label=f'Service time ({result.server.mean_service_time_s * 1000:.0f}ms)')
+    ax.plot(bucket_times, bucket_avg_latencies, "b-", linewidth=1.5, marker="o", markersize=3)
+    ax.axhline(
+        y=result.server.mean_service_time_s * 1000,
+        color="g",
+        linestyle="--",
+        label=f"Service time ({result.server.mean_service_time_s * 1000:.0f}ms)",
+    )
     if crossover_time:
-        ax.axvline(x=crossover_time, color='orange', linestyle=':', linewidth=2)
-    ax.axvline(x=profile.duration_s, color='green', linestyle=':', linewidth=2)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Avg Latency (ms)')
-    ax.set_title('End-to-End Latency Over Time (1s avg)')
-    ax.legend(loc='upper left')
+        ax.axvline(x=crossover_time, color="orange", linestyle=":", linewidth=2)
+    ax.axvline(x=profile.duration_s, color="green", linestyle=":", linewidth=2)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Avg Latency (ms)")
+    ax.set_title("End-to-End Latency Over Time (1s avg)")
+    ax.legend(loc="upper left")
     ax.grid(True, alpha=0.3)
 
     # 4. Throughput over time
@@ -376,17 +412,20 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     throughput_times = sorted(completion_buckets.keys())
     throughput_values = [completion_buckets[t] for t in throughput_times]
 
-    ax.plot(throughput_times, throughput_values, 'g-', linewidth=1.5, marker='o', markersize=3)
-    ax.axhline(y=server_capacity, color='r', linestyle='--',
-               label=f'Server Capacity ({server_capacity:.0f} req/s)')
+    ax.plot(throughput_times, throughput_values, "g-", linewidth=1.5, marker="o", markersize=3)
+    ax.axhline(
+        y=server_capacity,
+        color="r",
+        linestyle="--",
+        label=f"Server Capacity ({server_capacity:.0f} req/s)",
+    )
     if crossover_time:
-        ax.axvline(x=crossover_time, color='orange', linestyle=':', linewidth=2)
-    ax.axvline(x=profile.duration_s, color='green', linestyle=':', linewidth=2,
-               label='Load stops')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Completions / second')
-    ax.set_title('Throughput Over Time')
-    ax.legend(loc='upper right')
+        ax.axvline(x=crossover_time, color="orange", linestyle=":", linewidth=2)
+    ax.axvline(x=profile.duration_s, color="green", linestyle=":", linewidth=2, label="Load stops")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Completions / second")
+    ax.set_title("Throughput Over Time")
+    ax.legend(loc="upper right")
     ax.grid(True, alpha=0.3)
 
     fig.tight_layout()
@@ -404,18 +443,24 @@ def print_summary(result: SimulationResult) -> None:
     print("INCREASING QUEUE DEPTH SIMULATION RESULTS")
     print("=" * 70)
 
-    print(f"\nConfiguration:")
-    print(f"  Server capacity: {server_capacity:.0f} req/s (mean service time = {result.server.mean_service_time_s * 1000:.0f}ms)")
-    print(f"  Load ramp: {profile.start_rate} → {profile.end_rate} req/s over {profile.duration_s}s")
+    print("\nConfiguration:")
+    print(
+        f"  Server capacity: {server_capacity:.0f} req/s (mean service time = {result.server.mean_service_time_s * 1000:.0f}ms)"
+    )
+    print(
+        f"  Load ramp: {profile.start_rate} → {profile.end_rate} req/s over {profile.duration_s}s"
+    )
 
     # Calculate crossover time
     crossover_time = 0.0
     if profile.end_rate > profile.start_rate:
-        crossover_fraction = (server_capacity - profile.start_rate) / (profile.end_rate - profile.start_rate)
+        crossover_fraction = (server_capacity - profile.start_rate) / (
+            profile.end_rate - profile.start_rate
+        )
         crossover_time = crossover_fraction * profile.duration_s
         print(f"  Crossover (λ = μ) at: t = {crossover_time:.1f}s")
 
-    print(f"\nRequests:")
+    print("\nRequests:")
     print(f"  Generated: {result.requests_generated}")
     print(f"  Completed: {result.sink.events_received}")
     print(f"  Server processed: {result.server.stats_processed}")
@@ -427,32 +472,42 @@ def print_summary(result: SimulationResult) -> None:
     max_depth = max(q_depths) if q_depths else 0
     max_depth_time = q_times[q_depths.index(max_depth)] if q_depths else 0
 
-    print(f"\nQueue Depth:")
+    print("\nQueue Depth:")
     print(f"  Maximum: {max_depth:.0f} at t = {max_depth_time:.1f}s")
 
     # Analyze by phase
     def avg_depth_in_range(start: float, end: float) -> float:
-        depths = [d for t, d in zip(q_times, q_depths) if start <= t < end]
+        depths = [d for t, d in zip(q_times, q_depths, strict=False) if start <= t < end]
         return sum(depths) / len(depths) if depths else 0.0
 
-    print(f"\n  By phase:")
-    print(f"    Before crossover (0-{crossover_time:.0f}s): avg = {avg_depth_in_range(0, crossover_time):.1f}")
-    print(f"    After crossover ({crossover_time:.0f}-{profile.duration_s:.0f}s): avg = {avg_depth_in_range(crossover_time, profile.duration_s):.1f}")
-    print(f"    During drain ({profile.duration_s:.0f}-{profile.duration_s + 30:.0f}s): avg = {avg_depth_in_range(profile.duration_s, profile.duration_s + 30):.1f}")
+    print("\n  By phase:")
+    print(
+        f"    Before crossover (0-{crossover_time:.0f}s): avg = {avg_depth_in_range(0, crossover_time):.1f}"
+    )
+    print(
+        f"    After crossover ({crossover_time:.0f}-{profile.duration_s:.0f}s): avg = {avg_depth_in_range(crossover_time, profile.duration_s):.1f}"
+    )
+    print(
+        f"    During drain ({profile.duration_s:.0f}-{profile.duration_s + 30:.0f}s): avg = {avg_depth_in_range(profile.duration_s, profile.duration_s + 30):.1f}"
+    )
 
     # Latency analysis
     times_s, latencies_s = result.sink.latency_time_series_seconds()
 
     def avg_latency_in_range(start: float, end: float) -> float:
-        lats = [lat for t, lat in zip(times_s, latencies_s) if start <= t < end]
+        lats = [lat for t, lat in zip(times_s, latencies_s, strict=False) if start <= t < end]
         return sum(lats) / len(lats) if lats else 0.0
 
-    print(f"\nLatency:")
+    print("\nLatency:")
     print(f"  Overall average: {sum(latencies_s) / len(latencies_s) * 1000:.1f}ms")
-    print(f"\n  By phase:")
+    print("\n  By phase:")
     print(f"    Before crossover: avg = {avg_latency_in_range(0, crossover_time) * 1000:.1f}ms")
-    print(f"    After crossover: avg = {avg_latency_in_range(crossover_time, profile.duration_s) * 1000:.1f}ms")
-    print(f"    During drain: avg = {avg_latency_in_range(profile.duration_s, profile.duration_s + 30) * 1000:.1f}ms")
+    print(
+        f"    After crossover: avg = {avg_latency_in_range(crossover_time, profile.duration_s) * 1000:.1f}ms"
+    )
+    print(
+        f"    During drain: avg = {avg_latency_in_range(profile.duration_s, profile.duration_s + 30) * 1000:.1f}ms"
+    )
 
     print("\n" + "=" * 70)
     print("KEY INSIGHT:")
@@ -480,11 +535,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Queue depth buildup simulation")
     parser.add_argument("--duration", type=float, default=90.0, help="Ramp duration (s)")
     parser.add_argument("--drain", type=float, default=30.0, help="Drain time after load stops (s)")
-    parser.add_argument("--start-rate", type=float, default=2.0, help="Starting arrival rate (req/s)")
+    parser.add_argument(
+        "--start-rate", type=float, default=2.0, help="Starting arrival rate (req/s)"
+    )
     parser.add_argument("--end-rate", type=float, default=20.0, help="Ending arrival rate (req/s)")
     parser.add_argument("--service-time", type=float, default=0.1, help="Mean service time (s)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/increasing_queue_depth", help="Output dir")
+    parser.add_argument(
+        "--output", type=str, default="output/increasing_queue_depth", help="Output dir"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()
 

@@ -36,7 +36,7 @@ import random
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -52,6 +52,8 @@ from happysimulator import (
 )
 from happysimulator.faults import InjectLatency, InjectPacketLoss
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -110,10 +112,14 @@ class NetworkClient(Entity):
         rid = self._next_id
         self._pending[rid] = self.now
         self.sent_times.append(self.now.to_seconds())
-        return [self.network.send(
-            self, self.server, "Request",
-            payload={"request_id": rid},
-        )]
+        return [
+            self.network.send(
+                self,
+                self.server,
+                "Request",
+                payload={"request_id": rid},
+            )
+        ]
 
     def _record_response(self, event: Event) -> list[Event]:
         rid = event.context.get("metadata", {}).get("request_id")
@@ -127,7 +133,8 @@ class NetworkClient(Entity):
     # -- Derived series for plotting --
 
     def throughput_series(
-        self, bucket_s: float = 1.0,
+        self,
+        bucket_s: float = 1.0,
     ) -> tuple[list[float], list[int], list[int]]:
         """(times, sent_per_s, received_per_s) bucketed time series."""
         sent: dict[int, int] = defaultdict(int)
@@ -151,7 +158,8 @@ class NetworkClient(Entity):
         )
 
     def success_rate_series(
-        self, bucket_s: float = 1.0,
+        self,
+        bucket_s: float = 1.0,
     ) -> tuple[list[float], list[float]]:
         """(times, pct_success) — responses received / requests sent per bucket."""
         sent: dict[int, int] = defaultdict(int)
@@ -171,7 +179,11 @@ class NetworkServer(Entity):
     """Server that processes requests and sends responses through the network."""
 
     def __init__(
-        self, name: str, *, network: Network, mean_service_time_s: float = 0.005,
+        self,
+        name: str,
+        *,
+        network: Network,
+        mean_service_time_s: float = 0.005,
     ):
         super().__init__(name)
         self.network = network
@@ -182,10 +194,14 @@ class NetworkServer(Entity):
     def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
         self.processed += 1
         yield random.expovariate(1.0 / self.mean_service_time_s)
-        return [self.network.send(
-            self, self.client, "Response",
-            payload={"request_id": event.context.get("metadata", {}).get("request_id")},
-        )]
+        return [
+            self.network.send(
+                self,
+                self.client,
+                "Response",
+                payload={"request_id": event.context.get("metadata", {}).get("request_id")},
+            )
+        ]
 
 
 # =============================================================================
@@ -225,7 +241,9 @@ def run_simulation(
     network = Network(name="net")
     client = NetworkClient("Client", network=network)
     server = NetworkServer(
-        "Server", network=network, mean_service_time_s=mean_service_time_s,
+        "Server",
+        network=network,
+        mean_service_time_s=mean_service_time_s,
     )
     client.server = server
     server.client = client
@@ -297,7 +315,7 @@ def print_summary(result: SimulationResult) -> None:
     total_lost = total_sent - total_recv
     overall_loss = total_lost / total_sent * 100 if total_sent else 0
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Requests sent:      {total_sent}")
     print(f"  Responses received: {total_recv}")
     print(f"  Requests lost:      {total_lost} ({overall_loss:.1f}%)")
@@ -308,13 +326,15 @@ def print_summary(result: SimulationResult) -> None:
         avg = sum(all_lats) / len(all_lats)
         p50 = all_lats[len(all_lats) // 2]
         p99 = all_lats[int(len(all_lats) * 0.99)]
-        print(f"\nOverall Latency:")
+        print("\nOverall Latency:")
         print(f"  Average: {avg * 1000:.1f}ms")
         print(f"  p50:     {p50 * 1000:.1f}ms")
         print(f"  p99:     {p99 * 1000:.1f}ms")
 
-    print(f"\nPer-Phase Breakdown:")
-    header = f"  {'Phase':<22s} {'Sent':>6s} {'Recv':>6s} {'Loss%':>7s} {'Avg(ms)':>9s} {'p99(ms)':>9s}"
+    print("\nPer-Phase Breakdown:")
+    header = (
+        f"  {'Phase':<22s} {'Sent':>6s} {'Recv':>6s} {'Loss%':>7s} {'Avg(ms)':>9s} {'p99(ms)':>9s}"
+    )
     print(header)
     print(f"  {'-' * 60}")
 
@@ -322,9 +342,7 @@ def print_summary(result: SimulationResult) -> None:
         sent = sum(1 for t in client.sent_times if start <= t < end)
         recv = sum(1 for t in client.received_times if start <= t < end)
         loss = (1 - recv / sent) * 100 if sent else 0
-        phase_lats = sorted(
-            lat * 1000 for t, lat in client.latencies if start <= t < end
-        )
+        phase_lats = sorted(lat * 1000 for t, lat in client.latencies if start <= t < end)
         avg_ms = sum(phase_lats) / len(phase_lats) if phase_lats else 0
         p99_ms = phase_lats[int(len(phase_lats) * 0.99)] if len(phase_lats) > 1 else avg_ms
         print(f"  {label:<22s} {sent:>6d} {recv:>6d} {loss:>6.1f}% {avg_ms:>8.1f} {p99_ms:>8.1f}")
@@ -340,7 +358,7 @@ def print_summary(result: SimulationResult) -> None:
 
 def _shade_phases(ax) -> None:
     """Add semi-transparent phase shading to an axes."""
-    for (start, end, _label), color in zip(PHASES, PHASE_COLORS):
+    for (start, end, _label), color in zip(PHASES, PHASE_COLORS, strict=False):
         ax.axvspan(start, end, alpha=0.3, color=color)
 
 
@@ -360,7 +378,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     if lat_times:
         ax.scatter(lat_times, lat_ms, s=2, alpha=0.2, color="steelblue", rasterized=True)
         buckets: dict[int, list[float]] = defaultdict(list)
-        for t, l in zip(lat_times, lat_ms):
+        for t, l in zip(lat_times, lat_ms, strict=False):
             buckets[int(t)].append(l)
         avg_t = sorted(buckets)
         avg_l = [sum(buckets[k]) / len(buckets[k]) for k in avg_t]
@@ -411,7 +429,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # -- 5. Latency box plots by phase --
     ax = axes[2, 0]
     phase_lats = [[] for _ in PHASES]
-    for t, l in zip(lat_times, lat_ms):
+    for t, l in zip(lat_times, lat_ms, strict=False):
         for i, (start, end, _) in enumerate(PHASES):
             if start <= t < end:
                 phase_lats[i].append(l)
@@ -422,10 +440,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
             [pl for _, pl in valid],
             tick_labels=[PHASES[i][2] for i, _ in valid],
             patch_artist=True,
-            medianprops=dict(color="black"),
+            medianprops={"color": "black"},
             showfliers=False,
         )
-        for patch, (i, _) in zip(bp["boxes"], valid):
+        for patch, (i, _) in zip(bp["boxes"], valid, strict=False):
             patch.set_facecolor(PHASE_COLORS[i])
     ax.set_ylabel("Latency (ms)")
     ax.set_title("Latency Distribution by Phase")
@@ -447,7 +465,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         rows.append([label, str(s), str(r), f"{loss:.1f}", f"{avg:.1f}", f"{p99:.1f}"])
 
     table = ax.table(
-        cellText=rows, colLabels=headers, cellLoc="center", loc="center",
+        cellText=rows,
+        colLabels=headers,
+        cellLoc="center",
+        loc="center",
     )
     table.auto_set_font_size(False)
     table.set_fontsize(8)
@@ -459,7 +480,8 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     fig.suptitle(
         "Network Degradation Simulation \u2014 Fault Injection Impact",
-        fontsize=14, fontweight="bold",
+        fontsize=14,
+        fontweight="bold",
     )
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     path = output_dir / "degraded_network.png"
@@ -491,7 +513,7 @@ if __name__ == "__main__":
 
     print("Running degraded network simulation...")
     print(f"  Duration: {args.duration}s | Rate: {args.rate} req/s")
-    print(f"  Phases:")
+    print("  Phases:")
     for start, end, label in PHASES:
         print(f"    [{start:>3.0f}s - {end:>3.0f}s] {label}")
 

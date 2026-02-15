@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -41,11 +41,13 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.infrastructure import (
-    DNSResolver,
     DNSRecord,
+    DNSResolver,
     DNSStats,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity
@@ -86,12 +88,14 @@ class ServiceCaller(Entity):
         # Simulate backend call
         yield 0.005
 
-        return [Event(
-            time=self.now,
-            event_type="Response",
-            target=self._downstream,
-            context={**event.context, "ip": ip},
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="Response",
+                target=self._downstream,
+                context={**event.context, "ip": ip},
+            )
+        ]
 
 
 # =============================================================================
@@ -107,10 +111,7 @@ HOSTNAMES = [
     "worker.example.com",
 ]
 
-RECORDS = {
-    h: DNSRecord(h, f"10.0.0.{i+1}", ttl_s=60.0)
-    for i, h in enumerate(HOSTNAMES)
-}
+RECORDS = {h: DNSRecord(h, f"10.0.0.{i + 1}", ttl_s=60.0) for i, h in enumerate(HOSTNAMES)}
 
 
 @dataclass
@@ -130,10 +131,7 @@ class SimulationResult:
 
 
 def _make_records(ttl_s: float) -> dict[str, DNSRecord]:
-    return {
-        h: DNSRecord(h, f"10.0.0.{i+1}", ttl_s=ttl_s)
-        for i, h in enumerate(HOSTNAMES)
-    }
+    return {h: DNSRecord(h, f"10.0.0.{i + 1}", ttl_s=ttl_s) for i, h in enumerate(HOSTNAMES)}
 
 
 def _run_config(
@@ -188,17 +186,23 @@ def run_simulation(
     short_ttl = _run_config(
         "Short TTL (5s)",
         DNSResolver("DNS_Short", records=_make_records(5.0)),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     long_ttl = _run_config(
         "Long TTL (300s)",
         DNSResolver("DNS_Long", records=_make_records(300.0)),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     large_cache = _run_config(
         "Large Cache (5000)",
         DNSResolver("DNS_Large", records=_make_records(5.0), cache_capacity=5000),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
 
     return SimulationResult(
@@ -228,9 +232,17 @@ def print_summary(result: SimulationResult) -> None:
     print(f"{'Cache hits':<30} " + " ".join(f"{c.stats.cache_hits:>18,}" for c in configs))
     print(f"{'Cache misses':<30} " + " ".join(f"{c.stats.cache_misses:>18,}" for c in configs))
     print(f"{'Hit rate':<30} " + " ".join(f"{c.stats.hit_rate:>18.1%}" for c in configs))
-    print(f"{'TTL expirations':<30} " + " ".join(f"{c.stats.cache_expirations:>18,}" for c in configs))
-    print(f"{'Avg resolution (ms)':<30} " + " ".join(f"{c.stats.avg_resolution_latency_s*1000:>18.2f}" for c in configs))
-    print(f"{'Total resolution (ms)':<30} " + " ".join(f"{c.stats.total_resolution_latency_s*1000:>18.1f}" for c in configs))
+    print(
+        f"{'TTL expirations':<30} " + " ".join(f"{c.stats.cache_expirations:>18,}" for c in configs)
+    )
+    print(
+        f"{'Avg resolution (ms)':<30} "
+        + " ".join(f"{c.stats.avg_resolution_latency_s * 1000:>18.2f}" for c in configs)
+    )
+    print(
+        f"{'Total resolution (ms)':<30} "
+        + " ".join(f"{c.stats.total_resolution_latency_s * 1000:>18.1f}" for c in configs)
+    )
     print(f"{'Requests processed':<30} " + " ".join(f"{c.calls:>18,}" for c in configs))
 
     print("\n" + "=" * 72)

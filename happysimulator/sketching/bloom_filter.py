@@ -28,11 +28,12 @@ import hashlib
 import math
 import struct
 import sys
-from typing import Generic, TypeVar, Hashable
+from collections.abc import Hashable
+from typing import TypeVar
 
 from happysimulator.sketching.base import MembershipSketch
 
-T = TypeVar('T', bound=Hashable)
+T = TypeVar("T", bound=Hashable)
 
 
 def _optimal_num_hashes(size_bits: int, expected_items: int) -> int:
@@ -42,7 +43,7 @@ def _optimal_num_hashes(size_bits: int, expected_items: int) -> int:
     """
     if expected_items == 0:
         return 1
-    return max(1, int(round((size_bits / expected_items) * math.log(2))))
+    return max(1, round((size_bits / expected_items) * math.log(2)))
 
 
 def _optimal_size_bits(expected_items: int, fp_rate: float) -> int:
@@ -52,7 +53,7 @@ def _optimal_size_bits(expected_items: int, fp_rate: float) -> int:
     """
     if expected_items == 0:
         return 64
-    return int(math.ceil(-expected_items * math.log(fp_rate) / (math.log(2) ** 2)))
+    return math.ceil(-expected_items * math.log(fp_rate) / (math.log(2) ** 2))
 
 
 class BloomFilter(MembershipSketch[T]):
@@ -119,7 +120,7 @@ class BloomFilter(MembershipSketch[T]):
         n: int,
         fp_rate: float,
         seed: int | None = None,
-    ) -> "BloomFilter[T]":
+    ) -> BloomFilter[T]:
         """Create a filter sized for expected items and false positive rate.
 
         Args:
@@ -159,7 +160,7 @@ class BloomFilter(MembershipSketch[T]):
         """
         h = hashlib.sha256()
         h.update(struct.pack(">QQ", self._seed, i))
-        h.update(repr(item).encode('utf-8'))
+        h.update(repr(item).encode("utf-8"))
         digest = h.digest()
         h1 = struct.unpack(">Q", digest[:8])[0]
         h2 = struct.unpack(">Q", digest[8:16])[0]
@@ -239,14 +240,14 @@ class BloomFilter(MembershipSketch[T]):
         fill_ratio = self._bits_set / self._size_bits
 
         # False positive probability: fill_ratio^num_hashes
-        return fill_ratio ** self._num_hashes
+        return fill_ratio**self._num_hashes
 
     @property
     def fill_ratio(self) -> float:
         """Proportion of bits that are set."""
         return self._bits_set / self._size_bits
 
-    def merge(self, other: "BloomFilter[T]") -> None:
+    def merge(self, other: BloomFilter[T]) -> None:
         """Merge another Bloom Filter into this one (OR operation).
 
         After merging, this filter represents the union of both sets.
@@ -276,7 +277,7 @@ class BloomFilter(MembershipSketch[T]):
             self._bits[i] |= other._bits[i]
 
         # Recount bits (could track incrementally but this is simpler)
-        self._bits_set = sum(bin(word).count('1') for word in self._bits)
+        self._bits_set = sum(bin(word).count("1") for word in self._bits)
         self._total_count += other._total_count
 
     @property

@@ -72,7 +72,7 @@ class TestFixedWindowForwarding:
 
     def test_forwards_under_limit(self):
         """Requests under the limit are forwarded."""
-        limiter, downstream, policy = _make_limiter(requests_per_window=5)
+        limiter, _downstream, _policy = _make_limiter(requests_per_window=5)
 
         for i in range(5):
             event = Event(
@@ -88,7 +88,7 @@ class TestFixedWindowForwarding:
 
     def test_queues_over_limit(self):
         """Requests over the limit are queued (not dropped)."""
-        limiter, downstream, policy = _make_limiter(requests_per_window=3)
+        limiter, _downstream, _policy = _make_limiter(requests_per_window=3)
 
         for i in range(5):
             event = Event(
@@ -104,7 +104,7 @@ class TestFixedWindowForwarding:
 
     def test_forward_event_targets_downstream(self):
         """Forwarded events target the downstream entity."""
-        limiter, downstream, policy = _make_limiter()
+        limiter, downstream, _policy = _make_limiter()
 
         event = Event(
             time=Instant.from_seconds(0),
@@ -119,7 +119,7 @@ class TestFixedWindowForwarding:
 
     def test_forward_event_copies_context(self):
         """Forwarded events copy the original context."""
-        limiter, downstream, policy = _make_limiter()
+        limiter, _downstream, _policy = _make_limiter()
 
         event = Event(
             time=Instant.from_seconds(0),
@@ -139,7 +139,7 @@ class TestFixedWindowReset:
 
     def test_resets_on_new_window(self):
         """Counter resets when moving to a new window."""
-        limiter, downstream, policy = _make_limiter(requests_per_window=2)
+        limiter, _downstream, _policy = _make_limiter(requests_per_window=2)
 
         # Fill first window
         for i in range(2):
@@ -177,7 +177,7 @@ class TestFixedWindowStatistics:
 
     def test_tracks_all_stats(self):
         """Statistics track all request outcomes."""
-        limiter, downstream, policy = _make_limiter(requests_per_window=2)
+        limiter, _downstream, _policy = _make_limiter(requests_per_window=2)
 
         for i in range(4):
             event = Event(
@@ -194,7 +194,7 @@ class TestFixedWindowStatistics:
 
     def test_tracks_time_series(self):
         """Time series data is recorded."""
-        limiter, downstream, policy = _make_limiter(requests_per_window=2)
+        limiter, _downstream, _policy = _make_limiter(requests_per_window=2)
 
         for i in range(3):
             event = Event(

@@ -10,20 +10,22 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Callable, Generator
+from collections.abc import Callable, Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
-
-from happysimulator.components.behavior.traits import TraitSet, PersonalityTraits
-from happysimulator.components.behavior.state import AgentState, Memory
 from happysimulator.components.behavior.decision import (
     Choice,
     DecisionContext,
     DecisionModel,
 )
+from happysimulator.components.behavior.state import AgentState, Memory
 from happysimulator.components.behavior.stats import AgentStats
+from happysimulator.components.behavior.traits import PersonalityTraits, TraitSet
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -131,12 +133,14 @@ class Agent(Entity):
         events: list[Event] = []
         if self.heartbeat_interval > 0:
             next_time = self.now + self.heartbeat_interval
-            events.append(Event(
-                time=next_time,
-                event_type=f"heartbeat::{self.name}",
-                target=self,
-                daemon=True,
-            ))
+            events.append(
+                Event(
+                    time=next_time,
+                    event_type=f"heartbeat::{self.name}",
+                    target=self,
+                    daemon=True,
+                )
+            )
         return events
 
     def schedule_first_heartbeat(self, start_time: Instant) -> Event | None:
@@ -195,13 +199,15 @@ class Agent(Entity):
         # Record memory
         valence = metadata.get("valence", 0.0)
         source_name = metadata.get("source", "")
-        self.state.add_memory(Memory(
-            time=self.now.to_seconds(),
-            event_type=event.event_type,
-            source=source_name,
-            valence=valence,
-            details=dict(metadata),
-        ))
+        self.state.add_memory(
+            Memory(
+                time=self.now.to_seconds(),
+                event_type=event.event_type,
+                source=source_name,
+                valence=valence,
+                details=dict(metadata),
+            )
+        )
 
         # Update mood based on valence
         if valence != 0:
@@ -240,10 +246,12 @@ class Agent(Entity):
             if isinstance(item, Choice):
                 choices.append(item)
             elif isinstance(item, dict):
-                choices.append(Choice(
-                    action=item.get("action", "unknown"),
-                    context=item.get("context", {}),
-                ))
+                choices.append(
+                    Choice(
+                        action=item.get("action", "unknown"),
+                        context=item.get("context", {}),
+                    )
+                )
             elif isinstance(item, str):
                 choices.append(Choice(action=item))
         return choices
@@ -253,9 +261,7 @@ class Agent(Entity):
     ) -> Generator[float, None, list[Event]] | list[Event] | None:
         handler = self._action_handlers.get(choice.action)
         if handler is None:
-            logger.debug(
-                "[%s] No handler for action '%s'", self.name, choice.action
-            )
+            logger.debug("[%s] No handler for action '%s'", self.name, choice.action)
             return None
 
         if self.action_delay > 0:

@@ -28,9 +28,10 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator, Callable, Any
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -189,7 +190,7 @@ class RWLock(Entity):
         self._write_acquisitions += 1
         return True
 
-    def acquire_read(self) -> Generator[float, None, None]:
+    def acquire_read(self) -> Generator[float]:
         """Acquire a read lock, blocking if necessary.
 
         Blocks if a writer holds the lock or a writer is waiting.
@@ -226,7 +227,7 @@ class RWLock(Entity):
             wait_time = self._clock.now.nanoseconds - enqueue_time
             self._total_read_wait_ns += wait_time
 
-    def acquire_write(self) -> Generator[float, None, None]:
+    def acquire_write(self) -> Generator[float]:
         """Acquire a write lock, blocking if necessary.
 
         Blocks if any readers or another writer holds the lock.
@@ -339,4 +340,3 @@ class RWLock(Entity):
 
     def handle_event(self, event: Event) -> None:
         """RWLock doesn't directly handle events."""
-        pass

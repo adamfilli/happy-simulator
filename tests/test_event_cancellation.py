@@ -7,7 +7,7 @@ regression for normal event processing.
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Counter,
@@ -19,6 +19,9 @@ from happysimulator import (
 )
 from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.event import ProcessContinuation
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 _null = NullEntity()
 
@@ -110,7 +113,7 @@ def test_cancel_process_continuation() -> None:
     steps_executed: list[int] = []
 
     class MultiStep(Entity):
-        def handle_event(self, event: Event) -> Generator[float, None, None]:
+        def handle_event(self, event: Event) -> Generator[float]:
             steps_executed.append(1)
             yield 0.1
             steps_executed.append(2)

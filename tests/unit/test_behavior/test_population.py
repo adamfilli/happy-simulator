@@ -1,12 +1,12 @@
 """Unit tests for behavior population module."""
 
-from happysimulator.components.behavior.traits import NormalTraitDistribution
-from happysimulator.components.behavior.state import AgentState
-from happysimulator.components.behavior.decision import UtilityModel, Choice
+from happysimulator.components.behavior.decision import UtilityModel
 from happysimulator.components.behavior.population import (
     DemographicSegment,
     Population,
 )
+from happysimulator.components.behavior.state import AgentState
+from happysimulator.components.behavior.traits import NormalTraitDistribution
 
 
 class TestPopulation:
@@ -50,9 +50,13 @@ class TestPopulation:
 
     def test_from_segments_with_custom_traits(self):
         dist = NormalTraitDistribution(
-            means={"openness": 0.9, "conscientiousness": 0.5,
-                   "extraversion": 0.8, "agreeableness": 0.5,
-                   "neuroticism": 0.3},
+            means={
+                "openness": 0.9,
+                "conscientiousness": 0.5,
+                "extraversion": 0.8,
+                "agreeableness": 0.5,
+                "neuroticism": 0.3,
+            },
         )
         segments = [
             DemographicSegment(
@@ -65,9 +69,7 @@ class TestPopulation:
         pop = Population.from_segments(total_size=50, segments=segments, seed=42)
         assert pop.size == 50
         # Innovators should have high openness on average
-        avg_openness = sum(
-            a.traits.get("openness") for a in pop.agents
-        ) / len(pop.agents)
+        avg_openness = sum(a.traits.get("openness") for a in pop.agents) / len(pop.agents)
         assert avg_openness > 0.7
 
     def test_from_segments_initial_state(self):

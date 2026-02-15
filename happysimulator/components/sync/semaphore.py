@@ -19,8 +19,9 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Generator, Callable, Any
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -130,7 +131,7 @@ class Semaphore(Entity):
 
         return False
 
-    def acquire(self, count: int = 1) -> Generator[float, None, None]:
+    def acquire(self, count: int = 1) -> Generator[float]:
         """Acquire permits, blocking if necessary.
 
         This is a generator that yields control while waiting for permits.
@@ -228,4 +229,3 @@ class Semaphore(Entity):
 
     def handle_event(self, event: Event) -> None:
         """Semaphore doesn't directly handle events."""
-        pass

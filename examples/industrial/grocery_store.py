@@ -21,21 +21,31 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Entity, Event, Instant, LatencyTracker, QueuedResource,
-    FIFOQueue, Simulation, SimulationSummary, Source,
+    Entity,
+    Event,
+    FIFOQueue,
+    Instant,
+    LatencyTracker,
+    QueuedResource,
+    Simulation,
+    SimulationSummary,
+    Source,
 )
 from happysimulator.components.industrial import (
-    BalkingQueue, BreakdownScheduler,
+    BreakdownScheduler,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True)
 class GroceryConfig:
     duration_s: float = 7200.0  # 2 hours
-    arrival_rate: float = 0.1   # customers/sec (~360/hr)
+    arrival_rate: float = 0.1  # customers/sec (~360/hr)
     num_regular: int = 4
     num_self_checkout: int = 6
     express_item_limit: int = 15
@@ -45,15 +55,14 @@ class GroceryConfig:
     balk_threshold: int = 6
     # Self-checkout jam parameters
     jam_mttf: float = 600.0  # 10 min between jams
-    jam_mttr: float = 60.0   # 1 min to fix
+    jam_mttr: float = 60.0  # 1 min to fix
     seed: int = 42
 
 
 class CheckoutLane(QueuedResource):
     """Single checkout lane."""
 
-    def __init__(self, name: str, service_time: float, downstream: Entity,
-                 policy=None):
+    def __init__(self, name: str, service_time: float, downstream: Entity, policy=None):
         super().__init__(name, policy=policy or FIFOQueue())
         self.mean_service_time = service_time
         self.downstream = downstream
@@ -74,18 +83,22 @@ class CheckoutLane(QueuedResource):
             self.customers_served += 1
         finally:
             self._active -= 1
-        return [
-            self.forward(event, self.downstream, event_type="Done")
-        ]
+        return [self.forward(event, self.downstream, event_type="Done")]
 
 
 class LaneChooser(Entity):
     """Routes customers to shortest queue, respecting express rules."""
 
-    def __init__(self, name: str, regular: list[CheckoutLane],
-                 express: CheckoutLane, self_checkouts: list[CheckoutLane],
-                 express_limit: int, balked_target: Entity,
-                 balk_threshold: int = 6):
+    def __init__(
+        self,
+        name: str,
+        regular: list[CheckoutLane],
+        express: CheckoutLane,
+        self_checkouts: list[CheckoutLane],
+        express_limit: int,
+        balked_target: Entity,
+        balk_threshold: int = 6,
+    ):
         super().__init__(name)
         self.regular = regular
         self.express = express
@@ -102,17 +115,14 @@ class LaneChooser(Entity):
         ctx["items"] = items
 
         # Find shortest queue across all options
-        candidates: list[tuple[int, CheckoutLane]] = []
-
-        for lane in self.regular:
-            candidates.append((lane.depth, lane))
+        candidates: list[tuple[int, CheckoutLane]] = [(lane.depth, lane) for lane in self.regular]
 
         if items <= self.express_limit:
             candidates.append((self.express.depth, self.express))
 
-        for sc in self.self_checkouts:
-            if not getattr(sc, '_broken', False):
-                candidates.append((sc.depth, sc))
+        candidates.extend(
+            (sc.depth, sc) for sc in self.self_checkouts if not getattr(sc, "_broken", False)
+        )
 
         if not candidates:
             self.balked += 1
@@ -122,21 +132,16 @@ class LaneChooser(Entity):
         candidates.sort(key=lambda x: x[0])
         shortest_depth = candidates[0][0]
 
-        if shortest_depth >= self.balk_threshold:
-            if random.random() < 0.7:  # 70% chance of balking
-                self.balked += 1
-                return [
-                    Event(time=self.now, event_type="Balked",
-                          target=self.balked_target, context=ctx)
-                ]
+        if shortest_depth >= self.balk_threshold and random.random() < 0.7:  # 70% chance of balking
+            self.balked += 1
+            return [
+                Event(time=self.now, event_type="Balked", target=self.balked_target, context=ctx)
+            ]
 
         # Choose shortest
         target = candidates[0][1]
         self.routed += 1
-        return [
-            Event(time=self.now, event_type="Checkout",
-                  target=target, context=ctx)
-        ]
+        return [Event(time=self.now, event_type="Checkout", target=target, context=ctx)]
 
 
 @dataclass
@@ -161,12 +166,12 @@ def run_grocery_simulation(config: GroceryConfig | None = None) -> GroceryResult
 
     # Create lanes
     regular = [
-        CheckoutLane(f"Regular{i+1}", config.regular_service_time, sink)
+        CheckoutLane(f"Regular{i + 1}", config.regular_service_time, sink)
         for i in range(config.num_regular)
     ]
     express = CheckoutLane("Express", config.express_service_time, sink)
     self_checkouts = [
-        CheckoutLane(f"SelfCheckout{i+1}", config.self_checkout_time, sink)
+        CheckoutLane(f"SelfCheckout{i + 1}", config.self_checkout_time, sink)
         for i in range(config.num_self_checkout)
     ]
 
@@ -174,26 +179,32 @@ def run_grocery_simulation(config: GroceryConfig | None = None) -> GroceryResult
     breakdowns = []
     for sc in self_checkouts:
         bd = BreakdownScheduler(
-            f"{sc.name}_BD", target=sc,
+            f"{sc.name}_BD",
+            target=sc,
             mean_time_to_failure=config.jam_mttf,
             mean_repair_time=config.jam_mttr,
         )
         breakdowns.append(bd)
 
     chooser = LaneChooser(
-        "Chooser", regular, express, self_checkouts,
-        config.express_item_limit, balked_sink,
+        "Chooser",
+        regular,
+        express,
+        self_checkouts,
+        config.express_item_limit,
+        balked_sink,
         balk_threshold=config.balk_threshold,
     )
 
     source = Source.poisson(
-        rate=config.arrival_rate, target=chooser,
-        event_type="Customer", name="Arrivals",
+        rate=config.arrival_rate,
+        target=chooser,
+        event_type="Customer",
+        name="Arrivals",
         stop_after=config.duration_s,
     )
 
-    entities = [chooser, *regular, express, *self_checkouts,
-                *breakdowns, sink, balked_sink]
+    entities = [chooser, *regular, express, *self_checkouts, *breakdowns, sink, balked_sink]
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -206,10 +217,14 @@ def run_grocery_simulation(config: GroceryConfig | None = None) -> GroceryResult
     summary = sim.run()
 
     return GroceryResult(
-        sink=sink, balked_sink=balked_sink, chooser=chooser,
-        regular_lanes=regular, express=express,
+        sink=sink,
+        balked_sink=balked_sink,
+        chooser=chooser,
+        regular_lanes=regular,
+        express=express,
         self_checkouts=self_checkouts,
-        config=config, summary=summary,
+        config=config,
+        summary=summary,
     )
 
 
@@ -218,26 +233,28 @@ def print_summary(result: GroceryResult) -> None:
     print("GROCERY STORE SIMULATION RESULTS")
     print("=" * 60)
 
-    print(f"\nConfiguration:")
-    print(f"  Duration: {result.config.duration_s/60:.0f} minutes")
-    print(f"  Lanes: {result.config.num_regular} regular, 1 express, "
-          f"{result.config.num_self_checkout} self-checkout")
+    print("\nConfiguration:")
+    print(f"  Duration: {result.config.duration_s / 60:.0f} minutes")
+    print(
+        f"  Lanes: {result.config.num_regular} regular, 1 express, "
+        f"{result.config.num_self_checkout} self-checkout"
+    )
 
-    print(f"\nCustomer Routing:")
+    print("\nCustomer Routing:")
     print(f"  Routed: {result.chooser.routed}")
     print(f"  Balked: {result.chooser.balked}")
 
-    print(f"\nLane Performance:")
+    print("\nLane Performance:")
     for lane in result.regular_lanes:
         print(f"  {lane.name}: {lane.customers_served} served")
     print(f"  {result.express.name}: {result.express.customers_served} served")
     for sc in result.self_checkouts:
         print(f"  {sc.name}: {sc.customers_served} served")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Completed: {result.sink.count}")
     if result.sink.count > 0:
-        print(f"  Avg checkout time: {result.sink.mean_latency()/60:.1f} min")
+        print(f"  Avg checkout time: {result.sink.mean_latency() / 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 60)

@@ -18,8 +18,7 @@ import random
 import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from dataclasses import dataclass, field
-from typing import Optional, Callable
+from collections.abc import Callable
 
 
 class CacheEvictionPolicy(ABC):
@@ -36,7 +35,6 @@ class CacheEvictionPolicy(ABC):
         Args:
             key: The accessed key.
         """
-        pass
 
     @abstractmethod
     def on_insert(self, key: str) -> None:
@@ -45,7 +43,6 @@ class CacheEvictionPolicy(ABC):
         Args:
             key: The inserted key.
         """
-        pass
 
     @abstractmethod
     def on_remove(self, key: str) -> None:
@@ -54,21 +51,18 @@ class CacheEvictionPolicy(ABC):
         Args:
             key: The removed key.
         """
-        pass
 
     @abstractmethod
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Select a key to evict.
 
         Returns:
             The key to evict, or None if no keys to evict.
         """
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Clear all tracking state."""
-        pass
 
 
 class LRUEviction(CacheEvictionPolicy):
@@ -95,7 +89,7 @@ class LRUEviction(CacheEvictionPolicy):
         """Remove key from tracking."""
         self._order.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Return least recently used key."""
         if not self._order:
             return None
@@ -135,7 +129,7 @@ class LFUEviction(CacheEvictionPolicy):
         """Remove key from tracking."""
         self._counts.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Return least frequently used key."""
         if not self._counts:
             return None
@@ -167,7 +161,7 @@ class TTLEviction(CacheEvictionPolicy):
         ttl: Time-to-live in seconds.
     """
 
-    def __init__(self, ttl: float, clock_func: Optional[Callable[[], float]] = None):
+    def __init__(self, ttl: float, clock_func: Callable[[], float] | None = None):
         """Initialize TTL eviction policy.
 
         Args:
@@ -191,7 +185,6 @@ class TTLEviction(CacheEvictionPolicy):
 
     def on_access(self, key: str) -> None:
         """TTL doesn't update on access (only insertion time matters)."""
-        pass
 
     def on_insert(self, key: str) -> None:
         """Record insertion time."""
@@ -201,7 +194,7 @@ class TTLEviction(CacheEvictionPolicy):
         """Remove key from tracking."""
         self._insert_times.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Return an expired key, or oldest key if none expired."""
         if not self._insert_times:
             return None
@@ -240,8 +233,7 @@ class TTLEviction(CacheEvictionPolicy):
         """
         now = self._clock_func()
         return [
-            key for key, insert_time in self._insert_times.items()
-            if now - insert_time >= self._ttl
+            key for key, insert_time in self._insert_times.items() if now - insert_time >= self._ttl
         ]
 
     def clear(self) -> None:
@@ -262,7 +254,6 @@ class FIFOEviction(CacheEvictionPolicy):
 
     def on_access(self, key: str) -> None:
         """FIFO doesn't update on access."""
-        pass
 
     def on_insert(self, key: str) -> None:
         """Add key to end of queue."""
@@ -274,7 +265,7 @@ class FIFOEviction(CacheEvictionPolicy):
         if key in self._order:
             self._order.remove(key)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Return first inserted key."""
         if not self._order:
             return None
@@ -302,7 +293,6 @@ class RandomEviction(CacheEvictionPolicy):
 
     def on_access(self, key: str) -> None:
         """Random doesn't track access."""
-        pass
 
     def on_insert(self, key: str) -> None:
         """Track key."""
@@ -312,7 +302,7 @@ class RandomEviction(CacheEvictionPolicy):
         """Remove key from tracking."""
         self._keys.discard(key)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Return a random key."""
         if not self._keys:
             return None
@@ -392,7 +382,7 @@ class SLRUEviction(CacheEvictionPolicy):
         self._probationary.pop(key, None)
         self._protected.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Evict from probationary first, then protected."""
         # Try probationary first
         if self._probationary:
@@ -471,7 +461,7 @@ class SampledLRUEviction(CacheEvictionPolicy):
         """Remove key from tracking."""
         self._access_times.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Sample keys and evict the least recently accessed."""
         if not self._access_times:
             return None
@@ -545,7 +535,7 @@ class ClockEviction(CacheEvictionPolicy):
             if self._hand >= len(self._keys) and self._keys:
                 self._hand = 0
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Evict using clock algorithm."""
         if not self._keys:
             return None
@@ -661,7 +651,7 @@ class TwoQueueEviction(CacheEvictionPolicy):
             self._a1out.remove(key)
         self._am.pop(key, None)
 
-    def evict(self) -> Optional[str]:
+    def evict(self) -> str | None:
         """Evict from A1in first, then Am."""
         if self._a1in:
             key = self._a1in.pop(0)

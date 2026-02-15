@@ -1,14 +1,13 @@
 """Tests for RaftNode consensus protocol."""
 
-import pytest
 import random
 
+from happysimulator.components.consensus.raft import RaftNode, RaftState, RaftStats
+from happysimulator.components.network import Network
 from happysimulator.core.clock import Clock
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
 from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.raft import RaftNode, RaftStats, RaftState
-from happysimulator.components.network import Network
 
 
 def make_clock(t=0.0):
@@ -109,7 +108,7 @@ class TestRaftElectionTimeout:
 
         # Advance clock to timeout
         clock.update(timeout_event.time)
-        result = node.handle_event(timeout_event)
+        node.handle_event(timeout_event)
 
         assert node.state == RaftState.CANDIDATE
         assert node.current_term == 1
@@ -120,7 +119,7 @@ class TestRaftCandidateState:
 
     def test_candidate_increments_term(self):
         """Starting an election increments the term."""
-        nodes, _, clock = make_raft_cluster(3)
+        nodes, _, _clock = make_raft_cluster(3)
         node = nodes[0]
 
         node._start_election()
@@ -130,7 +129,7 @@ class TestRaftCandidateState:
 
     def test_candidate_votes_for_self(self):
         """A candidate votes for itself."""
-        nodes, _, clock = make_raft_cluster(3)
+        nodes, _, _clock = make_raft_cluster(3)
         node = nodes[0]
 
         node._start_election()
@@ -151,13 +150,15 @@ class TestRaftRequestVote:
             time=Instant.from_seconds(1.0),
             event_type="RaftRequestVote",
             target=follower,
-            context={"metadata": {
-                "term": 1,
-                "candidate_id": "node-0",
-                "last_log_index": 0,
-                "last_log_term": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "term": 1,
+                    "candidate_id": "node-0",
+                    "last_log_index": 0,
+                    "last_log_term": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = follower.handle_event(vote_event)
@@ -179,16 +180,18 @@ class TestRaftRequestVote:
             time=Instant.from_seconds(1.0),
             event_type="RaftRequestVote",
             target=follower,
-            context={"metadata": {
-                "term": 3,
-                "candidate_id": "node-0",
-                "last_log_index": 0,
-                "last_log_term": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "term": 3,
+                    "candidate_id": "node-0",
+                    "last_log_index": 0,
+                    "last_log_term": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
-        result = follower.handle_event(vote_event)
+        follower.handle_event(vote_event)
 
         # Vote should not be granted (follower's voted_for should remain None)
         assert follower._voted_for is None
@@ -205,16 +208,18 @@ class TestRaftRequestVote:
             time=Instant.from_seconds(1.0),
             event_type="RaftRequestVote",
             target=follower,
-            context={"metadata": {
-                "term": 3,
-                "candidate_id": "node-0",
-                "last_log_index": 0,
-                "last_log_term": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "term": 3,
+                    "candidate_id": "node-0",
+                    "last_log_index": 0,
+                    "last_log_term": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
-        result = follower.handle_event(vote_event)
+        follower.handle_event(vote_event)
 
         # Candidate's log is stale (term 0 < term 2), so vote should be rejected
         assert follower._voted_for is None
@@ -225,7 +230,7 @@ class TestRaftStepDown:
 
     def test_step_down_on_higher_term(self):
         """A node steps down when it sees a higher term."""
-        nodes, _, clock = make_raft_cluster(3)
+        nodes, _, _clock = make_raft_cluster(3)
         node = nodes[0]
         node._state = RaftState.CANDIDATE
         node._current_term = 3
@@ -242,7 +247,7 @@ class TestRaftBecomeLeader:
 
     def test_become_leader_initializes_state(self):
         """Becoming leader initializes next_index and match_index for peers."""
-        nodes, _, clock = make_raft_cluster(3)
+        nodes, _, _clock = make_raft_cluster(3)
         node = nodes[0]
         node._current_term = 1
         node._state = RaftState.CANDIDATE
@@ -270,15 +275,17 @@ class TestRaftAppendEntries:
             time=Instant.from_seconds(1.0),
             event_type="RaftAppendEntries",
             target=follower,
-            context={"metadata": {
-                "term": 1,
-                "leader_id": "node-0",
-                "prev_log_index": 0,
-                "prev_log_term": 0,
-                "entries": [],
-                "leader_commit": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "term": 1,
+                    "leader_id": "node-0",
+                    "prev_log_index": 0,
+                    "prev_log_term": 0,
+                    "entries": [],
+                    "leader_commit": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = follower.handle_event(ae_event)
@@ -300,15 +307,17 @@ class TestRaftAppendEntries:
             time=Instant.from_seconds(1.0),
             event_type="RaftAppendEntries",
             target=follower,
-            context={"metadata": {
-                "term": 3,
-                "leader_id": "node-0",
-                "prev_log_index": 0,
-                "prev_log_term": 0,
-                "entries": [],
-                "leader_commit": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "term": 3,
+                    "leader_id": "node-0",
+                    "prev_log_index": 0,
+                    "prev_log_term": 0,
+                    "entries": [],
+                    "leader_commit": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = follower.handle_event(ae_event)
@@ -323,7 +332,7 @@ class TestRaftSubmit:
 
     def test_submit_as_leader_appends_to_log(self):
         """Submitting as leader appends the command to the log."""
-        nodes, _, clock = make_raft_cluster(3)
+        nodes, _, _clock = make_raft_cluster(3)
         node = nodes[0]
         node._state = RaftState.LEADER
         node._current_term = 1

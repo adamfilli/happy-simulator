@@ -25,8 +25,8 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -69,7 +69,10 @@ class AsyncServer(Entity):
         name: str,
         max_connections: int = 10000,
         cpu_work_distribution: LatencyDistribution | None = None,
-        io_handler: Callable[[Event], Generator[float, None, list[Event] | Event | None] | list[Event] | Event | None] | None = None,
+        io_handler: Callable[
+            [Event], Generator[float, None, list[Event] | Event | None] | list[Event] | Event | None
+        ]
+        | None = None,
     ):
         """Initialize the async server.
 
@@ -229,16 +232,15 @@ class AsyncServer(Entity):
         if not self._cpu_busy and len(self._cpu_queue) == 0:
             # CPU is free, process immediately
             return self._start_cpu_processing(event)
-        else:
-            # Queue for later processing
-            self._cpu_queue.append(event)
-            logger.debug(
-                "[%s] Request queued for CPU: type=%s queue_depth=%d",
-                self.name,
-                event.event_type,
-                len(self._cpu_queue),
-            )
-            return None
+        # Queue for later processing
+        self._cpu_queue.append(event)
+        logger.debug(
+            "[%s] Request queued for CPU: type=%s queue_depth=%d",
+            self.name,
+            event.event_type,
+            len(self._cpu_queue),
+        )
+        return None
 
     def _start_cpu_processing(self, event: Event) -> list[Event]:
         """Start CPU processing for a request.
@@ -330,7 +332,7 @@ class AsyncServer(Entity):
                         elif isinstance(result, list):
                             return result + result_events
                         else:
-                            return [result] + result_events
+                            return [result, *result_events]
 
                     return io_wrapper()
 
@@ -338,8 +340,7 @@ class AsyncServer(Entity):
                 self._complete_request(original_event)
                 if isinstance(io_result, list):
                     return io_result + result_events
-                else:
-                    return [io_result] + result_events
+                return [io_result, *result_events]
 
         # No I/O handler - complete request immediately
         if original_event is not None:

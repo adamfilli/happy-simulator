@@ -2,16 +2,7 @@
 
 import pytest
 
-from happysimulator.core.temporal import Instant
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
-from happysimulator.instrumentation.summary import SimulationSummary
 from happysimulator.analysis.phases import Phase, detect_phases
-from happysimulator.analysis.trace_analysis import (
-    EventLifecycle,
-    trace_event_lifecycle,
-    list_event_lifecycles,
-)
 from happysimulator.analysis.report import (
     Anomaly,
     CausalChain,
@@ -19,9 +10,18 @@ from happysimulator.analysis.report import (
     SimulationAnalysis,
     analyze,
 )
-
+from happysimulator.analysis.trace_analysis import (
+    EventLifecycle,
+    list_event_lifecycles,
+    trace_event_lifecycle,
+)
+from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.data import Data
+from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
+from happysimulator.instrumentation.summary import SimulationSummary
 
 # === Helpers ===
+
 
 def _make_data(pairs: list[tuple[float, float]]) -> Data:
     d = Data()
@@ -209,8 +209,15 @@ class TestTraceAnalysis:
 class TestMetricSummary:
     def test_to_dict(self):
         ms = MetricSummary(
-            name="latency", count=100, mean=0.05, std=0.02,
-            min=0.01, max=0.2, p50=0.04, p95=0.09, p99=0.15,
+            name="latency",
+            count=100,
+            mean=0.05,
+            std=0.02,
+            min=0.01,
+            max=0.2,
+            p50=0.04,
+            p95=0.09,
+            p99=0.15,
         )
         d = ms.to_dict()
         assert d["name"] == "latency"
@@ -220,8 +227,10 @@ class TestMetricSummary:
 class TestAnomaly:
     def test_to_dict(self):
         a = Anomaly(
-            time_s=55.0, metric="latency",
-            description="spike", severity="warning",
+            time_s=55.0,
+            metric="latency",
+            description="spike",
+            severity="warning",
             context={"value": 0.5},
         )
         d = a.to_dict()
@@ -347,7 +356,9 @@ class TestSimulationAnalysis:
         analysis = SimulationAnalysis(
             summary=summary,
             anomalies=[
-                Anomaly(time_s=55.0, metric="latency", description="spike detected", severity="warning"),
+                Anomaly(
+                    time_s=55.0, metric="latency", description="spike detected", severity="warning"
+                ),
             ],
         )
         ctx = analysis.to_prompt_context()

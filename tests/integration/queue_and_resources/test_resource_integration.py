@@ -6,28 +6,29 @@ and a visualization test with 2N workers contending for N capacity.
 """
 
 import json
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
+from happysimulator.components.resource import Resource
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.components.resource import Resource
 from happysimulator.instrumentation.data import Data
-
 
 # ---------------------------------------------------------------------------
 # Helper entities
 # ---------------------------------------------------------------------------
 
+
 class Worker(Entity):
     """Worker that acquires a resource, does work, then releases."""
 
-    def __init__(self, name: str, resource: Resource, amount: int | float = 1,
-                 work_time: float = 0.1):
+    def __init__(
+        self, name: str, resource: Resource, amount: int | float = 1, work_time: float = 0.1
+    ):
         super().__init__(name)
         self.resource = resource
         self.amount = amount
@@ -49,8 +50,9 @@ class Worker(Entity):
 class MultiResourceWorker(Entity):
     """Worker that acquires multiple resources before doing work."""
 
-    def __init__(self, name: str, cpu: Resource, memory: Resource,
-                 cpu_amount: int = 1, mem_amount: int = 1):
+    def __init__(
+        self, name: str, cpu: Resource, memory: Resource, cpu_amount: int = 1, mem_amount: int = 1
+    ):
         super().__init__(name)
         self.cpu = cpu
         self.memory = memory
@@ -99,17 +101,20 @@ def _make_sim(*entities, end_time_s=60.0):
 
 def _trigger(sim, target, event_type="Go", time_s=0.0, **extra_context):
     """Schedule a trigger event into the simulation."""
-    sim.schedule(Event(
-        time=Instant.from_seconds(time_s),
-        event_type=event_type,
-        target=target,
-        context=extra_context,
-    ))
+    sim.schedule(
+        Event(
+            time=Instant.from_seconds(time_s),
+            event_type=event_type,
+            target=target,
+            context=extra_context,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestBasicContention:
     """Workers sharing a CPU resource with basic contention."""
@@ -301,6 +306,7 @@ class TestWaitTimeTracking:
 # Visualization test: 2N workers contending for N-capacity resource
 # ---------------------------------------------------------------------------
 
+
 class RepeatingWorker(Entity):
     """Worker that repeatedly acquires a resource, works, and releases.
 
@@ -308,8 +314,7 @@ class RepeatingWorker(Entity):
     Records acquire and release timestamps for analysis.
     """
 
-    def __init__(self, name: str, resource: Resource, amount: int = 1,
-                 work_time: float = 0.1):
+    def __init__(self, name: str, resource: Resource, amount: int = 1, work_time: float = 0.1):
         super().__init__(name)
         self.resource = resource
         self.amount = amount
@@ -340,9 +345,15 @@ class ResourceSampler(Entity):
     Runs as a daemon-like entity — triggered by its own events.
     """
 
-    def __init__(self, name: str, resource: Resource,
-                 utilization_data: Data, waiters_data: Data,
-                 interval: float = 0.1, duration: float = 10.0):
+    def __init__(
+        self,
+        name: str,
+        resource: Resource,
+        utilization_data: Data,
+        waiters_data: Data,
+        interval: float = 0.1,
+        duration: float = 10.0,
+    ):
         super().__init__(name)
         self.resource = resource
         self.utilization_data = utilization_data
@@ -358,12 +369,14 @@ class ResourceSampler(Entity):
         # Schedule next sample if within duration
         next_t = self.now.to_seconds() + self.interval
         if next_t <= self.duration:
-            return [Event(
-                time=Instant.from_seconds(next_t),
-                event_type="Sample",
-                target=self,
-                daemon=True,
-            )]
+            return [
+                Event(
+                    time=Instant.from_seconds(next_t),
+                    event_type="Sample",
+                    target=self,
+                    daemon=True,
+                )
+            ]
         return []
 
 
@@ -379,11 +392,11 @@ class TestResourceContentionVisualization:
         import matplotlib.pyplot as plt
 
         # ── Configuration ──
-        N = 4              # resource capacity
+        N = 4  # resource capacity
         NUM_WORKERS = 2 * N  # 2N = 8 workers
-        WORK_TIME = 0.3    # each worker holds the resource for 300ms
-        RATE = 2.0         # each worker gets a new job every 0.5s
-        DURATION = 10.0    # simulation duration
+        WORK_TIME = 0.3  # each worker holds the resource for 300ms
+        RATE = 2.0  # each worker gets a new job every 0.5s
+        DURATION = 10.0  # simulation duration
         SAMPLE_INTERVAL = 0.05
 
         # ── Setup ──
@@ -392,8 +405,12 @@ class TestResourceContentionVisualization:
         utilization_data = Data()
         waiters_data = Data()
         sampler = ResourceSampler(
-            "sampler", resource, utilization_data, waiters_data,
-            interval=SAMPLE_INTERVAL, duration=DURATION,
+            "sampler",
+            resource,
+            utilization_data,
+            waiters_data,
+            interval=SAMPLE_INTERVAL,
+            duration=DURATION,
         )
 
         # Create 2N workers
@@ -408,26 +425,30 @@ class TestResourceContentionVisualization:
         )
 
         # Kick off the sampler
-        sim.schedule(Event(
-            time=Instant.Epoch,
-            event_type="Sample",
-            target=sampler,
-            daemon=True,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.Epoch,
+                event_type="Sample",
+                target=sampler,
+                daemon=True,
+            )
+        )
 
         # Each worker gets jobs at a constant rate, staggered slightly
         for i, w in enumerate(workers):
             offset = i * (1.0 / RATE / NUM_WORKERS)  # stagger starts
             t = offset
             while t < DURATION:
-                sim.schedule(Event(
-                    time=Instant.from_seconds(t),
-                    event_type="Job",
-                    target=w,
-                ))
+                sim.schedule(
+                    Event(
+                        time=Instant.from_seconds(t),
+                        event_type="Job",
+                        target=w,
+                    )
+                )
                 t += 1.0 / RATE
 
-        summary = sim.run()
+        sim.run()
 
         # ── Assertions ──
         total_completed = sum(w.completed for w in workers)
@@ -451,8 +472,7 @@ class TestResourceContentionVisualization:
         axes[0].axhline(y=1.0, color="r", linestyle="--", alpha=0.5, label="100%")
         axes[0].set_ylabel("Utilization")
         axes[0].set_title(
-            f"Resource Contention: {NUM_WORKERS} workers, "
-            f"capacity={N}, work_time={WORK_TIME}s"
+            f"Resource Contention: {NUM_WORKERS} workers, capacity={N}, work_time={WORK_TIME}s"
         )
         axes[0].set_ylim(-0.05, 1.15)
         axes[0].legend(loc="upper right")
@@ -468,10 +488,14 @@ class TestResourceContentionVisualization:
         # Per-worker Gantt chart showing acquire/release intervals
         colors = plt.cm.tab10.colors
         for i, w in enumerate(workers):
-            for acq, rel in zip(w.acquired_at, w.released_at):
+            for acq, rel in zip(w.acquired_at, w.released_at, strict=False):
                 axes[2].barh(
-                    i, rel - acq, left=acq, height=0.6,
-                    color=colors[i % len(colors)], alpha=0.7,
+                    i,
+                    rel - acq,
+                    left=acq,
+                    height=0.6,
+                    color=colors[i % len(colors)],
+                    alpha=0.7,
                 )
         axes[2].set_ylabel("Worker")
         axes[2].set_xlabel("Simulation Time (s)")
@@ -511,15 +535,13 @@ class TestResourceContentionVisualization:
                 {
                     "name": w.name,
                     "completed": w.completed,
-                    "avg_wait_s": round(
-                        sum(w.waited) / len(w.waited), 6
-                    ) if w.waited else 0,
+                    "avg_wait_s": round(sum(w.waited) / len(w.waited), 6) if w.waited else 0,
                 }
                 for w in workers
             ],
         }
         json_path = test_output_dir / "resource_contention_summary.json"
-        with open(json_path, "w") as f:
+        with json_path.open("w") as f:
             json.dump(summary_data, f, indent=2)
 
         assert json_path.exists()

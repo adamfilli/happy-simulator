@@ -7,12 +7,12 @@ through the link are delayed and may be dropped based on configuration.
 
 import logging
 import random
+from collections.abc import Generator
 from dataclasses import dataclass, field
-from typing import Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.clock import Clock
 from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,7 @@ class NetworkLink(Entity):
 
     def __post_init__(self):
         if self.packet_loss_rate < 0.0 or self.packet_loss_rate > 1.0:
-            raise ValueError(
-                f"packet_loss_rate must be in [0, 1], got {self.packet_loss_rate}"
-            )
+            raise ValueError(f"packet_loss_rate must be in [0, 1], got {self.packet_loss_rate}")
         logger.debug(
             "[%s] NetworkLink created: latency=%s, bandwidth=%s bps, loss=%.2f%%",
             self.name,
@@ -108,9 +106,7 @@ class NetworkLink(Entity):
             packets_dropped=self.packets_dropped,
         )
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event] | Event | None]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event] | Event | None]:
         """Process an event through the network link.
 
         Applies packet loss, calculates total delay (latency + jitter +

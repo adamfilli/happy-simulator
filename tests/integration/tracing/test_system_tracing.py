@@ -6,21 +6,17 @@ with Simulation and EventHeap. This is separate from application-level
 tracing (Event.context["trace"]) which is tested in test_tracing_basic.py.
 """
 
-from typing import List
-
-import pytest
-
 from happysimulator.core.entity import Entity
-from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.event import Event
+from happysimulator.core.event_heap import EventHeap
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation import InMemoryTraceRecorder, NullTraceRecorder
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.core.simulation import Simulation
-from happysimulator.instrumentation import InMemoryTraceRecorder, NullTraceRecorder
-from happysimulator.core.temporal import Instant
-
 
 # --- Test Fixtures ---
+
 
 class SimpleEntity(Entity):
     """Simple entity that counts events and optionally yields."""
@@ -29,7 +25,7 @@ class SimpleEntity(Entity):
         super().__init__(name)
         self.events_handled = 0
 
-    def handle_event(self, event: Event) -> List[Event]:
+    def handle_event(self, event: Event) -> list[Event]:
         self.events_handled += 1
         return []
 
@@ -62,6 +58,7 @@ class ConstantRateProfile(Profile):
 
 
 # --- TraceRecorder Unit Tests ---
+
 
 class TestInMemoryTraceRecorder:
     """Tests for InMemoryTraceRecorder functionality."""
@@ -166,6 +163,7 @@ class TestNullTraceRecorder:
 
 # --- EventHeap Tracing Tests ---
 
+
 class TestEventHeapTracing:
     """Tests for EventHeap tracing integration."""
 
@@ -201,7 +199,7 @@ class TestEventHeapTracing:
         )
 
         heap.push(event)
-        popped = heap.pop()
+        heap.pop()
 
         pop_spans = recorder.filter_by_kind("heap.pop")
         assert len(pop_spans) == 1
@@ -245,6 +243,7 @@ class TestEventHeapTracing:
 
 # --- Simulation Tracing Tests ---
 
+
 class TestSimulationTracing:
     """Tests for Simulation tracing integration."""
 
@@ -255,8 +254,11 @@ class TestSimulationTracing:
 
         profile = ConstantRateProfile(rate=1.0, duration=2.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -287,8 +289,11 @@ class TestSimulationTracing:
 
         profile = ConstantRateProfile(rate=2.0, duration=2.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -302,7 +307,9 @@ class TestSimulationTracing:
 
         dequeue_spans = recorder.filter_by_kind("simulation.dequeue")
         # Should have dequeue spans for source events + generated events
-        assert len(dequeue_spans) >= 2, f"Expected at least 2 dequeue spans, got {len(dequeue_spans)}"
+        assert len(dequeue_spans) >= 2, (
+            f"Expected at least 2 dequeue spans, got {len(dequeue_spans)}"
+        )
 
     def test_simulation_schedule_traced(self):
         """Verify simulation.schedule spans are recorded for new events."""
@@ -311,8 +318,11 @@ class TestSimulationTracing:
 
         profile = ConstantRateProfile(rate=1.0, duration=1.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -326,7 +336,9 @@ class TestSimulationTracing:
 
         schedule_spans = recorder.filter_by_kind("simulation.schedule")
         # DelayingEntity creates ProcessContinuation events
-        assert len(schedule_spans) >= 1, f"Expected at least 1 schedule span, got {len(schedule_spans)}"
+        assert len(schedule_spans) >= 1, (
+            f"Expected at least 1 schedule span, got {len(schedule_spans)}"
+        )
 
     def test_trace_recorder_accessible_after_run(self):
         """Verify trace_recorder property allows post-run inspection."""
@@ -335,8 +347,11 @@ class TestSimulationTracing:
 
         profile = ConstantRateProfile(rate=1.0, duration=1.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -363,8 +378,11 @@ class TestSystemTracingIntegration:
 
         profile = ConstantRateProfile(rate=1.0, duration=2.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -379,7 +397,7 @@ class TestSystemTracingIntegration:
         # Get all unique event IDs from system traces
         system_event_ids = set()
         for span in recorder.spans:
-            if "event_id" in span and span["event_id"]:
+            if span.get("event_id"):
                 system_event_ids.add(span["event_id"])
 
         # Verify we captured event IDs
@@ -402,8 +420,11 @@ class TestSystemTracingIntegration:
 
         profile = ConstantRateProfile(rate=2.0, duration=3.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         sim = Simulation(
@@ -419,8 +440,9 @@ class TestSystemTracingIntegration:
 
         # Verify times are non-decreasing (same time is allowed)
         for i in range(1, len(times)):
-            assert times[i] >= times[i-1], \
-                f"Trace times should be non-decreasing: {times[i-1]} > {times[i]} at index {i}"
+            assert times[i] >= times[i - 1], (
+                f"Trace times should be non-decreasing: {times[i - 1]} > {times[i]} at index {i}"
+            )
 
     def test_simulation_without_recorder_works(self):
         """Verify simulation works correctly without explicit trace recorder."""
@@ -428,8 +450,11 @@ class TestSystemTracingIntegration:
 
         profile = ConstantRateProfile(rate=1.0, duration=2.0)
         source = Source.with_profile(
-            profile=profile, target=entity, event_type="SimpleEvent",
-            poisson=False, name="TestSource",
+            profile=profile,
+            target=entity,
+            event_type="SimpleEvent",
+            poisson=False,
+            name="TestSource",
         )
 
         # No trace_recorder argument

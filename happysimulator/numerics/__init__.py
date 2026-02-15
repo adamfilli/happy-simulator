@@ -10,7 +10,7 @@ from happysimulator.numerics.integration import integrate_adaptive_simpson
 from happysimulator.numerics.root_finding import RootResult, brentq
 
 __all__ = [
-    "integrate_adaptive_simpson",
     "RootResult",
     "brentq",
+    "integrate_adaptive_simpson",
 ]

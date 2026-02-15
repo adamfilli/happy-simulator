@@ -23,11 +23,11 @@ Example:
         yield from tx.commit()
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Generator, Optional, Callable
 from collections import deque
+from collections.abc import Callable, Generator
+from dataclasses import dataclass, field
 from enum import Enum
-import re
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -89,7 +89,7 @@ class Transaction:
     def __init__(
         self,
         transaction_id: int,
-        database: 'Database',
+        database: "Database",
         connection: Connection,
     ):
         """Initialize the transaction.
@@ -142,7 +142,7 @@ class Transaction:
         result = yield from self._database._execute_query(query)
         return result
 
-    def commit(self) -> Generator[float, None, None]:
+    def commit(self) -> Generator[float]:
         """Commit the transaction.
 
         Yields:
@@ -160,7 +160,7 @@ class Transaction:
         self._state = TransactionState.COMMITTED
         self._database._end_transaction(self)
 
-    def rollback(self) -> Generator[float, None, None]:
+    def rollback(self) -> Generator[float]:
         """Roll back the transaction.
 
         Yields:
@@ -386,11 +386,7 @@ class Database(Entity):
         if query_upper.startswith("SELECT"):
             # Return empty result set
             return []
-        elif query_upper.startswith("INSERT"):
-            return {"affected_rows": 1}
-        elif query_upper.startswith("UPDATE"):
-            return {"affected_rows": 1}
-        elif query_upper.startswith("DELETE"):
+        elif query_upper.startswith(("INSERT", "UPDATE", "DELETE")):
             return {"affected_rows": 1}
         else:
             return None
@@ -467,4 +463,3 @@ class Database(Entity):
 
     def handle_event(self, event: Event) -> None:
         """Database can handle events for query execution."""
-        pass

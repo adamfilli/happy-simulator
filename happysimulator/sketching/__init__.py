@@ -50,56 +50,56 @@ Example:
 
 # Base protocols
 from happysimulator.sketching.base import (
-    Sketch,
-    FrequencySketch,
-    FrequencyEstimate,
-    QuantileSketch,
     CardinalitySketch,
+    FrequencyEstimate,
+    FrequencySketch,
     MembershipSketch,
+    QuantileSketch,
     SamplingSketch,
+    Sketch,
 )
 
-# Frequency estimation
-from happysimulator.sketching.topk import TopK
+# Membership testing
+from happysimulator.sketching.bloom_filter import BloomFilter
 from happysimulator.sketching.count_min_sketch import CountMinSketch
-
-# Quantile estimation
-from happysimulator.sketching.tdigest import TDigest
 
 # Cardinality estimation
 from happysimulator.sketching.hyperloglog import HyperLogLog
 
-# Membership testing
-from happysimulator.sketching.bloom_filter import BloomFilter
+# Hash trees
+from happysimulator.sketching.merkle_tree import KeyRange, MerkleNode, MerkleTree
 
 # Sampling
 from happysimulator.sketching.reservoir import ReservoirSampler
 
-# Hash trees
-from happysimulator.sketching.merkle_tree import MerkleTree, MerkleNode, KeyRange
+# Quantile estimation
+from happysimulator.sketching.tdigest import TDigest
+
+# Frequency estimation
+from happysimulator.sketching.topk import TopK
 
 __all__ = [
-    # Protocols
-    "Sketch",
-    "FrequencySketch",
-    "FrequencyEstimate",
-    "QuantileSketch",
-    "CardinalitySketch",
-    "MembershipSketch",
-    "SamplingSketch",
-    # Frequency estimation
-    "TopK",
-    "CountMinSketch",
-    # Quantile estimation
-    "TDigest",
-    # Cardinality estimation
-    "HyperLogLog",
     # Membership testing
     "BloomFilter",
-    # Sampling
-    "ReservoirSampler",
+    "CardinalitySketch",
+    "CountMinSketch",
+    "FrequencyEstimate",
+    "FrequencySketch",
+    # Cardinality estimation
+    "HyperLogLog",
+    "KeyRange",
+    "MembershipSketch",
+    "MerkleNode",
     # Hash trees
     "MerkleTree",
-    "MerkleNode",
-    "KeyRange",
+    "QuantileSketch",
+    # Sampling
+    "ReservoirSampler",
+    "SamplingSketch",
+    # Protocols
+    "Sketch",
+    # Quantile estimation
+    "TDigest",
+    # Frequency estimation
+    "TopK",
 ]

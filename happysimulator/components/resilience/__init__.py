@@ -26,18 +26,14 @@ Example:
     bulkhead = Bulkhead("bulkhead", breaker, max_concurrent=10)
 """
 
-from happysimulator.components.resilience.circuit_breaker import (
-    CircuitBreaker,
-    CircuitState,
-    CircuitBreakerStats,
-)
 from happysimulator.components.resilience.bulkhead import (
     Bulkhead,
     BulkheadStats,
 )
-from happysimulator.components.resilience.timeout import (
-    TimeoutWrapper,
-    TimeoutStats,
+from happysimulator.components.resilience.circuit_breaker import (
+    CircuitBreaker,
+    CircuitBreakerStats,
+    CircuitState,
 )
 from happysimulator.components.resilience.fallback import (
     Fallback,
@@ -47,22 +43,26 @@ from happysimulator.components.resilience.hedge import (
     Hedge,
     HedgeStats,
 )
+from happysimulator.components.resilience.timeout import (
+    TimeoutStats,
+    TimeoutWrapper,
+)
 
 __all__ = [
-    # Circuit Breaker
-    "CircuitBreaker",
-    "CircuitState",
-    "CircuitBreakerStats",
     # Bulkhead
     "Bulkhead",
     "BulkheadStats",
-    # Timeout
-    "TimeoutWrapper",
-    "TimeoutStats",
+    # Circuit Breaker
+    "CircuitBreaker",
+    "CircuitBreakerStats",
+    "CircuitState",
     # Fallback
     "Fallback",
     "FallbackStats",
     # Hedge
     "Hedge",
     "HedgeStats",
+    "TimeoutStats",
+    # Timeout
+    "TimeoutWrapper",
 ]

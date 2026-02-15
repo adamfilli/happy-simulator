@@ -1,7 +1,5 @@
 """Tests for LWWRegister CRDT."""
 
-import pytest
-
 from happysimulator.components.crdt.lww_register import LWWRegister
 from happysimulator.components.crdt.protocol import CRDT
 from happysimulator.core.logical_clocks import HLCTimestamp

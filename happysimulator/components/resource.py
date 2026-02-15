@@ -27,10 +27,13 @@ from __future__ import annotations
 import logging
 from collections import deque
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
+
+if TYPE_CHECKING:
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +81,7 @@ class Grant:
         released: Whether this grant has been released.
     """
 
-    __slots__ = ("_resource", "_amount", "_released")
+    __slots__ = ("_amount", "_released", "_resource")
 
     def __init__(self, resource: Resource, amount: int | float) -> None:
         self._resource = resource
@@ -241,7 +244,9 @@ class Resource(Entity):
             future.resolve(grant)
             logger.debug(
                 "[%s] Immediate acquire(%s), available=%s",
-                self.name, amount, self._available,
+                self.name,
+                amount,
+                self._available,
             )
         else:
             # Must wait — enqueue
@@ -255,7 +260,10 @@ class Resource(Entity):
 
             logger.debug(
                 "[%s] Queued acquire(%s), waiters=%d, available=%s",
-                self.name, amount, len(self._waiters), self._available,
+                self.name,
+                amount,
+                len(self._waiters),
+                self._available,
             )
 
         return future
@@ -305,7 +313,9 @@ class Resource(Entity):
 
         logger.debug(
             "[%s] Released %s, available=%s",
-            self.name, amount, self._available,
+            self.name,
+            amount,
+            self._available,
         )
 
         self._wake_waiters()
@@ -337,7 +347,9 @@ class Resource(Entity):
 
                 logger.debug(
                     "[%s] Woke waiter for %s, available=%s",
-                    self.name, waiter.amount, self._available,
+                    self.name,
+                    waiter.amount,
+                    self._available,
                 )
             else:
                 # Not enough capacity for head-of-line waiter — stop
@@ -351,7 +363,6 @@ class Resource(Entity):
 
     def handle_event(self, event: Event) -> None:
         """Resource does not process events directly."""
-        pass
 
     def _current_time_ns(self) -> int:
         """Get current simulation time in nanoseconds, or -1 if unavailable."""

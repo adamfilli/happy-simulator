@@ -6,8 +6,6 @@ stop_after behavior, and backward compatibility with the manual constructor.
 
 from __future__ import annotations
 
-import pytest
-
 from happysimulator import (
     Entity,
     Event,
@@ -16,14 +14,14 @@ from happysimulator import (
     Source,
     SpikeProfile,
 )
-from happysimulator.load.source import _SimpleEventProvider
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
-
+from happysimulator.load.source import _SimpleEventProvider
 
 # ---------------------------------------------------------------------------
 # Helper: simple collector entity
 # ---------------------------------------------------------------------------
+
 
 class Collector(Entity):
     """Collects received events for test assertions."""
@@ -41,8 +39,8 @@ class Collector(Entity):
 # _SimpleEventProvider
 # ---------------------------------------------------------------------------
 
-class TestSimpleEventProvider:
 
+class TestSimpleEventProvider:
     def test_generates_event_with_correct_fields(self):
         target = Collector()
         provider = _SimpleEventProvider(target, "Request")
@@ -105,8 +103,8 @@ class TestSimpleEventProvider:
 # Source.constant()
 # ---------------------------------------------------------------------------
 
-class TestSourceConstant:
 
+class TestSourceConstant:
     def test_creates_source_instance(self):
         target = Collector()
         source = Source.constant(rate=10, target=target)
@@ -206,8 +204,8 @@ class TestSourceConstant:
 # Source.poisson()
 # ---------------------------------------------------------------------------
 
-class TestSourcePoisson:
 
+class TestSourcePoisson:
     def test_creates_source_instance(self):
         target = Collector()
         source = Source.poisson(rate=10, target=target)
@@ -254,8 +252,8 @@ class TestSourcePoisson:
 # Source.with_profile()
 # ---------------------------------------------------------------------------
 
-class TestSourceWithProfile:
 
+class TestSourceWithProfile:
     def test_with_spike_profile_poisson(self):
         target = Collector()
         profile = SpikeProfile(
@@ -264,9 +262,7 @@ class TestSourceWithProfile:
             warmup_s=1.0,
             spike_duration_s=1.0,
         )
-        source = Source.with_profile(
-            profile=profile, target=target, poisson=True
-        )
+        source = Source.with_profile(profile=profile, target=target, poisson=True)
 
         assert isinstance(source._time_provider, PoissonArrivalTimeProvider)
 
@@ -278,9 +274,7 @@ class TestSourceWithProfile:
             warmup_s=1.0,
             spike_duration_s=1.0,
         )
-        source = Source.with_profile(
-            profile=profile, target=target, poisson=False
-        )
+        source = Source.with_profile(profile=profile, target=target, poisson=False)
 
         assert isinstance(source._time_provider, ConstantArrivalTimeProvider)
 
@@ -292,9 +286,7 @@ class TestSourceWithProfile:
             warmup_s=1.0,
             spike_duration_s=1.0,
         )
-        source = Source.with_profile(
-            profile=profile, target=target, poisson=False, stop_after=3.0
-        )
+        source = Source.with_profile(profile=profile, target=target, poisson=False, stop_after=3.0)
 
         sim = Simulation(
             end_time=Instant.from_seconds(4.0),
@@ -325,8 +317,8 @@ class TestSourceWithProfile:
 # Backward compatibility
 # ---------------------------------------------------------------------------
 
-class TestBackwardCompatibility:
 
+class TestBackwardCompatibility:
     def test_manual_constructor_still_works(self):
         """The original 4-object construction pattern must still work."""
         from happysimulator import (
@@ -349,9 +341,7 @@ class TestBackwardCompatibility:
                 ]
 
         provider = MyProvider()
-        arrival = ConstantArrivalTimeProvider(
-            ConstantRateProfile(rate=5), start_time=Instant.Epoch
-        )
+        arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate=5), start_time=Instant.Epoch)
         source = Source(
             name="ManualSource",
             event_provider=provider,
@@ -373,8 +363,8 @@ class TestBackwardCompatibility:
 # _resolve_stop_after
 # ---------------------------------------------------------------------------
 
-class TestResolveStopAfter:
 
+class TestResolveStopAfter:
     def test_none_returns_none(self):
         assert Source._resolve_stop_after(None) is None
 

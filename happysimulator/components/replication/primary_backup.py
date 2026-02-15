@@ -15,11 +15,14 @@ Backups can optionally serve stale reads.
 Example::
 
     from happysimulator.components.replication import (
-        PrimaryNode, BackupNode, ReplicationMode,
+        PrimaryNode,
+        BackupNode,
+        ReplicationMode,
     )
 
-    primary = PrimaryNode("primary", store=kv, backups=[backup1, backup2],
-                          network=net, mode=ReplicationMode.SEMI_SYNC)
+    primary = PrimaryNode(
+        "primary", store=kv, backups=[backup1, backup2], network=net, mode=ReplicationMode.SEMI_SYNC
+    )
 """
 
 from __future__ import annotations
@@ -27,12 +30,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture, all_of
-from happysimulator.components.datastore.kv_store import KVStore
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.datastore.kv_store import KVStore
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +150,9 @@ class PrimaryNode(Entity):
 
     def handle_event(
         self, event: Event
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """Handle Write, Read, and ReplicationAck events."""
         if event.event_type == "Write":
             return (yield from self._handle_write(event))
@@ -156,7 +165,9 @@ class PrimaryNode(Entity):
 
     def _handle_write(
         self, event: Event
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """Process a write: apply locally, replicate to backups."""
         metadata = event.context.get("metadata", {})
         key = metadata.get("key")
@@ -179,10 +190,14 @@ class PrimaryNode(Entity):
             # Fire and forget
             events = []
             for backup in self._backups:
-                events.append(self._network.send(
-                    self, backup, "Replicate",
-                    payload={"key": key, "value": value, "seq": seq},
-                ))
+                events.append(
+                    self._network.send(
+                        self,
+                        backup,
+                        "Replicate",
+                        payload={"key": key, "value": value, "seq": seq},
+                    )
+                )
                 self._replications_sent += 1
             if events:
                 yield 0.0, events
@@ -196,13 +211,19 @@ class PrimaryNode(Entity):
             events = []
             for backup in self._backups:
                 ack_future = SimFuture()
-                events.append(self._network.send(
-                    self, backup, "Replicate",
-                    payload={
-                        "key": key, "value": value, "seq": seq,
-                        "ack_future": ack_future,
-                    },
-                ))
+                events.append(
+                    self._network.send(
+                        self,
+                        backup,
+                        "Replicate",
+                        payload={
+                            "key": key,
+                            "value": value,
+                            "seq": seq,
+                            "ack_future": ack_future,
+                        },
+                    )
+                )
                 ack_futures.append(ack_future)
                 self._replications_sent += 1
             yield 0.0, events
@@ -210,6 +231,7 @@ class PrimaryNode(Entity):
             # Wait for first ack (any_of requires 2+, handle edge case)
             if len(ack_futures) >= 2:
                 from happysimulator.core.sim_future import any_of
+
                 _idx, _val = yield any_of(*ack_futures)
             elif ack_futures:
                 yield ack_futures[0]
@@ -224,13 +246,19 @@ class PrimaryNode(Entity):
             events = []
             for backup in self._backups:
                 ack_future = SimFuture()
-                events.append(self._network.send(
-                    self, backup, "Replicate",
-                    payload={
-                        "key": key, "value": value, "seq": seq,
-                        "ack_future": ack_future,
-                    },
-                ))
+                events.append(
+                    self._network.send(
+                        self,
+                        backup,
+                        "Replicate",
+                        payload={
+                            "key": key,
+                            "value": value,
+                            "seq": seq,
+                            "ack_future": ack_future,
+                        },
+                    )
+                )
                 ack_futures.append(ack_future)
                 self._replications_sent += 1
             yield 0.0, events
@@ -244,9 +272,7 @@ class PrimaryNode(Entity):
                 reply_future.resolve({"status": "ok", "seq": seq})
             return None
 
-    def _handle_read(
-        self, event: Event
-    ) -> Generator[float, None, list[Event] | Event | None]:
+    def _handle_read(self, event: Event) -> Generator[float, None, list[Event] | Event | None]:
         """Process a read: return value from local store."""
         metadata = event.context.get("metadata", {})
         key = metadata.get("key")
@@ -355,15 +381,15 @@ class BackupNode(Entity):
 
         # Also send ack event for lag tracking (ASYNC mode)
         ack_event = self._network.send(
-            self, self._primary, "ReplicationAck",
+            self,
+            self._primary,
+            "ReplicationAck",
             payload={"source": self.name, "seq": seq},
         )
         yield 0.0, [ack_event]
         return None
 
-    def _handle_read(
-        self, event: Event
-    ) -> Generator[float, None, list[Event] | Event | None]:
+    def _handle_read(self, event: Event) -> Generator[float, None, list[Event] | Event | None]:
         """Serve a read from the local (possibly stale) store."""
         metadata = event.context.get("metadata", {})
         key = metadata.get("key")
@@ -373,10 +399,12 @@ class BackupNode(Entity):
         value = yield from self._store.get(key)
 
         if reply_future is not None:
-            reply_future.resolve({
-                "status": "ok",
-                "value": value,
-                "stale": True,
-                "seq": self._last_applied_seq,
-            })
+            reply_future.resolve(
+                {
+                    "status": "ok",
+                    "value": value,
+                    "stale": True,
+                    "seq": self._last_applied_seq,
+                }
+            )
         return None

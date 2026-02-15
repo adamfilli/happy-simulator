@@ -26,33 +26,33 @@ Example:
     notifications.subscribe(sms_service)
 """
 
-from happysimulator.components.messaging.message_queue import (
-    MessageQueue,
-    MessageQueueStats,
-    Message,
-    MessageState,
-)
-from happysimulator.components.messaging.topic import (
-    Topic,
-    TopicStats,
-    Subscription,
-)
 from happysimulator.components.messaging.dlq import (
     DeadLetterQueue,
     DeadLetterStats,
 )
+from happysimulator.components.messaging.message_queue import (
+    Message,
+    MessageQueue,
+    MessageQueueStats,
+    MessageState,
+)
+from happysimulator.components.messaging.topic import (
+    Subscription,
+    Topic,
+    TopicStats,
+)
 
 __all__ = [
-    # Message Queue
-    "MessageQueue",
-    "MessageQueueStats",
-    "Message",
-    "MessageState",
-    # Topic
-    "Topic",
-    "TopicStats",
-    "Subscription",
     # Dead Letter Queue
     "DeadLetterQueue",
     "DeadLetterStats",
+    "Message",
+    # Message Queue
+    "MessageQueue",
+    "MessageQueueStats",
+    "MessageState",
+    "Subscription",
+    # Topic
+    "Topic",
+    "TopicStats",
 ]

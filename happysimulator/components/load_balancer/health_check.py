@@ -23,13 +23,20 @@ Example:
     sim.schedule(health_checker.start())
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +83,7 @@ class HealthChecker(Entity):
     def __init__(
         self,
         name: str,
-        load_balancer: "LoadBalancer",
+        load_balancer: LoadBalancer,
         interval: float = 10.0,
         timeout: float = 5.0,
         healthy_threshold: int = 2,
@@ -104,9 +111,7 @@ class HealthChecker(Entity):
         if timeout <= 0:
             raise ValueError(f"timeout must be > 0, got {timeout}")
         if timeout >= interval:
-            raise ValueError(
-                f"timeout ({timeout}) must be < interval ({interval})"
-            )
+            raise ValueError(f"timeout ({timeout}) must be < interval ({interval})")
         if healthy_threshold < 1:
             raise ValueError(f"healthy_threshold must be >= 1, got {healthy_threshold}")
         if unhealthy_threshold < 1:
@@ -161,7 +166,7 @@ class HealthChecker(Entity):
         )
 
     @property
-    def load_balancer(self) -> "LoadBalancer":
+    def load_balancer(self) -> LoadBalancer:
         """The load balancer being monitored."""
         return self._load_balancer
 
@@ -373,16 +378,19 @@ class HealthChecker(Entity):
 
         # Check if backend should be marked healthy
         backend_info = self._load_balancer.get_backend_info_by_name(backend_name)
-        if backend_info and not backend_info.is_healthy:
-            if state.consecutive_successes >= self._healthy_threshold:
-                backend = backend_info.backend
-                self._load_balancer.mark_healthy(backend)
-                self._backends_marked_healthy += 1
-                logger.info(
-                    "[%s] Backend marked healthy: %s",
-                    self.name,
-                    backend_name,
-                )
+        if (
+            backend_info
+            and not backend_info.is_healthy
+            and state.consecutive_successes >= self._healthy_threshold
+        ):
+            backend = backend_info.backend
+            self._load_balancer.mark_healthy(backend)
+            self._backends_marked_healthy += 1
+            logger.info(
+                "[%s] Backend marked healthy: %s",
+                self.name,
+                backend_name,
+            )
 
     def _handle_timeout(self, event: Event) -> None:
         """Handle a health check timeout (failure)."""
@@ -418,16 +426,19 @@ class HealthChecker(Entity):
 
         # Check if backend should be marked unhealthy
         backend_info = self._load_balancer.get_backend_info_by_name(backend_name)
-        if backend_info and backend_info.is_healthy:
-            if state.consecutive_failures >= self._unhealthy_threshold:
-                backend = backend_info.backend
-                self._load_balancer.mark_unhealthy(backend)
-                self._backends_marked_unhealthy += 1
-                logger.info(
-                    "[%s] Backend marked unhealthy: %s",
-                    self.name,
-                    backend_name,
-                )
+        if (
+            backend_info
+            and backend_info.is_healthy
+            and state.consecutive_failures >= self._unhealthy_threshold
+        ):
+            backend = backend_info.backend
+            self._load_balancer.mark_unhealthy(backend)
+            self._backends_marked_unhealthy += 1
+            logger.info(
+                "[%s] Backend marked unhealthy: %s",
+                self.name,
+                backend_name,
+            )
 
     def get_backend_state_by_name(self, name: str) -> BackendHealthState | None:
         """Get health state by backend name."""

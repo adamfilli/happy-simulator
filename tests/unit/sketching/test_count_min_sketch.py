@@ -1,12 +1,12 @@
 """Tests for Count-Min Sketch."""
 
-from collections import Counter
 import math
+from collections import Counter
 
 import pytest
 
-from happysimulator.sketching import CountMinSketch, FrequencyEstimate
 from happysimulator.distributions import ZipfDistribution
+from happysimulator.sketching import CountMinSketch, FrequencyEstimate
 
 
 class TestCountMinSketchCreation:
@@ -235,7 +235,7 @@ class TestCountMinSketchErrorBounds:
         assert estimate.item == 42
         assert estimate.count >= 100
         # Error bound is epsilon * total_count
-        expected_error = int(math.ceil(cms.epsilon * cms.item_count))
+        expected_error = math.ceil(cms.epsilon * cms.item_count)
         assert estimate.error == expected_error
 
 

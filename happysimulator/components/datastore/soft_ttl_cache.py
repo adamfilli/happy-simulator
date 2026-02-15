@@ -27,13 +27,14 @@ Example:
         value = yield from cache.get("user:123")
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Generator, Optional
+from typing import Any
 
+from happysimulator.components.datastore.kv_store import KVStore
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
-from happysimulator.components.datastore.kv_store import KVStore
 
 
 @dataclass
@@ -174,12 +175,10 @@ class SoftTTLCache(Entity):
 
         # Convert float to Duration if needed
         self._soft_ttl = (
-            soft_ttl if isinstance(soft_ttl, Duration)
-            else Duration.from_seconds(soft_ttl)
+            soft_ttl if isinstance(soft_ttl, Duration) else Duration.from_seconds(soft_ttl)
         )
         self._hard_ttl = (
-            hard_ttl if isinstance(hard_ttl, Duration)
-            else Duration.from_seconds(hard_ttl)
+            hard_ttl if isinstance(hard_ttl, Duration) else Duration.from_seconds(hard_ttl)
         )
 
         # Validation
@@ -188,9 +187,7 @@ class SoftTTLCache(Entity):
         if self._hard_ttl.nanoseconds < 0:
             raise ValueError(f"hard_ttl must be >= 0, got {hard_ttl}")
         if self._soft_ttl > self._hard_ttl:
-            raise ValueError(
-                f"soft_ttl ({soft_ttl}) must be <= hard_ttl ({hard_ttl})"
-            )
+            raise ValueError(f"soft_ttl ({soft_ttl}) must be <= hard_ttl ({hard_ttl})")
         if cache_capacity is not None and cache_capacity < 1:
             raise ValueError(f"cache_capacity must be >= 1 or None, got {cache_capacity}")
         if cache_read_latency < 0:
@@ -254,7 +251,7 @@ class SoftTTLCache(Entity):
         """Current number of cached entries."""
         return len(self._cache)
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value with soft TTL semantics.
 
         Behavior depends on cache state:
@@ -313,7 +310,7 @@ class SoftTTLCache(Entity):
             self._store(key, value)
         return value
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Store a value in cache and backing store.
 
         Updates the cache timestamp and writes through to backing store.
@@ -377,7 +374,7 @@ class SoftTTLCache(Entity):
         """
         return list(self._cache.keys())
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         """Handle internal cache events (background refresh).
 
         Args:
@@ -415,12 +412,14 @@ class SoftTTLCache(Entity):
         self._refreshing_keys.add(key)
         self._background_refreshes += 1
 
-        return [Event(
-            time=self.now,
-            event_type="_sttl_refresh",
-            target=self,
-            context={"metadata": {"key": key}},
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="_sttl_refresh",
+                target=self,
+                context={"metadata": {"key": key}},
+            )
+        ]
 
     def _store(self, key: str, value: Any) -> None:
         """Store a value in the cache with current timestamp.

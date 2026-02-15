@@ -6,18 +6,15 @@ building a trace of the event's journey through the system.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
+from happysimulator.components.common import Sink
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
-from happysimulator.components.common import Sink
-from happysimulator.components.queued_resource import QueuedResource
-
 
 # --- Test entities ---
+
 
 class ForwardingEntity(Entity):
     """Immediately forwards events to a downstream entity."""
@@ -27,12 +24,14 @@ class ForwardingEntity(Entity):
         self.downstream = downstream
 
     def handle_event(self, event: Event):
-        return [Event(
-            time=self.now,
-            event_type=event.event_type,
-            target=self.downstream,
-            context=event.context,
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type=event.event_type,
+                target=self.downstream,
+                context=event.context,
+            )
+        ]
 
 
 class YieldingForwarder(Entity):
@@ -44,12 +43,14 @@ class YieldingForwarder(Entity):
 
     def handle_event(self, event: Event):
         yield 0.1
-        return [Event(
-            time=self.now,
-            event_type=event.event_type,
-            target=self.downstream,
-            context=event.context,
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type=event.event_type,
+                target=self.downstream,
+                context=event.context,
+            )
+        ]
 
 
 class TerminalEntity(Entity):
@@ -66,6 +67,7 @@ class TerminalEntity(Entity):
 
 # --- Tests ---
 
+
 class TestEventContextStack:
     """Verify that context['stack'] tracks event handling chain."""
 
@@ -77,11 +79,13 @@ class TestEventContextStack:
             entities=[terminal],
             end_time=Instant.from_seconds(1.0),
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Ping",
-            target=terminal,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Ping",
+                target=terminal,
+            )
+        )
         sim.run()
 
         assert len(terminal.received_contexts) == 1
@@ -96,11 +100,13 @@ class TestEventContextStack:
             entities=[forwarder, terminal],
             end_time=Instant.from_seconds(1.0),
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Ping",
-            target=forwarder,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Ping",
+                target=forwarder,
+            )
+        )
         sim.run()
 
         assert len(terminal.received_contexts) == 1
@@ -116,11 +122,13 @@ class TestEventContextStack:
             entities=[a, b, terminal],
             end_time=Instant.from_seconds(1.0),
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Ping",
-            target=a,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Ping",
+                target=a,
+            )
+        )
         sim.run()
 
         assert len(terminal.received_contexts) == 1
@@ -135,11 +143,13 @@ class TestEventContextStack:
             entities=[forwarder, terminal],
             end_time=Instant.from_seconds(1.0),
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Ping",
-            target=forwarder,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Ping",
+                target=forwarder,
+            )
+        )
         sim.run()
 
         assert len(terminal.received_contexts) == 1
@@ -153,16 +163,20 @@ class TestEventContextStack:
             entities=[terminal],
             end_time=Instant.from_seconds(1.0),
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="First",
-            target=terminal,
-        ))
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.2),
-            event_type="Second",
-            target=terminal,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="First",
+                target=terminal,
+            )
+        )
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.2),
+                event_type="Second",
+                target=terminal,
+            )
+        )
         sim.run()
 
         assert len(terminal.received_contexts) == 2

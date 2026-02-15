@@ -27,21 +27,22 @@ import hashlib
 import math
 import struct
 import sys
-from typing import Generic, TypeVar, Hashable
+from collections.abc import Hashable
+from typing import TypeVar
 
-from happysimulator.sketching.base import FrequencySketch, FrequencyEstimate
+from happysimulator.sketching.base import FrequencyEstimate, FrequencySketch
 
-T = TypeVar('T', bound=Hashable)
+T = TypeVar("T", bound=Hashable)
 
 
 def _optimal_width(epsilon: float) -> int:
     """Calculate optimal width for target error rate epsilon."""
-    return int(math.ceil(math.e / epsilon))
+    return math.ceil(math.e / epsilon)
 
 
 def _optimal_depth(delta: float) -> int:
     """Calculate optimal depth for target failure probability delta."""
-    return int(math.ceil(math.log(1.0 / delta)))
+    return math.ceil(math.log(1.0 / delta))
 
 
 class CountMinSketch(FrequencySketch[T]):
@@ -96,9 +97,7 @@ class CountMinSketch(FrequencySketch[T]):
         self._seed = seed if seed is not None else 0
 
         # 2D array of counters [depth][width]
-        self._counters: list[list[int]] = [
-            [0] * width for _ in range(depth)
-        ]
+        self._counters: list[list[int]] = [[0] * width for _ in range(depth)]
         self._total_count = 0
 
         # Precompute hash seeds for each row
@@ -110,7 +109,7 @@ class CountMinSketch(FrequencySketch[T]):
         epsilon: float,
         delta: float,
         seed: int | None = None,
-    ) -> "CountMinSketch[T]":
+    ) -> CountMinSketch[T]:
         """Create a sketch with specified error guarantees.
 
         Args:
@@ -206,7 +205,7 @@ class CountMinSketch(FrequencySketch[T]):
             Estimated count. This is guaranteed to be >= true count,
             and with high probability <= true_count + epsilon * total_count.
         """
-        min_count = float('inf')
+        min_count = float("inf")
         for row in range(self._depth):
             col = self._hash(item, row)
             min_count = min(min_count, self._counters[row][col])
@@ -222,7 +221,7 @@ class CountMinSketch(FrequencySketch[T]):
             FrequencyEstimate with count and error bound.
         """
         count = self.estimate(item)
-        error = int(math.ceil(self.epsilon * self._total_count))
+        error = math.ceil(self.epsilon * self._total_count)
         return FrequencyEstimate(item=item, count=count, error=error)
 
     def top(self, k: int) -> list[FrequencyEstimate[T]]:
@@ -245,7 +244,7 @@ class CountMinSketch(FrequencySketch[T]):
             "Use TopK (Space-Saving) for heavy hitters queries."
         )
 
-    def inner_product(self, other: "CountMinSketch[T]") -> int:
+    def inner_product(self, other: CountMinSketch[T]) -> int:
         """Estimate the inner product of two streams.
 
         The inner product is sum(count_A[x] * count_B[x]) over all items x.
@@ -266,16 +265,15 @@ class CountMinSketch(FrequencySketch[T]):
                 f"({self._width}x{self._depth} vs {other._width}x{other._depth})"
             )
 
-        min_product = float('inf')
+        min_product = float("inf")
         for row in range(self._depth):
             product = sum(
-                self._counters[row][col] * other._counters[row][col]
-                for col in range(self._width)
+                self._counters[row][col] * other._counters[row][col] for col in range(self._width)
             )
             min_product = min(min_product, product)
         return int(min_product)
 
-    def merge(self, other: "CountMinSketch[T]") -> None:
+    def merge(self, other: CountMinSketch[T]) -> None:
         """Merge another Count-Min Sketch into this one.
 
         After merging, this sketch estimates frequencies for the combined stream.
@@ -295,9 +293,7 @@ class CountMinSketch(FrequencySketch[T]):
                 f"({self._width}x{self._depth} vs {other._width}x{other._depth})"
             )
         if self._seed != other._seed:
-            raise ValueError(
-                f"Cannot merge: seeds differ ({self._seed} vs {other._seed})"
-            )
+            raise ValueError(f"Cannot merge: seeds differ ({self._seed} vs {other._seed})")
 
         for row in range(self._depth):
             for col in range(self._width):

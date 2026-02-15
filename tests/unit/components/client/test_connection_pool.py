@@ -2,22 +2,25 @@
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass, field
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.client.connection_pool import (
     Connection,
     ConnectionPool,
-    ConnectionPoolStats,
 )
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.core.callback_entity import NullEntity
 from happysimulator.distributions.constant import ConstantLatency
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 _null = NullEntity()
 
@@ -31,7 +34,7 @@ class MockServer(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -426,10 +429,8 @@ class TestConnectionPoolTimeout:
 
         def requester():
             yield 0.050
-            try:
+            with contextlib.suppress(TimeoutError):
                 yield from pool.acquire()
-            except TimeoutError:
-                pass
 
         event1 = Event.once(
             time=Instant.Epoch,

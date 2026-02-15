@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -29,6 +28,7 @@ class LockGrant:
         granted_at: Simulation time when lock was granted (seconds).
         lease_duration: Duration of the lease in seconds.
     """
+
     lock_name: str
     fencing_token: int
     holder: str
@@ -53,6 +53,7 @@ class DistributedLockStats:
         active_locks: Number of currently held locks.
         total_waiters: Total queued waiters across all locks.
     """
+
     total_acquires: int = 0
     total_releases: int = 0
     total_expirations: int = 0
@@ -64,6 +65,7 @@ class DistributedLockStats:
 @dataclass
 class _LockState:
     """Internal state for a single named lock."""
+
     holder: str | None = None
     fencing_token: int = 0
     granted_at: float = 0.0
@@ -195,19 +197,22 @@ class DistributedLock(Entity):
         expected_token = metadata.get("fencing_token")
 
         if lock_name is None:
-            return None
+            return
 
         state = self._locks.get(lock_name)
         if state is None or state.holder is None:
-            return None
+            return
 
         # Only expire if the token matches (hasn't been re-acquired)
         if state.fencing_token != expected_token:
-            return None
+            return
 
         logger.debug(
             "[%s] Lock '%s' expired (holder=%s, token=%d)",
-            self.name, lock_name, state.holder, state.fencing_token,
+            self.name,
+            lock_name,
+            state.holder,
+            state.fencing_token,
         )
         self._total_expirations += 1
         state.holder = None
@@ -215,7 +220,7 @@ class DistributedLock(Entity):
 
         # Wake next waiter
         self._wake_next_waiter(state, lock_name)
-        return None
+        return
 
     def _handle_acquire_request(self, event: Event) -> list[Event] | None:
         metadata = event.context.get("metadata", {})
@@ -239,7 +244,7 @@ class DistributedLock(Entity):
 
         if lock_name is not None and fencing_token is not None:
             self.release(lock_name, fencing_token)
-        return None
+        return
 
     def _get_or_create(self, lock_name: str) -> _LockState:
         if lock_name not in self._locks:
@@ -264,10 +269,12 @@ class DistributedLock(Entity):
                 event_type="LockLeaseExpiry",
                 target=self,
                 daemon=True,
-                context={"metadata": {
-                    "lock_name": lock_name,
-                    "fencing_token": token,
-                }},
+                context={
+                    "metadata": {
+                        "lock_name": lock_name,
+                        "fencing_token": token,
+                    }
+                },
             )
             if state.lease_event:
                 state.lease_event.cancel()
@@ -287,14 +294,20 @@ class DistributedLock(Entity):
 
         logger.debug(
             "[%s] Lock '%s' granted to %s (token=%d)",
-            self.name, lock_name, requester, token,
+            self.name,
+            lock_name,
+            requester,
+            token,
         )
         return grant
 
     def _release_lock(self, state: _LockState, lock_name: str) -> None:
         logger.debug(
             "[%s] Lock '%s' released by %s (token=%d)",
-            self.name, lock_name, state.holder, state.fencing_token,
+            self.name,
+            lock_name,
+            state.holder,
+            state.fencing_token,
         )
         self._total_releases += 1
         state.holder = None

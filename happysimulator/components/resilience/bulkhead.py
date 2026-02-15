@@ -21,8 +21,8 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -376,7 +376,7 @@ class Bulkhead(Entity):
                 return
 
         # Request already processed or removed
-        return None
+        return
 
     def _try_process_queued(self) -> list[Event] | None:
         """Try to process the next queued request."""

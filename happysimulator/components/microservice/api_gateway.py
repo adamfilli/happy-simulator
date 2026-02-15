@@ -27,8 +27,8 @@ Example:
 
 import logging
 import random
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Callable, Generator
 
 from happysimulator.components.rate_limiter.policy import RateLimiterPolicy
 from happysimulator.core.entity import Entity
@@ -125,7 +125,7 @@ class APIGateway(Entity):
         self._route_extractor = route_extractor or self._default_route_extractor
 
         # Per-route round-robin indices
-        self._route_indices: dict[str, int] = {key: 0 for key in routes}
+        self._route_indices: dict[str, int] = dict.fromkeys(routes, 0)
 
         # Request tracking for timeout
         self._in_flight: dict[int, dict] = {}
@@ -188,7 +188,9 @@ class APIGateway(Entity):
 
         return self._handle_request(event)
 
-    def _handle_request(self, event: Event) -> Generator[float, None, list[Event]] | list[Event] | None:
+    def _handle_request(
+        self, event: Event
+    ) -> Generator[float, None, list[Event]] | list[Event] | None:
         """Process request through auth, rate limit, and routing."""
         self._total_requests += 1
 
@@ -202,9 +204,7 @@ class APIGateway(Entity):
         route = self._routes[route_key]
 
         # Track per-route requests
-        self._per_route_requests[route_key] = (
-            self._per_route_requests.get(route_key, 0) + 1
-        )
+        self._per_route_requests[route_key] = self._per_route_requests.get(route_key, 0) + 1
 
         # 2. Auth check (needs generator for latency simulation)
         if route.auth_required:
@@ -236,11 +236,12 @@ class APIGateway(Entity):
     ) -> list[Event] | None:
         """Apply per-route rate limiting and forward to backend."""
         # Rate limit check
-        if route.rate_limit_policy is not None:
-            if not route.rate_limit_policy.try_acquire(self.now):
-                self._requests_rejected_rate_limit += 1
-                logger.debug("[%s] Rate limited on route=%s", self.name, route_key)
-                return None
+        if route.rate_limit_policy is not None and not route.rate_limit_policy.try_acquire(
+            self.now
+        ):
+            self._requests_rejected_rate_limit += 1
+            logger.debug("[%s] Rate limited on route=%s", self.name, route_key)
+            return None
 
         # Select backend
         if not route.backends:

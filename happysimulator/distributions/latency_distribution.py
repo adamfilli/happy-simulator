@@ -49,7 +49,6 @@ class LatencyDistribution(ABC):
         Returns:
             Sampled latency as a Duration.
         """
-        pass
 
     def __add__(self, additional: float) -> "LatencyDistribution":
         """Return a copy with increased mean latency."""

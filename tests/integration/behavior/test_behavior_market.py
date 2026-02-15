@@ -6,15 +6,12 @@ Verify innovators adopt before majority (adoption curve).
 
 import random
 
-from happysimulator import Simulation, Instant, Event
-from happysimulator.components.behavior.agent import Agent
-from happysimulator.components.behavior.traits import NormalTraitDistribution
-from happysimulator.components.behavior.state import AgentState
+from happysimulator import Event, Instant, Simulation
 from happysimulator.components.behavior.decision import Choice, UtilityModel
 from happysimulator.components.behavior.environment import Environment
-from happysimulator.components.behavior.social_network import SocialGraph
 from happysimulator.components.behavior.population import DemographicSegment, Population
 from happysimulator.components.behavior.stimulus import price_change
+from happysimulator.components.behavior.traits import NormalTraitDistribution
 
 
 def _innovator_utility(choice, ctx):
@@ -39,14 +36,22 @@ class TestBehaviorMarket:
         random.seed(42)
 
         innovator_dist = NormalTraitDistribution(
-            means={"openness": 0.9, "conscientiousness": 0.5,
-                   "extraversion": 0.7, "agreeableness": 0.5,
-                   "neuroticism": 0.3},
+            means={
+                "openness": 0.9,
+                "conscientiousness": 0.5,
+                "extraversion": 0.7,
+                "agreeableness": 0.5,
+                "neuroticism": 0.3,
+            },
         )
         majority_dist = NormalTraitDistribution(
-            means={"openness": 0.4, "conscientiousness": 0.5,
-                   "extraversion": 0.5, "agreeableness": 0.6,
-                   "neuroticism": 0.5},
+            means={
+                "openness": 0.4,
+                "conscientiousness": 0.5,
+                "extraversion": 0.5,
+                "agreeableness": 0.6,
+                "neuroticism": 0.5,
+            },
         )
 
         segments = [
@@ -90,7 +95,7 @@ class TestBehaviorMarket:
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=5.0,
-            entities=[env] + pop.agents,
+            entities=[env, *pop.agents],
         )
 
         sim.schedule(price_change(1.0, env, "ProductX", 100.0, 80.0))
@@ -100,12 +105,10 @@ class TestBehaviorMarket:
         # Count buys by segment
         innovator_count = int(0.15 * 50)
         innovator_buys = sum(
-            pop.agents[i].stats.actions_by_type.get("buy", 0)
-            for i in range(innovator_count)
+            pop.agents[i].stats.actions_by_type.get("buy", 0) for i in range(innovator_count)
         )
         majority_buys = sum(
-            pop.agents[i].stats.actions_by_type.get("buy", 0)
-            for i in range(innovator_count, 50)
+            pop.agents[i].stats.actions_by_type.get("buy", 0) for i in range(innovator_count, 50)
         )
 
         # Innovators should have higher per-capita adoption
@@ -129,17 +132,21 @@ class TestBehaviorMarket:
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=2.0,
-            entities=[env] + pop.agents,
+            entities=[env, *pop.agents],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="BroadcastStimulus",
-            target=env,
-            context={"metadata": {
-                "stimulus_type": "Test",
-                "choices": [Choice(action="buy")],
-            }},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="BroadcastStimulus",
+                target=env,
+                context={
+                    "metadata": {
+                        "stimulus_type": "Test",
+                        "choices": [Choice(action="buy")],
+                    }
+                },
+            )
+        )
         sim.run()
 
         stats = pop.stats

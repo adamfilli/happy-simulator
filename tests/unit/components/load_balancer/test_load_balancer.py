@@ -3,36 +3,37 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.load_balancer.load_balancer import (
     LoadBalancer,
-    LoadBalancerStats,
-    BackendInfo,
 )
 from happysimulator.components.load_balancer.strategies import (
-    RoundRobin,
     LeastConnections,
-    Random,
+    RoundRobin,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 @dataclass
 class MockServer(Entity):
     """Mock server that processes requests."""
+
     name: str
     response_time: float = 0.010
 
     requests_received: int = field(default=0, init=False)
     active_connections: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         self.active_connections += 1
         yield self.response_time
@@ -42,13 +43,14 @@ class MockServer(Entity):
 @dataclass
 class FailingServer(Entity):
     """Server that fails after N requests."""
+
     name: str
     fail_after: int = 3
     response_time: float = 0.010
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         if self.requests_received > self.fail_after:
             raise RuntimeError("Server failed")
@@ -196,7 +198,7 @@ class TestLoadBalancerRouting:
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
-            entities=servers + [lb],
+            entities=[*servers, lb],
         )
 
         # Send request to load balancer
@@ -223,7 +225,7 @@ class TestLoadBalancerRouting:
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
-            entities=servers + [lb],
+            entities=[*servers, lb],
         )
 
         # Send 6 requests
@@ -254,7 +256,7 @@ class TestLoadBalancerRouting:
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
-            entities=servers + [lb],
+            entities=[*servers, lb],
         )
 
         # Send 4 requests
@@ -313,7 +315,7 @@ class TestLoadBalancerWithLeastConnections:
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(0.5),
             sources=[],
-            entities=servers + [lb],
+            entities=[*servers, lb],
         )
 
         # Make "busy" server busy first

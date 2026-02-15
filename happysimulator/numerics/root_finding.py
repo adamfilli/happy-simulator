@@ -3,8 +3,8 @@
 Provides Brent's method as a pure Python replacement for scipy.optimize.brentq.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 
 @dataclass
@@ -62,9 +62,7 @@ def brentq(
     fb = eval_f(b)
 
     if fa * fb > 0:
-        raise ValueError(
-            f"f(a) and f(b) must have opposite signs, got f({a})={fa}, f({b})={fb}"
-        )
+        raise ValueError(f"f(a) and f(b) must have opposite signs, got f({a})={fa}, f({b})={fb}")
 
     # Ensure |f(b)| <= |f(a)| so b is the best estimate
     if abs(fa) < abs(fb):
@@ -151,6 +149,4 @@ def brentq(
             fc = fa
 
     # Did not converge within maxiter
-    return RootResult(
-        root=b, converged=False, iterations=maxiter, function_calls=func_calls
-    )
+    return RootResult(root=b, converged=False, iterations=maxiter, function_calls=func_calls)

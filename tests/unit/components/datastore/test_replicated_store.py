@@ -3,9 +3,9 @@
 import pytest
 
 from happysimulator.components.datastore import (
-    ReplicatedStore,
     ConsistencyLevel,
     KVStore,
+    ReplicatedStore,
 )
 
 
@@ -181,5 +181,5 @@ class TestReplicatedStoreStatistics:
         status = store.get_replica_status()
 
         assert len(status) == 3
-        assert status[0]['name'] == "node0"
-        assert status[0]['size'] == 1
+        assert status[0]["name"] == "node0"
+        assert status[0]["size"] == 1

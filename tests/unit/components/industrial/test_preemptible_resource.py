@@ -2,25 +2,35 @@
 
 from __future__ import annotations
 
-import pytest
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.components.industrial.preemptible_resource import (
-    PreemptibleResource,
-    PreemptibleGrant,
-)
+import pytest
+
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.preemptible_resource import (
+    PreemptibleGrant,
+    PreemptibleResource,
+)
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 class Acquirer(Entity):
     """Test entity that acquires from a PreemptibleResource."""
 
-    def __init__(self, name: str, resource: PreemptibleResource, priority: float,
-                 hold_time: float, downstream: Entity):
+    def __init__(
+        self,
+        name: str,
+        resource: PreemptibleResource,
+        priority: float,
+        hold_time: float,
+        downstream: Entity,
+    ):
         super().__init__(name)
         self.resource = resource
         self.priority = priority
@@ -35,7 +45,9 @@ class Acquirer(Entity):
             self.preempted = True
 
         grant = yield self.resource.acquire(
-            amount=1, priority=self.priority, on_preempt=on_preempt,
+            amount=1,
+            priority=self.priority,
+            on_preempt=on_preempt,
         )
         self._grant = grant
         self.acquired = True
@@ -44,13 +56,15 @@ class Acquirer(Entity):
 
         if not grant.preempted:
             grant.release()
-            return [Event(time=self.now, event_type="Done", target=self.downstream,
-                          context=event.context)]
+            return [
+                Event(
+                    time=self.now, event_type="Done", target=self.downstream, context=event.context
+                )
+            ]
         return []
 
 
 class TestPreemptibleResourceBasics:
-
     def test_creates_with_capacity(self):
         res = PreemptibleResource("res", capacity=4)
         assert res.capacity == 4

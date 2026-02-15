@@ -7,24 +7,25 @@ correctly follow the expected Zipf distribution, with visualization output.
 from __future__ import annotations
 
 from collections import Counter
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
 from happysimulator import (
+    ConstantArrivalTimeProvider,
+    ConstantRateProfile,
+    DistributedFieldProvider,
     Entity,
     Event,
     Instant,
     Simulation,
     Source,
-    ConstantArrivalTimeProvider,
-    ConstantRateProfile,
-    ZipfDistribution,
     UniformDistribution,
-    DistributedFieldProvider,
+    ZipfDistribution,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # =============================================================================
 # Statistics Collector Sink
@@ -171,30 +172,32 @@ class TestZipfDistributionVisualization:
         ax = axes[0, 0]
         observed_counts = [count for _, count in freq_dist]
         ranks = range(1, len(observed_counts) + 1)
-        ax.loglog(ranks, observed_counts, 'bo-', alpha=0.6, label='Observed', markersize=4)
+        ax.loglog(ranks, observed_counts, "bo-", alpha=0.6, label="Observed", markersize=4)
 
         # Expected Zipf frequencies
-        expected_probs = [1.0 / (k ** zipf_s) for k in ranks]
+        expected_probs = [1.0 / (k**zipf_s) for k in ranks]
         expected_total = sum(expected_probs)
         expected_counts = [p / expected_total * sink.events_received for p in expected_probs]
-        ax.loglog(ranks, expected_counts, 'r--', alpha=0.8, label=f'Expected (s={zipf_s})', linewidth=2)
+        ax.loglog(
+            ranks, expected_counts, "r--", alpha=0.8, label=f"Expected (s={zipf_s})", linewidth=2
+        )
 
         ax.set_xlabel("Rank (log scale)")
         ax.set_ylabel("Frequency (log scale)")
         ax.set_title("Zipf Distribution: Rank vs Frequency")
         ax.legend()
-        ax.grid(True, alpha=0.3, which='both')
+        ax.grid(True, alpha=0.3, which="both")
 
         # Plot 2: Cumulative distribution
         ax = axes[0, 1]
         cumulative = np.cumsum(observed_counts) / sum(observed_counts) * 100
-        ax.plot(ranks, cumulative, 'b-', linewidth=2, label='Observed')
+        ax.plot(ranks, cumulative, "b-", linewidth=2, label="Observed")
 
         expected_cumulative = np.cumsum(expected_counts) / sum(expected_counts) * 100
-        ax.plot(ranks, expected_cumulative, 'r--', linewidth=2, label='Expected')
+        ax.plot(ranks, expected_cumulative, "r--", linewidth=2, label="Expected")
 
-        ax.axhline(y=80, color='gray', linestyle=':', alpha=0.7)
-        ax.axvline(x=num_customers * 0.2, color='gray', linestyle=':', alpha=0.7)
+        ax.axhline(y=80, color="gray", linestyle=":", alpha=0.7)
+        ax.axvline(x=num_customers * 0.2, color="gray", linestyle=":", alpha=0.7)
         ax.set_xlabel("Customer Rank")
         ax.set_ylabel("Cumulative % of Requests")
         ax.set_title("Cumulative Distribution (80/20 Rule)")
@@ -206,52 +209,76 @@ class TestZipfDistributionVisualization:
         top_20 = freq_dist[:20]
         customer_ids = [str(cid) for cid, _ in top_20]
         counts = [count for _, count in top_20]
-        bars = ax.bar(range(len(top_20)), counts, color='steelblue', alpha=0.8)
+        bars = ax.bar(range(len(top_20)), counts, color="steelblue", alpha=0.8)
         ax.set_xticks(range(len(top_20)))
-        ax.set_xticklabels(customer_ids, rotation=45, ha='right')
+        ax.set_xticklabels(customer_ids, rotation=45, ha="right")
         ax.set_xlabel("Customer ID")
         ax.set_ylabel("Request Count")
         ax.set_title("Top 20 Customers by Request Volume")
-        ax.grid(True, alpha=0.3, axis='y')
+        ax.grid(True, alpha=0.3, axis="y")
 
         # Add percentage labels on bars
         total = sink.events_received
-        for i, (bar, count) in enumerate(zip(bars, counts)):
+        for _i, (bar, count) in enumerate(zip(bars, counts, strict=False)):
             pct = count / total * 100
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                    f'{pct:.1f}%', ha='center', va='bottom', fontsize=8)
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
 
         # Plot 4: Distribution comparison (histogram of frequencies)
         ax = axes[1, 1]
-        ax.hist(observed_counts, bins=30, alpha=0.6, color='steelblue', label='Observed', edgecolor='black')
+        ax.hist(
+            observed_counts,
+            bins=30,
+            alpha=0.6,
+            color="steelblue",
+            label="Observed",
+            edgecolor="black",
+        )
         ax.set_xlabel("Request Count per Customer")
         ax.set_ylabel("Number of Customers")
         ax.set_title("Distribution of Request Counts")
         ax.legend()
-        ax.grid(True, alpha=0.3, axis='y')
+        ax.grid(True, alpha=0.3, axis="y")
 
-        fig.suptitle(f"Zipf Distribution Verification (s={zipf_s}, n={num_customers}, events={sink.events_received})",
-                     fontsize=14, fontweight='bold')
+        fig.suptitle(
+            f"Zipf Distribution Verification (s={zipf_s}, n={num_customers}, events={sink.events_received})",
+            fontsize=14,
+            fontweight="bold",
+        )
         fig.tight_layout()
         fig.savefig(test_output_dir / "zipf_distribution_verification.png", dpi=150)
         plt.close(fig)
 
         # Write summary statistics to file
-        with open(test_output_dir / "zipf_statistics.txt", "w") as f:
-            f.write(f"Zipf Distribution Test Summary\n")
-            f.write(f"==============================\n\n")
-            f.write(f"Configuration:\n")
+        with (test_output_dir / "zipf_statistics.txt").open("w") as f:
+            f.write("Zipf Distribution Test Summary\n")
+            f.write("==============================\n\n")
+            f.write("Configuration:\n")
             f.write(f"  Number of customers: {num_customers}\n")
             f.write(f"  Zipf exponent (s): {zipf_s}\n")
             f.write(f"  Events generated: {sink.events_received}\n\n")
-            f.write(f"Results:\n")
+            f.write("Results:\n")
             f.write(f"  Top 10% customers: {top_10_pct:.1f}% of traffic\n")
-            f.write(f"  Top 20% customers: {sink.get_top_n_percentage('customer_id', 20):.1f}% of traffic\n")
-            f.write(f"  Rank 1 customer: {freq_dist[0][1]} requests ({freq_dist[0][1]/sink.events_received*100:.1f}%)\n")
-            f.write(f"  Rank 1/2 ratio: {freq_dist[0][1]/freq_dist[1][1]:.2f} (expected ~2.0)\n\n")
-            f.write(f"Top 10 customers:\n")
+            f.write(
+                f"  Top 20% customers: {sink.get_top_n_percentage('customer_id', 20):.1f}% of traffic\n"
+            )
+            f.write(
+                f"  Rank 1 customer: {freq_dist[0][1]} requests ({freq_dist[0][1] / sink.events_received * 100:.1f}%)\n"
+            )
+            f.write(
+                f"  Rank 1/2 ratio: {freq_dist[0][1] / freq_dist[1][1]:.2f} (expected ~2.0)\n\n"
+            )
+            f.write("Top 10 customers:\n")
             for i, (cid, count) in enumerate(freq_dist[:10], 1):
-                f.write(f"  {i}. Customer {cid}: {count} requests ({count/sink.events_received*100:.2f}%)\n")
+                f.write(
+                    f"  {i}. Customer {cid}: {count} requests ({count / sink.events_received * 100:.2f}%)\n"
+                )
 
     def test_compare_zipf_parameters(self, test_output_dir: Path):
         """Compare different Zipf s parameters side by side.
@@ -314,45 +341,58 @@ class TestZipfDistributionVisualization:
         # Plot 1: Rank-frequency for all s values
         ax = axes[0, 0]
         colors = plt.cm.viridis([i / len(s_values) for i in range(len(s_values))])
-        for (s, data), color in zip(results.items(), colors):
+        for (s, data), color in zip(results.items(), colors, strict=False):
             freq_dist = data["freq_dist"]
             counts = [count for _, count in freq_dist]
             ranks = range(1, len(counts) + 1)
             label = f"s={s}" if s > 0 else "s=0 (uniform)"
-            ax.loglog(ranks, counts, 'o-', alpha=0.7, label=label, color=color, markersize=3)
+            ax.loglog(ranks, counts, "o-", alpha=0.7, label=label, color=color, markersize=3)
 
         ax.set_xlabel("Rank (log scale)")
         ax.set_ylabel("Frequency (log scale)")
         ax.set_title("Effect of Zipf Exponent on Rank-Frequency")
         ax.legend()
-        ax.grid(True, alpha=0.3, which='both')
+        ax.grid(True, alpha=0.3, which="both")
 
         # Plot 2: Top 10% traffic share
         ax = axes[0, 1]
         s_labels = [f"s={s}" for s in s_values]
         top_10_values = [results[s]["top_10_pct"] for s in s_values]
-        bars = ax.bar(s_labels, top_10_values, color='steelblue', alpha=0.8)
-        ax.axhline(y=10, color='red', linestyle='--', alpha=0.7, label='Uniform (10%)')
+        bars = ax.bar(s_labels, top_10_values, color="steelblue", alpha=0.8)
+        ax.axhline(y=10, color="red", linestyle="--", alpha=0.7, label="Uniform (10%)")
         ax.set_xlabel("Zipf Exponent")
         ax.set_ylabel("% of Traffic to Top 10 Customers")
         ax.set_title("Traffic Concentration vs Zipf Exponent")
         ax.legend()
-        ax.grid(True, alpha=0.3, axis='y')
+        ax.grid(True, alpha=0.3, axis="y")
 
-        for bar, val in zip(bars, top_10_values):
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                    f'{val:.1f}%', ha='center', va='bottom')
+        for bar, val in zip(bars, top_10_values, strict=False):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{val:.1f}%",
+                ha="center",
+                va="bottom",
+            )
 
         # Plot 3: Cumulative distributions
         ax = axes[1, 0]
-        for (s, data), color in zip(results.items(), colors):
+        for (s, data), color in zip(results.items(), colors, strict=False):
             freq_dist = data["freq_dist"]
             counts = [count for _, count in freq_dist]
-            cumulative = [sum(counts[:i+1])/sum(counts)*100 for i in range(len(counts))]
+            cumulative = [sum(counts[: i + 1]) / sum(counts) * 100 for i in range(len(counts))]
             label = f"s={s}" if s > 0 else "s=0 (uniform)"
-            ax.plot(range(1, len(cumulative)+1), cumulative, '-', alpha=0.8, label=label, color=color, linewidth=2)
+            ax.plot(
+                range(1, len(cumulative) + 1),
+                cumulative,
+                "-",
+                alpha=0.8,
+                label=label,
+                color=color,
+                linewidth=2,
+            )
 
-        ax.axhline(y=80, color='gray', linestyle=':', alpha=0.7)
+        ax.axhline(y=80, color="gray", linestyle=":", alpha=0.7)
         ax.set_xlabel("Number of Top Customers")
         ax.set_ylabel("Cumulative % of Traffic")
         ax.set_title("Cumulative Traffic Share")
@@ -361,29 +401,35 @@ class TestZipfDistributionVisualization:
 
         # Plot 4: Summary table as text
         ax = axes[1, 1]
-        ax.axis('off')
+        ax.axis("off")
         table_data = [
             ["s value", "Top 10%", "Top 20%", "Rank 1 %"],
         ]
         for s in s_values:
             data = results[s]
             rank1_pct = data["freq_dist"][0][1] / data["sink"].events_received * 100
-            table_data.append([
-                f"{s:.1f}",
-                f"{data['top_10_pct']:.1f}%",
-                f"{data['top_20_pct']:.1f}%",
-                f"{rank1_pct:.1f}%",
-            ])
+            table_data.append(
+                [
+                    f"{s:.1f}",
+                    f"{data['top_10_pct']:.1f}%",
+                    f"{data['top_20_pct']:.1f}%",
+                    f"{rank1_pct:.1f}%",
+                ]
+            )
 
-        table = ax.table(cellText=table_data, loc='center', cellLoc='center',
-                         colWidths=[0.2, 0.2, 0.2, 0.2])
+        table = ax.table(
+            cellText=table_data, loc="center", cellLoc="center", colWidths=[0.2, 0.2, 0.2, 0.2]
+        )
         table.auto_set_font_size(False)
         table.set_fontsize(12)
         table.scale(1.2, 1.8)
         ax.set_title("Summary Statistics", pad=20)
 
-        fig.suptitle(f"Comparing Zipf Exponent Values (n={num_customers} customers)",
-                     fontsize=14, fontweight='bold')
+        fig.suptitle(
+            f"Comparing Zipf Exponent Values (n={num_customers} customers)",
+            fontsize=14,
+            fontweight="bold",
+        )
         fig.tight_layout()
         fig.savefig(test_output_dir / "zipf_parameter_comparison.png", dpi=150)
         plt.close(fig)
@@ -460,19 +506,21 @@ class TestZipfDistributionVisualization:
 
         avg_count = num_accesses / num_keys  # Expected average
 
-        for ax, (name, data) in zip(axes, results.items()):
+        for ax, (name, data) in zip(axes, results.items(), strict=False):
             counts = sorted(data["counts"], reverse=True)
             ax.bar(range(len(counts)), counts, width=1.0, alpha=0.7)
-            ax.axhline(y=avg_count, color='red', linestyle='--',
-                       label=f'Average ({avg_count:.0f})')
+            ax.axhline(y=avg_count, color="red", linestyle="--", label=f"Average ({avg_count:.0f})")
             ax.set_xlabel("Key Rank")
             ax.set_ylabel("Access Count")
             ax.set_title(f"{name}\nHot keys: {data['hot_keys']}, Cold keys: {data['cold_keys']}")
             ax.legend()
             ax.set_xlim(0, 200)  # Show first 200 keys
 
-        fig.suptitle(f"Hot Key Distribution: Zipf vs Uniform ({num_keys} keys, {num_accesses} accesses)",
-                     fontsize=14, fontweight='bold')
+        fig.suptitle(
+            f"Hot Key Distribution: Zipf vs Uniform ({num_keys} keys, {num_accesses} accesses)",
+            fontsize=14,
+            fontweight="bold",
+        )
         fig.tight_layout()
         fig.savefig(test_output_dir / "zipf_hotspot_comparison.png", dpi=150)
         plt.close(fig)
@@ -535,29 +583,39 @@ class TestMultiFieldDistribution:
         # Customer ID distribution
         ax = axes[0]
         customer_counts = [count for _, count in customer_dist[:30]]
-        ax.bar(range(len(customer_counts)), customer_counts, color='steelblue', alpha=0.8)
+        ax.bar(range(len(customer_counts)), customer_counts, color="steelblue", alpha=0.8)
         ax.set_xlabel("Customer Rank")
         ax.set_ylabel("Request Count")
-        ax.set_title(f"Customer Distribution (Zipf s=1.0)\nTop 10%: {top_10_customer:.1f}% of traffic")
-        ax.grid(True, alpha=0.3, axis='y')
+        ax.set_title(
+            f"Customer Distribution (Zipf s=1.0)\nTop 10%: {top_10_customer:.1f}% of traffic"
+        )
+        ax.grid(True, alpha=0.3, axis="y")
 
         # Region distribution
         ax = axes[1]
         regions = list(region_counts.keys())
         counts = [region_counts[r] for r in regions]
-        bars = ax.bar(regions, counts, color='forestgreen', alpha=0.8)
+        bars = ax.bar(regions, counts, color="forestgreen", alpha=0.8)
         ax.set_xlabel("Region")
         ax.set_ylabel("Request Count")
         ax.set_title("Region Distribution (Uniform)")
-        ax.grid(True, alpha=0.3, axis='y')
+        ax.grid(True, alpha=0.3, axis="y")
 
-        for bar, count in zip(bars, counts):
+        for bar, count in zip(bars, counts, strict=False):
             pct = count / total_regions * 100
-            ax.text(bar.get_x() + bar.get_width()/2, bar.get_height(),
-                    f'{pct:.1f}%', ha='center', va='bottom')
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"{pct:.1f}%",
+                ha="center",
+                va="bottom",
+            )
 
-        fig.suptitle(f"Multi-Field Distribution Test ({sink.events_received} events)",
-                     fontsize=14, fontweight='bold')
+        fig.suptitle(
+            f"Multi-Field Distribution Test ({sink.events_received} events)",
+            fontsize=14,
+            fontweight="bold",
+        )
         fig.tight_layout()
         fig.savefig(test_output_dir / "multi_field_distribution.png", dpi=150)
         plt.close(fig)

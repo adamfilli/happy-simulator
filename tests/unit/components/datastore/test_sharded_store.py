@@ -3,11 +3,11 @@
 import pytest
 
 from happysimulator.components.datastore import (
-    ShardedStore,
-    HashSharding,
-    RangeSharding,
     ConsistentHashSharding,
+    HashSharding,
     KVStore,
+    RangeSharding,
+    ShardedStore,
 )
 
 

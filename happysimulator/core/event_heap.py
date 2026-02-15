@@ -10,7 +10,7 @@ from typing import Union
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
+from happysimulator.instrumentation.recorder import NullTraceRecorder, TraceRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ class EventHeap:
         events: Optional initial events to populate the heap.
         trace_recorder: Optional recorder for debugging heap operations.
     """
+
     def __init__(
         self,
         events: list[Event] | None = None,
@@ -70,7 +71,10 @@ class EventHeap:
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Popped event: type=%s time=%r heap_size=%d primary_remaining=%d",
-                popped.event_type, popped.time, len(self._heap), self._primary_event_count
+                popped.event_type,
+                popped.time,
+                len(self._heap),
+                self._primary_event_count,
             )
         self._trace.record(
             time=self._current_time,
@@ -104,7 +108,10 @@ class EventHeap:
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Pushed event: type=%s scheduled_for=%r daemon=%s heap_size=%d",
-                event.event_type, event.time, event.daemon, len(self._heap)
+                event.event_type,
+                event.time,
+                event.daemon,
+                len(self._heap),
             )
         self._trace.record(
             time=self._current_time,

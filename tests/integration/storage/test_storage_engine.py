@@ -4,31 +4,24 @@ Tests the full storage engine pipeline: WAL, Memtable, SSTable, LSMTree,
 BTree, and TransactionManager working together.
 """
 
-import pytest
-
 from happysimulator import (
-    Simulation,
-    Event,
     Entity,
+    Event,
     Instant,
-    Source,
-    Sink,
     LatencyTracker,
+    Simulation,
+    Source,
 )
 from happysimulator.components.storage import (
-    SSTable,
-    WriteAheadLog,
-    Memtable,
-    LSMTree,
-    LSMTreeStats,
     BTree,
-    BTreeStats,
-    TransactionManager,
     IsolationLevel,
-    SizeTieredCompaction,
     LeveledCompaction,
+    LSMTree,
+    SizeTieredCompaction,
     SyncEveryWrite,
     SyncOnBatch,
+    TransactionManager,
+    WriteAheadLog,
 )
 
 
@@ -37,7 +30,7 @@ class TestLSMWriteReadRoundtrip:
 
     def test_write_read_roundtrip(self):
         lsm = LSMTree("db", memtable_size=10)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[lsm],
@@ -54,7 +47,7 @@ class TestLSMWriteReadRoundtrip:
 
     def test_overwrite_preserves_latest(self):
         lsm = LSMTree("db", memtable_size=5)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[lsm],
@@ -71,7 +64,7 @@ class TestWALRecovery:
 
     def test_all_entries_present(self):
         wal = WriteAheadLog("wal", sync_policy=SyncEveryWrite())
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[wal],
@@ -89,7 +82,7 @@ class TestWALRecovery:
 
     def test_recovery_after_truncate(self):
         wal = WriteAheadLog("wal")
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[wal],
@@ -113,7 +106,7 @@ class TestCompactionReducesSSTables:
             memtable_size=5,
             compaction_strategy=SizeTieredCompaction(min_sstables=3),
         )
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[lsm],
@@ -133,7 +126,7 @@ class TestCompactionReducesSSTables:
             memtable_size=5,
             compaction_strategy=LeveledCompaction(level_0_max=2, base_size_keys=10),
         )
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[lsm],
@@ -153,7 +146,7 @@ class TestBloomFilterReducesPageReads:
 
     def test_bloom_saves_on_missing_keys(self):
         lsm = LSMTree("db", memtable_size=50)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[lsm],
@@ -181,7 +174,7 @@ class TestBTreeVsLSMComparison:
     def test_same_workload_produces_same_results(self):
         btree = BTree("btree", order=16)
         lsm = LSMTree("lsm", memtable_size=20)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[btree, lsm],
@@ -200,7 +193,7 @@ class TestBTreeVsLSMComparison:
         """BTree typically has lower read amplification."""
         btree = BTree("btree", order=32)
         lsm = LSMTree("lsm", memtable_size=20)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[btree, lsm],
@@ -228,10 +221,11 @@ class TestSnapshotIsolationConflicts:
     def test_write_write_conflict_detected(self):
         store = LSMTree("store")
         tm = TransactionManager(
-            "txm", store=store,
+            "txm",
+            store=store,
             isolation=IsolationLevel.SNAPSHOT_ISOLATION,
         )
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[store, tm],
@@ -249,12 +243,15 @@ class TestSnapshotIsolationConflicts:
         store.put_sync("shared_key", "tx1_value")
         tm._version += 1
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(["shared_key"]),
-            keys_read=frozenset(),
-        ))
+
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(["shared_key"]),
+                keys_read=frozenset(),
+            )
+        )
 
         # tx2 should detect conflict
         assert tm._check_conflict(tx2)
@@ -267,10 +264,11 @@ class TestSerializableConflicts:
         store = LSMTree("store")
         store.put_sync("counter", 0)
         tm = TransactionManager(
-            "txm", store=store,
+            "txm",
+            store=store,
             isolation=IsolationLevel.SERIALIZABLE,
         )
-        sim = Simulation(
+        Simulation(
             start_time=Instant.from_seconds(0),
             duration=100,
             entities=[store, tm],
@@ -286,13 +284,16 @@ class TestSerializableConflicts:
 
         # Commit tx1 first
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
         tm._version += 1
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(),
-            keys_read=frozenset(["counter"]),
-        ))
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(),
+                keys_read=frozenset(["counter"]),
+            )
+        )
 
         # tx2 writes a key that tx1 read -> conflict
         assert tm._check_conflict(tx2)
@@ -322,12 +323,14 @@ class TestFullPipeline:
                 value = self._store.get_sync(key)
                 assert value is not None
 
-                return [Event(
-                    time=self.now,
-                    event_type="Processed",
-                    target=self._tracker,
-                    context={"created_at": event.time},
-                )]
+                return [
+                    Event(
+                        time=self.now,
+                        event_type="Processed",
+                        target=self._tracker,
+                        context={"created_at": event.time},
+                    )
+                ]
 
         worker = StorageWorker("worker", lsm, tracker)
 

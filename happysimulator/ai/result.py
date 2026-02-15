@@ -7,11 +7,13 @@ Wraps SimulationSummary + SimulationAnalysis + raw metric Data.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from happysimulator.analysis.report import SimulationAnalysis, analyze
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.summary import SimulationSummary
+
+if TYPE_CHECKING:
+    from happysimulator.instrumentation.data import Data
+    from happysimulator.instrumentation.summary import SimulationSummary
 
 
 @dataclass
@@ -50,9 +52,7 @@ class SimulationComparison:
         return {
             "result_a": self.result_a.to_dict(),
             "result_b": self.result_b.to_dict(),
-            "metric_diffs": {
-                name: diff.to_dict() for name, diff in self.metric_diffs.items()
-            },
+            "metric_diffs": {name: diff.to_dict() for name, diff in self.metric_diffs.items()},
         }
 
     def to_prompt_context(self, max_tokens: int = 2000) -> str:
@@ -84,8 +84,7 @@ class SimulationComparison:
             eps_change = ((b_eps - a_eps) / a_eps) * 100
             sign_t = "+" if eps_change >= 0 else ""
             lines.append(
-                f"| throughput | {a_eps:.1f}/s | {b_eps:.1f}/s "
-                f"| {sign_t}{eps_change:.1f}% |"
+                f"| throughput | {a_eps:.1f}/s | {b_eps:.1f}/s | {sign_t}{eps_change:.1f}% |"
             )
 
         lines.append("")
@@ -168,6 +167,7 @@ class SimulationResult:
 
         # Generate recommendations
         from happysimulator.ai.insights import generate_recommendations
+
         result.recommendations = generate_recommendations(result)
 
         return result
@@ -189,9 +189,7 @@ class SimulationResult:
         if self.recommendations:
             rec_lines = ["## Recommendations"]
             for rec in self.recommendations:
-                rec_lines.append(
-                    f"- [{rec.confidence}] **{rec.category}**: {rec.description}"
-                )
+                rec_lines.append(f"- [{rec.confidence}] **{rec.category}**: {rec.description}")
                 if rec.suggested_change:
                     rec_lines.append(f"  Suggested: {rec.suggested_change}")
             rec_lines.append("")
@@ -204,21 +202,25 @@ class SimulationResult:
         diffs: dict[str, MetricDiff] = {}
 
         # Compare latency if both have it
-        if self.latency is not None and other.latency is not None:
-            if self.latency.count() > 0 and other.latency.count() > 0:
-                mean_a = self.latency.mean()
-                mean_b = other.latency.mean()
-                p99_a = self.latency.percentile(0.99)
-                p99_b = other.latency.percentile(0.99)
-                diffs["latency"] = MetricDiff(
-                    name="latency",
-                    mean_a=mean_a,
-                    mean_b=mean_b,
-                    mean_change_pct=_pct_change(mean_a, mean_b),
-                    p99_a=p99_a,
-                    p99_b=p99_b,
-                    p99_change_pct=_pct_change(p99_a, p99_b),
-                )
+        if (
+            self.latency is not None
+            and other.latency is not None
+            and self.latency.count() > 0
+            and other.latency.count() > 0
+        ):
+            mean_a = self.latency.mean()
+            mean_b = other.latency.mean()
+            p99_a = self.latency.percentile(0.99)
+            p99_b = other.latency.percentile(0.99)
+            diffs["latency"] = MetricDiff(
+                name="latency",
+                mean_a=mean_a,
+                mean_b=mean_b,
+                mean_change_pct=_pct_change(mean_a, mean_b),
+                p99_a=p99_a,
+                p99_b=p99_b,
+                p99_change_pct=_pct_change(p99_a, p99_b),
+            )
 
         # Compare queue depths
         common_keys = set(self.queue_depth.keys()) & set(other.queue_depth.keys())
@@ -272,6 +274,7 @@ class SweepResult:
         Returns:
             The SimulationResult with the lowest value for the given metric+stat.
         """
+
         def _get_value(result: SimulationResult) -> float:
             if metric == "latency" and result.latency is not None:
                 data = result.latency
@@ -283,9 +286,9 @@ class SweepResult:
                 return float("inf")
             if stat == "p99":
                 return data.percentile(0.99)
-            elif stat == "p50":
+            if stat == "p50":
                 return data.percentile(0.50)
-            elif stat == "mean":
+            if stat == "mean":
                 return data.mean()
             return data.percentile(0.99)
 
@@ -320,7 +323,7 @@ class SweepResult:
         # Track for saturation detection
         prev_latency_p99 = None
 
-        for val, result in zip(self.parameter_values, self.results):
+        for val, result in zip(self.parameter_values, self.results, strict=False):
             row = f"| {val} |"
 
             if result.latency is not None and result.latency.count() > 0:
@@ -359,19 +362,22 @@ class SweepResult:
 
             # Detect saturation point
             for i in range(1, len(latencies)):
-                if latencies[i] is not None and latencies[i - 1] is not None:
-                    if latencies[i] > latencies[i - 1] * 5:
-                        observations.append(
-                            f"- System saturates between {self.parameter_name}="
-                            f"{self.parameter_values[i-1]} and "
-                            f"{self.parameter_name}={self.parameter_values[i]}"
-                        )
-                        ratio = latencies[i] / latencies[i - 1] if latencies[i - 1] > 0 else 0
-                        observations.append(
-                            f"- At {self.parameter_name}={self.parameter_values[i]}, "
-                            f"p99 latency increases {ratio:.0f}x"
-                        )
-                        break
+                if (
+                    latencies[i] is not None
+                    and latencies[i - 1] is not None
+                    and latencies[i] > latencies[i - 1] * 5
+                ):
+                    observations.append(
+                        f"- System saturates between {self.parameter_name}="
+                        f"{self.parameter_values[i - 1]} and "
+                        f"{self.parameter_name}={self.parameter_values[i]}"
+                    )
+                    ratio = latencies[i] / latencies[i - 1] if latencies[i - 1] > 0 else 0
+                    observations.append(
+                        f"- At {self.parameter_name}={self.parameter_values[i]}, "
+                        f"p99 latency increases {ratio:.0f}x"
+                    )
+                    break
 
         if observations:
             lines.append("## Observations")

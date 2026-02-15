@@ -17,10 +17,14 @@ from __future__ import annotations
 import bisect
 import logging
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +59,12 @@ class _BTreeNode:
     internal nodes store keys and child pointers.
     """
 
-    __slots__ = ("leaf", "keys", "values", "children")
+    __slots__ = ("children", "keys", "leaf", "values")
 
     def __init__(self, leaf: bool = True) -> None:
         self.leaf = leaf
         self.keys: list[str] = []
-        self.values: list[Any] = []      # Only used in leaf nodes
+        self.values: list[Any] = []  # Only used in leaf nodes
         self.children: list[_BTreeNode] = []  # Only used in internal nodes
 
 
@@ -175,7 +179,7 @@ class BTree(Entity):
             return node.values[idx]
         return None
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Insert or update a key-value pair, yielding I/O latency.
 
         Traverses from root to leaf (page reads), then writes the leaf
@@ -188,7 +192,7 @@ class BTree(Entity):
         self._total_page_reads += self._depth
 
         # Perform the actual insert
-        is_update = self._insert(key, value)
+        self._insert(key, value)
 
         # Write latency for the modified leaf
         self._total_page_writes += 1
@@ -313,10 +317,10 @@ class BTree(Entity):
         else:
             # Internal node split: median key is promoted (removed from both)
             separator = child.keys[mid]
-            new_node.keys = child.keys[mid + 1:]
-            new_node.children = child.children[mid + 1:]
+            new_node.keys = child.keys[mid + 1 :]
+            new_node.children = child.children[mid + 1 :]
             child.keys = child.keys[:mid]
-            child.children = child.children[:mid + 1]
+            child.children = child.children[: mid + 1]
 
         # Insert separator into parent
         parent.keys.insert(child_idx, separator)
@@ -368,7 +372,6 @@ class BTree(Entity):
 
     def handle_event(self, event: Event) -> None:
         """BTree does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

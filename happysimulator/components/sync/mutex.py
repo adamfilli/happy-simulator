@@ -18,8 +18,9 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Generator, Callable, Any
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -119,7 +120,7 @@ class Mutex(Entity):
         self._acquisitions += 1
         return True
 
-    def acquire(self, owner: str | None = None) -> Generator[float, None, None]:
+    def acquire(self, owner: str | None = None) -> Generator[float]:
         """Acquire the lock, blocking if necessary.
 
         This is a generator that yields control while waiting for the lock.
@@ -189,11 +190,9 @@ class Mutex(Entity):
             # Lock transfers directly to next waiter
             self._locked = True
             return []
-        else:
-            # No waiters, unlock
-            self._locked = False
-            return []
+        # No waiters, unlock
+        self._locked = False
+        return []
 
     def handle_event(self, event: Event) -> None:
         """Mutex doesn't directly handle events."""
-        pass

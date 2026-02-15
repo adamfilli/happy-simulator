@@ -17,7 +17,10 @@ Example::
 
 from __future__ import annotations
 
-from typing import Any, Iterator, Self
+from typing import TYPE_CHECKING, Any, Self
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 class ORSet:
@@ -35,7 +38,7 @@ class ORSet:
         node_id: Identifier for this replica.
     """
 
-    __slots__ = ("_node_id", "_entries", "_seq")
+    __slots__ = ("_entries", "_node_id", "_seq")
 
     def __init__(self, node_id: str):
         self._node_id = node_id

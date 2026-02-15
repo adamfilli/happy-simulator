@@ -5,8 +5,9 @@ Run with: pytest tests/test_visualization_example.py -v
 Output will be in: test_output/test_visualization_example/<test_name>/
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 
 class TestVisualizationExample:
@@ -51,7 +52,7 @@ class TestVisualizationExample:
         ]
 
         csv_path = test_output_dir / "simulation_data.csv"
-        with open(csv_path, "w", newline="") as f:
+        with csv_path.open("w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["time", "value", "event"])
             writer.writeheader()
             writer.writerows(data)
@@ -78,7 +79,7 @@ class TestVisualizationExample:
         }
 
         json_path = test_output_dir / "results.json"
-        with open(json_path, "w") as f:
+        with json_path.open("w") as f:
             json.dump(results, f, indent=2)
 
         assert json_path.exists()

@@ -1,10 +1,7 @@
 """Tests for DeadLetterQueue."""
 
-import pytest
-
 from happysimulator.components.messaging import (
     DeadLetterQueue,
-    MessageQueue,
     Message,
     MessageState,
 )
@@ -208,7 +205,7 @@ class TestDeadLetterQueueReprocess:
         assert event is not None
         assert event.event_type == "republish"
         assert event.target == queue
-        assert event.context['original_message_id'] == "msg1"
+        assert event.context["original_message_id"] == "msg1"
         assert dlq.message_count == 0
         assert dlq.stats.messages_reprocessed == 1
 

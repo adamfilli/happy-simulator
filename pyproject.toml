@@ -104,11 +104,20 @@ ignore = [
     "SIM108", # use ternary instead of if-else (readability preference)
     "N806",   # variable in function should be lowercase (conflicts with math conventions)
     "UP007",  # use X | Y for union types (keep Optional for readability in some cases)
+    "E741",   # ambiguous variable name (common in math/plotting: l, I, O)
+    "RUF001", # ambiguous unicode character in string (intentional)
+    "RUF002", # ambiguous unicode character in docstring (intentional)
+    "RUF003", # ambiguous unicode character in comment (intentional)
+    "E402",   # module import not at top (common in __init__.py and conditional imports)
+    "PGH003", # blanket type: ignore (specific codes not always known)
+    "RUF012", # mutable class default (too noisy for simulation entities)
+    "B023",   # function uses loop variable (common in test/example code)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "examples/**" = ["T20"]   # allow print() in examples
 "tests/**" = ["T20"]      # allow print() in tests
+"examples/load-balancing/**" = ["N999"]  # hyphenated directory name is intentional
 
 [tool.ruff.lint.isort]
 known-first-party = ["happysimulator"]

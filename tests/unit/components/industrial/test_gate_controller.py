@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
-from happysimulator.components.industrial.gate_controller import GateController
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.gate_controller import GateController
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestGateControllerBasics:
-
     def test_creates_initially_open(self):
         sink = Sink()
         gate = GateController("gate", downstream=sink, initially_open=True)
@@ -56,11 +53,11 @@ class TestGateControllerBasics:
 
 
 class TestGateControllerSchedule:
-
     def test_schedule_open_close(self):
         sink = Sink()
         gate = GateController(
-            "gate", downstream=sink,
+            "gate",
+            downstream=sink,
             schedule=[(1.0, 3.0)],
             initially_open=False,
         )
@@ -85,7 +82,10 @@ class TestGateControllerSchedule:
     def test_rejects_when_queue_full(self):
         sink = Sink()
         gate = GateController(
-            "gate", downstream=sink, initially_open=False, queue_capacity=1,
+            "gate",
+            downstream=sink,
+            initially_open=False,
+            queue_capacity=1,
         )
 
         sim = Simulation(

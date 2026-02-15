@@ -4,7 +4,7 @@ These tests exercise the control surface against realistic simulation
 configurations with sources, queued resources, and probes.
 """
 
-from typing import Generator
+from collections.abc import Generator
 
 from happysimulator import (
     ConditionBreakpoint,
@@ -22,10 +22,10 @@ from happysimulator import (
     TimeBreakpoint,
 )
 
-
 # -------------------------------------------------------
 # Helper entities
 # -------------------------------------------------------
+
 
 class SimpleServer(QueuedResource):
     """A queued resource with explicit concurrency limit.
@@ -34,7 +34,9 @@ class SimpleServer(QueuedResource):
     when arrivals outpace processing.
     """
 
-    def __init__(self, name: str, downstream: Entity, service_time: float = 0.01, concurrency: int = 1):
+    def __init__(
+        self, name: str, downstream: Entity, service_time: float = 0.01, concurrency: int = 1
+    ):
         super().__init__(name, policy=FIFOQueue())
         self._downstream = downstream
         self._service_time = service_time
@@ -54,6 +56,7 @@ class SimpleServer(QueuedResource):
 # -------------------------------------------------------
 # Pause -> inspect -> resume workflow
 # -------------------------------------------------------
+
 
 def test_pause_inspect_resume():
     """Pause mid-simulation, inspect state, then resume to completion."""
@@ -173,12 +176,14 @@ def test_metric_breakpoint_on_queue_depth():
         entities=[server, counter],
     )
 
-    sim.control.add_breakpoint(MetricBreakpoint(
-        entity_name="Server",
-        attribute="depth",
-        operator="gt",
-        threshold=3,
-    ))
+    sim.control.add_breakpoint(
+        MetricBreakpoint(
+            entity_name="Server",
+            attribute="depth",
+            operator="gt",
+            threshold=3,
+        )
+    )
     sim.run()
 
     state = sim.control.get_state()
@@ -199,10 +204,12 @@ def test_condition_breakpoint():
     )
 
     # Break when counter has received 20+ events
-    sim.control.add_breakpoint(ConditionBreakpoint(
-        fn=lambda ctx: counter.total >= 20,
-        description="counter >= 20",
-    ))
+    sim.control.add_breakpoint(
+        ConditionBreakpoint(
+            fn=lambda ctx: counter.total >= 20,
+            description="counter >= 20",
+        )
+    )
     sim.run()
 
     assert sim.control.is_paused

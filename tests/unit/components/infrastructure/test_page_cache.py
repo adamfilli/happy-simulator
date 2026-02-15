@@ -51,7 +51,7 @@ class TestPageCacheBehavior:
             return values, e.value
 
     def test_read_miss_then_hit(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         # First read: miss
         values, _ = self._exhaust(cache.read_page(1))
@@ -64,14 +64,14 @@ class TestPageCacheBehavior:
         assert cache.stats.hits == 1
 
     def test_write_marks_dirty(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         self._exhaust(cache.write_page(1))
         assert cache.dirty_pages == 1
         assert cache.pages_cached == 1
 
     def test_write_hit_marks_dirty(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         # Read page first (clean)
         self._exhaust(cache.read_page(1))
@@ -82,7 +82,7 @@ class TestPageCacheBehavior:
         assert cache.dirty_pages == 1
 
     def test_eviction_on_full_cache(self):
-        cache, sim = self._make_cache(capacity_pages=3)
+        cache, _sim = self._make_cache(capacity_pages=3)
 
         for i in range(3):
             self._exhaust(cache.read_page(i))
@@ -94,7 +94,7 @@ class TestPageCacheBehavior:
         assert cache.stats.evictions == 1
 
     def test_lru_eviction_order(self):
-        cache, sim = self._make_cache(capacity_pages=3)
+        cache, _sim = self._make_cache(capacity_pages=3)
 
         # Load pages 0, 1, 2
         for i in range(3):
@@ -115,7 +115,7 @@ class TestPageCacheBehavior:
         assert len(values) > 0  # miss
 
     def test_dirty_eviction_causes_writeback(self):
-        cache, sim = self._make_cache(capacity_pages=2)
+        cache, _sim = self._make_cache(capacity_pages=2)
 
         # Write page 0 (dirty)
         self._exhaust(cache.write_page(0))
@@ -123,11 +123,11 @@ class TestPageCacheBehavior:
         self._exhaust(cache.read_page(1))
 
         # Add page 2 — evicts page 0 (dirty) which causes writeback
-        values, _ = self._exhaust(cache.read_page(2))
+        _values, _ = self._exhaust(cache.read_page(2))
         assert cache.stats.dirty_writebacks == 1
 
     def test_readahead(self):
-        cache, sim = self._make_cache(capacity_pages=10, readahead_pages=2)
+        cache, _sim = self._make_cache(capacity_pages=10, readahead_pages=2)
 
         self._exhaust(cache.read_page(5))
         # Pages 5, 6, 7 should be cached
@@ -141,26 +141,26 @@ class TestPageCacheBehavior:
         assert len(values_7) == 0
 
     def test_flush(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         self._exhaust(cache.write_page(1))
         self._exhaust(cache.write_page(2))
         assert cache.dirty_pages == 2
 
-        values, flushed = self._exhaust(cache.flush())
+        _values, flushed = self._exhaust(cache.flush())
         assert flushed == 2
         assert cache.dirty_pages == 0
         assert cache.stats.dirty_writebacks == 2
 
     def test_flush_no_dirty(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         self._exhaust(cache.read_page(1))
-        values, flushed = self._exhaust(cache.flush())
+        _values, flushed = self._exhaust(cache.flush())
         assert flushed == 0
 
     def test_hit_rate(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
 
         self._exhaust(cache.read_page(1))  # miss
         self._exhaust(cache.read_page(1))  # hit
@@ -169,12 +169,13 @@ class TestPageCacheBehavior:
         assert cache.stats.hit_rate == pytest.approx(2.0 / 3.0)
 
     def test_repr(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
         assert "test_cache" in repr(cache)
 
     def test_handle_event_is_noop(self):
-        cache, sim = self._make_cache()
+        cache, _sim = self._make_cache()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",

@@ -9,26 +9,30 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
+from happysimulator.components.common import Sink
 from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 from happysimulator.components.load_balancer.strategies import (
     ConsistentHash,
-    RoundRobin,
     LeastConnections,
     PowerOfTwoChoices,
+    RoundRobin,
 )
-from happysimulator.components.common import Sink
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 @dataclass
 class SimpleServer(Entity):
     """Backend server that processes requests and forwards to downstream."""
+
     name: str
     service_time: float = 0.01
     downstream: Entity | None = None
@@ -52,6 +56,7 @@ class CachingServer(Entity):
 
     Uses client_id from request metadata as cache key.
     """
+
     name: str
     service_time: float = 0.01
     cache_hit_time: float = 0.001
@@ -108,25 +113,28 @@ class TestConsistentHashVsRoundRobin:
             for i in range(num_servers)
         ]
         ch_lb = LoadBalancer(
-            name="ch_lb", backends=ch_servers,
+            name="ch_lb",
+            backends=ch_servers,
             strategy=ConsistentHash(),
         )
 
         ch_sim = Simulation(
             start_time=Instant.Epoch,
             duration=30.0,
-            entities=ch_servers + [ch_lb, sink],
+            entities=[*ch_servers, ch_lb, sink],
         )
 
         # Send requests from repeating clients
         for i in range(num_requests):
             client_id = f"client_{i % num_clients}"
-            ch_sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.1),
-                event_type="request",
-                target=ch_lb,
-                context={"metadata": {"client_id": client_id}},
-            ))
+            ch_sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.1),
+                    event_type="request",
+                    target=ch_lb,
+                    context={"metadata": {"client_id": client_id}},
+                )
+            )
         ch_sim.run()
 
         ch_total_hits = sum(s.cache_hits for s in ch_servers)
@@ -139,24 +147,27 @@ class TestConsistentHashVsRoundRobin:
             for i in range(num_servers)
         ]
         rr_lb = LoadBalancer(
-            name="rr_lb", backends=rr_servers,
+            name="rr_lb",
+            backends=rr_servers,
             strategy=RoundRobin(),
         )
 
         rr_sim = Simulation(
             start_time=Instant.Epoch,
             duration=30.0,
-            entities=rr_servers + [rr_lb, rr_sink],
+            entities=[*rr_servers, rr_lb, rr_sink],
         )
 
         for i in range(num_requests):
             client_id = f"client_{i % num_clients}"
-            rr_sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.1),
-                event_type="request",
-                target=rr_lb,
-                context={"metadata": {"client_id": client_id}},
-            ))
+            rr_sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.1),
+                    event_type="request",
+                    target=rr_lb,
+                    context={"metadata": {"client_id": client_id}},
+                )
+            )
         rr_sim.run()
 
         rr_total_hits = sum(s.cache_hits for s in rr_servers)
@@ -174,29 +185,29 @@ class TestConsistentHashVsRoundRobin:
         num_clients = 10
         num_requests = 100
 
-        ch_servers = [
-            CachingServer(name=f"ch_s{i}", cache_capacity=20)
-            for i in range(num_servers)
-        ]
+        ch_servers = [CachingServer(name=f"ch_s{i}", cache_capacity=20) for i in range(num_servers)]
         ch_lb = LoadBalancer(
-            name="ch_lb", backends=ch_servers,
+            name="ch_lb",
+            backends=ch_servers,
             strategy=ConsistentHash(),
         )
 
         ch_sim = Simulation(
             start_time=Instant.Epoch,
             duration=15.0,
-            entities=ch_servers + [ch_lb],
+            entities=[*ch_servers, ch_lb],
         )
 
         for i in range(num_requests):
             client_id = f"client_{i % num_clients}"
-            ch_sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.1),
-                event_type="request",
-                target=ch_lb,
-                context={"metadata": {"client_id": client_id}},
-            ))
+            ch_sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.1),
+                    event_type="request",
+                    target=ch_lb,
+                    context={"metadata": {"client_id": client_id}},
+                )
+            )
         ch_sim.run()
 
         total_misses = sum(s.cache_misses for s in ch_servers)
@@ -215,12 +226,10 @@ class TestLeastConnectionsDistribution:
         sink = Sink("responses")
         # Use slower service so connections overlap, giving LeastConnections
         # useful data to differentiate servers
-        servers = [
-            SimpleServer(name=f"s{i}", service_time=0.5, downstream=sink)
-            for i in range(4)
-        ]
+        servers = [SimpleServer(name=f"s{i}", service_time=0.5, downstream=sink) for i in range(4)]
         lb = LoadBalancer(
-            name="lb", backends=servers,
+            name="lb",
+            backends=servers,
             strategy=LeastConnections(),
         )
 
@@ -230,7 +239,7 @@ class TestLeastConnectionsDistribution:
             start_time=Instant.Epoch,
             duration=8.0,
             sources=[source],
-            entities=servers + [lb, sink],
+            entities=[*servers, lb, sink],
         )
         sim.run()
 
@@ -249,12 +258,10 @@ class TestPowerOfTwoChoicesLoadBalancing:
     def test_reasonable_distribution(self):
         random.seed(42)
         sink = Sink("responses")
-        servers = [
-            SimpleServer(name=f"s{i}", service_time=0.05, downstream=sink)
-            for i in range(5)
-        ]
+        servers = [SimpleServer(name=f"s{i}", service_time=0.05, downstream=sink) for i in range(5)]
         lb = LoadBalancer(
-            name="lb", backends=servers,
+            name="lb",
+            backends=servers,
             strategy=PowerOfTwoChoices(),
         )
 
@@ -264,7 +271,7 @@ class TestPowerOfTwoChoicesLoadBalancing:
             start_time=Instant.Epoch,
             duration=8.0,
             sources=[source],
-            entities=servers + [lb, sink],
+            entities=[*servers, lb, sink],
         )
         sim.run()
 

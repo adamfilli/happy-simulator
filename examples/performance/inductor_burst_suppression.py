@@ -14,20 +14,20 @@ input/output throughput, EWMA rate estimate, and queue depth.
 
 from dataclasses import dataclass
 
+from happysimulator.components.rate_limiter.inductor import Inductor
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.components.rate_limiter.inductor import Inductor
 from happysimulator.instrumentation.collectors import ThroughputTracker
 from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.visual import serve, Chart
-
+from happysimulator.visual import Chart, serve
 
 # -- Inline passthrough counter -----------------------------------------------
+
 
 class InputCounter(Entity):
     """Counts arrivals (1.0 per event) then forwards to downstream."""
@@ -43,6 +43,7 @@ class InputCounter(Entity):
 
 
 # -- Multi-phase profile ------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class InductorShowcaseProfile(Profile):
@@ -109,13 +110,28 @@ sim = Simulation(
     duration=180.0,
 )
 
-serve(sim, charts=[
-    Chart(input_counter.data, title="Input Throughput",
-          transform="rate", window_s=1.0, y_label="req/s", color="#6366f1"),
-    Chart(output_tracker.data, title="Output Throughput",
-          transform="rate", window_s=1.0, y_label="req/s", color="#10b981"),
-    Chart(rate_data, title="EWMA Rate Estimate",
-          transform="raw", y_label="req/s", color="#f59e0b"),
-    Chart(depth_data, title="Queue Depth",
-          transform="raw", y_label="items", color="#ef4444"),
-])
+serve(
+    sim,
+    charts=[
+        Chart(
+            input_counter.data,
+            title="Input Throughput",
+            transform="rate",
+            window_s=1.0,
+            y_label="req/s",
+            color="#6366f1",
+        ),
+        Chart(
+            output_tracker.data,
+            title="Output Throughput",
+            transform="rate",
+            window_s=1.0,
+            y_label="req/s",
+            color="#10b981",
+        ),
+        Chart(
+            rate_data, title="EWMA Rate Estimate", transform="raw", y_label="req/s", color="#f59e0b"
+        ),
+        Chart(depth_data, title="Queue Depth", transform="raw", y_label="items", color="#ef4444"),
+    ],
+)

@@ -7,12 +7,9 @@ import pytest
 from happysimulator import Event, Instant, Simulation
 from happysimulator.components.advertising import (
     AdPlatform,
-    AdPlatformStats,
     Advertiser,
-    AdvertiserStats,
     AudienceTier,
 )
-
 
 # =============================================================================
 # AudienceTier tests
@@ -346,7 +343,6 @@ class TestAdPlatform:
         assert per_event == pytest.approx(1000.0)
 
     def test_ignores_other_events(self):
-        from happysimulator import NullEntity
 
         platform = AdPlatform("Test")
         sim = Simulation(

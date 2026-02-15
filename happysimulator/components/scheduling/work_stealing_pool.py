@@ -18,8 +18,8 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -93,7 +93,9 @@ class _Worker(Entity):
             return self._queue.pop()
         return None
 
-    def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event] | None:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float, None, list[Event]] | list[Event] | None:
         if event.event_type == "_worker_try_next":
             return self._try_next()
         if event.event_type == "_worker_process":
@@ -139,12 +141,14 @@ class _Worker(Entity):
         # Forward to downstream if configured
         result_events: list[Event] = []
         if self._pool._downstream is not None:
-            result_events.append(Event(
-                time=self.now,
-                event_type="Completed",
-                target=self._pool._downstream,
-                context=event.context,
-            ))
+            result_events.append(
+                Event(
+                    time=self.now,
+                    event_type="Completed",
+                    target=self._pool._downstream,
+                    context=event.context,
+                )
+            )
 
         # Try next task
         result_events.append(self._make_try_next_event())
@@ -210,10 +214,7 @@ class WorkStealingPool(Entity):
         self._processing_time_key = processing_time_key
         self._default_processing_time = default_processing_time
 
-        self._workers = [
-            _Worker(f"{name}.worker_{i}", self, i)
-            for i in range(num_workers)
-        ]
+        self._workers = [_Worker(f"{name}.worker_{i}", self, i) for i in range(num_workers)]
 
         # Statistics (private counters → frozen snapshot via @property)
         self._tasks_submitted = 0
@@ -223,7 +224,8 @@ class WorkStealingPool(Entity):
 
         logger.debug(
             "[%s] WorkStealingPool initialized: workers=%d",
-            name, num_workers,
+            name,
+            num_workers,
         )
 
     @property
@@ -266,7 +268,9 @@ class WorkStealingPool(Entity):
 
         logger.debug(
             "[%s] Assigning task to %s (depth=%d)",
-            self.name, target_worker.name, target_worker.queue_depth,
+            self.name,
+            target_worker.name,
+            target_worker.queue_depth,
         )
 
         return target_worker.enqueue(event)

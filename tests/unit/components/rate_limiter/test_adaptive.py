@@ -4,8 +4,8 @@ import pytest
 
 from happysimulator.components.rate_limiter import (
     AdaptivePolicy,
-    RateLimitedEntity,
     RateAdjustmentReason,
+    RateLimitedEntity,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -106,7 +106,9 @@ class TestAdaptiveRateAdjustment:
     def test_success_increases_rate(self):
         """Recording success increases the rate."""
         policy = AdaptivePolicy(
-            initial_rate=100.0, increase_step=10.0, max_rate=1000.0,
+            initial_rate=100.0,
+            increase_step=10.0,
+            max_rate=1000.0,
         )
         initial = policy.current_rate
         policy.record_success(Instant.Epoch)
@@ -117,7 +119,9 @@ class TestAdaptiveRateAdjustment:
     def test_failure_decreases_rate(self):
         """Recording failure decreases the rate."""
         policy = AdaptivePolicy(
-            initial_rate=100.0, decrease_factor=0.5, min_rate=10.0,
+            initial_rate=100.0,
+            decrease_factor=0.5,
+            min_rate=10.0,
         )
         initial = policy.current_rate
         policy.record_failure(Instant.Epoch)
@@ -128,7 +132,8 @@ class TestAdaptiveRateAdjustment:
     def test_timeout_decreases_rate(self):
         """Recording timeout decreases the rate."""
         policy = AdaptivePolicy(
-            initial_rate=100.0, decrease_factor=0.5,
+            initial_rate=100.0,
+            decrease_factor=0.5,
         )
         initial = policy.current_rate
         policy.record_failure(Instant.Epoch, reason=RateAdjustmentReason.TIMEOUT)
@@ -138,7 +143,9 @@ class TestAdaptiveRateAdjustment:
     def test_rate_capped_at_max(self):
         """Rate cannot exceed max_rate."""
         policy = AdaptivePolicy(
-            initial_rate=95.0, increase_step=10.0, max_rate=100.0,
+            initial_rate=95.0,
+            increase_step=10.0,
+            max_rate=100.0,
         )
         policy.record_success(Instant.Epoch)
         assert policy.current_rate == 100.0
@@ -148,7 +155,9 @@ class TestAdaptiveRateAdjustment:
     def test_rate_floored_at_min(self):
         """Rate cannot go below min_rate."""
         policy = AdaptivePolicy(
-            initial_rate=15.0, decrease_factor=0.5, min_rate=10.0,
+            initial_rate=15.0,
+            decrease_factor=0.5,
+            min_rate=10.0,
         )
         policy.record_failure(Instant.Epoch)
         assert policy.current_rate == 10.0
@@ -158,8 +167,11 @@ class TestAdaptiveRateAdjustment:
     def test_aimd_pattern(self):
         """Rate follows AIMD pattern (slow increase, fast decrease)."""
         policy = AdaptivePolicy(
-            initial_rate=100.0, increase_step=5.0, decrease_factor=0.5,
-            min_rate=10.0, max_rate=200.0,
+            initial_rate=100.0,
+            increase_step=5.0,
+            decrease_factor=0.5,
+            min_rate=10.0,
+            max_rate=200.0,
         )
         for i in range(10):
             policy.record_success(Instant.from_seconds(float(i)))
@@ -177,7 +189,7 @@ class TestAdaptiveForwarding:
 
     def test_forwards_with_tokens(self):
         """Requests are forwarded when tokens available."""
-        limiter, downstream, policy = _make_limiter(initial_rate=10.0, window_size=1.0)
+        limiter, _downstream, _policy = _make_limiter(initial_rate=10.0, window_size=1.0)
 
         event = Event(
             time=Instant.from_seconds(0),
@@ -191,7 +203,7 @@ class TestAdaptiveForwarding:
 
     def test_queues_without_tokens(self):
         """Requests are queued when no tokens available."""
-        limiter, downstream, policy = _make_limiter(initial_rate=2.0, window_size=1.0)
+        limiter, _downstream, _policy = _make_limiter(initial_rate=2.0, window_size=1.0)
 
         # Exhaust tokens
         for i in range(5):
@@ -209,10 +221,10 @@ class TestAdaptiveForwarding:
 
     def test_tokens_refill_over_time(self):
         """Tokens refill based on current rate and elapsed time."""
-        limiter, downstream, policy = _make_limiter(initial_rate=10.0, window_size=1.0)
+        limiter, _downstream, _policy = _make_limiter(initial_rate=10.0, window_size=1.0)
 
         # Use all tokens at t=0
-        for i in range(10):
+        for _i in range(10):
             event = Event(
                 time=Instant.from_seconds(0),
                 event_type="request",
@@ -237,7 +249,9 @@ class TestAdaptiveRateHistory:
     def test_records_rate_changes(self):
         """Rate history records changes with timestamps."""
         policy = AdaptivePolicy(
-            initial_rate=100.0, increase_step=10.0, decrease_factor=0.5,
+            initial_rate=100.0,
+            increase_step=10.0,
+            decrease_factor=0.5,
         )
         now = Instant.from_seconds(1.0)
         policy.record_success(now)
@@ -255,7 +269,7 @@ class TestAdaptiveStatistics:
 
     def test_tracks_all_stats(self):
         """Statistics track all relevant counts."""
-        limiter, downstream, policy = _make_limiter(initial_rate=100.0)
+        limiter, _downstream, policy = _make_limiter(initial_rate=100.0)
 
         for i in range(5):
             event = Event(

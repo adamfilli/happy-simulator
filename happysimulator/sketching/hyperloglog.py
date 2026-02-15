@@ -26,11 +26,12 @@ import hashlib
 import math
 import struct
 import sys
-from typing import Generic, TypeVar, Hashable
+from collections.abc import Hashable
+from typing import TypeVar
 
 from happysimulator.sketching.base import CardinalitySketch
 
-T = TypeVar('T', bound=Hashable)
+T = TypeVar("T", bound=Hashable)
 
 
 def _count_leading_zeros(value: int, max_bits: int = 64) -> int:
@@ -54,7 +55,7 @@ def _count_leading_zeros(value: int, max_bits: int = 64) -> int:
     return count
 
 
-class HyperLogLog(CardinalitySketch, Generic[T]):
+class HyperLogLog[T: Hashable](CardinalitySketch):
     """HyperLogLog for streaming cardinality estimation.
 
     Estimates the number of distinct elements in a stream using
@@ -130,7 +131,7 @@ class HyperLogLog(CardinalitySketch, Generic[T]):
         # Include seed for reproducibility
         h.update(struct.pack(">Q", self._seed))
         # Hash the item (convert to bytes via repr for general hashables)
-        h.update(repr(item).encode('utf-8'))
+        h.update(repr(item).encode("utf-8"))
         return struct.unpack(">Q", h.digest()[:8])[0]
 
     def add(self, item: T, count: int = 1) -> None:
@@ -199,7 +200,7 @@ class HyperLogLog(CardinalitySketch, Generic[T]):
         """
         return 1.04 / math.sqrt(self._num_registers)
 
-    def merge(self, other: "HyperLogLog[T]") -> None:
+    def merge(self, other: HyperLogLog[T]) -> None:
         """Merge another HyperLogLog into this one.
 
         After merging, this sketch estimates the cardinality of the union

@@ -9,6 +9,7 @@ actual intervals vary randomly according to the exponential distribution.
 """
 
 import math
+
 import numpy as np
 
 from happysimulator.load.arrival_time_provider import ArrivalTimeProvider

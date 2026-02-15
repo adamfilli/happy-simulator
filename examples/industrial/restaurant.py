@@ -39,15 +39,15 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
+    FIFOQueue,
     Instant,
     LatencyTracker,
     QueuedResource,
-    FIFOQueue,
     Resource,
     Simulation,
     SimulationSummary,
@@ -59,25 +59,28 @@ from happysimulator.components.industrial import (
     RenegingQueuedResource,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class RestaurantConfig:
-    duration_s: float = 7200.0      # 2 hours of dinner service
-    walkin_rate: float = 0.02       # walk-ins per second (~72/hr)
+    duration_s: float = 7200.0  # 2 hours of dinner service
+    walkin_rate: float = 0.02  # walk-ins per second (~72/hr)
     num_two_tops: int = 15
     num_four_tops: int = 5
     reservation_interval_min: float = 5.0  # one reservation every 5 min
     no_show_rate: float = 0.10
     walkin_patience_s: float = 1200.0  # 20 min patience for walk-ins
     # Kitchen times (seconds)
-    prep_time: float = 180.0        # 3 min
-    cook_time: float = 600.0        # 10 min
-    plate_time: float = 60.0        # 1 min
-    dining_time: float = 1800.0     # 30 min average dining
+    prep_time: float = 180.0  # 3 min
+    cook_time: float = 600.0  # 10 min
+    plate_time: float = 60.0  # 1 min
+    dining_time: float = 1800.0  # 30 min average dining
     # Staffing
     num_prep_cooks: int = 3
     num_line_cooks: int = 4
@@ -89,16 +92,24 @@ class RestaurantConfig:
 # Host Stand (RenegingQueuedResource)
 # =============================================================================
 
+
 class HostStand(RenegingQueuedResource):
     """Walk-in queue where guests renege after patience expires.
 
     Once a guest is seated, they are forwarded to table seating.
     """
 
-    def __init__(self, name: str, downstream: Entity, reneged_target: Entity,
-                 default_patience_s: float, concurrency: int):
+    def __init__(
+        self,
+        name: str,
+        downstream: Entity,
+        reneged_target: Entity,
+        default_patience_s: float,
+        concurrency: int,
+    ):
         super().__init__(
-            name, reneged_target=reneged_target,
+            name,
+            reneged_target=reneged_target,
             default_patience_s=default_patience_s,
             policy=FIFOQueue(),
         )
@@ -116,14 +127,13 @@ class HostStand(RenegingQueuedResource):
         yield 30.0
         self._active -= 1
         self.guests_seated += 1
-        return [
-            self.forward(event, self.downstream, event_type="Seat")
-        ]
+        return [self.forward(event, self.downstream, event_type="Seat")]
 
 
 # =============================================================================
 # Table Seating (acquires table Resource, routes to kitchen)
 # =============================================================================
+
 
 class TableSeating(Entity):
     """Acquires a table resource and sends order to kitchen.
@@ -131,8 +141,14 @@ class TableSeating(Entity):
     Parties of 1-2 use two-tops; parties of 3-4 use four-tops.
     """
 
-    def __init__(self, name: str, two_tops: Resource, four_tops: Resource,
-                 kitchen_entry: Entity, dining_stage: Entity):
+    def __init__(
+        self,
+        name: str,
+        two_tops: Resource,
+        four_tops: Resource,
+        kitchen_entry: Entity,
+        dining_stage: Entity,
+    ):
         super().__init__(name)
         self.two_tops = two_tops
         self.four_tops = four_tops
@@ -155,21 +171,18 @@ class TableSeating(Entity):
         ctx["table_grant"] = grant
         self.tables_assigned += 1
 
-        return [
-            Event(time=self.now, event_type="Order",
-                  target=self.kitchen_entry, context=ctx)
-        ]
+        return [Event(time=self.now, event_type="Order", target=self.kitchen_entry, context=ctx)]
 
 
 # =============================================================================
 # Kitchen Pipeline Stages
 # =============================================================================
 
+
 class KitchenStation(QueuedResource):
     """Kitchen processing stage with limited concurrency."""
 
-    def __init__(self, name: str, service_time: float, downstream: Entity,
-                 concurrency: int):
+    def __init__(self, name: str, service_time: float, downstream: Entity, concurrency: int):
         super().__init__(name, policy=FIFOQueue())
         self.service_time_s = service_time
         self.downstream = downstream
@@ -187,20 +200,25 @@ class KitchenStation(QueuedResource):
         finally:
             self._active -= 1
         self.orders_processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 # =============================================================================
 # Dining Stage (holds table, then releases)
 # =============================================================================
 
+
 class DiningStage(Entity):
     """Simulates guests dining, then releases the table."""
 
-    def __init__(self, name: str, two_tops: Resource, four_tops: Resource,
-                 downstream: Entity, mean_dining_time: float):
+    def __init__(
+        self,
+        name: str,
+        two_tops: Resource,
+        four_tops: Resource,
+        downstream: Entity,
+        mean_dining_time: float,
+    ):
         super().__init__(name)
         self.two_tops = two_tops
         self.four_tops = four_tops
@@ -219,14 +237,13 @@ class DiningStage(Entity):
             grant.release()
 
         self.guests_finished += 1
-        return [
-            self.forward(event, self.downstream, event_type="Finished")
-        ]
+        return [self.forward(event, self.downstream, event_type="Finished")]
 
 
 # =============================================================================
 # Main Simulation
 # =============================================================================
+
 
 @dataclass
 class RestaurantResult:
@@ -258,18 +275,15 @@ def run_restaurant_simulation(config: RestaurantConfig | None = None) -> Restaur
     # Build pipeline from end to start
     dining = DiningStage("Dining", two_tops, four_tops, sink, config.dining_time)
 
-    plate_station = KitchenStation(
-        "Plate", config.plate_time, dining, config.num_platers)
-    cook_station = KitchenStation(
-        "Cook", config.cook_time, plate_station, config.num_line_cooks)
-    prep_station = KitchenStation(
-        "Prep", config.prep_time, cook_station, config.num_prep_cooks)
+    plate_station = KitchenStation("Plate", config.plate_time, dining, config.num_platers)
+    cook_station = KitchenStation("Cook", config.cook_time, plate_station, config.num_line_cooks)
+    prep_station = KitchenStation("Prep", config.prep_time, cook_station, config.num_prep_cooks)
 
-    table_seating = TableSeating(
-        "TableSeating", two_tops, four_tops, prep_station, dining)
+    table_seating = TableSeating("TableSeating", two_tops, four_tops, prep_station, dining)
 
     host_stand = HostStand(
-        "HostStand", downstream=table_seating,
+        "HostStand",
+        downstream=table_seating,
         reneged_target=reneged_counter,
         default_patience_s=config.walkin_patience_s,
         concurrency=3,  # 3 hosts can seat simultaneously
@@ -277,19 +291,19 @@ def run_restaurant_simulation(config: RestaurantConfig | None = None) -> Restaur
 
     # Walk-in source
     walkin_source = Source.poisson(
-        rate=config.walkin_rate, target=host_stand,
-        event_type="WalkIn", name="WalkIns",
+        rate=config.walkin_rate,
+        target=host_stand,
+        event_type="WalkIn",
+        name="WalkIns",
         stop_after=config.duration_s,
     )
 
     # Reservation scheduler: one reservation every interval
     num_reservations = int(config.duration_s / (config.reservation_interval_min * 60))
-    appointment_times = [
-        i * config.reservation_interval_min * 60
-        for i in range(num_reservations)
-    ]
+    appointment_times = [i * config.reservation_interval_min * 60 for i in range(num_reservations)]
     scheduler = AppointmentScheduler(
-        "Reservations", target=host_stand,
+        "Reservations",
+        target=host_stand,
         appointments=appointment_times,
         no_show_rate=config.no_show_rate,
         event_type="Reservation",
@@ -302,8 +316,17 @@ def run_restaurant_simulation(config: RestaurantConfig | None = None) -> Restaur
     }
 
     entities = [
-        host_stand, table_seating, prep_station, cook_station, plate_station,
-        dining, two_tops, four_tops, sink, reneged_counter, scheduler,
+        host_stand,
+        table_seating,
+        prep_station,
+        cook_station,
+        plate_station,
+        dining,
+        two_tops,
+        four_tops,
+        sink,
+        reneged_counter,
+        scheduler,
     ]
 
     sim = Simulation(
@@ -320,10 +343,17 @@ def run_restaurant_simulation(config: RestaurantConfig | None = None) -> Restaur
     summary = sim.run()
 
     return RestaurantResult(
-        sink=sink, reneged=reneged_counter, host_stand=host_stand,
-        table_seating=table_seating, kitchen_stations=kitchen_stations,
-        dining=dining, two_tops=two_tops, four_tops=four_tops,
-        scheduler=scheduler, config=config, summary=summary,
+        sink=sink,
+        reneged=reneged_counter,
+        host_stand=host_stand,
+        table_seating=table_seating,
+        kitchen_stations=kitchen_stations,
+        dining=dining,
+        two_tops=two_tops,
+        four_tops=four_tops,
+        scheduler=scheduler,
+        config=config,
+        summary=summary,
     )
 
 
@@ -333,15 +363,17 @@ def print_summary(result: RestaurantResult) -> None:
     print("=" * 65)
 
     c = result.config
-    print(f"\nConfiguration:")
-    print(f"  Duration: {c.duration_s/60:.0f} minutes")
-    print(f"  Walk-in rate: {c.walkin_rate*3600:.0f}/hr")
+    print("\nConfiguration:")
+    print(f"  Duration: {c.duration_s / 60:.0f} minutes")
+    print(f"  Walk-in rate: {c.walkin_rate * 3600:.0f}/hr")
     print(f"  Tables: {c.num_two_tops} two-tops, {c.num_four_tops} four-tops")
-    print(f"  Reservations: every {c.reservation_interval_min:.0f} min "
-          f"({c.no_show_rate*100:.0f}% no-show)")
+    print(
+        f"  Reservations: every {c.reservation_interval_min:.0f} min "
+        f"({c.no_show_rate * 100:.0f}% no-show)"
+    )
 
     sched = result.scheduler.stats
-    print(f"\nArrivals:")
+    print("\nArrivals:")
     print(f"  Reservations scheduled: {sched.total_scheduled}")
     print(f"  Reservations arrived: {sched.arrivals}")
     print(f"  No-shows: {sched.no_shows}")
@@ -350,26 +382,24 @@ def print_summary(result: RestaurantResult) -> None:
     rs = result.host_stand.reneging_stats
     print(f"  Walk-ins reneged: {rs.reneged}")
 
-    print(f"\nKitchen Performance:")
+    print("\nKitchen Performance:")
     for name, station in result.kitchen_stations.items():
         print(f"  {name}: {station.orders_processed} orders")
 
-    print(f"\nTable Utilization:")
+    print("\nTable Utilization:")
     ts = result.two_tops.stats
     fs = result.four_tops.stats
-    print(f"  Two-tops: {ts.peak_utilization*100:.0f}% peak, "
-          f"{ts.contentions} contentions")
-    print(f"  Four-tops: {fs.peak_utilization*100:.0f}% peak, "
-          f"{fs.contentions} contentions")
+    print(f"  Two-tops: {ts.peak_utilization * 100:.0f}% peak, {ts.contentions} contentions")
+    print(f"  Four-tops: {fs.peak_utilization * 100:.0f}% peak, {fs.contentions} contentions")
 
-    print(f"\nDining:")
+    print("\nDining:")
     print(f"  Guests finished: {result.dining.guests_finished}")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Completed meals: {result.sink.count}")
     if result.sink.count > 0:
-        print(f"  Avg end-to-end: {result.sink.mean_latency()/60:.1f} min")
-        print(f"  p99 end-to-end: {result.sink.p99()/60:.1f} min")
+        print(f"  Avg end-to-end: {result.sink.mean_latency() / 60:.1f} min")
+        print(f"  p99 end-to-end: {result.sink.p99() / 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 65)
@@ -377,10 +407,15 @@ def print_summary(result: RestaurantResult) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Restaurant simulation")
-    parser.add_argument("--duration", type=float, default=7200.0,
-                        help="Duration in seconds (default: 7200)")
-    parser.add_argument("--walkin-rate", type=float, default=0.02,
-                        help="Walk-in arrival rate per second (default: 0.02)")
+    parser.add_argument(
+        "--duration", type=float, default=7200.0, help="Duration in seconds (default: 7200)"
+    )
+    parser.add_argument(
+        "--walkin-rate",
+        type=float,
+        default=0.02,
+        help="Walk-in arrival rate per second (default: 0.02)",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()

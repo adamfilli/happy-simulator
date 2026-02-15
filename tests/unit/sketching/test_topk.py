@@ -4,8 +4,8 @@ from collections import Counter
 
 import pytest
 
-from happysimulator.sketching import TopK, FrequencyEstimate
 from happysimulator.distributions import ZipfDistribution
+from happysimulator.sketching import FrequencyEstimate, TopK
 
 
 class TestTopKCreation:
@@ -283,7 +283,7 @@ class TestTopKMerge:
         topk2 = TopK[int](k=10)
 
         topk1.add(1, count=10)  # topk1 total = 10
-        topk2.add(2, count=5)   # topk2 total = 5
+        topk2.add(2, count=5)  # topk2 total = 5
 
         topk1.merge(topk2)
 
@@ -296,9 +296,9 @@ class TestTopKMerge:
         topk2 = TopK[int](k=10)
 
         topk1.add(1, count=10)
-        topk1.add(2, count=5)   # topk1 total = 15
+        topk1.add(2, count=5)  # topk1 total = 15
         topk2.add(2, count=3)
-        topk2.add(3, count=7)   # topk2 total = 10
+        topk2.add(3, count=7)  # topk2 total = 10
 
         topk1.merge(topk2)
 

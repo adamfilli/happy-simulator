@@ -83,6 +83,7 @@ class PerishableInventory(Entity):
 
         # FIFO batches: (arrival_instant, quantity)
         from happysimulator.core.temporal import Instant
+
         self._items: deque[tuple[Instant, int]] = deque()
         self._deferred_initial_stock = 0
         if initial_stock > 0:
@@ -152,7 +153,9 @@ class PerishableInventory(Entity):
             self._total_spoiled += spoiled
             logger.debug(
                 "[%s] Spoilage check: %d items expired, stock now %d",
-                self.name, spoiled, self.stock,
+                self.name,
+                spoiled,
+                self.stock,
             )
 
         results: list[Event] = []
@@ -205,7 +208,9 @@ class PerishableInventory(Entity):
             self._stockouts += 1
             logger.debug(
                 "[%s] Stockout: requested %d, have %d",
-                self.name, amount, current,
+                self.name,
+                amount,
+                current,
             )
 
         results.extend(self._check_reorder())
@@ -229,7 +234,9 @@ class PerishableInventory(Entity):
         self._order_pending = False
         logger.debug(
             "[%s] Replenished %d units, stock now %d",
-            self.name, quantity, self.stock,
+            self.name,
+            quantity,
+            self.stock,
         )
         return []
 
@@ -242,7 +249,9 @@ class PerishableInventory(Entity):
             now_s = self.now.to_seconds()
             logger.debug(
                 "[%s] Reorder #%d placed: Q=%d, arriving at t=%.2f",
-                self.name, self._reorders, self.order_quantity,
+                self.name,
+                self._reorders,
+                self.order_quantity,
                 now_s + self.lead_time,
             )
             return [

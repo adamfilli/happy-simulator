@@ -6,12 +6,9 @@ with sources driving demand.
 
 from __future__ import annotations
 
-import pytest
-
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.inventory import InventoryBuffer
 from happysimulator.components.industrial.perishable_inventory import PerishableInventory
-from happysimulator.components.common import Sink
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source

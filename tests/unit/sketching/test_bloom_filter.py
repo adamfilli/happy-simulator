@@ -1,7 +1,5 @@
 """Tests for Bloom Filter membership testing."""
 
-import random
-
 import pytest
 
 from happysimulator.sketching import BloomFilter
@@ -189,9 +187,7 @@ class TestBloomFilterFalsePositiveRate:
             bf.add(i)
 
         # Test against items we didn't add
-        false_positives = sum(
-            1 for i in range(10000, 20000) if bf.contains(i)
-        )
+        false_positives = sum(1 for i in range(10000, 20000) if bf.contains(i))
         actual_fp_rate = false_positives / 10000
 
         # Should be within 2x of target

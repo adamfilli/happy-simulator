@@ -44,14 +44,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from happysimulator.components.consensus.raft import RaftNode, RaftState
+from happysimulator.components.consensus.raft_state_machine import KVStateMachine
+from happysimulator.components.network.conditions import datacenter_network
+from happysimulator.components.network.network import Network
+from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.core.event import Event
-from happysimulator.components.network.network import Network
-from happysimulator.components.network.conditions import datacenter_network
-from happysimulator.components.consensus.raft import RaftNode, RaftStats, RaftState
-from happysimulator.components.consensus.raft_state_machine import KVStateMachine
-
 
 # =============================================================================
 # Simulation Result
@@ -61,6 +60,7 @@ from happysimulator.components.consensus.raft_state_machine import KVStateMachin
 @dataclass
 class SimulationResult:
     """Results from the Raft leader election simulation."""
+
     nodes: list[RaftNode]
     state_machines: dict[str, KVStateMachine]
     commands_submitted: list[dict[str, Any]]
@@ -117,10 +117,8 @@ def run(args=None) -> SimulationResult:
 
     # Create datacenter links between all pairs
     for i, a in enumerate(nodes):
-        for b in nodes[i + 1:]:
-            network.add_bidirectional_link(
-                a, b, datacenter_network(f"link-{a.name}-{b.name}")
-            )
+        for b in nodes[i + 1 :]:
+            network.add_bidirectional_link(a, b, datacenter_network(f"link-{a.name}-{b.name}"))
 
     # Schedule node start events (each node starts its election timeout)
     start_events: list[Event] = []
@@ -129,6 +127,7 @@ def run(args=None) -> SimulationResult:
         def make_start_fn(n: RaftNode):
             def start_fn(event: Event):
                 return n.start()
+
             return start_fn
 
         evt = Event.once(
@@ -164,10 +163,12 @@ def run(args=None) -> SimulationResult:
 
         events = []
         for i, cmd in enumerate(commands_submitted):
+
             def make_submit_fn(ld: RaftNode, command: dict):
                 def fn(e: Event):
                     ld.submit(command)
-                    return None
+                    return
+
                 return fn
 
             submit_evt = Event.once(
@@ -188,7 +189,7 @@ def run(args=None) -> SimulationResult:
     sim = Simulation(
         start_time=Instant.Epoch,
         duration=duration_s,
-        entities=[network] + nodes,
+        entities=[network, *nodes],
     )
 
     for evt in start_events:
@@ -229,21 +230,25 @@ def print_summary(result: SimulationResult) -> None:
     else:
         print("\nNo leader elected (cluster may be partitioned)")
 
-    print(f"\nNode States:")
-    print(f"  {'Node':<10} {'State':<12} {'Term':<6} {'Leader':<10} "
-          f"{'Log Len':<9} {'Committed':<11} {'Elections':<11} {'Votes Rcvd':<10}")
+    print("\nNode States:")
+    print(
+        f"  {'Node':<10} {'State':<12} {'Term':<6} {'Leader':<10} "
+        f"{'Log Len':<9} {'Committed':<11} {'Elections':<11} {'Votes Rcvd':<10}"
+    )
     print(f"  {'-' * 89}")
 
     for node in result.nodes:
         s = node.stats
         state_str = s.state.name
         leader_str = s.current_leader or "-"
-        print(f"  {node.name:<10} {state_str:<12} {s.current_term:<6} "
-              f"{leader_str:<10} {s.log_length:<9} {s.commit_index:<11} "
-              f"{s.elections_started:<11} {s.votes_received:<10}")
+        print(
+            f"  {node.name:<10} {state_str:<12} {s.current_term:<6} "
+            f"{leader_str:<10} {s.log_length:<9} {s.commit_index:<11} "
+            f"{s.elections_started:<11} {s.votes_received:<10}"
+        )
 
     # Show state machine contents
-    print(f"\nState Machine Contents (leader):")
+    print("\nState Machine Contents (leader):")
     if leaders:
         sm = result.state_machines[leaders[0].name]
         data = sm.data
@@ -254,11 +259,11 @@ def print_summary(result: SimulationResult) -> None:
             print("  (empty)")
 
     # Check replication consistency
-    print(f"\nReplication Consistency:")
+    print("\nReplication Consistency:")
     sm_snapshots = {}
     for name, sm in result.state_machines.items():
         sm_snapshots[name] = sm.data
-    unique_states = set(str(sorted(v.items())) for v in sm_snapshots.values())
+    unique_states = {str(sorted(v.items())) for v in sm_snapshots.values()}
     if len(unique_states) == 1:
         print("  All nodes have consistent state machine state")
     else:
@@ -266,7 +271,7 @@ def print_summary(result: SimulationResult) -> None:
         for name, snap in sm_snapshots.items():
             print(f"    {name}: {snap}")
 
-    print(f"\nNetwork Statistics:")
+    print("\nNetwork Statistics:")
     print(f"  Events routed:  {result.network.events_routed}")
     print(f"  Dropped (partition): {result.network.events_dropped_partition}")
 
@@ -296,7 +301,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     x = range(len(node_names))
     width = 0.35
     ax.bar([i - width / 2 for i in x], log_lengths, width, label="Log Length", color="steelblue")
-    ax.bar([i + width / 2 for i in x], commit_indices, width, label="Commit Index", color="seagreen")
+    ax.bar(
+        [i + width / 2 for i in x], commit_indices, width, label="Commit Index", color="seagreen"
+    )
     ax.set_xlabel("Node")
     ax.set_ylabel("Log Index")
     ax.set_title("Log Replication State")
@@ -321,14 +328,20 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax.set_title("Node States and Terms")
 
     # Add state labels on bars
-    for bar, state in zip(bars, states):
-        ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
-                state.name, va="center", fontsize=10)
+    for bar, state in zip(bars, states, strict=False):
+        ax.text(
+            bar.get_width() + 0.1,
+            bar.get_y() + bar.get_height() / 2,
+            state.name,
+            va="center",
+            fontsize=10,
+        )
 
     ax.grid(True, alpha=0.3, axis="x")
 
     # Legend for states
     from matplotlib.patches import Patch
+
     legend_elements = [
         Patch(facecolor="steelblue", label="Follower"),
         Patch(facecolor="gold", label="Candidate"),
@@ -373,6 +386,7 @@ if __name__ == "__main__":
     if not args.no_viz:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             output_dir = Path(args.output)
             visualize_results(result, output_dir)

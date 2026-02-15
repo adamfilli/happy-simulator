@@ -13,10 +13,11 @@ This module defines the core protocols that all sketch implementations follow:
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Generic, TypeVar, Iterator
+from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class Sketch(ABC):
@@ -41,7 +42,6 @@ class Sketch(ABC):
             item: The item to add.
             count: Number of occurrences to add (default 1).
         """
-        pass
 
     @abstractmethod
     def merge(self, other: "Sketch") -> None:
@@ -57,7 +57,6 @@ class Sketch(ABC):
             TypeError: If other is not the same sketch type.
             ValueError: If other has incompatible configuration.
         """
-        pass
 
     @property
     @abstractmethod
@@ -67,7 +66,6 @@ class Sketch(ABC):
         Returns:
             Approximate memory footprint of the sketch data structures.
         """
-        pass
 
     @property
     @abstractmethod
@@ -77,16 +75,14 @@ class Sketch(ABC):
         Returns:
             Sum of all counts added via add().
         """
-        pass
 
     @abstractmethod
     def clear(self) -> None:
         """Reset the sketch to its initial empty state."""
-        pass
 
 
 @dataclass(frozen=True, slots=True)
-class FrequencyEstimate(Generic[T]):
+class FrequencyEstimate[T]:
     """A frequency estimate for an item.
 
     Attributes:
@@ -94,12 +90,13 @@ class FrequencyEstimate(Generic[T]):
         count: Estimated frequency count.
         error: Upper bound on the estimation error.
     """
+
     item: T
     count: int
     error: int
 
 
-class FrequencySketch(Sketch, Generic[T]):
+class FrequencySketch[T](Sketch):
     """Protocol for sketches that estimate item frequencies.
 
     Used for finding heavy hitters (most frequent items) and estimating
@@ -119,7 +116,6 @@ class FrequencySketch(Sketch, Generic[T]):
             Estimated count. May be an overestimate (never an underestimate
             for Count-Min) or approximate (for Space-Saving).
         """
-        pass
 
     @abstractmethod
     def top(self, k: int) -> list[FrequencyEstimate[T]]:
@@ -132,7 +128,6 @@ class FrequencySketch(Sketch, Generic[T]):
             List of FrequencyEstimate objects sorted by count (descending).
             May return fewer than k items if fewer distinct items were seen.
         """
-        pass
 
 
 class QuantileSketch(Sketch):
@@ -160,7 +155,6 @@ class QuantileSketch(Sketch):
         Raises:
             ValueError: If q is not in [0, 1].
         """
-        pass
 
     @abstractmethod
     def cdf(self, value: float) -> float:
@@ -172,7 +166,6 @@ class QuantileSketch(Sketch):
         Returns:
             Estimated probability that a random sample <= value (0.0 to 1.0).
         """
-        pass
 
     def percentile(self, p: float) -> float:
         """Convenience method for percentile estimation.
@@ -207,10 +200,9 @@ class CardinalitySketch(Sketch):
         Returns:
             Estimated count of unique items added.
         """
-        pass
 
 
-class MembershipSketch(Sketch, Generic[T]):
+class MembershipSketch[T](Sketch):
     """Protocol for sketches that test set membership.
 
     Used for efficiently testing if an item was (probably) seen before.
@@ -230,7 +222,6 @@ class MembershipSketch(Sketch, Generic[T]):
             True if the item might be in the set (possible false positive).
             False if the item is definitely not in the set (no false negatives).
         """
-        pass
 
     @property
     @abstractmethod
@@ -240,10 +231,9 @@ class MembershipSketch(Sketch, Generic[T]):
         Returns:
             Probability that contains() returns True for an item not in the set.
         """
-        pass
 
 
-class SamplingSketch(Sketch, Generic[T]):
+class SamplingSketch[T](Sketch):
     """Protocol for sketches that maintain a sample of stream items.
 
     Used for maintaining a representative sample of a stream for later analysis.
@@ -258,12 +248,10 @@ class SamplingSketch(Sketch, Generic[T]):
         Returns:
             List of sampled items (may be smaller than capacity if fewer items seen).
         """
-        pass
 
     @abstractmethod
     def __iter__(self) -> Iterator[T]:
         """Iterate over sampled items."""
-        pass
 
     @property
     @abstractmethod
@@ -273,4 +261,3 @@ class SamplingSketch(Sketch, Generic[T]):
         Returns:
             Sample size limit.
         """
-        pass

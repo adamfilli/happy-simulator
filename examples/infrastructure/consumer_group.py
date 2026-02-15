@@ -24,26 +24,28 @@ join and leave a consumer group, triggering rebalancing.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
     Instant,
-    Simulation,
     SimFuture,
+    Simulation,
     Source,
 )
-from happysimulator.components.streaming.event_log import EventLog, Record
 from happysimulator.components.streaming.consumer_group import (
     ConsumerGroup,
     RangeAssignment,
     RoundRobinAssignment,
     StickyAssignment,
 )
+from happysimulator.components.streaming.event_log import EventLog
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Client entities
@@ -58,16 +60,23 @@ class Producer(Entity):
         self.log = log
         self._count = 0
 
-    def handle_event(self, event: Event) -> Generator[float | SimFuture | tuple[float, list[Event]], None, None]:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]]]:
         self._count += 1
         key = f"user-{self._count % 20}"
         reply = SimFuture()
-        yield 0.0, [Event(
-            time=self.now,
-            event_type="Append",
-            target=self.log,
-            context={"key": key, "value": {"seq": self._count}, "reply_future": reply},
-        )]
+        yield (
+            0.0,
+            [
+                Event(
+                    time=self.now,
+                    event_type="Append",
+                    target=self.log,
+                    context={"key": key, "value": {"seq": self._count}, "reply_future": reply},
+                )
+            ],
+        )
         yield reply
 
 
@@ -80,16 +89,27 @@ class Consumer(Entity):
         self.records_consumed: int = 0
         self.lag_history: list[tuple[float, int]] = []
 
-    def handle_event(self, event: Event) -> Generator[float | SimFuture | tuple[float, list[Event]], None, None]:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]]]:
         if event.event_type == "PollCycle":
             # Poll
             reply = SimFuture()
-            yield 0.0, [Event(
-                time=self.now,
-                event_type="Poll",
-                target=self.group,
-                context={"consumer_name": self.name, "max_records": 50, "reply_future": reply},
-            )]
+            yield (
+                0.0,
+                [
+                    Event(
+                        time=self.now,
+                        event_type="Poll",
+                        target=self.group,
+                        context={
+                            "consumer_name": self.name,
+                            "max_records": 50,
+                            "reply_future": reply,
+                        },
+                    )
+                ],
+            )
             records = yield reply
 
             if records:
@@ -101,12 +121,17 @@ class Consumer(Entity):
                     if pid not in offsets or rec.offset + 1 > offsets[pid]:
                         offsets[pid] = rec.offset + 1
 
-                yield 0.0, [Event(
-                    time=self.now,
-                    event_type="Commit",
-                    target=self.group,
-                    context={"consumer_name": self.name, "offsets": offsets},
-                )]
+                yield (
+                    0.0,
+                    [
+                        Event(
+                            time=self.now,
+                            event_type="Commit",
+                            target=self.group,
+                            context={"consumer_name": self.name, "offsets": offsets},
+                        )
+                    ],
+                )
 
             # Track lag
             lag = self.group.consumer_lag(self.name)
@@ -162,28 +187,42 @@ def run_consumer_group(
     # Schedule consumer joins (c0 and c1 join early, c2 joins mid-sim)
     join_events = []
     for i, c in enumerate(consumers[:2]):
-        join_events.append(Event(
-            time=Instant.from_seconds(0.1 + i * 0.05),
-            event_type="Join",
-            target=group,
-            context={"consumer_name": c.name, "consumer_entity": c, "reply_future": SimFuture()},
-        ))
+        join_events.append(
+            Event(
+                time=Instant.from_seconds(0.1 + i * 0.05),
+                event_type="Join",
+                target=group,
+                context={
+                    "consumer_name": c.name,
+                    "consumer_entity": c,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
     # Consumer 2 joins at 1/3 of duration
-    join_events.append(Event(
-        time=Instant.from_seconds(duration_s / 3),
-        event_type="Join",
-        target=group,
-        context={"consumer_name": consumers[2].name, "consumer_entity": consumers[2], "reply_future": SimFuture()},
-    ))
+    join_events.append(
+        Event(
+            time=Instant.from_seconds(duration_s / 3),
+            event_type="Join",
+            target=group,
+            context={
+                "consumer_name": consumers[2].name,
+                "consumer_entity": consumers[2],
+                "reply_future": SimFuture(),
+            },
+        )
+    )
 
     # Consumer 1 leaves at 2/3 of duration
-    join_events.append(Event(
-        time=Instant.from_seconds(2 * duration_s / 3),
-        event_type="Leave",
-        target=group,
-        context={"consumer_name": consumers[1].name, "reply_future": SimFuture()},
-    ))
+    join_events.append(
+        Event(
+            time=Instant.from_seconds(2 * duration_s / 3),
+            event_type="Leave",
+            target=group,
+            context={"consumer_name": consumers[1].name, "reply_future": SimFuture()},
+        )
+    )
 
     # Poll cycles for all consumers
     poll_events = []
@@ -191,17 +230,21 @@ def run_consumer_group(
     for c in consumers:
         t = 1.0
         while t < duration_s:
-            poll_events.append(Event(
-                time=Instant.from_seconds(t),
-                event_type="PollCycle",
-                target=c,
-            ))
+            poll_events.append(
+                Event(
+                    time=Instant.from_seconds(t),
+                    event_type="PollCycle",
+                    target=c,
+                )
+            )
             t += poll_interval
 
     producer_sources = [
         Source.constant(
-            rate=produce_rate, target=p,
-            event_type="Produce", stop_after=duration_s,
+            rate=produce_rate,
+            target=p,
+            event_type="Produce",
+            stop_after=duration_s,
         )
         for p in producers
     ]
@@ -262,6 +305,7 @@ def print_summary(results: list[GroupResult]) -> None:
 def visualize_results(results: list[GroupResult], output_dir: Path) -> None:
     """Generate consumer lag over time charts."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -273,7 +317,7 @@ def visualize_results(results: list[GroupResult], output_dir: Path) -> None:
 
     colors = ["steelblue", "coral", "seagreen"]
 
-    for ax, r in zip(axes, results):
+    for ax, r in zip(axes, results, strict=False):
         for i, c in enumerate(r.consumers):
             if c.lag_history:
                 times = [t for t, _ in c.lag_history]
@@ -317,8 +361,10 @@ if __name__ == "__main__":
     for strategy in ["range", "roundrobin", "sticky"]:
         print(f"  Strategy: {strategy}...")
         r = run_consumer_group(
-            strategy, duration_s=args.duration,
-            produce_rate=args.rate, seed=args.seed,
+            strategy,
+            duration_s=args.duration,
+            produce_rate=args.rate,
+            seed=args.seed,
         )
         results.append(r)
 

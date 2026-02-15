@@ -138,7 +138,9 @@ class GateController(Entity):
             self._rejected += 1
             logger.debug(
                 "[%s] Rejected (gate closed, queue full: %d/%d)",
-                self.name, len(self._queue), self._queue_capacity,
+                self.name,
+                len(self._queue),
+                self._queue_capacity,
             )
             return []
 
@@ -154,7 +156,8 @@ class GateController(Entity):
         self._open_cycles += 1
         logger.debug(
             "[%s] Gate opened (flushing %d queued items)",
-            self.name, len(self._queue),
+            self.name,
+            len(self._queue),
         )
 
         # Flush queue

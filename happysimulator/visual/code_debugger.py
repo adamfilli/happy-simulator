@@ -20,8 +20,10 @@ import sys
 import threading
 import uuid
 from dataclasses import dataclass, field
-from types import FrameType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import FrameType
 
 logger = logging.getLogger(__name__)
 
@@ -178,8 +180,7 @@ class CodeDebugger:
             self._active_entities.discard(entity_name)
             # Remove breakpoints for this entity
             to_remove = [
-                bp_id for bp_id, bp in self._breakpoints.items()
-                if bp.entity_name == entity_name
+                bp_id for bp_id, bp in self._breakpoints.items() if bp.entity_name == entity_name
             ]
             for bp_id in to_remove:
                 del self._breakpoints[bp_id]
@@ -235,8 +236,9 @@ class CodeDebugger:
         """Add a code breakpoint. Returns the breakpoint ID."""
         with self._lock:
             self._breakpoints[bp.id] = bp
-        logger.debug("Code breakpoint added: entity=%s line=%d id=%s",
-                      bp.entity_name, bp.line_number, bp.id)
+        logger.debug(
+            "Code breakpoint added: entity=%s line=%d id=%s", bp.entity_name, bp.line_number, bp.id
+        )
         return bp.id
 
     def remove_breakpoint(self, bp_id: str) -> bool:
@@ -290,9 +292,7 @@ class CodeDebugger:
                             break
 
                 # Check step mode
-                if self._step_mode == "step":
-                    should_break = True
-                elif self._step_mode == "step_over":
+                if self._step_mode == "step" or self._step_mode == "step_over":
                     should_break = True
                 elif self._step_mode == "step_out":
                     pass  # Only break on return
@@ -314,7 +314,9 @@ class CodeDebugger:
 
                     # Wait for continue/step command (with deadman timeout)
                     if not self._pause_event.wait(timeout=DEADMAN_TIMEOUT_S):
-                        logger.warning("Code breakpoint deadman timeout after %ds", DEADMAN_TIMEOUT_S)
+                        logger.warning(
+                            "Code breakpoint deadman timeout after %ds", DEADMAN_TIMEOUT_S
+                        )
 
                     self._paused_entity = None
                     self._paused_line = None
@@ -358,7 +360,7 @@ class CodeDebugger:
                 )
                 self._completed_traces.append(execution_trace)
             # Restore previous sys.settrace
-            prev = getattr(self, '_prev_settrace', None)
+            prev = getattr(self, "_prev_settrace", None)
             sys.settrace(prev)
 
     def drain_completed_traces(self) -> list[ExecutionTrace]:

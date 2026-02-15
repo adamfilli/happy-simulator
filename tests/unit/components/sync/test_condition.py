@@ -2,7 +2,7 @@
 
 import pytest
 
-from happysimulator.components.sync import Mutex, Condition
+from happysimulator.components.sync import Condition, Mutex
 
 
 class TestConditionCreation:
@@ -211,8 +211,6 @@ class TestConditionWakeupBehavior:
         """Waiters are woken in FIFO order."""
         mutex = Mutex(name="lock")
         cond = Condition(name="cond", lock=mutex)
-
-        wakeup_order = []
 
         mutex.try_acquire()
         gen1 = cond.wait()

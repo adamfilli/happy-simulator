@@ -25,9 +25,9 @@ Example:
 """
 
 import logging
+from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from collections import deque
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -78,7 +78,7 @@ class DeadLetterQueue(Entity):
         self._retention_period = retention_period
 
         # Message storage
-        self._messages: deque['Message'] = deque()
+        self._messages: deque[Message] = deque()
         self._message_times: deque[Instant] = deque()
 
         # Statistics
@@ -101,7 +101,7 @@ class DeadLetterQueue(Entity):
         return len(self._messages)
 
     @property
-    def messages(self) -> list['Message']:
+    def messages(self) -> list["Message"]:
         """List of all dead-lettered messages."""
         return list(self._messages)
 
@@ -117,7 +117,7 @@ class DeadLetterQueue(Entity):
             return False
         return len(self._messages) >= self._capacity
 
-    def add_message(self, message: 'Message') -> bool:
+    def add_message(self, message: "Message") -> bool:
         """Add a message to the dead letter queue.
 
         Args:
@@ -129,12 +129,10 @@ class DeadLetterQueue(Entity):
         # Cleanup expired messages first
         self._cleanup_expired()
 
-        if self.is_full:
-            # Remove oldest if at capacity
-            if self._messages:
-                self._messages.popleft()
-                self._message_times.popleft()
-                self._messages_discarded += 1
+        if self.is_full and self._messages:
+            self._messages.popleft()
+            self._message_times.popleft()
+            self._messages_discarded += 1
 
         now = self._clock.now if self._clock else Instant.Epoch
         self._messages.append(message)
@@ -161,7 +159,7 @@ class DeadLetterQueue(Entity):
             else:
                 break
 
-    def get_message(self, index: int) -> 'Message | None':
+    def get_message(self, index: int) -> "Message | None":
         """Get a message by index.
 
         Args:
@@ -174,7 +172,7 @@ class DeadLetterQueue(Entity):
             return self._messages[index]
         return None
 
-    def peek(self) -> 'Message | None':
+    def peek(self) -> "Message | None":
         """Peek at the oldest message.
 
         Returns:
@@ -184,7 +182,7 @@ class DeadLetterQueue(Entity):
             return self._messages[0]
         return None
 
-    def pop(self) -> 'Message | None':
+    def pop(self) -> "Message | None":
         """Remove and return the oldest message.
 
         Returns:
@@ -207,7 +205,7 @@ class DeadLetterQueue(Entity):
         self._messages_discarded += count
         return count
 
-    def reprocess(self, message: 'Message', target_queue: 'MessageQueue') -> Event | None:
+    def reprocess(self, message: "Message", target_queue: "MessageQueue") -> Event | None:
         """Reprocess a single message by publishing to a queue.
 
         Args:
@@ -234,13 +232,13 @@ class DeadLetterQueue(Entity):
             event_type="republish",
             target=target_queue,
             context={
-                'payload': message.payload,
-                'original_message_id': message.id,
-                'delivery_count': message.delivery_count,
+                "payload": message.payload,
+                "original_message_id": message.id,
+                "delivery_count": message.delivery_count,
             },
         )
 
-    def reprocess_all(self, target_queue: 'MessageQueue') -> list[Event]:
+    def reprocess_all(self, target_queue: "MessageQueue") -> list[Event]:
         """Reprocess all messages in the DLQ.
 
         Args:
@@ -261,16 +259,16 @@ class DeadLetterQueue(Entity):
                 event_type="republish",
                 target=target_queue,
                 context={
-                    'payload': message.payload,
-                    'original_message_id': message.id,
-                    'delivery_count': message.delivery_count,
+                    "payload": message.payload,
+                    "original_message_id": message.id,
+                    "delivery_count": message.delivery_count,
                 },
             )
             events.append(event)
 
         return events
 
-    def get_messages_by_age(self, max_age: float) -> list['Message']:
+    def get_messages_by_age(self, max_age: float) -> list["Message"]:
         """Get messages younger than max_age seconds.
 
         Args:
@@ -283,14 +281,14 @@ class DeadLetterQueue(Entity):
         now_seconds = now.to_seconds()
 
         result = []
-        for msg, msg_time in zip(self._messages, self._message_times):
+        for msg, msg_time in zip(self._messages, self._message_times, strict=False):
             age = now_seconds - msg_time.to_seconds()
             if age <= max_age:
                 result.append(msg)
 
         return result
 
-    def get_messages_by_delivery_count(self, min_count: int) -> list['Message']:
+    def get_messages_by_delivery_count(self, min_count: int) -> list["Message"]:
         """Get messages with at least min_count delivery attempts.
 
         Args:

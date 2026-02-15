@@ -50,20 +50,20 @@ from happysimulator import (
 from happysimulator.components.common import Counter
 from happysimulator.components.industrial import InventoryBuffer
 
-
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class SupplyChainConfig:
-    duration_s: float = 86400.0     # 24 hours (1 day)
-    demand_rate: float = 0.008      # orders per second (~29/hr)
+    duration_s: float = 86400.0  # 24 hours (1 day)
+    demand_rate: float = 0.008  # orders per second (~29/hr)
     # Retailer
     retailer_stock: int = 100
     retailer_reorder_point: int = 30
     retailer_order_qty: int = 50
-    retailer_lead_time: float = 7200.0   # 2 hours
+    retailer_lead_time: float = 7200.0  # 2 hours
     # Distributor
     distributor_stock: int = 300
     distributor_reorder_point: int = 100
@@ -81,6 +81,7 @@ class SupplyChainConfig:
 # Demand Tap: passes events through and records timestamps for analysis
 # =============================================================================
 
+
 class DemandTap(Entity):
     """Transparent tap that records demand events and forwards to downstream."""
 
@@ -93,9 +94,7 @@ class DemandTap(Entity):
     def handle_event(self, event: Event) -> list[Event]:
         self.event_times.append(self.now.to_seconds())
         self.event_quantities.append(event.context.get("quantity", 1))
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
     @property
     def total_events(self) -> int:
@@ -112,7 +111,7 @@ class DemandTap(Entity):
         max_t = max(self.event_times)
         num_windows = max(1, int(max_t / window_s))
         quantities = [0] * num_windows
-        for t, q in zip(self.event_times, self.event_quantities):
+        for t, q in zip(self.event_times, self.event_quantities, strict=False):
             idx = min(int(t / window_s), num_windows - 1)
             quantities[idx] += q
         if len(quantities) < 2:
@@ -133,6 +132,7 @@ class DemandTap(Entity):
 # Demand Amplifier: monitors a tier's reorders and creates upstream demand
 # =============================================================================
 
+
 class DemandAmplifier(Entity):
     """Periodically checks an inventory tier and sends batch consume upstream.
 
@@ -143,8 +143,13 @@ class DemandAmplifier(Entity):
 
     _CHECK = "_DemandAmpCheck"
 
-    def __init__(self, name: str, watched: InventoryBuffer,
-                 upstream_tap: DemandTap, check_interval: float = 300.0):
+    def __init__(
+        self,
+        name: str,
+        watched: InventoryBuffer,
+        upstream_tap: DemandTap,
+        check_interval: float = 300.0,
+    ):
         super().__init__(name)
         self.watched = watched
         self.upstream_tap = upstream_tap
@@ -202,6 +207,7 @@ class DemandAmplifier(Entity):
 # =============================================================================
 # Main Simulation
 # =============================================================================
+
 
 @dataclass
 class SupplyChainResult:
@@ -268,27 +274,40 @@ def run_supply_chain_simulation(config: SupplyChainConfig | None = None) -> Supp
 
     # Amplifiers: link tiers upstream
     retail_amplifier = DemandAmplifier(
-        "RetailAmplifier", watched=retailer,
-        upstream_tap=dist_tap, check_interval=300.0,
+        "RetailAmplifier",
+        watched=retailer,
+        upstream_tap=dist_tap,
+        check_interval=300.0,
     )
     dist_amplifier = DemandAmplifier(
-        "DistAmplifier", watched=distributor,
-        upstream_tap=factory_tap, check_interval=300.0,
+        "DistAmplifier",
+        watched=distributor,
+        upstream_tap=factory_tap,
+        check_interval=300.0,
     )
 
     # Customer demand source (flows through retail tap)
     source = Source.poisson(
-        rate=config.demand_rate, target=retail_tap,
-        event_type="Consume", name="CustomerDemand",
+        rate=config.demand_rate,
+        target=retail_tap,
+        event_type="Consume",
+        name="CustomerDemand",
         stop_after=config.duration_s,
     )
 
     entities = [
-        retailer, distributor, factory,
-        retail_tap, dist_tap, factory_tap,
-        retail_amplifier, dist_amplifier,
+        retailer,
+        distributor,
+        factory,
+        retail_tap,
+        dist_tap,
+        factory_tap,
+        retail_amplifier,
+        dist_amplifier,
         customer_sink,
-        retail_stockout, dist_stockout, factory_stockout,
+        retail_stockout,
+        dist_stockout,
+        factory_stockout,
     ]
 
     sim = Simulation(
@@ -336,9 +355,9 @@ def print_summary(result: SupplyChainResult) -> None:
     print("=" * 65)
 
     c = result.config
-    print(f"\nConfiguration:")
-    print(f"  Duration: {c.duration_s/3600:.0f} hours")
-    print(f"  Customer demand rate: {c.demand_rate*3600:.0f} orders/hr")
+    print("\nConfiguration:")
+    print(f"  Duration: {c.duration_s / 3600:.0f} hours")
+    print(f"  Customer demand rate: {c.demand_rate * 3600:.0f} orders/hr")
 
     initial_stocks = {
         "Retailer": c.retailer_stock,
@@ -346,43 +365,44 @@ def print_summary(result: SupplyChainResult) -> None:
         "Factory": c.factory_stock,
     }
 
-    print(f"\nInventory Levels:")
+    print("\nInventory Levels:")
     for name, inv in result.inventories.items():
         stats = inv.stats
         print(f"  {name}:")
         print(f"    Initial: {initial_stocks[name]}, Final: {stats.current_stock}")
         print(f"    Consumed: {stats.items_consumed}, Replenished: {stats.items_replenished}")
         print(f"    Reorders: {stats.reorders}")
-        print(f"    Fill rate: {stats.fill_rate*100:.1f}%")
+        print(f"    Fill rate: {stats.fill_rate * 100:.1f}%")
 
-    print(f"\nStockouts:")
+    print("\nStockouts:")
     for name, counter in result.stockout_counters.items():
         print(f"  {name}: {counter.total}")
 
-    print(f"\nDemand Amplification:")
+    print("\nDemand Amplification:")
     for name, amp in result.amplifiers.items():
         print(f"  {name}: {amp.amplified_orders} batch orders sent upstream")
 
     # Bullwhip analysis
-    print(f"\nBullwhip Effect (demand quantity per 1-hr window):")
+    print("\nBullwhip Effect (demand quantity per 1-hr window):")
     window = 3600.0
     variances = {}
     for name, tap in result.demand_taps.items():
         m = tap.quantity_mean(window)
         v = tap.quantity_variance(window)
         variances[name] = v
-        print(f"  {name}: {tap.total_quantity} total units, "
-              f"mean={m:.1f} units/hr, variance={v:.1f}")
+        print(
+            f"  {name}: {tap.total_quantity} total units, mean={m:.1f} units/hr, variance={v:.1f}"
+        )
 
     retail_var = variances.get("Retailer", 0)
     if retail_var > 0:
-        print(f"\n  Variance amplification (vs Retailer):")
+        print("\n  Variance amplification (vs Retailer):")
         for name, v in variances.items():
             if name != "Retailer":
                 ratio = v / retail_var
                 print(f"    {name}: {ratio:.2f}x")
 
-    print(f"\nCustomer Fulfillment:")
+    print("\nCustomer Fulfillment:")
     print(f"  Orders fulfilled: {result.customer_sink.count}")
     total_demand = result.demand_taps["Retailer"].total_events
     if total_demand > 0:
@@ -395,10 +415,15 @@ def print_summary(result: SupplyChainResult) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Multi-echelon supply chain simulation")
-    parser.add_argument("--duration", type=float, default=86400.0,
-                        help="Duration in seconds (default: 86400 = 24hr)")
-    parser.add_argument("--demand-rate", type=float, default=0.008,
-                        help="Demand rate per second (default: 0.008)")
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=86400.0,
+        help="Duration in seconds (default: 86400 = 24hr)",
+    )
+    parser.add_argument(
+        "--demand-rate", type=float, default=0.008, help="Demand rate per second (default: 0.008)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()

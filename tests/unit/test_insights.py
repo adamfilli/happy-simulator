@@ -2,10 +2,7 @@
 
 import random
 
-import pytest
-
 from happysimulator import (
-    ConstantLatency,
     ExponentialLatency,
     LatencyTracker,
     Probe,
@@ -25,7 +22,8 @@ def _run_queue(arrival_rate, service_rate, servers=1, duration=100, seed=42):
     random.seed(seed)
     tracker = LatencyTracker("Sink")
     server = Server(
-        "Server", concurrency=servers,
+        "Server",
+        concurrency=servers,
         service_time=ExponentialLatency(1.0 / service_rate),
         downstream=tracker,
     )

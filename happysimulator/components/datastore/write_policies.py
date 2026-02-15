@@ -14,7 +14,7 @@ Example:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generator, Set
+from typing import Any
 
 
 class WritePolicy(ABC):
@@ -31,7 +31,6 @@ class WritePolicy(ABC):
         Returns:
             True if writes should go to backing store immediately.
         """
-        pass
 
     @abstractmethod
     def on_write(self, key: str, value: Any) -> None:
@@ -41,7 +40,6 @@ class WritePolicy(ABC):
             key: The written key.
             value: The written value.
         """
-        pass
 
     @abstractmethod
     def should_flush(self) -> bool:
@@ -50,7 +48,6 @@ class WritePolicy(ABC):
         Returns:
             True if flush should be triggered.
         """
-        pass
 
     @abstractmethod
     def get_keys_to_flush(self) -> list[str]:
@@ -59,7 +56,6 @@ class WritePolicy(ABC):
         Returns:
             List of keys to write to backing store.
         """
-        pass
 
     @abstractmethod
     def on_flush(self, keys: list[str]) -> None:
@@ -68,7 +64,6 @@ class WritePolicy(ABC):
         Args:
             keys: Keys that were flushed.
         """
-        pass
 
 
 @dataclass
@@ -85,7 +80,6 @@ class WriteThrough(WritePolicy):
 
     def on_write(self, key: str, value: Any) -> None:
         """No tracking needed for write-through."""
-        pass
 
     def should_flush(self) -> bool:
         """Never needs flush - writes are immediate."""
@@ -97,7 +91,6 @@ class WriteThrough(WritePolicy):
 
     def on_flush(self, keys: list[str]) -> None:
         """No action needed."""
-        pass
 
 
 class WriteBack(WritePolicy):
@@ -136,7 +129,7 @@ class WriteBack(WritePolicy):
 
         self._flush_interval = flush_interval
         self._max_dirty = max_dirty
-        self._dirty_keys: Set[str] = set()
+        self._dirty_keys: set[str] = set()
         self._last_flush_time: float = 0.0
 
     @property
@@ -208,7 +201,6 @@ class WriteAround(WritePolicy):
 
     def on_flush(self, keys: list[str]) -> None:
         """No action needed."""
-        pass
 
     def get_keys_to_invalidate(self) -> list[str]:
         """Get keys to remove from cache.

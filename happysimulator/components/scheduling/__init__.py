@@ -17,7 +17,7 @@ __all__ = [
     "JobScheduler",
     "JobSchedulerStats",
     "JobState",
-    "WorkerStats",
     "WorkStealingPool",
     "WorkStealingPoolStats",
+    "WorkerStats",
 ]

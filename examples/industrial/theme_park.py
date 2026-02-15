@@ -29,24 +29,19 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
-    FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     Simulation,
     SimulationSummary,
     Source,
 )
 from happysimulator.components.common import Counter
 from happysimulator.components.industrial import ConditionalRouter, PooledCycleResource
-
 
 # =============================================================================
 # Configuration
@@ -89,7 +84,11 @@ class GuestProvider(EventProvider):
     def __init__(self, target: Entity, config: ThemeParkConfig, stop_after: Instant | None = None):
         self._target = target
         self._config = config
-        self._ride_weights = [config.roller_coaster_pct, config.ferris_wheel_pct, config.water_ride_pct]
+        self._ride_weights = [
+            config.roller_coaster_pct,
+            config.ferris_wheel_pct,
+            config.water_ride_pct,
+        ]
         self._stop_after = stop_after
         self.generated: int = 0
 
@@ -101,7 +100,7 @@ class GuestProvider(EventProvider):
         r = random.random()
         cumulative = 0.0
         ride_choice = RIDE_NAMES[-1]
-        for name, weight in zip(RIDE_NAMES, self._ride_weights):
+        for name, weight in zip(RIDE_NAMES, self._ride_weights, strict=False):
             cumulative += weight
             if r < cumulative:
                 ride_choice = name
@@ -132,7 +131,9 @@ class GuestProvider(EventProvider):
 class RideEntrance(Entity):
     """Checks queue depth before allowing guests to enter a ride."""
 
-    def __init__(self, name: str, ride: PooledCycleResource, balk_threshold: int, balk_counter: Entity):
+    def __init__(
+        self, name: str, ride: PooledCycleResource, balk_threshold: int, balk_counter: Entity
+    ):
         super().__init__(name)
         self.ride = ride
         self.balk_threshold = balk_threshold
@@ -144,13 +145,9 @@ class RideEntrance(Entity):
         total_busy = self.ride.queued + self.ride.active
         if total_busy >= self.balk_threshold:
             self._balked += 1
-            return [
-                self.forward(event, self.balk_counter, event_type="Balked")
-            ]
+            return [self.forward(event, self.balk_counter, event_type="Balked")]
         self._entered += 1
-        return [
-            self.forward(event, self.ride)
-        ]
+        return [self.forward(event, self.ride)]
 
 
 # =============================================================================
@@ -189,8 +186,12 @@ def run_theme_park_simulation(config: ThemeParkConfig | None = None) -> ThemePar
 
     # Create rides
     rides = {
-        "roller_coaster": PooledCycleResource("RollerCoaster", config.rc_seats, config.rc_cycle_time, sink),
-        "ferris_wheel": PooledCycleResource("FerrisWheel", config.fw_seats, config.fw_cycle_time, sink),
+        "roller_coaster": PooledCycleResource(
+            "RollerCoaster", config.rc_seats, config.rc_cycle_time, sink
+        ),
+        "ferris_wheel": PooledCycleResource(
+            "FerrisWheel", config.fw_seats, config.fw_cycle_time, sink
+        ),
         "water_ride": PooledCycleResource("WaterRide", config.wr_seats, config.wr_cycle_time, sink),
     }
 
@@ -208,14 +209,14 @@ def run_theme_park_simulation(config: ThemeParkConfig | None = None) -> ThemePar
     router = ConditionalRouter.by_context_field(
         "RideChooser",
         "ride_choice",
-        {name: entrance for name, entrance in entrances.items()},
+        dict(entrances.items()),
     )
 
     stop_after = Instant.from_seconds(config.duration_s)
     guest_provider = GuestProvider(router, config, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Guests",
@@ -266,7 +267,7 @@ def print_summary(result: ThemeParkResult) -> None:
     print("THEME PARK SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Guest arrival rate:  {config.arrival_rate_per_min:.1f}/min")
     print(f"  FastPass rate:       {config.fastpass_pct:.0%}")
@@ -274,11 +275,11 @@ def print_summary(result: ThemeParkResult) -> None:
     total = result.guest_provider.generated
     total_balked = sum(e._balked for e in result.entrances.values())
 
-    print(f"\nGuest Flow:")
+    print("\nGuest Flow:")
     print(f"  Total guests:        {total}")
     print(f"  Total balked:        {total_balked} ({100 * total_balked / max(total, 1):.1f}%)")
 
-    print(f"\nRide Statistics:")
+    print("\nRide Statistics:")
     for name, ride in result.rides.items():
         entrance = result.entrances[name]
         stats = ride.stats
@@ -290,7 +291,7 @@ def print_summary(result: ThemeParkResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency (ride wait + cycle):")
+        print("\nEnd-to-End Latency (ride wait + cycle):")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.1f} min")
         print(f"  p50:     {result.sink.p50() / 60:.1f} min")

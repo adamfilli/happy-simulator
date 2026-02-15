@@ -7,16 +7,21 @@ to latency percentiles (p50, p95, p99, p999).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.sketching.tdigest import TDigest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.core.event import Event
 
 
 @dataclass(frozen=True, slots=True)
 class LatencyPercentiles:
     """Summary of key latency percentiles."""
+
     p50: float
     p75: float
     p90: float
@@ -156,8 +161,15 @@ class QuantileEstimator(Entity):
         """
         if self._tdigest.item_count == 0:
             return LatencyPercentiles(
-                p50=0.0, p75=0.0, p90=0.0, p95=0.0, p99=0.0, p999=0.0,
-                min=None, max=None, count=0,
+                p50=0.0,
+                p75=0.0,
+                p90=0.0,
+                p95=0.0,
+                p99=0.0,
+                p999=0.0,
+                min=None,
+                max=None,
+                count=0,
             )
 
         return LatencyPercentiles(

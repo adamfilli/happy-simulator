@@ -5,20 +5,17 @@ work correctly in full simulation scenarios with Sources, Events, and
 the simulation loop.
 """
 
-from dataclasses import dataclass
-from typing import Generator, List
-
-import pytest
+from collections.abc import Generator
 
 from happysimulator.core.decorators import simulatable
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
 from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.source import Source
 
-
 # --- Decorated Entities ---
+
 
 @simulatable
 class TickCounter:
@@ -43,7 +40,7 @@ class EchoServer:
         self.processing_delay = processing_delay
         self.requests_handled = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, List[Event]]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event]]:
         self.requests_handled += 1
         yield self.processing_delay
 
@@ -68,7 +65,7 @@ class SimpleClient:
         self.requests_sent = 0
         self.responses_received = 0
 
-    def send_request(self, event: Event) -> List[Event]:
+    def send_request(self, event: Event) -> list[Event]:
         self.requests_sent += 1
         return []
 
@@ -81,6 +78,7 @@ class SimpleClient:
 
 # --- Event Providers (kept for RequestProvider with custom logic) ---
 
+
 class RequestProvider(EventProvider):
     """Generates request events from client to server."""
 
@@ -90,7 +88,7 @@ class RequestProvider(EventProvider):
         self.server = server
         self.request_count = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         self.request_count += 1
         event = Event(
             time=time,
@@ -103,6 +101,7 @@ class RequestProvider(EventProvider):
 
 
 # --- Tests ---
+
 
 class TestDecoratedCounterSimulation:
     """Test decorated counter in a simulation with a Source."""
@@ -239,21 +238,27 @@ class TestMixedEntityTypes:
         )
 
         # Schedule events for both
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.1),
-            event_type="ping",
-            target=traditional,
-        ))
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.2),
-            event_type="ping",
-            target=decorated,
-        ))
-        sim.schedule(Event(
-            time=Instant.from_seconds(0.3),
-            event_type="ping",
-            target=traditional,
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="ping",
+                target=traditional,
+            )
+        )
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.2),
+                event_type="ping",
+                target=decorated,
+            )
+        )
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(0.3),
+                event_type="ping",
+                target=traditional,
+            )
+        )
 
         sim.run()
 

@@ -10,10 +10,13 @@ from __future__ import annotations
 import logging
 from collections import deque
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -109,9 +112,7 @@ class PooledCycleResource(Entity):
             utilization=self.utilization,
         )
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]] | list[Event]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event]:
         if self._available > 0:
             return self._start_cycle(event)
 
@@ -120,14 +121,17 @@ class PooledCycleResource(Entity):
             self._rejected += 1
             logger.debug(
                 "[%s] Rejected (queue full: %d/%d)",
-                self.name, len(self._queue), self._queue_capacity,
+                self.name,
+                len(self._queue),
+                self._queue_capacity,
             )
             return []
 
         self._queue.append(event)
         logger.debug(
             "[%s] Queued (no units available, queue depth=%d)",
-            self.name, len(self._queue),
+            self.name,
+            len(self._queue),
         )
         return []
 

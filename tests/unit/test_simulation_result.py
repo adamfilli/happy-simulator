@@ -5,7 +5,6 @@ import random
 import pytest
 
 from happysimulator import (
-    ConstantLatency,
     ExponentialLatency,
     LatencyTracker,
     Probe,
@@ -27,7 +26,8 @@ def _run_queue(arrival_rate, service_rate, duration=50, seed=42):
     random.seed(seed)
     tracker = LatencyTracker("Sink")
     server = Server(
-        "Server", concurrency=1,
+        "Server",
+        concurrency=1,
         service_time=ExponentialLatency(1.0 / service_rate),
         downstream=tracker,
     )
@@ -145,9 +145,11 @@ class TestMetricDiff:
     def test_to_dict(self):
         diff = MetricDiff(
             name="latency",
-            mean_a=0.05, mean_b=0.03,
+            mean_a=0.05,
+            mean_b=0.03,
             mean_change_pct=-40.0,
-            p99_a=0.5, p99_b=0.12,
+            p99_a=0.5,
+            p99_b=0.12,
             p99_change_pct=-76.0,
         )
         d = diff.to_dict()

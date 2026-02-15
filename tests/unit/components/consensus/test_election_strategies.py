@@ -1,13 +1,12 @@
 """Tests for election strategies: Bully, Ring, and Randomized."""
 
-import pytest
 import random
 
 from happysimulator.components.consensus.election_strategies import (
-    ElectionStrategy,
     BullyStrategy,
-    RingStrategy,
+    ElectionStrategy,
     RandomizedStrategy,
+    RingStrategy,
 )
 
 

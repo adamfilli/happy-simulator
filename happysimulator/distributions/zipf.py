@@ -19,11 +19,12 @@ The Zipf exponent (s) controls the degree of skew:
 
 import bisect
 import random
-from typing import Sequence, TypeVar
+from collections.abc import Sequence
+from typing import TypeVar
 
 from happysimulator.distributions.value_distribution import ValueDistribution
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class ZipfDistribution(ValueDistribution[T]):
@@ -165,8 +166,8 @@ class ZipfDistribution(ValueDistribution[T]):
         try:
             idx = self._values.index(value)
             return self._probabilities[idx]
-        except ValueError:
-            raise ValueError(f"Value {value!r} not in population")
+        except ValueError as err:
+            raise ValueError(f"Value {value!r} not in population") from err
 
     def expected_frequency(self, rank: int, n_samples: int) -> float:
         """Return the expected count for a rank given n samples.

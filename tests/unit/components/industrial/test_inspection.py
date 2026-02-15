@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.inspection import InspectionStation
-from happysimulator.components.common import Sink, Counter
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestInspectionBasics:
-
     def test_creates_with_defaults(self):
         pass_sink = Sink("pass")
         fail_sink = Sink("fail")
@@ -85,8 +82,11 @@ class TestInspectionBasics:
         pass_sink = Sink("pass")
         fail_sink = Sink("fail")
         station = InspectionStation(
-            "inspect", pass_sink, fail_sink,
-            pass_rate=0.8, inspection_time=0.001,
+            "inspect",
+            pass_sink,
+            fail_sink,
+            pass_rate=0.8,
+            inspection_time=0.001,
         )
 
         sim = Simulation(

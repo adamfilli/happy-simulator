@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.microservice import (
     APIGateway,
-    APIGatewayStats,
     RouteConfig,
 )
 from happysimulator.components.rate_limiter import TokenBucketPolicy
@@ -18,6 +17,9 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass
@@ -29,7 +31,7 @@ class BackendService(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -93,8 +95,12 @@ class TestAPIGatewayRouting:
         gw = APIGateway(
             name="gw",
             routes={
-                "/api/users": RouteConfig(name="users", backends=[users_backend], auth_required=False),
-                "/api/orders": RouteConfig(name="orders", backends=[orders_backend], auth_required=False),
+                "/api/users": RouteConfig(
+                    name="users", backends=[users_backend], auth_required=False
+                ),
+                "/api/orders": RouteConfig(
+                    name="orders", backends=[orders_backend], auth_required=False
+                ),
             },
             auth_latency=0,
         )
@@ -134,7 +140,9 @@ class TestAPIGatewayRouting:
         backend = BackendService(name="backend")
         gw = APIGateway(
             name="gw",
-            routes={"/api/users": RouteConfig(name="users", backends=[backend], auth_required=False)},
+            routes={
+                "/api/users": RouteConfig(name="users", backends=[backend], auth_required=False)
+            },
             auth_latency=0,
         )
 
@@ -422,19 +430,23 @@ class TestAPIGatewayAuth:
         )
 
         for _ in range(3):
-            sim.schedule(Event(
-                time=Instant.Epoch,
-                event_type="request",
-                target=gw,
-                context={"metadata": {"route": "/a"}},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.Epoch,
+                    event_type="request",
+                    target=gw,
+                    context={"metadata": {"route": "/a"}},
+                )
+            )
         for _ in range(2):
-            sim.schedule(Event(
-                time=Instant.Epoch,
-                event_type="request",
-                target=gw,
-                context={"metadata": {"route": "/b"}},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.Epoch,
+                    event_type="request",
+                    target=gw,
+                    context={"metadata": {"route": "/b"}},
+                )
+            )
 
         sim.run()
 

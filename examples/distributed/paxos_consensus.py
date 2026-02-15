@@ -38,13 +38,12 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 
+from happysimulator.components.consensus.paxos import PaxosNode
+from happysimulator.components.network.conditions import datacenter_network
+from happysimulator.components.network.network import Network
+from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.core.event import Event
-from happysimulator.components.network.network import Network
-from happysimulator.components.network.conditions import datacenter_network
-from happysimulator.components.consensus.paxos import PaxosNode, PaxosStats
-
 
 # =============================================================================
 # Simulation Result
@@ -54,6 +53,7 @@ from happysimulator.components.consensus.paxos import PaxosNode, PaxosStats
 @dataclass
 class SimulationResult:
     """Results from the Paxos consensus simulation."""
+
     nodes: list[PaxosNode]
     proposer: PaxosNode
     proposed_value: str
@@ -97,7 +97,7 @@ def run(args=None) -> SimulationResult:
 
     # Create datacenter links between all pairs
     for i, a in enumerate(nodes):
-        for b in nodes[i + 1:]:
+        for b in nodes[i + 1 :]:
             network.add_bidirectional_link(a, b, datacenter_network(f"link-{a.name}-{b.name}"))
 
     # Propose a value from node1 using Event.once() trigger
@@ -147,9 +147,11 @@ def print_summary(result: SimulationResult) -> None:
     print(f"Proposed value: {result.proposed_value!r}")
     print(f"Proposer: {result.proposer.name}")
 
-    print(f"\nNode States:")
-    print(f"  {'Node':<10} {'Decided':<10} {'Value':<15} {'Proposals':<12} "
-          f"{'Promises':<10} {'Accepts':<10} {'Nacks':<8}")
+    print("\nNode States:")
+    print(
+        f"  {'Node':<10} {'Decided':<10} {'Value':<15} {'Proposals':<12} "
+        f"{'Promises':<10} {'Accepts':<10} {'Nacks':<8}"
+    )
     print(f"  {'-' * 75}")
 
     all_decided = True
@@ -157,9 +159,11 @@ def print_summary(result: SimulationResult) -> None:
         s = node.stats
         decided_str = "YES" if node.is_decided else "NO"
         value_str = repr(s.decided_value) if s.decided_value is not None else "-"
-        print(f"  {node.name:<10} {decided_str:<10} {value_str:<15} "
-              f"{s.proposals_started:<12} {s.promises_received:<10} "
-              f"{s.accepts_received:<10} {s.nacks_received:<8}")
+        print(
+            f"  {node.name:<10} {decided_str:<10} {value_str:<15} "
+            f"{s.proposals_started:<12} {s.promises_received:<10} "
+            f"{s.accepts_received:<10} {s.nacks_received:<8}"
+        )
         if not node.is_decided:
             all_decided = False
 
@@ -172,7 +176,7 @@ def print_summary(result: SimulationResult) -> None:
     elif len(decided_values) > 1:
         print(f"SAFETY VIOLATION: Multiple decided values: {decided_values}")
 
-    print(f"\nNetwork Statistics:")
+    print("\nNetwork Statistics:")
     print(f"  Events routed:  {result.network.events_routed}")
     print(f"  Dropped (partition): {result.network.events_dropped_partition}")
     print(f"  Dropped (no route):  {result.network.events_dropped_no_route}")
@@ -223,9 +227,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     labels = [f"Succeeded ({succeeded})", f"Failed ({failed})", f"Pending ({pending})"]
     colors = ["seagreen", "indianred", "gold"]
     # Filter out zero slices
-    non_zero = [(s, l, c) for s, l, c in zip(sizes, labels, colors) if s > 0]
+    non_zero = [(s, l, c) for s, l, c in zip(sizes, labels, colors, strict=False) if s > 0]
     if non_zero:
-        sizes, labels, colors = zip(*non_zero)
+        sizes, labels, colors = zip(*non_zero, strict=False)
         ax.pie(sizes, labels=labels, colors=colors, autopct="%1.0f%%", startangle=90)
     ax.set_title("Proposal Outcomes")
 
@@ -264,6 +268,7 @@ if __name__ == "__main__":
     if not args.no_viz:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             output_dir = Path(args.output)
             visualize_results(result, output_dir)

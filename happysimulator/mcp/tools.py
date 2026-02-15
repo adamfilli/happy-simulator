@@ -11,7 +11,7 @@ import json
 import random
 from typing import Any
 
-from happysimulator.ai.result import SimulationResult, SweepResult
+from happysimulator.ai.result import SimulationResult
 from happysimulator.components.server import Server as SimServer
 from happysimulator.core.simulation import Simulation
 from happysimulator.distributions.exponential import ExponentialLatency
@@ -114,10 +114,14 @@ def run_pipeline_simulation(
 
 def format_response(result: SimulationResult) -> str:
     """Format a SimulationResult as JSON with prompt_context and data."""
-    return json.dumps({
-        "prompt_context": result.to_prompt_context(),
-        "data": result.to_dict(),
-    }, indent=2, default=str)
+    return json.dumps(
+        {
+            "prompt_context": result.to_prompt_context(),
+            "data": result.to_dict(),
+        },
+        indent=2,
+        default=str,
+    )
 
 
 DISTRIBUTIONS_INFO = [
@@ -143,7 +147,7 @@ DISTRIBUTIONS_INFO = [
         "name": "PercentileFittedLatency",
         "description": "Fit a distribution to observed percentile data",
         "parameters": {"percentiles": "Dict of {percentile: value}"},
-        "example": 'PercentileFittedLatency({0.5: 0.01, 0.99: 0.1})',
+        "example": "PercentileFittedLatency({0.5: 0.01, 0.99: 0.1})",
     },
 ]
 

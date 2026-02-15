@@ -55,6 +55,9 @@ assignment uniformity - it's that some keys are accessed much more frequently.
 from __future__ import annotations
 
 import random
+
+# Import from common (sibling module)
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,17 +75,13 @@ from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 from happysimulator.distributions.uniform import UniformDistribution
 from happysimulator.distributions.zipf import ZipfDistribution
 
-# Import from common (sibling module)
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (
     CachingServer,
     CustomerRequestProvider,
     collect_aggregate_metrics,
     create_customer_consistent_hash,
-    customer_id_key_extractor,
 )
-
 
 # =============================================================================
 # Configuration
@@ -188,12 +187,14 @@ def run_scenario(
 
     # Calculate load imbalance
     requests = list(metrics.per_server_request_counts.values())
-    load_imbalance = max(requests) / min(requests) if min(requests) > 0 else float('inf')
+    load_imbalance = max(requests) / min(requests) if min(requests) > 0 else float("inf")
 
-    top_server = max(metrics.per_server_request_counts,
-                     key=metrics.per_server_request_counts.get)
-    top_server_pct = metrics.per_server_request_counts[top_server] / metrics.total_requests \
-        if metrics.total_requests > 0 else 0
+    top_server = max(metrics.per_server_request_counts, key=metrics.per_server_request_counts.get)
+    top_server_pct = (
+        metrics.per_server_request_counts[top_server] / metrics.total_requests
+        if metrics.total_requests > 0
+        else 0
+    )
 
     return DistributionResult(
         distribution_type=distribution_type,
@@ -227,6 +228,7 @@ def run_comparison(config: ZipfConfig) -> ComparisonResult:
     class DummyBackend(Entity):
         def __init__(self, name: str):
             super().__init__(name)
+
         def handle_event(self, event: Event) -> list[Event]:
             return []
 
@@ -287,13 +289,23 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     uniform_counts = [result.uniform.per_server_requests[s] for s in servers]
     zipf_counts = [result.zipf.per_server_requests[s] for s in servers]
 
-    ax.bar([i - width/2 for i in x], uniform_counts, width, label='Uniform',
-           color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], zipf_counts, width, label='Zipf',
-           color='coral', alpha=0.8)
+    ax.bar(
+        [i - width / 2 for i in x],
+        uniform_counts,
+        width,
+        label="Uniform",
+        color="steelblue",
+        alpha=0.8,
+    )
+    ax.bar([i + width / 2 for i in x], zipf_counts, width, label="Zipf", color="coral", alpha=0.8)
 
-    ax.axhline(y=result.uniform.total_requests / len(servers), color='blue',
-               linestyle='--', alpha=0.5, label='Expected (uniform)')
+    ax.axhline(
+        y=result.uniform.total_requests / len(servers),
+        color="blue",
+        linestyle="--",
+        alpha=0.5,
+        label="Expected (uniform)",
+    )
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Request Count")
@@ -301,18 +313,23 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(servers)
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Top-right: Hit rate comparison
     ax = axes[0, 1]
     uniform_rates = [result.uniform.per_server_hit_rates[s] for s in servers]
     zipf_rates = [result.zipf.per_server_hit_rates[s] for s in servers]
 
-    ax.bar([i - width/2 for i in x], uniform_rates, width, label='Uniform',
-           color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], zipf_rates, width, label='Zipf',
-           color='coral', alpha=0.8)
+    ax.bar(
+        [i - width / 2 for i in x],
+        uniform_rates,
+        width,
+        label="Uniform",
+        color="steelblue",
+        alpha=0.8,
+    )
+    ax.bar([i + width / 2 for i in x], zipf_rates, width, label="Zipf", color="coral", alpha=0.8)
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Cache Hit Rate")
@@ -321,8 +338,8 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_xticklabels(servers)
     ax.legend()
     ax.set_ylim(0, 1.0)
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Bottom-left: Load imbalance visualization
     ax = axes[1, 0]
@@ -333,14 +350,20 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     uniform_pcts = [c / total_uniform * 100 for c in uniform_counts]
     zipf_pcts = [c / total_zipf * 100 for c in zipf_counts]
 
-    ax.bar([i - width/2 for i in x], uniform_pcts, width, label='Uniform',
-           color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], zipf_pcts, width, label='Zipf',
-           color='coral', alpha=0.8)
+    ax.bar(
+        [i - width / 2 for i in x],
+        uniform_pcts,
+        width,
+        label="Uniform",
+        color="steelblue",
+        alpha=0.8,
+    )
+    ax.bar([i + width / 2 for i in x], zipf_pcts, width, label="Zipf", color="coral", alpha=0.8)
 
     expected_pct = 100 / len(servers)
-    ax.axhline(y=expected_pct, color='green', linestyle='--',
-               label=f'Expected ({expected_pct:.0f}%)')
+    ax.axhline(
+        y=expected_pct, color="green", linestyle="--", label=f"Expected ({expected_pct:.0f}%)"
+    )
 
     ax.set_xlabel("Server")
     ax.set_ylabel("% of Total Requests")
@@ -348,24 +371,24 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(servers)
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Annotate the "hot" server
     hot_idx = servers.index(result.zipf.top_server)
     ax.annotate(
         f"HOT!\n{result.zipf.top_server_pct:.1%}",
-        xy=(hot_idx + width/2, zipf_pcts[hot_idx]),
+        xy=(hot_idx + width / 2, zipf_pcts[hot_idx]),
         xytext=(hot_idx + 1, zipf_pcts[hot_idx] + 5),
-        arrowprops=dict(arrowstyle='->', color='red'),
+        arrowprops={"arrowstyle": "->", "color": "red"},
         fontsize=10,
-        color='red',
-        fontweight='bold',
+        color="red",
+        fontweight="bold",
     )
 
     # Bottom-right: Summary metrics
     ax = axes[1, 1]
-    ax.axis('off')
+    ax.axis("off")
 
     summary_text = f"""
     SUMMARY COMPARISON
@@ -388,13 +411,20 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     KEY INSIGHT:
       With Zipf, {result.zipf.top_server} receives
-      {result.zipf.top_server_pct / (1/result.config.num_servers):.1f}x more load
+      {result.zipf.top_server_pct / (1 / result.config.num_servers):.1f}x more load
       than expected, even with perfect consistent hashing!
     """
 
-    ax.text(0.1, 0.9, summary_text, transform=ax.transAxes,
-            fontsize=11, verticalalignment='top', fontfamily='monospace',
-            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax.text(
+        0.1,
+        0.9,
+        summary_text,
+        transform=ax.transAxes,
+        fontsize=11,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.5},
+    )
 
     fig.tight_layout()
     fig.savefig(output_dir / "zipf_effect.png", dpi=150)
@@ -406,17 +436,18 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     # Left: Zipf probability distribution (top 50 customers)
     ax = axes[0]
-    zipf_dist = ZipfDistribution(list(range(result.config.num_customers)),
-                                  s=result.config.zipf_s, seed=result.config.seed)
+    zipf_dist = ZipfDistribution(
+        list(range(result.config.num_customers)), s=result.config.zipf_s, seed=result.config.seed
+    )
 
     top_n = 50
     probs = [zipf_dist.probability(rank) for rank in range(1, top_n + 1)]
 
-    ax.bar(range(1, top_n + 1), probs, color='coral', alpha=0.8)
+    ax.bar(range(1, top_n + 1), probs, color="coral", alpha=0.8)
     ax.set_xlabel("Customer Rank")
     ax.set_ylabel("Access Probability")
     ax.set_title(f"Zipf Distribution (s={result.config.zipf_s}): Top {top_n} Customers")
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Annotate key statistics
     top10_prob = sum(probs[:10])
@@ -425,7 +456,7 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
         xy=(5, probs[4]),
         xytext=(15, probs[4] * 0.8),
         fontsize=10,
-        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8),
+        bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
     )
 
     # Right: Cumulative distribution
@@ -436,22 +467,22 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
         total += p
         cumulative.append(total)
 
-    ax.plot(range(1, top_n + 1), cumulative, 'b-', linewidth=2)
+    ax.plot(range(1, top_n + 1), cumulative, "b-", linewidth=2)
     ax.fill_between(range(1, top_n + 1), cumulative, alpha=0.3)
 
-    ax.axhline(y=0.5, color='green', linestyle='--', alpha=0.7)
-    ax.axhline(y=0.8, color='orange', linestyle='--', alpha=0.7)
+    ax.axhline(y=0.5, color="green", linestyle="--", alpha=0.7)
+    ax.axhline(y=0.8, color="orange", linestyle="--", alpha=0.7)
 
     # Find 50% and 80% points
-    for threshold, color, label in [(0.5, 'green', '50%'), (0.8, 'orange', '80%')]:
+    for threshold, color, label in [(0.5, "green", "50%"), (0.8, "orange", "80%")]:
         for i, c in enumerate(cumulative):
             if c >= threshold:
-                ax.axvline(x=i+1, color=color, linestyle=':', alpha=0.7)
+                ax.axvline(x=i + 1, color=color, linestyle=":", alpha=0.7)
                 ax.annotate(
-                    f"Top {i+1}:\n{label} of traffic",
-                    xy=(i+1, threshold),
-                    xytext=(i+10, threshold - 0.1),
-                    arrowprops=dict(arrowstyle='->', color=color),
+                    f"Top {i + 1}:\n{label} of traffic",
+                    xy=(i + 1, threshold),
+                    xytext=(i + 10, threshold - 0.1),
+                    arrowprops={"arrowstyle": "->", "color": color},
                     fontsize=9,
                     color=color,
                 )
@@ -476,22 +507,22 @@ def print_summary(result: ComparisonResult) -> None:
     print("=" * 70)
 
     config = result.config
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Customers: {config.num_customers}")
     print(f"  Servers: {config.num_servers}")
     print(f"  Zipf exponent: {config.zipf_s}")
 
-    print(f"\nUniform Distribution:")
+    print("\nUniform Distribution:")
     print(f"  Load imbalance (max/min): {result.uniform.load_imbalance:.2f}x")
     print(f"  Top server: {result.uniform.top_server} ({result.uniform.top_server_pct:.1%})")
     print(f"  Aggregate hit rate: {result.uniform.aggregate_hit_rate:.1%}")
 
-    print(f"\nZipf Distribution:")
+    print("\nZipf Distribution:")
     print(f"  Load imbalance (max/min): {result.zipf.load_imbalance:.2f}x")
     print(f"  Top server: {result.zipf.top_server} ({result.zipf.top_server_pct:.1%})")
     print(f"  Aggregate hit rate: {result.zipf.aggregate_hit_rate:.1%}")
 
-    print(f"\nPer-Server Request Counts:")
+    print("\nPer-Server Request Counts:")
     servers = sorted(result.uniform.per_server_requests.keys())
     print(f"  {'Server':<10} | {'Uniform':>10} | {'Zipf':>10} | {'Zipf Diff':>10}")
     print(f"  {'-' * 10} | {'-' * 10} | {'-' * 10} | {'-' * 10}")
@@ -505,16 +536,16 @@ def print_summary(result: ComparisonResult) -> None:
     print("\n" + "=" * 70)
     print("KEY INSIGHTS:")
     print("-" * 70)
-    print(f"\n1. CONSISTENT HASHING distributes KEYS uniformly")
-    print(f"   (each server has ~{100/config.num_servers:.0f}% of customer IDs)")
-    print(f"\n2. But with ZIPF, TRAFFIC is NOT uniform")
-    print(f"   (a few customers generate most of the traffic)")
-    print(f"\n3. The server assigned to the hottest customers becomes a \"HOT SHARD\"")
+    print("\n1. CONSISTENT HASHING distributes KEYS uniformly")
+    print(f"   (each server has ~{100 / config.num_servers:.0f}% of customer IDs)")
+    print("\n2. But with ZIPF, TRAFFIC is NOT uniform")
+    print("   (a few customers generate most of the traffic)")
+    print('\n3. The server assigned to the hottest customers becomes a "HOT SHARD"')
     print(f"   ({result.zipf.top_server} handles {result.zipf.top_server_pct:.1%} of traffic)")
-    print(f"\n4. Solutions for hot shards:")
-    print(f"   - Key replication (cache hot keys on multiple servers)")
-    print(f"   - Request splitting (break hot keys into sub-keys)")
-    print(f"   - Weighted routing (reduce traffic to hot servers)")
+    print("\n4. Solutions for hot shards:")
+    print("   - Key replication (cache hot keys on multiple servers)")
+    print("   - Request splitting (break hot keys into sub-keys)")
+    print("   - Weighted routing (reduce traffic to hot servers)")
     print("=" * 70)
 
 
@@ -533,10 +564,13 @@ if __name__ == "__main__":
     parser.add_argument("--duration", type=float, default=30.0, help="Simulation duration (s)")
     parser.add_argument("--customers", type=int, default=1000, help="Number of unique customers")
     parser.add_argument("--servers", type=int, default=5, help="Number of servers")
-    parser.add_argument("--zipf-s", type=float, default=1.5, help="Zipf exponent (higher=more skewed)")
+    parser.add_argument(
+        "--zipf-s", type=float, default=1.5, help="Zipf exponent (higher=more skewed)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/load-balancing",
-                        help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/load-balancing", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
 
     args = parser.parse_args()

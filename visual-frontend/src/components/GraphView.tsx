@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   type Node,
   type Edge,
   type NodeMouseHandler,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -15,8 +17,10 @@ import { useSimStore } from "../hooks/useSimState";
 import { useWebSocket } from "../hooks/useWebSocket";
 import EntityNode from "./EntityNode";
 import AnimatedEdge from "./AnimatedEdge";
+import ChartNode from "./ChartNode";
 import CodePanelNode from "./CodePanelNode";
 import { CodePanelCtx, type CodePanelContext } from "./CodePanelContext";
+import type { PinnedChart } from "../types";
 
 const elk = new ELK();
 
@@ -31,16 +35,47 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
-const nodeTypes = { entity: EntityNode, codePanel: CodePanelNode };
+const nodeTypes = { entity: EntityNode, chart: ChartNode, codePanel: CodePanelNode };
 const edgeTypes = { animated: AnimatedEdge };
 
+const DRAG_MIME = "application/happysim-chart";
+
 export default function GraphView() {
+  return (
+    <ReactFlowProvider>
+      <GraphViewInner />
+    </ReactFlowProvider>
+  );
+}
+
+function pinnedChartToNode(chart: PinnedChart): Node {
+  return {
+    id: `chart-${chart.id}`,
+    type: "chart",
+    position: { x: chart.x, y: chart.y },
+    data: {
+      chartId: chart.id,
+      kind: chart.kind,
+      entityName: chart.entityName,
+      metricKey: chart.metricKey,
+      displayMode: chart.displayMode,
+      probeName: chart.probeName,
+      label: chart.label,
+    },
+  };
+}
+
+function GraphViewInner() {
   const topology = useSimStore((s) => s.topology);
   const state = useSimStore((s) => s.state);
   const selectEntity = useSimStore((s) => s.selectEntity);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
   const codePanels = useSimStore((s) => s.codePanels);
+  const pinnedCharts = useSimStore((s) => s.pinnedCharts);
+  const addPinnedChart = useSimStore((s) => s.addPinnedChart);
+  const updatePinnedChartPosition = useSimStore((s) => s.updatePinnedChartPosition);
   const { send } = useWebSocket();
+  const { screenToFlowPosition } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDone, setLayoutDone] = useState(false);
@@ -159,7 +194,9 @@ export default function GraphView() {
           },
         };
       });
-      setNodes(rfNodes);
+      // Preserve existing pinned chart nodes across ELK re-layout
+      const chartNodes = useSimStore.getState().pinnedCharts.map(pinnedChartToNode);
+      setNodes([...rfNodes, ...chartNodes]);
       setEdges(flowEdges);
       setLayoutDone(true);
     });
@@ -177,7 +214,7 @@ export default function GraphView() {
     if (!state) return;
     setNodes((nds) =>
       nds.map((n) => {
-        if (n.type === "codePanel") return n;
+        if (n.type === "codePanel" || n.type === "chart") return n;
         const entityState = state.entities[n.id];
         return {
           ...n,
@@ -253,8 +290,73 @@ export default function GraphView() {
     });
   }, [codePanels, handleCloseCodePanel, setNodes, setEdges]);
 
+  // Sync pinned charts → React Flow nodes
+  useEffect(() => {
+    setNodes((nds) => {
+      const pinnedIds = new Set(pinnedCharts.map((c) => `chart-${c.id}`));
+      // Remove stale chart nodes
+      const withoutStale = nds.filter((n) => n.type !== "chart" || pinnedIds.has(n.id));
+      // Add new chart nodes
+      const existingChartIds = new Set(
+        withoutStale.filter((n) => n.type === "chart").map((n) => n.id)
+      );
+      const newChartNodes = pinnedCharts
+        .filter((c) => !existingChartIds.has(`chart-${c.id}`))
+        .map(pinnedChartToNode);
+      // Update displayMode on existing chart nodes
+      const updated = withoutStale.map((n) => {
+        if (n.type !== "chart") return n;
+        const chartId = (n.data as { chartId: string }).chartId;
+        const chart = pinnedCharts.find((c) => c.id === chartId);
+        if (chart && chart.displayMode !== (n.data as { displayMode?: string }).displayMode) {
+          return { ...n, data: { ...n.data, displayMode: chart.displayMode } };
+        }
+        return n;
+      });
+      return [...updated, ...newChartNodes];
+    });
+  }, [pinnedCharts, setNodes]);
+
+  // Drop handler for inspector drag
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes(DRAG_MIME)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  }, []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      const raw = e.dataTransfer.getData(DRAG_MIME);
+      if (!raw) return;
+      e.preventDefault();
+      const payload = JSON.parse(raw) as Omit<PinnedChart, "id" | "x" | "y">;
+      const position = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      addPinnedChart({
+        ...payload,
+        id: crypto.randomUUID(),
+        x: position.x,
+        y: position.y,
+      });
+    },
+    [screenToFlowPosition, addPinnedChart]
+  );
+
+  // Persist chart node position after drag
+  const onNodeDragStop = useCallback(
+    (_: unknown, node: Node) => {
+      if (node.type === "chart") {
+        const chartId = (node.data as { chartId: string }).chartId;
+        updatePinnedChartPosition(chartId, node.position.x, node.position.y);
+      }
+    },
+    [updatePinnedChartPosition]
+  );
+
+  // Click handler — skip chart nodes
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
+      if (node.type === "chart") return;
       selectEntity(node.id);
     },
     [selectEntity]
@@ -273,6 +375,9 @@ export default function GraphView() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

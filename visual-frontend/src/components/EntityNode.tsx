@@ -1,5 +1,6 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
+import { CodePanelCtx } from "./CodePanelContext";
 
 type EntityNodeData = {
   label: string;
@@ -8,14 +9,15 @@ type EntityNodeData = {
   color: string;
   metrics: Record<string, unknown>;
   selected?: boolean;
-  onOpenCodePanel?: (entityName: string) => void;
-  hasCodePanel?: boolean;
 };
 
 type EntityNodeType = Node<EntityNodeData, "entity">;
 
 function EntityNode({ data }: NodeProps<EntityNodeType>) {
-  const { label, entityType, color, metrics, selected, onOpenCodePanel, hasCodePanel } = data;
+  const { label, entityType, color, metrics, selected } = data;
+  const ctx = useContext(CodePanelCtx);
+  const onOpenCodePanel = ctx?.onOpenCodePanel;
+  const hasCodePanel = ctx?.openPanels.has(label) ?? false;
 
   // Pick top 2 metrics to show on the node
   const metricEntries = Object.entries(metrics).slice(0, 2);

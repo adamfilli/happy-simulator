@@ -71,12 +71,8 @@ export default function App() {
     });
   }, [setTopology, setState, addDashboardPanel, setActiveView]);
 
-  const handleStep = async (count: number) => {
-    const res = await fetch(`/api/step?count=${count}`, { method: "POST" });
-    const data: StepResult = await res.json();
-    setState(data.state);
-    if (data.new_events?.length) addEvents(data.new_events);
-    if (data.new_logs?.length) addLogs(data.new_logs);
+  const handleStep = (count: number) => {
+    send("step", { count });
   };
 
   const handlePlay = (speed: number) => {
@@ -114,14 +110,6 @@ export default function App() {
     setTopology(topo);
   };
 
-  const handleCodeStep = () => send("code_step");
-  const handleCodeStepOver = () => send("code_step_over");
-  const handleCodeStepOut = () => send("code_step_out");
-  const handleCodeContinue = () => {
-    useSimStore.getState().clearCodePaused();
-    send("code_continue");
-  };
-
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
       <ControlBar
@@ -132,10 +120,6 @@ export default function App() {
         onReset={handleReset}
         onRunTo={handleRunTo}
         onRunToEvent={handleRunToEvent}
-        onCodeStep={handleCodeStep}
-        onCodeStepOver={handleCodeStepOver}
-        onCodeStepOut={handleCodeStepOut}
-        onCodeContinue={handleCodeContinue}
       />
       <Timeline
         currentTime={state?.time_s ?? 0}

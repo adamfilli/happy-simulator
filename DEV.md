@@ -214,14 +214,16 @@ Verify at: https://pypi.org/project/happysim/
 3. Create a token scoped to this project (or account-wide for first upload)
 4. Store tokens securely (e.g., in a `.pypirc` file or password manager)
 
-Optional `.pypirc` for automated uploads (place in `$HOME`):
+Optional `.pypirc` for automated uploads (place in `$HOME`, **do not commit this file**):
 ```ini
 [pypi]
 username = __token__
-password = pypi-YOUR_TOKEN_HERE
+password = pypi-<YOUR_TOKEN_HERE>
 
 [testpypi]
 repository = https://test.pypi.org/legacy/
 username = __token__
-password = pypi-YOUR_TEST_TOKEN_HERE
+password = pypi-<YOUR_TEST_TOKEN_HERE>
 ```
+
+> **Warning**: Never commit `.pypirc` to version control — it contains secrets.

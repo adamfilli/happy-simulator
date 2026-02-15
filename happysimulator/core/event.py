@@ -18,8 +18,24 @@ from happysimulator.core.temporal import Instant
 
 if TYPE_CHECKING:
     from happysimulator.core.protocols import Simulatable
+    from happysimulator.visual.code_debugger import CodeDebugger
 
 logger = logging.getLogger(__name__)
+
+# Active code debugger context — set by Simulation.run() when visual debugging
+_active_code_debugger: CodeDebugger | None = None
+
+
+def _set_active_code_debugger(debugger: CodeDebugger | None) -> None:
+    """Set the active code debugger. Called by Simulation.run()."""
+    global _active_code_debugger
+    _active_code_debugger = debugger
+
+
+def _clear_active_code_debugger() -> None:
+    """Clear the active code debugger."""
+    global _active_code_debugger
+    _active_code_debugger = None
 
 _global_event_counter = count()
 
@@ -357,11 +373,29 @@ class ProcessContinuation(Event):
         self.process = process
         self._send_value: Any = None
 
+    def _resolve_entity_name(self) -> str | None:
+        """Resolve the actual entity name, handling QueuedResource indirection."""
+        from happysimulator.components.queued_resource import _QueuedResourceWorkerAdapter
+
+        target = self.target
+        if isinstance(target, _QueuedResourceWorkerAdapter):
+            target = target._resource
+        return getattr(target, "name", None)
+
     def invoke(self) -> List["Event"]:
         """Advance the generator to its next yield and schedule the continuation."""
         from happysimulator.core.sim_future import SimFuture
 
         self.trace("process.resume.start")
+
+        # Install code tracing if debugger is active for this entity
+        debugger = _active_code_debugger
+        tracing = False
+        if debugger is not None:
+            entity_name = self._resolve_entity_name()
+            if entity_name and debugger.is_active(entity_name):
+                debugger.install_trace(self.process, entity_name)
+                tracing = True
 
         try:
             # 1. Wake up the process
@@ -415,6 +449,10 @@ class ProcessContinuation(Event):
         except Exception as exc:
             self.trace("process.error", error=type(exc).__name__, message=str(exc))
             raise
+
+        finally:
+            if tracing and debugger is not None:
+                debugger.remove_trace(self.process)
         
     def _normalize_yield(self, value: Any) -> Tuple[float, List["Event"]]:
         """Unpacks `yield 0.1` vs `yield 0.1, [events]`"""

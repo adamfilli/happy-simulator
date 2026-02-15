@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from happysimulator.core.event import Event
+from happysimulator.visual.code_debugger import CodeBreakpoint, CodeDebugger
 from happysimulator.visual.serializers import is_internal_event, serialize_entity, serialize_event
 from happysimulator.visual.topology import discover
 
@@ -127,6 +128,10 @@ class SimulationBridge:
         self._entity_history: dict[str, list[tuple[float, dict]]] = {}
         self._last_snapshot_time: float = -1.0
         self._lock = threading.Lock()
+
+        # Code debugger — injected into the simulation for ProcessContinuation access
+        self._code_debugger = CodeDebugger()
+        sim._code_debugger = self._code_debugger
 
         # Install event hook
         sim.control.on_event(self._on_event)
@@ -306,13 +311,20 @@ class SimulationBridge:
         self._sim.control.step(count)
         state = self.get_state()
         new_events, new_edges, new_logs = self._drain_new_buffers()
-        return {
+
+        # Drain code traces
+        code_traces = [t.to_dict() for t in self._code_debugger.drain_completed_traces()]
+
+        result: dict[str, Any] = {
             "state": state,
             "new_events": new_events,
             "new_edges": new_edges,
             "new_logs": new_logs,
             "edge_stats": self.get_edge_stats(),
         }
+        if code_traces:
+            result["code_traces"] = code_traces
+        return result
 
     def run_to(self, time_s: float) -> dict[str, Any]:
         """Run the simulation until the given time, then return state."""
@@ -356,6 +368,7 @@ class SimulationBridge:
 
     def reset(self) -> dict[str, Any]:
         """Reset the simulation and return the initial state."""
+        self._code_debugger.reset()
         self._sim.control.reset()
         self._event_log.clear()
         self._log_buffer.clear()
@@ -485,3 +498,62 @@ class SimulationBridge:
                 "rate": round(rate, 2),
             }
         return stats
+
+    # --- Code Debug Methods ---
+
+    def get_entity_source(self, entity_name: str) -> dict[str, Any] | None:
+        """Return source code for an entity's handler method."""
+        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+            name = getattr(entity, "name", type(entity).__name__)
+            if name == entity_name:
+                location = self._code_debugger.get_source(entity)
+                if location:
+                    return location.to_dict()
+                return None
+        return None
+
+    def activate_code_debug(self, entity_name: str) -> dict[str, Any]:
+        """Activate code-level debugging for an entity."""
+        # Pre-cache source
+        for entity in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+            name = getattr(entity, "name", type(entity).__name__)
+            if name == entity_name:
+                self._code_debugger.get_source(entity)
+                break
+        self._code_debugger.activate_entity(entity_name)
+        return self._code_debugger.get_state()
+
+    def deactivate_code_debug(self, entity_name: str) -> dict[str, Any]:
+        """Deactivate code-level debugging for an entity."""
+        self._code_debugger.deactivate_entity(entity_name)
+        return self._code_debugger.get_state()
+
+    def set_code_breakpoint(self, entity_name: str, line_number: int) -> dict[str, Any]:
+        """Set a code breakpoint on a specific line."""
+        bp = CodeBreakpoint(entity_name=entity_name, line_number=line_number)
+        bp_id = self._code_debugger.add_breakpoint(bp)
+        return {"id": bp_id, **bp.to_dict()}
+
+    def remove_code_breakpoint(self, bp_id: str) -> bool:
+        """Remove a code breakpoint by ID."""
+        return self._code_debugger.remove_breakpoint(bp_id)
+
+    def get_code_debug_state(self) -> dict[str, Any]:
+        """Return the full code debug state."""
+        return self._code_debugger.get_state()
+
+    def code_continue(self) -> None:
+        """Continue from a code breakpoint pause."""
+        self._code_debugger.code_continue()
+
+    def code_step(self) -> None:
+        """Step to the next line."""
+        self._code_debugger.code_step()
+
+    def code_step_over(self) -> None:
+        """Step over — next line in the same frame."""
+        self._code_debugger.code_step_over()
+
+    def code_step_out(self) -> None:
+        """Step out — continue until the current frame returns."""
+        self._code_debugger.code_step_out()

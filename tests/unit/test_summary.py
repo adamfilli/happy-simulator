@@ -1,5 +1,7 @@
 """Tests for SimulationSummary and EntitySummary."""
 
+from collections.abc import Generator
+
 import pytest
 
 from happysimulator import (
@@ -19,7 +21,6 @@ from happysimulator.instrumentation.summary import (
     SimulationSummary,
 )
 from happysimulator.load.event_provider import EventProvider
-from typing import Generator
 
 
 class _CountingSink(Entity):
@@ -45,12 +46,14 @@ class _SimpleServer(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield 0.01
         self.stats_processed += 1
-        return [Event(
-            time=self.now,
-            event_type="Done",
-            target=self.downstream,
-            context=event.context,
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="Done",
+                target=self.downstream,
+                context=event.context,
+            )
+        ]
 
 
 class _SimpleProvider(EventProvider):

@@ -19,9 +19,9 @@ breaker transitions and the effective error rate seen by upstream callers.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -36,6 +36,8 @@ from happysimulator import (
 )
 from happysimulator.components.microservice import Sidecar
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Components
@@ -45,9 +47,14 @@ from happysimulator.components.microservice import Sidecar
 class FlakyBackend(Entity):
     """Backend that becomes slow/unresponsive periodically."""
 
-    def __init__(self, name: str, normal_latency: float = 0.01,
-                 slow_latency: float = 20.0, failure_interval: float = 5.0,
-                 failure_duration: float = 2.0):
+    def __init__(
+        self,
+        name: str,
+        normal_latency: float = 0.01,
+        slow_latency: float = 20.0,
+        failure_interval: float = 5.0,
+        failure_duration: float = 2.0,
+    ):
         super().__init__(name)
         self.normal_latency = normal_latency
         self.slow_latency = slow_latency
@@ -55,7 +62,7 @@ class FlakyBackend(Entity):
         self.failure_duration = failure_duration
         self.requests_received = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         t = self.now.to_seconds()
         cycle = t % self.failure_interval
@@ -117,7 +124,8 @@ def run_sidecar_simulation(
         name="Sidecar",
         target=backend,
         rate_limit_policy=TokenBucketPolicy(
-            capacity=rate_limit_capacity, refill_rate=rate_limit_refill,
+            capacity=rate_limit_capacity,
+            refill_rate=rate_limit_refill,
         ),
         circuit_failure_threshold=circuit_failure_threshold,
         circuit_success_threshold=2,
@@ -158,12 +166,12 @@ def print_summary(result: SimulationResult) -> None:
     print("SERVICE MESH SIDECAR — RESULTS")
     print("=" * 60)
 
-    print(f"\nTraffic:")
+    print("\nTraffic:")
     print(f"  Total requests:     {s.total_requests}")
     print(f"  Successful:         {s.successful_requests}")
     print(f"  Failed:             {s.failed_requests}")
 
-    print(f"\nResilience:")
+    print("\nResilience:")
     print(f"  Rate limited:       {s.rate_limited}")
     print(f"  Circuit broken:     {s.circuit_broken}")
     print(f"  Timed out:          {s.timed_out}")
@@ -174,7 +182,9 @@ def print_summary(result: SimulationResult) -> None:
 
     if s.total_requests > 0:
         effective_success = s.successful_requests / s.total_requests * 100
-        effective_error = (s.failed_requests + s.circuit_broken + s.rate_limited) / s.total_requests * 100
+        effective_error = (
+            (s.failed_requests + s.circuit_broken + s.rate_limited) / s.total_requests * 100
+        )
         print(f"\nEffective success rate: {effective_success:.1f}%")
         print(f"Effective error rate:   {effective_error:.1f}%")
 
@@ -184,6 +194,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate sidecar statistics visualization."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -195,8 +206,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     # Outcome breakdown
     ax = axes[0]
     categories = ["Successful", "Failed", "Rate Limited", "Circuit Broken", "Timed Out"]
-    values = [s.successful_requests, s.failed_requests, s.rate_limited,
-              s.circuit_broken, s.timed_out]
+    values = [
+        s.successful_requests,
+        s.failed_requests,
+        s.rate_limited,
+        s.circuit_broken,
+        s.timed_out,
+    ]
     colors = ["#2ecc71", "#e74c3c", "#f39c12", "#e67e22", "#9b59b6"]
     ax.bar(categories, values, color=colors, edgecolor="black", alpha=0.8)
     ax.set_ylabel("Count")
@@ -206,10 +222,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Pie chart
     ax = axes[1]
-    nonzero = [(c, v) for c, v in zip(categories, values) if v > 0]
+    nonzero = [(c, v) for c, v in zip(categories, values, strict=False) if v > 0]
     if nonzero:
-        labels, sizes = zip(*nonzero)
-        color_map = dict(zip(categories, colors))
+        labels, sizes = zip(*nonzero, strict=False)
+        color_map = dict(zip(categories, colors, strict=False))
         pie_colors = [color_map[l] for l in labels]
         ax.pie(sizes, labels=labels, colors=pie_colors, autopct="%1.1f%%", startangle=90)
         ax.set_title("Outcome Distribution")

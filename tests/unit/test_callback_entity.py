@@ -1,7 +1,5 @@
 """Unit tests for CallbackEntity, NullEntity, and Event.once()."""
 
-import pytest
-
 from happysimulator.core.callback_entity import CallbackEntity, NullEntity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant

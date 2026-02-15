@@ -9,16 +9,17 @@ This module also provides ProcessContinuation for generator-based multi-step
 processes, enabling entities to yield delays and resume execution later.
 """
 
-import uuid
 import logging
+import uuid
+from collections.abc import Callable, Generator
 from itertools import count
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from happysimulator.core.temporal import Instant
+from happysimulator.visual.code_debugger import CodeDebugger
 
 if TYPE_CHECKING:
     from happysimulator.core.protocols import Simulatable
-    from happysimulator.visual.code_debugger import CodeDebugger
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,10 @@ def _clear_active_code_debugger() -> None:
     global _active_code_debugger
     _active_code_debugger = None
 
+
 _global_event_counter = count()
 
-CompletionHook = Callable[[Instant], Union[List['Event'], 'Event', None]]
+CompletionHook = Callable[[Instant], Union[list["Event"], "Event", None]]
 """Signature for hooks that run when an event or process finishes."""
 
 
@@ -75,20 +77,26 @@ class Event:
     """
 
     __slots__ = (
-        "time", "event_type", "daemon", "target",
-        "on_complete", "context",
-        "_sort_index", "_id", "_cancelled",
+        "_cancelled",
+        "_id",
+        "_sort_index",
+        "context",
+        "daemon",
+        "event_type",
+        "on_complete",
+        "target",
+        "time",
     )
 
     def __init__(
         self,
         time: Instant,
         event_type: str,
-        target: Optional['Simulatable'] = None,
+        target: Optional["Simulatable"] = None,
         *,
         daemon: bool = False,
-        on_complete: List[CompletionHook] | None = None,
-        context: Dict[str, Any] | None = None,
+        on_complete: list[CompletionHook] | None = None,
+        context: dict[str, Any] | None = None,
     ):
         if target is None:
             raise ValueError(f"Event '{event_type}' must have a 'target'.")
@@ -138,7 +146,7 @@ class Event:
             action: Short action name (e.g., "handle.start", "process.yield").
             **data: Extra structured fields for debugging.
         """
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "time": self.time,
             "action": action,
             "event_id": self.context["id"],
@@ -147,7 +155,7 @@ class Event:
         if data:
             entry["data"] = data
         self._ensure_trace()["spans"].append(entry)
-        
+
     def add_completion_hook(self, hook: CompletionHook) -> None:
         """Attach a function to run when this event finishes processing.
 
@@ -170,7 +178,7 @@ class Event:
             self.context["stack"] = stack
         elif len(stack) >= self._MAX_STACK_DEPTH:
             # Trim to keep most recent entries
-            del stack[:len(stack) - self._MAX_STACK_DEPTH + 1]
+            del stack[: len(stack) - self._MAX_STACK_DEPTH + 1]
         return stack
 
     def _ensure_trace(self) -> dict:
@@ -181,7 +189,7 @@ class Event:
             self.context["trace"] = trace
         return trace
 
-    def invoke(self) -> List['Event']:
+    def invoke(self) -> list["Event"]:
         """Execute this event and return any resulting events.
 
         Dispatches to the target entity's handle_event() method. If the handler
@@ -191,7 +199,7 @@ class Event:
         Returns:
             New events to schedule, including any from completion hooks.
         """
-        if getattr(self.target, '_crashed', False):
+        if getattr(self.target, "_crashed", False):
             return []
 
         handler_label = getattr(self.target, "name", type(self.target).__name__)
@@ -215,8 +223,8 @@ class Event:
         except Exception as exc:
             self.trace("handle.error", error=type(exc).__name__, message=str(exc))
             raise
-        
-    def _run_completion_hooks(self, time: Instant) -> List['Event']:
+
+    def _run_completion_hooks(self, time: Instant) -> list["Event"]:
         """Helper to execute all hooks and flatten results.
 
         Hooks are expected to be one-shot: they run once when the event (or
@@ -226,7 +234,7 @@ class Event:
         hooks = list(self.on_complete)
         self.on_complete.clear()
 
-        results: List["Event"] = []
+        results: list[Event] = []
         for hook in hooks:
             hook_result = hook(time)
 
@@ -238,21 +246,22 @@ class Event:
                 results.append(hook_result)
 
         return results
-    
-    def _start_process(self, gen: Generator) -> List["Event"]:
+
+    def _start_process(self, gen: Generator) -> list["Event"]:
         continuation = ProcessContinuation(
-                time=self.time,
-                event_type=self.event_type,
-                daemon=self.daemon,
-                target=self.target,
-                process=gen,
-                on_complete=self.on_complete,
-                context=self.context)
-        
+            time=self.time,
+            event_type=self.event_type,
+            daemon=self.daemon,
+            target=self.target,
+            process=gen,
+            on_complete=self.on_complete,
+            context=self.context,
+        )
+
         # Execute it immediately to get to the first 'yield'
         return continuation.invoke()
-    
-    def _normalize_return(self, value: Any) -> List['Event']:
+
+    def _normalize_return(self, value: Any) -> list["Event"]:
         """Standardizes return values into List[Event]"""
         if value is None:
             return []
@@ -296,11 +305,11 @@ class Event:
     def once(
         time: Instant,
         event_type: str,
-        fn: Callable[['Event'], Any],
+        fn: Callable[["Event"], Any],
         *,
         daemon: bool = False,
-        context: Dict[str, Any] | None = None,
-    ) -> 'Event':
+        context: dict[str, Any] | None = None,
+    ) -> "Event":
         """Create a one-shot event that invokes a function.
 
         Wraps the function in a CallbackEntity so that all events
@@ -323,6 +332,7 @@ class Event:
             daemon=daemon,
             context=context or {},
         )
+
 
 class ProcessContinuation(Event):
     """Internal event that resumes a paused generator-based process.
@@ -349,18 +359,18 @@ class ProcessContinuation(Event):
         process: The Python generator being executed incrementally.
     """
 
-    __slots__ = ("process", "_send_value")
+    __slots__ = ("_send_value", "process")
 
     def __init__(
         self,
         time: Instant,
         event_type: str,
-        target: Optional['Simulatable'] = None,
+        target: Optional["Simulatable"] = None,
         *,
         daemon: bool = False,
-        on_complete: List[CompletionHook] | None = None,
-        context: Dict[str, Any] | None = None,
-        process: Generator = None,
+        on_complete: list[CompletionHook] | None = None,
+        context: dict[str, Any] | None = None,
+        process: Generator | None = None,
     ):
         super().__init__(
             time=time,
@@ -382,7 +392,7 @@ class ProcessContinuation(Event):
             target = target._resource
         return getattr(target, "name", None)
 
-    def invoke(self) -> List["Event"]:
+    def invoke(self) -> list["Event"]:
         """Advance the generator to its next yield and schedule the continuation."""
         from happysimulator.core.sim_future import SimFuture
 
@@ -417,10 +427,10 @@ class ProcessContinuation(Event):
                 time=resume_time,
                 event_type=self.event_type,
                 daemon=self.daemon,
-                target=self.target,     # Keep targeting the same entity
+                target=self.target,  # Keep targeting the same entity
                 on_complete=self.on_complete,
-                process=self.process,   # Pass the SAME generator forward
-                context=self.context    # Preserve trace context
+                process=self.process,  # Pass the SAME generator forward
+                context=self.context,  # Preserve trace context
             )
 
             if side_effects is None:
@@ -453,8 +463,8 @@ class ProcessContinuation(Event):
         finally:
             if tracing and debugger is not None:
                 debugger.remove_trace(self.process)
-        
-    def _normalize_yield(self, value: Any) -> Tuple[float, List["Event"]]:
+
+    def _normalize_yield(self, value: Any) -> tuple[float, list["Event"]]:
         """Unpacks `yield 0.1` vs `yield 0.1, [events]`"""
         if isinstance(value, tuple):
             # (delay, [side_effects])
@@ -466,8 +476,7 @@ class ProcessContinuation(Event):
             elif isinstance(effects, Event):
                 effects = [effects]
             return float(delay), effects
-        elif isinstance(value, (int, float)):
+        if isinstance(value, (int, float)):
             return float(value), []
-        else:
-            logger.warning("Generator yielded unknown type %s; assuming 0 delay.", type(value))
-            return 0.0, []
+        logger.warning("Generator yielded unknown type %s; assuming 0 delay.", type(value))
+        return 0.0, []

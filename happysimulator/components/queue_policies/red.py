@@ -16,7 +16,7 @@ Example:
 import random
 from collections import deque
 from dataclasses import dataclass
-from typing import TypeVar, Optional
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
 
@@ -95,9 +95,7 @@ class REDQueue(QueuePolicy[T]):
         if capacity is None:
             capacity = max_threshold * 2
         if capacity < max_threshold:
-            raise ValueError(
-                f"capacity must be >= max_threshold, got {capacity} < {max_threshold}"
-            )
+            raise ValueError(f"capacity must be >= max_threshold, got {capacity} < {max_threshold}")
         self._capacity = capacity
 
         # Queue storage
@@ -214,7 +212,7 @@ class REDQueue(QueuePolicy[T]):
         position = (self._avg_queue - self._min_threshold) / range_size
         return position * self._max_probability
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         """Remove and return the next item.
 
         Returns:
@@ -227,7 +225,7 @@ class REDQueue(QueuePolicy[T]):
         self._dequeued += 1
         return item
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         """Return the next item without removing it."""
         if not self._queue:
             return None

@@ -1,14 +1,13 @@
 """Unit tests for DiskIO."""
 
-import pytest
+import contextlib
 import random
 
 from happysimulator.components.infrastructure.disk_io import (
-    DiskIO,
-    DiskIOStats,
-    DiskProfile,
     HDD,
     SSD,
+    DiskIO,
+    DiskIOStats,
     NVMe,
 )
 from happysimulator.core.simulation import Simulation
@@ -95,7 +94,7 @@ class TestDiskIO:
         assert "HDD" in repr(disk)
 
     def test_stats_initial(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         stats = disk.stats
         assert isinstance(stats, DiskIOStats)
         assert stats.reads == 0
@@ -106,37 +105,33 @@ class TestDiskIO:
         assert stats.peak_queue_depth == 0
 
     def test_stats_avg_latency_zero_when_no_ops(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         assert disk.stats.avg_read_latency_s == 0.0
         assert disk.stats.avg_write_latency_s == 0.0
 
     def test_read_generator(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         gen = disk.read(4096)
         latency = next(gen)
         assert latency > 0
         # Complete the generator
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
         assert disk.stats.reads == 1
         assert disk.stats.bytes_read == 4096
 
     def test_write_generator(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         gen = disk.write(8192)
         latency = next(gen)
         assert latency > 0
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
         assert disk.stats.writes == 1
         assert disk.stats.bytes_written == 8192
 
     def test_peak_queue_depth_tracked(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         # Start two reads concurrently
         g1 = disk.read(4096)
         g2 = disk.read(4096)
@@ -146,19 +141,18 @@ class TestDiskIO:
         assert disk.stats.peak_queue_depth == 2
 
     def test_queue_depth_decreases_after_completion(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         gen = disk.read(4096)
         next(gen)
         assert disk.queue_depth == 1
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
         assert disk.queue_depth == 0
 
     def test_handle_event_is_noop(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",
@@ -168,14 +162,14 @@ class TestDiskIO:
         assert result is None
 
     def test_repr(self):
-        disk, sim = self._make_disk()
+        disk, _sim = self._make_disk()
         assert "test_disk" in repr(disk)
         assert "SSD" in repr(disk)  # default profile
 
     def test_hdd_profile_in_repr(self):
-        disk, sim = self._make_disk(profile=HDD())
+        disk, _sim = self._make_disk(profile=HDD())
         assert "HDD" in repr(disk)
 
     def test_nvme_profile_in_repr(self):
-        disk, sim = self._make_disk(profile=NVMe())
+        disk, _sim = self._make_disk(profile=NVMe())
         assert "NVMe" in repr(disk)

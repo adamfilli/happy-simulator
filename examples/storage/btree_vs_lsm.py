@@ -34,7 +34,6 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 from happysimulator import (
     Data,
@@ -54,7 +53,6 @@ from happysimulator.components.storage import (
     LSMTreeStats,
     SizeTieredCompaction,
 )
-
 
 # =============================================================================
 # Custom Entity: DualEngineDriver
@@ -272,8 +270,9 @@ def print_summary(result: SimulationResult) -> None:
     print("B-TREE vs LSM TREE COMPARISON")
     print("=" * 72)
 
-    print(f"\nWorkload: {result.num_keys} keys, {result.duration_s}s, "
-          f"phases: write -> read -> mixed")
+    print(
+        f"\nWorkload: {result.num_keys} keys, {result.duration_s}s, phases: write -> read -> mixed"
+    )
 
     bt = result.btree_stats
     ls = result.lsm_stats
@@ -305,7 +304,7 @@ def print_summary(result: SimulationResult) -> None:
     # Derived: page I/O per operation for B-tree
     total_bt_ops = bt.reads + bt.writes
     if total_bt_ops > 0:
-        print(f"\nB-Tree Efficiency:")
+        print("\nB-Tree Efficiency:")
         print(f"  Page reads / operation:  {bt.page_reads / total_bt_ops:.2f}")
         print(f"  Page writes / operation: {bt.page_writes / total_bt_ops:.2f}")
         print(f"  Page reads / read:       {bt.page_reads / bt.reads:.2f}" if bt.reads > 0 else "")
@@ -313,12 +312,9 @@ def print_summary(result: SimulationResult) -> None:
             print(f"  Page writes / write:     {bt.page_writes / bt.writes:.2f}")
 
     # LSM level summary
-    print(f"\nLSM Level Summary:")
+    print("\nLSM Level Summary:")
     for level in result.lsm.level_summary:
-        print(
-            f"  L{level['level']}: {level['sstables']} SSTables, "
-            f"{level['total_keys']:,} keys"
-        )
+        print(f"  L{level['level']}: {level['sstables']} SSTables, {level['total_keys']:,} keys")
 
     print("\n" + "=" * 72)
     print("INTERPRETATION:")
@@ -344,6 +340,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate grouped bar charts comparing B-tree and LSM page I/O."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -364,9 +361,15 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     values = [bt.page_reads, ls.reads * ls.read_amplification if ls.reads > 0 else 0]
     colors = ["#4C72B0", "#DD8452"]
     bars = ax.bar(categories, values, color=colors, edgecolor="black", alpha=0.85, width=0.5)
-    for bar, val in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 50,
-                f"{val:,.0f}", ha="center", va="bottom", fontsize=10)
+    for bar, val in zip(bars, values, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 50,
+            f"{val:,.0f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
     ax.set_ylabel("Count")
     ax.set_title("Read I/O Cost")
     ax.grid(True, alpha=0.3, axis="y")
@@ -378,9 +381,15 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     lsm_page_equiv = ls.writes * ls.write_amplification if ls.writes > 0 else 0
     values = [bt.page_writes, lsm_page_equiv]
     bars = ax.bar(categories, values, color=colors, edgecolor="black", alpha=0.85, width=0.5)
-    for bar, val in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 50,
-                f"{val:,.0f}", ha="center", va="bottom", fontsize=10)
+    for bar, val in zip(bars, values, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 50,
+            f"{val:,.0f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+        )
     ax.set_ylabel("Count")
     ax.set_title("Write I/O Cost")
     ax.grid(True, alpha=0.3, axis="y")
@@ -393,10 +402,24 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     x = range(len(metric_names))
     width = 0.35
-    ax.bar([i - width / 2 for i in x], bt_vals, width,
-           label="B-Tree", color="#4C72B0", edgecolor="black", alpha=0.85)
-    ax.bar([i + width / 2 for i in x], ls_vals, width,
-           label="LSM Tree", color="#DD8452", edgecolor="black", alpha=0.85)
+    ax.bar(
+        [i - width / 2 for i in x],
+        bt_vals,
+        width,
+        label="B-Tree",
+        color="#4C72B0",
+        edgecolor="black",
+        alpha=0.85,
+    )
+    ax.bar(
+        [i + width / 2 for i in x],
+        ls_vals,
+        width,
+        label="LSM Tree",
+        color="#DD8452",
+        edgecolor="black",
+        alpha=0.85,
+    )
     ax.set_xticks(list(x))
     ax.set_xticklabels(metric_names)
     ax.set_ylabel("Count")
@@ -409,14 +432,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     phase_times = result.phase_data.times()
     phase_vals = result.phase_data.raw_values()
 
-    phase_labels = {1: "Write", 2: "Read", 3: "Mixed"}
     phase_colors = {1: "#55A868", 2: "#4C72B0", 3: "#C44E52"}
 
     if phase_times and phase_vals:
         # Draw colored spans for each phase
         prev_t = phase_times[0]
         prev_p = int(phase_vals[0])
-        for t, p in zip(phase_times[1:], phase_vals[1:]):
+        for t, p in zip(phase_times[1:], phase_vals[1:], strict=False):
             p = int(p)
             ax.axvspan(prev_t, t, alpha=0.3, color=phase_colors.get(prev_p, "gray"))
             if p != prev_p:
@@ -424,11 +446,11 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
             prev_t = t
             prev_p = p
         # Fill last span to end
-        ax.axvspan(prev_t, result.duration_s, alpha=0.3,
-                   color=phase_colors.get(prev_p, "gray"))
+        ax.axvspan(prev_t, result.duration_s, alpha=0.3, color=phase_colors.get(prev_p, "gray"))
 
     # Add legend patches
     from matplotlib.patches import Patch
+
     legend_patches = [
         Patch(facecolor=phase_colors[1], alpha=0.5, label="Phase 1: Write"),
         Patch(facecolor=phase_colors[2], alpha=0.5, label="Phase 2: Read"),
@@ -458,17 +480,18 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="B-tree vs LSM tree storage engine comparison"
+    parser = argparse.ArgumentParser(description="B-tree vs LSM tree storage engine comparison")
+    parser.add_argument(
+        "--duration", type=float, default=30.0, help="Simulation duration in seconds"
     )
-    parser.add_argument("--duration", type=float, default=30.0,
-                        help="Simulation duration in seconds")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/btree_vs_lsm",
-                        help="Output directory for visualizations")
-    parser.add_argument("--no-viz", action="store_true",
-                        help="Skip visualization generation")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="output/btree_vs_lsm",
+        help="Output directory for visualizations",
+    )
+    parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
     seed = None if args.seed == -1 else args.seed

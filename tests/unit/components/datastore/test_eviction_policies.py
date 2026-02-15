@@ -3,14 +3,14 @@
 import pytest
 
 from happysimulator.components.datastore import (
-    LRUEviction,
-    LFUEviction,
-    TTLEviction,
-    FIFOEviction,
-    RandomEviction,
-    SLRUEviction,
-    SampledLRUEviction,
     ClockEviction,
+    FIFOEviction,
+    LFUEviction,
+    LRUEviction,
+    RandomEviction,
+    SampledLRUEviction,
+    SLRUEviction,
+    TTLEviction,
     TwoQueueEviction,
 )
 

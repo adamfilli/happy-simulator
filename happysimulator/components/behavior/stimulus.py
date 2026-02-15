@@ -8,15 +8,17 @@ entity. Follows the pattern of network condition factories
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
+from happysimulator.components.behavior.decision import Choice
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.components.behavior.decision import Choice
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from happysimulator.components.behavior.environment import Environment
 
 
@@ -176,6 +178,7 @@ def influence_propagation(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _to_instant(time: Instant | float) -> Instant:
     if isinstance(time, Instant):

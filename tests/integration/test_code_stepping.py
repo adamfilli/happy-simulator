@@ -6,20 +6,17 @@ Tests the full round-trip: entity generator -> trace function -> code debugger
 
 import threading
 
-import pytest
-
+from happysimulator.components.common import Sink
+from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
-from happysimulator.components.common import Sink
-from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.visual.code_debugger import CodeBreakpoint, CodeDebugger
 
-
 # --- Test entities ---
+
 
 class TraceableServer(Entity):
     def __init__(self, downstream):
@@ -27,11 +24,10 @@ class TraceableServer(Entity):
         self.downstream = downstream
 
     def handle_event(self, event):
-        step_one = "start"
+        step_one = 0.05  # noqa: F841 - intentional: test inspects source code
         yield 0.05
-        step_two = "middle"
+        step_two = 0.05  # noqa: F841 - intentional: test inspects source code
         yield 0.05
-        step_three = "end"
         return [Event(time=self.now, event_type="Done", target=self.downstream)]
 
 
@@ -41,9 +37,8 @@ class TraceableQueuedServer(QueuedResource):
         self.downstream = downstream
 
     def handle_queued_event(self, event):
-        phase = "processing"
+        phase = "processing"  # noqa: F841 - intentional: test inspects source code
         yield 0.1
-        phase = "complete"
         return [Event(time=self.now, event_type="Done", target=self.downstream)]
 
 
@@ -193,6 +188,7 @@ class TestCodeSteppingIntegration:
     def test_breakpoint_blocks_and_continues(self):
         """A breakpoint blocks the sim thread until code_continue is called."""
         import happysimulator.visual.code_debugger as cdm
+
         original_timeout = cdm.DEADMAN_TIMEOUT_S
         cdm.DEADMAN_TIMEOUT_S = 5.0  # Long enough for the test
 
@@ -241,6 +237,7 @@ class TestCodeSteppingIntegration:
 
             # Wait for the debugger to pause
             import time
+
             for _ in range(50):
                 if debugger.is_code_paused():
                     break

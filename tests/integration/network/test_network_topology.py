@@ -16,20 +16,13 @@ of geographic distribution on distributed system performance.
 from __future__ import annotations
 
 import csv
-from collections import defaultdict
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.network.link import NetworkLink
 from happysimulator.components.network.network import Network
-from happysimulator.components.network.conditions import (
-    cross_region_network,
-    datacenter_network,
-    internet_network,
-)
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
@@ -41,6 +34,9 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 # --- Profiles ---
 
@@ -48,6 +44,7 @@ from happysimulator.load.source import Source
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -64,6 +61,7 @@ class DatabaseReplica(Entity):
     Handles write and read requests with simulated disk/CPU latency.
     Tracks statistics for analysis.
     """
+
     name: str
     processing_latency: float = 0.005  # 5ms default processing
 
@@ -111,6 +109,7 @@ class QuorumCoordinator(Entity):
     For writes: sends to all replicas, waits for quorum_size acks.
     For reads: sends to quorum_size replicas, returns first response.
     """
+
     name: str
     replicas: list[DatabaseReplica] = field(default_factory=list)
     network: Network | None = None
@@ -134,9 +133,9 @@ class QuorumCoordinator(Entity):
 
         if event_type == "write_request":
             return self._handle_write_request(event)
-        elif event_type == "read_request":
+        if event_type == "read_request":
             return self._handle_read_request(event)
-        elif event_type in ("write_ack", "read_ack"):
+        if event_type in ("write_ack", "read_ack"):
             return self._handle_ack(event)
 
         return None
@@ -203,7 +202,7 @@ class QuorumCoordinator(Entity):
 
         # Send read to first quorum_size replicas
         events = []
-        for replica in self.replicas[:self.quorum_size]:
+        for replica in self.replicas[: self.quorum_size]:
             if self.network is not None:
                 read_event = Event(
                     time=self.now,
@@ -264,7 +263,7 @@ class QuorumCoordinator(Entity):
 
             # Notify downstream if configured
             if self.downstream is not None:
-                original = pending["original_event"]
+                pending["original_event"]
                 completion = Event(
                     time=self.now,
                     event_type=f"{pending['operation']}_complete",
@@ -289,6 +288,7 @@ class QuorumCoordinator(Entity):
 @dataclass
 class DatabaseClient(Entity):
     """Client that sends requests to the database coordinator."""
+
     name: str
     coordinator: QuorumCoordinator | None = None
     network: Network | None = None
@@ -329,7 +329,7 @@ class DatabaseRequestProvider(EventProvider):
         self._write_count = 0
         self._read_count = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -337,6 +337,7 @@ class DatabaseRequestProvider(EventProvider):
 
         # Determine operation type
         import random
+
         is_write = random.random() < self.write_ratio
 
         if is_write:
@@ -369,7 +370,7 @@ class DatabaseRequestProvider(EventProvider):
 
 def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
     """Write data to a CSV file."""
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
@@ -398,6 +399,7 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
 @dataclass
 class QuorumScenarioResult:
     """Results from a quorum simulation scenario."""
+
     coordinator: QuorumCoordinator
     client: DatabaseClient
     replicas: list[DatabaseReplica]
@@ -424,6 +426,7 @@ def run_quorum_scenario(
     - Replica C: EU-West (~80ms cross-region)
     """
     import random
+
     random.seed(42)  # Reproducibility
 
     # Create replicas with slightly different processing times
@@ -595,7 +598,9 @@ def _generate_outputs(
     if write_sorted:
         ax.hist(write_sorted, bins=30, alpha=0.7, color="coral", edgecolor="black")
         ax.axvline(_percentile_sorted(write_sorted, 0.50), color="red", linestyle="--", label="p50")
-        ax.axvline(_percentile_sorted(write_sorted, 0.99), color="darkred", linestyle="--", label="p99")
+        ax.axvline(
+            _percentile_sorted(write_sorted, 0.99), color="darkred", linestyle="--", label="p99"
+        )
         ax.legend()
     ax.set_title("Write Latency Distribution")
     ax.set_xlabel("Latency (s)")
@@ -607,7 +612,9 @@ def _generate_outputs(
     if read_sorted:
         ax.hist(read_sorted, bins=30, alpha=0.7, color="steelblue", edgecolor="black")
         ax.axvline(_percentile_sorted(read_sorted, 0.50), color="blue", linestyle="--", label="p50")
-        ax.axvline(_percentile_sorted(read_sorted, 0.99), color="darkblue", linestyle="--", label="p99")
+        ax.axvline(
+            _percentile_sorted(read_sorted, 0.99), color="darkblue", linestyle="--", label="p99"
+        )
         ax.legend()
     ax.set_title("Read Latency Distribution")
     ax.set_xlabel("Latency (s)")
@@ -637,8 +644,8 @@ def _generate_outputs(
     reads = [r.reads_received for r in replicas]
     x = range(len(replicas))
     width = 0.35
-    ax.bar([i - width/2 for i in x], writes, width, label="Writes", color="coral")
-    ax.bar([i + width/2 for i in x], reads, width, label="Reads", color="steelblue")
+    ax.bar([i - width / 2 for i in x], writes, width, label="Writes", color="coral")
+    ax.bar([i + width / 2 for i in x], reads, width, label="Reads", color="steelblue")
     ax.set_title("Replica Load Distribution")
     ax.set_xlabel("Replica")
     ax.set_ylabel("Requests")
@@ -675,7 +682,9 @@ class TestDatabaseQuorumTopology:
         # Write latency should be dominated by second-fastest replica
         # US-East is ~1ms round-trip, US-West is ~100ms round-trip
         # Quorum of 2 means we wait for US-West (second fastest)
-        avg_write_latency = sum(result.coordinator.write_latencies) / len(result.coordinator.write_latencies)
+        avg_write_latency = sum(result.coordinator.write_latencies) / len(
+            result.coordinator.write_latencies
+        )
 
         # Should be roughly 50ms * 2 (round-trip to US-West) + processing
         assert avg_write_latency > 0.050  # At least one cross-region RTT
@@ -694,7 +703,9 @@ class TestDatabaseQuorumTopology:
         assert result.coordinator.writes_completed > 0
         assert result.coordinator.reads_completed > 0
 
-        avg_write = sum(result.coordinator.write_latencies) / len(result.coordinator.write_latencies)
+        avg_write = sum(result.coordinator.write_latencies) / len(
+            result.coordinator.write_latencies
+        )
         avg_read = sum(result.coordinator.read_latencies) / len(result.coordinator.read_latencies)
 
         # Reads contact only 2 replicas (US-East + US-West typically)
@@ -772,6 +783,7 @@ class TestNetworkPartitionScenario:
     def test_partition_blocks_replica_communication(self, test_output_dir: Path):
         """Network partition should block communication to affected replica."""
         import random
+
         random.seed(42)
 
         # Create topology
@@ -819,7 +831,7 @@ class TestNetworkPartitionScenario:
             start_time=Instant.Epoch,
             duration=6.0,
             sources=[source],
-            entities=[network, coordinator, client] + replicas,
+            entities=[network, coordinator, client, *replicas],
         )
         sim.run()
 

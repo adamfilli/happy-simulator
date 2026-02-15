@@ -38,17 +38,14 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
-    LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
@@ -62,6 +59,8 @@ from happysimulator.components.industrial import (
     SplitMerge,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -72,17 +71,17 @@ from happysimulator.components.industrial import (
 class BloodBankConfig:
     """Configuration for the blood bank simulation."""
 
-    duration_s: float = 28800.0       # 8 hours
-    donation_time: float = 600.0      # 10 min
+    duration_s: float = 28800.0  # 8 hours
+    donation_time: float = 600.0  # 10 min
     type_test_time: float = 60.0
     infection_test_time: float = 120.0
     antibody_test_time: float = 90.0
     test_pass_rate: float = 0.95
-    shelf_life_s: float = 3628800.0   # 42 days
+    shelf_life_s: float = 3628800.0  # 42 days
     spoilage_check_s: float = 3600.0
     initial_stock: int = 50
     reorder_point: int = 10
-    order_quantity: int = 0           # no external reorder
+    order_quantity: int = 0  # no external reorder
     demand_rate_per_hour: float = 3.0
     # Appointments every 15 min from 8am-4pm
     appt_start_s: float = 0.0
@@ -108,9 +107,7 @@ class DonationStation(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.donation_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream, event_type="BloodUnit")
-        ]
+        return [self.forward(event, self.downstream, event_type="BloodUnit")]
 
 
 class TestLab(Entity):
@@ -248,8 +245,8 @@ def run_blood_bank_simulation(config: BloodBankConfig | None = None) -> BloodBan
     stop_after = Instant.from_seconds(config.duration_s)
     demand_provider = DemandProvider(inventory, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     demand_source = Source(
         name="Demand",
@@ -267,9 +264,15 @@ def run_blood_bank_simulation(config: BloodBankConfig | None = None) -> BloodBan
         end_time=end_time,
         sources=[demand_source],
         entities=[
-            donation_station, split_merge,
-            type_test, infection_test, antibody_test,
-            router, inventory, reject_counter, appointments,
+            donation_station,
+            split_merge,
+            type_test,
+            infection_test,
+            antibody_test,
+            router,
+            inventory,
+            reject_counter,
+            appointments,
         ],
     )
 
@@ -306,38 +309,38 @@ def print_summary(result: BloodBankResult) -> None:
     print("BLOOD BANK SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Appointments:        {len(result.appointments.appointments)}")
     print(f"  Demand rate:         {config.demand_rate_per_hour:.1f}/hour")
 
     appt_stats = result.appointments.stats
-    print(f"\nDonor Flow:")
+    print("\nDonor Flow:")
     print(f"  Scheduled:           {appt_stats.total_scheduled}")
     print(f"  Arrived:             {appt_stats.arrivals}")
     print(f"  No-shows:            {appt_stats.no_shows}")
     print(f"  Donated:             {result.donation_station._processed}")
 
     sm_stats = result.split_merge.stats
-    print(f"\nTesting:")
+    print("\nTesting:")
     print(f"  Splits initiated:    {sm_stats.splits_initiated}")
     print(f"  Merges completed:    {sm_stats.merges_completed}")
     for lab in result.test_labs:
         print(f"  {lab.name:20s} tested={lab._tested}, passed={lab._passed}")
 
-    print(f"\nRouting:")
+    print("\nRouting:")
     print(f"  Accepted (all pass): {result.router.total_routed}")
     print(f"  Rejected (any fail): {result.reject_counter.total}")
 
     inv = result.inventory.stats
-    print(f"\nInventory:")
+    print("\nInventory:")
     print(f"  Current stock:       {inv.current_stock}")
     print(f"  Total consumed:      {inv.total_consumed}")
     print(f"  Total spoiled:       {inv.total_spoiled}")
     print(f"  Stockouts:           {inv.stockouts}")
     print(f"  Waste rate:          {inv.waste_rate:.1%}")
 
-    print(f"\nDemand:")
+    print("\nDemand:")
     print(f"  Requests:            {result.demand_provider.generated}")
 
     print(f"\n{result.summary}")

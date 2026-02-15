@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import cProfile
 import pstats
-import sys
 from pathlib import Path
 
 from tests.perf.runner import (
@@ -108,23 +107,19 @@ def main() -> None:
         prof_dir = Path("test_output/perf")
         prof_dir.mkdir(parents=True, exist_ok=True)
 
-        from tests.perf.runner import BenchmarkResult
-
         results = []
         for name, module in scenarios.items():
             print(f"  Profiling '{name}'...")
             profiler = cProfile.Profile()
             profiler.enable()
-            result = run_scenario(
-                module, scale=args.scale, tracemalloc_top=args.tracemalloc_top
-            )
+            result = run_scenario(module, scale=args.scale, tracemalloc_top=args.tracemalloc_top)
             profiler.disable()
             results.append(result)
 
             prof_path = prof_dir / f"{name}.prof"
             profiler.dump_stats(str(prof_path))
             print(f"    Saved profile to {prof_path}")
-            print(f"    Top 20 by cumulative time:")
+            print("    Top 20 by cumulative time:")
             stats = pstats.Stats(profiler)
             stats.sort_stats("cumulative")
             stats.print_stats(20)
@@ -155,7 +150,9 @@ def main() -> None:
             git_hash = cp_data.get("git_hash", "?")
             print(f"  Comparing against checkpoint: {cp_path.name} ({git_hash})")
         else:
-            print(f"  Warning: checkpoint '{args.compare_checkpoint}' not found, skipping comparison")
+            print(
+                f"  Warning: checkpoint '{args.compare_checkpoint}' not found, skipping comparison"
+            )
     elif args.compare or (not args.save_baseline):
         baseline = load_baseline()
 

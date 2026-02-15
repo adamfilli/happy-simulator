@@ -6,6 +6,7 @@ Provides REST endpoints and a WebSocket for browser communication.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -231,7 +232,9 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                     if not pause_notified:
                         paused_state = bridge._code_debugger.get_paused_state()
                         try:
-                            await ws.send_json({"type": "code_paused", "paused_state": paused_state})
+                            await ws.send_json(
+                                {"type": "code_paused", "paused_state": paused_state}
+                            )
                         except Exception:
                             break
                         pause_notified = True
@@ -254,7 +257,7 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                             bridge.code_step_out()
                             pause_notified = False
                         # Ignore other actions while paused
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         pass
                 else:
                     pause_notified = False
@@ -262,10 +265,8 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
 
             await step_task
             if result_holder:
-                try:
+                with contextlib.suppress(Exception):
                     await ws.send_json({"type": "state_update", **result_holder[0]})
-                except Exception:
-                    pass
 
         try:
             while True:
@@ -350,23 +351,44 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                     entity_name = msg.get("entity_name", "")
                     state = await asyncio.to_thread(bridge.activate_code_debug, entity_name)
                     source = await asyncio.to_thread(bridge.get_entity_source, entity_name)
-                    await ws.send_json({"type": "code_debug_activated", "entity_name": entity_name, "source": source, "debug_state": state})
+                    await ws.send_json(
+                        {
+                            "type": "code_debug_activated",
+                            "entity_name": entity_name,
+                            "source": source,
+                            "debug_state": state,
+                        }
+                    )
 
                 elif action == "deactivate_code_debug":
                     entity_name = msg.get("entity_name", "")
                     state = await asyncio.to_thread(bridge.deactivate_code_debug, entity_name)
-                    await ws.send_json({"type": "code_debug_deactivated", "entity_name": entity_name, "debug_state": state})
+                    await ws.send_json(
+                        {
+                            "type": "code_debug_deactivated",
+                            "entity_name": entity_name,
+                            "debug_state": state,
+                        }
+                    )
 
                 elif action == "set_code_breakpoint":
                     entity_name = msg.get("entity_name", "")
                     line_number = msg.get("line_number", 0)
-                    result = await asyncio.to_thread(bridge.set_code_breakpoint, entity_name, line_number)
+                    result = await asyncio.to_thread(
+                        bridge.set_code_breakpoint, entity_name, line_number
+                    )
                     await ws.send_json({"type": "code_breakpoint_set", **result})
 
                 elif action == "remove_code_breakpoint":
                     bp_id = msg.get("breakpoint_id", "")
                     removed = await asyncio.to_thread(bridge.remove_code_breakpoint, bp_id)
-                    await ws.send_json({"type": "code_breakpoint_removed", "breakpoint_id": bp_id, "removed": removed})
+                    await ws.send_json(
+                        {
+                            "type": "code_breakpoint_removed",
+                            "breakpoint_id": bp_id,
+                            "removed": removed,
+                        }
+                    )
 
                 elif action == "code_continue":
                     bridge.code_continue()

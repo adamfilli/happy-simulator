@@ -17,11 +17,14 @@ import math
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +61,7 @@ class CongestionControl(ABC):
 
     @property
     @abstractmethod
-    def name(self) -> str:
-        ...
+    def name(self) -> str: ...
 
 
 class AIMD(CongestionControl):
@@ -311,7 +313,7 @@ class TCPConnection(Entity):
             algorithm=self._cc.name,
         )
 
-    def send(self, size_bytes: int) -> Generator[float, None, None]:
+    def send(self, size_bytes: int) -> Generator[float]:
         """Send data over the TCP connection.
 
         Segments data into MSS-sized chunks, applies congestion control,
@@ -352,7 +354,6 @@ class TCPConnection(Entity):
 
     def handle_event(self, event: Event) -> None:
         """TCPConnection does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

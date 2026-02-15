@@ -28,33 +28,33 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
+    FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
-    FIFOQueue,
     Simulation,
     SimulationSummary,
     Source,
 )
 from happysimulator.components.industrial import ConveyorBelt
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class CarWashConfig:
     duration_s: float = 3600.0  # 1 hour
-    arrival_rate: float = 2.0   # cars per minute -> 1/30 per second
+    arrival_rate: float = 2.0  # cars per minute -> 1/30 per second
     pre_rinse_time: float = 30.0
     wash_time: float = 120.0
     rinse_time: float = 60.0
@@ -75,6 +75,7 @@ class CarWashConfig:
 # Car Wash Station
 # =============================================================================
 
+
 class WashStation(QueuedResource):
     """Single-car wash stage with configurable service time."""
 
@@ -87,16 +88,20 @@ class WashStation(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time_s
         self.cars_processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 class TierRouter(Entity):
     """Routes cars to appropriate pipeline depth based on tier."""
 
-    def __init__(self, name: str, basic_exit: Entity, standard_exit: Entity,
-                 premium_next: Entity, pass_through: Entity):
+    def __init__(
+        self,
+        name: str,
+        basic_exit: Entity,
+        standard_exit: Entity,
+        premium_next: Entity,
+        pass_through: Entity,
+    ):
         super().__init__(name)
         self.basic_exit = basic_exit
         self.standard_exit = standard_exit
@@ -111,14 +116,13 @@ class TierRouter(Entity):
             target = self.standard_exit
         else:
             target = self.premium_next
-        return [
-            self.forward(event, target)
-        ]
+        return [self.forward(event, target)]
 
 
 # =============================================================================
 # Main Simulation
 # =============================================================================
+
 
 @dataclass
 class CarWashResult:
@@ -143,8 +147,13 @@ def run_car_wash_simulation(config: CarWashConfig | None = None) -> CarWashResul
     wash_station = WashStation("Wash", config.wash_time, conveyor2)
 
     # Router after wash: basic->sink, standard->rinse->sink, premium->rinse->dry->sink
-    router = TierRouter("Router", basic_exit=sink, standard_exit=rinse_station,
-                         premium_next=rinse_station, pass_through=rinse_station)
+    TierRouter(
+        "Router",
+        basic_exit=sink,
+        standard_exit=rinse_station,
+        premium_next=rinse_station,
+        pass_through=rinse_station,
+    )
     # Actually for simplicity: all go through full pipeline, but basic/standard skip stages
     # Let's use a simpler approach: all go through the full pipeline
     # Basic: skip rinse + dry (go directly to sink from wash)
@@ -165,7 +174,7 @@ def run_car_wash_simulation(config: CarWashConfig | None = None) -> CarWashResul
         r = random.random()
         if r < config.basic_pct:
             return "basic"
-        elif r < config.basic_pct + config.standard_pct:
+        if r < config.basic_pct + config.standard_pct:
             return "standard"
         return "premium"
 
@@ -178,8 +187,16 @@ def run_car_wash_simulation(config: CarWashConfig | None = None) -> CarWashResul
         stop_after=config.duration_s,
     )
 
-    entities = [pre_rinse, conveyor1, wash_station, conveyor2,
-                rinse_station, conveyor3, dry_station, sink]
+    entities = [
+        pre_rinse,
+        conveyor1,
+        wash_station,
+        conveyor2,
+        rinse_station,
+        conveyor3,
+        dry_station,
+        sink,
+    ]
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -204,19 +221,19 @@ def print_summary(result: CarWashResult) -> None:
     print("CAR WASH SIMULATION RESULTS")
     print("=" * 60)
 
-    print(f"\nConfiguration:")
-    print(f"  Duration: {result.config.duration_s/60:.0f} minutes")
+    print("\nConfiguration:")
+    print(f"  Duration: {result.config.duration_s / 60:.0f} minutes")
     print(f"  Arrival rate: {result.config.arrival_rate:.1f} cars/min")
 
-    print(f"\nStation Performance:")
+    print("\nStation Performance:")
     for name, station in result.stations.items():
         print(f"  {name}: {station.cars_processed} cars processed")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Cars completed: {result.sink.count}")
     if result.sink.count > 0:
-        print(f"  Avg cycle time: {result.sink.mean_latency()*60:.1f} min")
-        print(f"  p99 cycle time: {result.sink.p99()*60:.1f} min")
+        print(f"  Avg cycle time: {result.sink.mean_latency() * 60:.1f} min")
+        print(f"  p99 cycle time: {result.sink.p99() * 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 60)

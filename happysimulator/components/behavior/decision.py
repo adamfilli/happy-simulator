@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import logging
 import math
-import random
 
 logger = logging.getLogger(__name__)
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
-from happysimulator.components.behavior.traits import TraitSet
-from happysimulator.components.behavior.state import AgentState
+if TYPE_CHECKING:
+    import random
+
+    from happysimulator.components.behavior.state import AgentState
+    from happysimulator.components.behavior.traits import TraitSet
 
 
 @dataclass(frozen=True)
@@ -211,7 +214,9 @@ class SocialInfluenceModel:
         for choice in context.choices:
             individual = self._individual_fn(choice, context)
             peer_fraction = peer_actions.get(choice.action, 0) / total_peers
-            combined = (1.0 - effective_conformity) * individual + effective_conformity * peer_fraction
+            combined = (
+                1.0 - effective_conformity
+            ) * individual + effective_conformity * peer_fraction
             scores.append((choice, combined))
 
         # Weighted random selection

@@ -1,7 +1,5 @@
 """Tests for PNCounter CRDT."""
 
-import pytest
-
 from happysimulator.components.crdt.pn_counter import PNCounter
 from happysimulator.components.crdt.protocol import CRDT
 
@@ -89,8 +87,8 @@ class TestPNCounterMerge:
 
         a.merge(b)
         assert a.increments == 15  # 10 + 5
-        assert a.decrements == 5   # 2 + 3
-        assert a.value == 10       # 15 - 5
+        assert a.decrements == 5  # 2 + 3
+        assert a.value == 10  # 15 - 5
 
     def test_merge_is_idempotent(self):
         a = PNCounter("node-a")

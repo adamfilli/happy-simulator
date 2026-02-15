@@ -3,21 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.microservice import (
     Saga,
     SagaState,
-    SagaStats,
     SagaStep,
-    SagaStepResult,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass
@@ -30,7 +31,7 @@ class StepService(Entity):
     actions_received: int = field(default=0, init=False)
     compensations_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         metadata = event.context.get("metadata", {})
         if metadata.get("_saga_compensation"):
             self.compensations_received += 1
@@ -48,7 +49,7 @@ class SlowStepService(Entity):
 
     actions_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.actions_received += 1
         yield self.response_time
 

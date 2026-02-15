@@ -1,10 +1,10 @@
 from happysimulator.components.common import Counter
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
-from happysimulator.core.simulation import Simulation
 
 
 class PingCounterEntity(Entity):
@@ -12,7 +12,7 @@ class PingCounterEntity(Entity):
         super().__init__("pingcounter")
         self.side_effect_counter = side_effect_counter
         self.first_counter = 0
-        self.second_counter  = 0
+        self.second_counter = 0
 
     def handle_event(self, event: Event):
         self.first_counter += 1
@@ -26,14 +26,15 @@ class PingCounterEntity(Entity):
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""
+
     def get_rate(self, time: Instant) -> float:
         if time <= Instant.from_seconds(60):
             return 1.0
-        else:
-            return 0
+        return 0
 
 
 # --- 2. The Test Case ---
+
 
 def test_basic_constant_simulation():
     """
@@ -49,14 +50,15 @@ def test_basic_constant_simulation():
     # Create the Source using the custom profile that drops rate to 0 after t=60
     profile = ConstantOneProfile()
     source = Source.with_profile(
-        profile=profile, target=source_event_counter, event_type="Ping",
-        poisson=False, name="PingSource",
+        profile=profile,
+        target=source_event_counter,
+        event_type="Ping",
+        poisson=False,
+        name="PingSource",
     )
 
     # B. INITIALIZATION
-    sim = Simulation(
-        sources=[source],
-        entities=[source_event_counter, side_effect_counter])
+    sim = Simulation(sources=[source], entities=[source_event_counter, side_effect_counter])
 
     # C. EXECUTION
     # Run the simulation
@@ -66,11 +68,14 @@ def test_basic_constant_simulation():
     # Note: With the discontinuous rate profile (1.0 for t<=60, 0 for t>60),
     # numerical integration can produce 61 events due to boundary handling.
     # This matches test_simulation_basic_counter.py which also expects 61.
-    assert source_event_counter.first_counter == 61, \
+    assert source_event_counter.first_counter == 61, (
         f"Expected a count of 61 in the first counter, but there were {source_event_counter.first_counter}"
+    )
 
-    assert source_event_counter.second_counter == 61, \
+    assert source_event_counter.second_counter == 61, (
         f"Expected a count of 61 in the second counter, but there were {source_event_counter.second_counter}"
+    )
 
-    assert side_effect_counter.total == 61, \
+    assert side_effect_counter.total == 61, (
         f"Expected a count of 61 in the side effect counter, but there were {side_effect_counter.total}"
+    )

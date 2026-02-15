@@ -3,10 +3,10 @@
 import random
 
 from happysimulator.components.behavior.influence import (
-    DeGrootModel,
     BoundedConfidenceModel,
-    VoterModel,
+    DeGrootModel,
     InfluenceModel,
+    VoterModel,
 )
 
 

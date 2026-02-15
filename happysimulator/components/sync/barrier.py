@@ -20,8 +20,9 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Generator, Callable, Any
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -237,4 +238,3 @@ class Barrier(Entity):
 
     def handle_event(self, event: Event) -> None:
         """Barrier doesn't directly handle events."""
-        pass

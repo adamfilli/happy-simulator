@@ -55,7 +55,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from happysimulator import (
-    Data,
     Event,
     Instant,
     Simulation,
@@ -66,7 +65,6 @@ from happysimulator.components.advertising import (
     Advertiser,
     AudienceTier,
 )
-
 
 # =============================================================================
 # Scenario definitions
@@ -97,16 +95,19 @@ MARGIN = PRODUCT_PRICE - PRODUCTION_COST
 
 def print_tier_table(tiers: list[AudienceTier], margin: float) -> None:
     """Print a summary table of tier economics."""
-    print(f"  {'Tier':<28s} {'Sales/mo':>10s} {'CPA':>8s} {'Ad Spend':>10s} "
-          f"{'Profit':>10s} {'Plat Rev':>10s} {'Breakeven':>10s}")
-    print(f"  {'-' * 28} {'-' * 10} {'-' * 8} {'-' * 10} "
-          f"{'-' * 10} {'-' * 10} {'-' * 10}")
+    print(
+        f"  {'Tier':<28s} {'Sales/mo':>10s} {'CPA':>8s} {'Ad Spend':>10s} "
+        f"{'Profit':>10s} {'Plat Rev':>10s} {'Breakeven':>10s}"
+    )
+    print(f"  {'-' * 28} {'-' * 10} {'-' * 8} {'-' * 10} {'-' * 10} {'-' * 10} {'-' * 10}")
     for t in tiers:
-        print(f"  {t.name:<28s} {t.base_monthly_sales:>10,d} "
-              f"${t.base_cpa:>6.0f} ${t.monthly_ad_spend:>8,.0f} "
-              f"${t.tier_profit(1.0, margin):>8,.0f} "
-              f"${t.tier_platform_revenue(1.0, margin):>8,.0f} "
-              f"  s={t.breakeven_sentiment(margin):.2f}")
+        print(
+            f"  {t.name:<28s} {t.base_monthly_sales:>10,d} "
+            f"${t.base_cpa:>6.0f} ${t.monthly_ad_spend:>8,.0f} "
+            f"${t.tier_profit(1.0, margin):>8,.0f} "
+            f"${t.tier_platform_revenue(1.0, margin):>8,.0f} "
+            f"  s={t.breakeven_sentiment(margin):.2f}"
+        )
 
 
 def analyze_sentiment_shift(
@@ -134,8 +135,9 @@ def analyze_sentiment_shift(
             sales = t.monthly_sales(before)
             cpa = t.effective_cpa(before)
             profit = t.tier_profit(before, margin)
-            print(f"    {t.name:<28s} {sales:>6.0f} sales, "
-                  f"CPA ${cpa:>6.2f}, profit ${profit:>8,.0f}")
+            print(
+                f"    {t.name:<28s} {sales:>6.0f} sales, CPA ${cpa:>6.2f}, profit ${profit:>8,.0f}"
+            )
         else:
             print(f"    {t.name:<28s}   SHUT OFF")
     print(f"    {'-' * 70}")
@@ -151,11 +153,15 @@ def analyze_sentiment_shift(
             status = ""
             if not t.is_profitable(before, margin):
                 status = " <- REACTIVATED"
-            print(f"    {t.name:<28s} {sales:>6.0f} sales, "
-                  f"CPA ${cpa:>6.2f}, profit ${profit:>8,.0f}{status}")
+            print(
+                f"    {t.name:<28s} {sales:>6.0f} sales, "
+                f"CPA ${cpa:>6.2f}, profit ${profit:>8,.0f}{status}"
+            )
         else:
-            print(f"    {t.name:<28s}   SHUT OFF  "
-                  f"(CPA ${t.effective_cpa(after):.2f} >= ${margin:.0f} margin)")
+            print(
+                f"    {t.name:<28s}   SHUT OFF  "
+                f"(CPA ${t.effective_cpa(after):.2f} >= ${margin:.0f} margin)"
+            )
     print(f"    {'-' * 70}")
     print(f"    Advertiser profit:  ${profit_after:>10,.0f}/mo", end="")
     if profit_before > 0:
@@ -170,21 +176,23 @@ def analyze_sentiment_shift(
     else:
         print()
 
-    print(f"\n  THE AMPLIFICATION:")
+    print("\n  THE AMPLIFICATION:")
     print(f"    Consumer sentiment:  {sentiment_change:+.1f}%")
     if profit_before > 0:
-        print(f"    Advertiser profit:   "
-              f"{(profit_after - profit_before) / profit_before * 100:+.1f}%")
+        print(
+            f"    Advertiser profit:   {(profit_after - profit_before) / profit_before * 100:+.1f}%"
+        )
     if rev_before > 0:
-        print(f"    Platform revenue:    "
-              f"{(rev_after - rev_before) / rev_before * 100:+.1f}%")
+        print(f"    Platform revenue:    {(rev_after - rev_before) / rev_before * 100:+.1f}%")
         if profit_before > 0 and profit_after != profit_before:
             advertiser_pct = abs((profit_after - profit_before) / profit_before * 100)
             platform_pct = abs((rev_after - rev_before) / rev_before * 100)
             if advertiser_pct > 0:
-                print(f"    Amplification factor: {platform_pct / advertiser_pct:.1f}x "
-                      f"(platform loss is {platform_pct / advertiser_pct:.1f}x "
-                      f"worse than advertiser)")
+                print(
+                    f"    Amplification factor: {platform_pct / advertiser_pct:.1f}x "
+                    f"(platform loss is {platform_pct / advertiser_pct:.1f}x "
+                    f"worse than advertiser)"
+                )
 
 
 # =============================================================================
@@ -270,7 +278,7 @@ def run_extended_scenario(duration_months: int = 36) -> AAAResult:
 
     # Sentiment schedule
     shifts = [
-        (6.5, 0.90),   # Mild slowdown
+        (6.5, 0.90),  # Mild slowdown
         (12.5, 0.70),  # Recession
         (18.5, 0.40),  # Deep recession
         (24.5, 0.80),  # Recovery
@@ -326,10 +334,8 @@ def visualize_sensitivity(
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
 
     # Top: absolute values
-    ax1.plot(sentiments, [p / 1000 for p in profits], "b-", linewidth=2,
-             label="Advertiser Profit")
-    ax1.plot(sentiments, [r / 1000 for r in revenues], "r-", linewidth=2,
-             label="Platform Revenue")
+    ax1.plot(sentiments, [p / 1000 for p in profits], "b-", linewidth=2, label="Advertiser Profit")
+    ax1.plot(sentiments, [r / 1000 for r in revenues], "r-", linewidth=2, label="Platform Revenue")
     ax1.set_ylabel("$/month (thousands)")
     ax1.set_title("Adverse Advertising Amplification: Revenue vs. Consumer Sentiment")
     ax1.legend(loc="upper left")
@@ -340,26 +346,34 @@ def visualize_sensitivity(
         be = t.breakeven_sentiment(margin)
         if 0 < be < 1:
             ax1.axvline(x=be, color="gray", linestyle=":", alpha=0.5)
-            ax1.annotate(f"{t.name}\nshuts off",
-                         xy=(be, 0), xytext=(be, ax1.get_ylim()[1] * 0.3),
-                         ha="center", fontsize=8, color="gray",
-                         arrowprops=dict(arrowstyle="->", color="gray", alpha=0.5))
+            ax1.annotate(
+                f"{t.name}\nshuts off",
+                xy=(be, 0),
+                xytext=(be, ax1.get_ylim()[1] * 0.3),
+                ha="center",
+                fontsize=8,
+                color="gray",
+                arrowprops={"arrowstyle": "->", "color": "gray", "alpha": 0.5},
+            )
 
     # Active tier count on secondary axis
     ax1b = ax1.twinx()
-    ax1b.fill_between(sentiments, active_counts, alpha=0.1, color="green",
-                       step="post")
+    ax1b.fill_between(sentiments, active_counts, alpha=0.1, color="green", step="post")
     ax1b.set_ylabel("Active Tiers", color="green")
     ax1b.tick_params(axis="y", labelcolor="green")
     ax1b.set_ylim(0, len(tiers) + 1)
 
     # Bottom: percentage of baseline
-    ax2.plot(sentiments, profit_pct, "b-", linewidth=2,
-             label="Advertiser Profit (% of baseline)")
-    ax2.plot(sentiments, revenue_pct, "r-", linewidth=2,
-             label="Platform Revenue (% of baseline)")
-    ax2.plot(sentiments, [s * 100 for s in sentiments], "k--", linewidth=1,
-             alpha=0.5, label="Linear (no amplification)")
+    ax2.plot(sentiments, profit_pct, "b-", linewidth=2, label="Advertiser Profit (% of baseline)")
+    ax2.plot(sentiments, revenue_pct, "r-", linewidth=2, label="Platform Revenue (% of baseline)")
+    ax2.plot(
+        sentiments,
+        [s * 100 for s in sentiments],
+        "k--",
+        linewidth=1,
+        alpha=0.5,
+        label="Linear (no amplification)",
+    )
     ax2.set_xlabel("Consumer Sentiment")
     ax2.set_ylabel("% of Baseline")
     ax2.set_title("Amplification Effect: % Loss vs. Sentiment Drop")
@@ -375,8 +389,9 @@ def visualize_sensitivity(
     print(f"  Saved: {path}")
 
 
-def visualize_timeline(result: AAAResult, output_dir: Path,
-                       filename: str = "aaa_timeline.png") -> None:
+def visualize_timeline(
+    result: AAAResult, output_dir: Path, filename: str = "aaa_timeline.png"
+) -> None:
     """Generate a timeline chart from simulation results."""
     import matplotlib.pyplot as plt
 
@@ -459,8 +474,10 @@ def main() -> None:
     print("\n" + "-" * 74)
     print("  ESSAY SCENARIO (2 tiers)")
     print("-" * 74)
-    print(f"\n  Product: ${PRODUCT_PRICE:.0f} price, "
-          f"${PRODUCTION_COST:.0f} production cost, ${MARGIN:.0f} margin\n")
+    print(
+        f"\n  Product: ${PRODUCT_PRICE:.0f} price, "
+        f"${PRODUCTION_COST:.0f} production cost, ${MARGIN:.0f} margin\n"
+    )
     print_tier_table(ESSAY_TIERS, MARGIN)
     analyze_sentiment_shift(ESSAY_TIERS, MARGIN, before=1.0, after=0.80)
 
@@ -468,8 +485,10 @@ def main() -> None:
     print("\n\n" + "-" * 74)
     print("  EXTENDED SCENARIO (4 tiers)")
     print("-" * 74)
-    print(f"\n  Product: ${PRODUCT_PRICE:.0f} price, "
-          f"${PRODUCTION_COST:.0f} production cost, ${MARGIN:.0f} margin\n")
+    print(
+        f"\n  Product: ${PRODUCT_PRICE:.0f} price, "
+        f"${PRODUCTION_COST:.0f} production cost, ${MARGIN:.0f} margin\n"
+    )
     print_tier_table(EXTENDED_TIERS, MARGIN)
     analyze_sentiment_shift(EXTENDED_TIERS, MARGIN, before=1.0, after=0.90)
     analyze_sentiment_shift(EXTENDED_TIERS, MARGIN, before=1.0, after=0.70)
@@ -494,6 +513,7 @@ def main() -> None:
     # -- Visualization ----------------------------------------------------
     try:
         import matplotlib
+
         matplotlib.use("Agg")
     except ImportError:
         print("\n  [matplotlib not installed, skipping charts]")
@@ -502,14 +522,10 @@ def main() -> None:
     output_dir = Path("output/aaa")
     print(f"\n\n  Generating visualizations -> {output_dir.absolute()}")
 
-    visualize_sensitivity(ESSAY_TIERS, MARGIN, output_dir,
-                          "aaa_essay_sensitivity.png")
-    visualize_sensitivity(EXTENDED_TIERS, MARGIN, output_dir,
-                          "aaa_extended_sensitivity.png")
-    visualize_timeline(essay_result, output_dir,
-                       "aaa_essay_timeline.png")
-    visualize_timeline(extended_result, output_dir,
-                       "aaa_extended_timeline.png")
+    visualize_sensitivity(ESSAY_TIERS, MARGIN, output_dir, "aaa_essay_sensitivity.png")
+    visualize_sensitivity(EXTENDED_TIERS, MARGIN, output_dir, "aaa_extended_sensitivity.png")
+    visualize_timeline(essay_result, output_dir, "aaa_essay_timeline.png")
+    visualize_timeline(extended_result, output_dir, "aaa_extended_timeline.png")
 
     print(f"\n  All visualizations saved to: {output_dir.absolute()}")
 

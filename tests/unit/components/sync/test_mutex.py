@@ -1,5 +1,7 @@
 """Tests for Mutex."""
 
+import contextlib
+
 import pytest
 
 from happysimulator.components.sync import Mutex
@@ -142,10 +144,8 @@ class TestMutexContention:
         mutex.release()
 
         # Continue generator - should now be acquired
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         assert mutex.is_locked is True
         assert mutex.owner == "thread-2"
@@ -166,19 +166,15 @@ class TestMutexContention:
 
         # Release - thread-2 should get lock
         mutex.release()
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen2)
-        except StopIteration:
-            pass
 
         assert mutex.owner == "thread-2"
 
         # Release again - thread-3 should get lock
         mutex.release()
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen3)
-        except StopIteration:
-            pass
 
         assert mutex.owner == "thread-3"
 
@@ -199,10 +195,8 @@ class TestMutexStatistics:
 
         # Release and let thread-2 acquire
         mutex.release()
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         # Final release
         mutex.release()

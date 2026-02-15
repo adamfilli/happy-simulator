@@ -11,14 +11,13 @@ from happysimulator import (
     ExponentialLatency,
     LatencyTracker,
     Probe,
+    SimpleEventProvider,
     Simulation,
     Source,
-    SimpleEventProvider,
 )
 from happysimulator.components.server import Server
 from happysimulator.core.entity import Entity
 from happysimulator.core.temporal import Instant
-
 
 # ── Probe.on() ──────────────────────────────────────────────────────────────
 
@@ -130,6 +129,7 @@ class TestEntityForward:
         target = _DummyEntity("B")
         # Inject clock so entity.now works
         from happysimulator.core.clock import Clock
+
         clock = Clock(Instant.Epoch)
         clock._current_time = Instant.from_seconds(5.0)
         entity.set_clock(clock)
@@ -152,11 +152,14 @@ class TestEntityForward:
         entity = _DummyEntity("A")
         target = _DummyEntity("B")
         from happysimulator.core.clock import Clock
+
         clock = Clock(Instant.Epoch)
         entity.set_clock(clock)
 
         original = Event(
-            time=Instant.Epoch, event_type="Request", target=entity,
+            time=Instant.Epoch,
+            event_type="Request",
+            target=entity,
         )
 
         forwarded = entity.forward(original, target, event_type="Response")
@@ -259,7 +262,8 @@ class TestEndToEndMM1:
 
         tracker = LatencyTracker("Sink")
         server = Server(
-            "Server", concurrency=1,
+            "Server",
+            concurrency=1,
             service_time=ExponentialLatency(1 / 12),
             downstream=tracker,
         )

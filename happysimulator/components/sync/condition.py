@@ -29,13 +29,14 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Generator, Callable, Any
+from typing import Any
 
+from happysimulator.components.sync.mutex import Mutex
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.components.sync.mutex import Mutex
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,7 @@ class Condition(Entity):
         """Number of threads waiting on this condition."""
         return len(self._waiters)
 
-    def wait(self) -> Generator[float, None, None]:
+    def wait(self) -> Generator[float]:
         """Wait for the condition to be signaled.
 
         Atomically releases the associated mutex, waits for a signal,
@@ -141,9 +142,7 @@ class Condition(Entity):
             # condition is now true, mutex is held
         """
         if not self._lock.is_locked:
-            raise RuntimeError(
-                f"Condition {self.name}: wait() called without holding mutex"
-            )
+            raise RuntimeError(f"Condition {self.name}: wait() called without holding mutex")
 
         self._waits += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
@@ -191,9 +190,7 @@ class Condition(Entity):
             True if predicate became true, False if timed out.
         """
         if not self._lock.is_locked:
-            raise RuntimeError(
-                f"Condition {self.name}: wait_for() called without holding mutex"
-            )
+            raise RuntimeError(f"Condition {self.name}: wait_for() called without holding mutex")
 
         start_time = self._clock.now.nanoseconds if self._clock else 0
 
@@ -250,4 +247,3 @@ class Condition(Entity):
 
     def handle_event(self, event: Event) -> None:
         """Condition doesn't directly handle events."""
-        pass

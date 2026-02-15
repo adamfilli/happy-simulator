@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-import pytest
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.components.industrial.split_merge import SplitMerge
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.split_merge import SplitMerge
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class EchoWorker(Entity):
@@ -32,7 +34,6 @@ class EchoWorker(Entity):
 
 
 class TestSplitMergeBasics:
-
     def test_creates_with_parameters(self):
         sink = Sink()
         w1, w2 = EchoWorker("w1"), EchoWorker("w2")
@@ -51,9 +52,7 @@ class TestSplitMergeBasics:
             end_time=Instant.from_seconds(2.0),
             entities=[sm, w1, w2, sink],
         )
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="Task", target=sm, context={"id": 1})
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="Task", target=sm, context={"id": 1}))
         sim.run()
 
         assert sm.stats.splits_initiated == 1

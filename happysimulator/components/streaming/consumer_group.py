@@ -7,7 +7,9 @@ rebalancing on join/leave.
 Example::
 
     from happysimulator.components.streaming import (
-        EventLog, ConsumerGroup, RoundRobinAssignment,
+        EventLog,
+        ConsumerGroup,
+        RoundRobinAssignment,
     )
 
     log = EventLog(name="events", num_partitions=4)
@@ -26,15 +28,19 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import Any, Generator, Protocol
 from abc import abstractmethod
+from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING, Protocol
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.streaming.event_log import EventLog, Record
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.streaming.event_log import EventLog, Record
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +305,9 @@ class ConsumerGroup(Entity):
 
     # Convenience generators for yield-from composition
 
-    def join(self, consumer_name: str, consumer_entity: Entity) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[int]]:
+    def join(
+        self, consumer_name: str, consumer_entity: Entity
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[int]]:
         """Join a consumer to the group.
 
         Args:
@@ -327,7 +335,7 @@ class ConsumerGroup(Entity):
         result = yield reply
         return result
 
-    def leave(self, consumer_name: str) -> Generator[float | SimFuture | tuple[float, list[Event]], None, None]:
+    def leave(self, consumer_name: str) -> Generator[float | SimFuture | tuple[float, list[Event]]]:
         """Remove a consumer from the group.
 
         Args:
@@ -349,7 +357,9 @@ class ConsumerGroup(Entity):
         yield 0.0, [event]
         yield reply
 
-    def poll(self, consumer_name: str, max_records: int = 100) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Record]]:
+    def poll(
+        self, consumer_name: str, max_records: int = 100
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]], None, list[Record]]:
         """Poll for records from assigned partitions.
 
         Args:
@@ -377,7 +387,9 @@ class ConsumerGroup(Entity):
         result = yield reply
         return result
 
-    def commit(self, consumer_name: str, offsets: dict[int, int]) -> Generator[float | tuple[float, list[Event]], None, None]:
+    def commit(
+        self, consumer_name: str, offsets: dict[int, int]
+    ) -> Generator[float | tuple[float, list[Event]]]:
         """Commit offsets for a consumer.
 
         Args:

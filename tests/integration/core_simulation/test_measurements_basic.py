@@ -2,13 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from happysimulator.instrumentation.probe import Probe
 from happysimulator.core.entity import Entity
-from happysimulator.load.source import Source
-from happysimulator.core.temporal import Instant
 from happysimulator.core.event import Event
-from happysimulator.load.profile import Profile
 from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
 
 
 class ConcurrencyTrackerEntity(Entity):
@@ -31,17 +31,18 @@ class ConcurrencyTrackerEntity(Entity):
 
 class ConstantOneProfile(Profile):
     """Returns a rate of 1.0 event per second."""
+
     def get_rate(self, time: Instant) -> float:
         if time <= Instant.from_seconds(60):
             return 1.0
-        else:
-            return 0
+        return 0
 
 
 def _write_csv(path: Path, header: list[str], rows: list[tuple]) -> None:
     """Helper to write CSV files for test output."""
     import csv
-    with open(path, "w", newline="") as f:
+
+    with path.open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         for row in rows:
@@ -49,6 +50,7 @@ def _write_csv(path: Path, header: list[str], rows: list[tuple]) -> None:
 
 
 # --- 2. The Test Case ---
+
 
 def test_basic_concurrency_probe(test_output_dir: Path):
     """
@@ -74,8 +76,11 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     # Create the event Source
     profile = ConstantOneProfile()
     event_source = Source.with_profile(
-        profile=profile, target=tracker, event_type="Ping",
-        poisson=False, name="PingSource",
+        profile=profile,
+        target=tracker,
+        event_type="Ping",
+        poisson=False,
+        name="PingSource",
     )
 
     # Create the Probe to measure concurrency
@@ -86,7 +91,7 @@ def test_basic_concurrency_probe(test_output_dir: Path):
         sources=[event_source],
         entities=[tracker],
         probes=[concurrency_probe],
-        duration=sim_duration
+        duration=sim_duration,
     )
 
     # C. EXECUTION
@@ -110,8 +115,12 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     assert max_concurrency >= 1, f"Expected max concurrency >= 1, got {max_concurrency}"
 
     # Verify the tracker processed around 60 events
-    assert 59 <= tracker.first_counter <= 61, f"Expected around 60 events started, got {tracker.first_counter}"
-    assert 59 <= tracker.second_counter <= 61, f"Expected around 60 events completed, got {tracker.second_counter}"
+    assert 59 <= tracker.first_counter <= 61, (
+        f"Expected around 60 events started, got {tracker.first_counter}"
+    )
+    assert 59 <= tracker.second_counter <= 61, (
+        f"Expected around 60 events completed, got {tracker.second_counter}"
+    )
 
     # E. VISUALIZATION
 
@@ -119,7 +128,7 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     _write_csv(
         test_output_dir / "concurrency_samples.csv",
         header=["time_s", "concurrency"],
-        rows=[(t, v) for t, v in samples]
+        rows=[(t, v) for t, v in samples],
     )
 
     # Plot 1: Concurrency over time
@@ -136,7 +145,9 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     ax_conc.set_ylim(bottom=0)
 
     # Histogram of concurrency values
-    ax_hist.hist(values, bins=range(int(max(values)) + 3), edgecolor="black", alpha=0.7, color="steelblue")
+    ax_hist.hist(
+        values, bins=range(int(max(values)) + 3), edgecolor="black", alpha=0.7, color="steelblue"
+    )
     ax_hist.set_xlabel("Concurrency Level")
     ax_hist.set_ylabel("Frequency (# samples)")
     ax_hist.set_title("Distribution of Concurrency Levels")

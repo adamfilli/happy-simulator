@@ -32,7 +32,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from happysimulator import Data, Event, Instant, Simulation, SimulationSummary
-from happysimulator.core.entity import Entity
 from happysimulator.components.behavior import (
     Agent,
     AgentState,
@@ -52,8 +51,8 @@ from happysimulator.components.behavior.stimulus import (
     broadcast_stimulus,
     influence_propagation,
 )
+from happysimulator.core.entity import Entity
 from happysimulator.instrumentation.probe import Probe
-
 
 # =============================================================================
 # Configuration & Result
@@ -126,28 +125,36 @@ class Bank(Entity):
             actual = min(amount, max(0.0, self.reserves))
             self.reserves -= actual
             self.withdrawal_count += 1
-            return [Event(
-                time=self.now,
-                event_type="StateChange",
-                target=self.env,
-                context={"metadata": {
-                    "key": "bank_health",
-                    "value": self.health_ratio,
-                }},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="StateChange",
+                    target=self.env,
+                    context={
+                        "metadata": {
+                            "key": "bank_health",
+                            "value": self.health_ratio,
+                        }
+                    },
+                )
+            ]
 
         if event.event_type == "Deposit":
             amount = event.context.get("metadata", {}).get("amount", 0)
             self.reserves += amount
-            return [Event(
-                time=self.now,
-                event_type="StateChange",
-                target=self.env,
-                context={"metadata": {
-                    "key": "bank_health",
-                    "value": self.health_ratio,
-                }},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="StateChange",
+                    target=self.env,
+                    context={
+                        "metadata": {
+                            "key": "bank_health",
+                            "value": self.health_ratio,
+                        }
+                    },
+                )
+            ]
 
         return None
 
@@ -178,19 +185,22 @@ class CentralBank(Entity):
         self.injections = 0
 
     def handle_event(self, event):
-        if event.event_type == "MonitorBank":
-            if self.bank.health_ratio < self.threshold:
-                self.bank.reserves += self.injection_amount
-                self.injections += 1
-                return [Event(
+        if event.event_type == "MonitorBank" and self.bank.health_ratio < self.threshold:
+            self.bank.reserves += self.injection_amount
+            self.injections += 1
+            return [
+                Event(
                     time=self.now,
                     event_type="StateChange",
                     target=self.bank.env,
-                    context={"metadata": {
-                        "key": "bank_health",
-                        "value": self.bank.health_ratio,
-                    }},
-                )]
+                    context={
+                        "metadata": {
+                            "key": "bank_health",
+                            "value": self.bank.health_ratio,
+                        }
+                    },
+                )
+            ]
         return None
 
 
@@ -226,13 +236,13 @@ def make_utility(insurance: bool = False):
             distrust = 1 - confidence
             panic = (health_fear * 0.4 + distrust * 0.6) * (0.5 + neuroticism)
             return min(1.0, panic)
-        else:  # stay
-            trust = bank_health * 0.3 + confidence * 0.4
-            calm = (1 - neuroticism) * 0.1
-            score = trust + 0.05 + calm
-            if insurance:
-                score += 0.5  # insurance bonus
-            return min(1.0, score)
+        # stay
+        trust = bank_health * 0.3 + confidence * 0.4
+        calm = (1 - neuroticism) * 0.1
+        score = trust + 0.05 + calm
+        if insurance:
+            score += 0.5  # insurance bonus
+        return min(1.0, score)
 
     return utility
 
@@ -247,7 +257,7 @@ def _segment_ranges(pop_size: int) -> dict[str, range]:
     n_cautious = int(0.25 * pop_size)
     n_steady = int(0.55 * pop_size)
     return {
-        "cautious": range(0, n_cautious),
+        "cautious": range(n_cautious),
         "steady": range(n_cautious, n_cautious + n_steady),
         "loyal": range(n_cautious + n_steady, pop_size),
     }
@@ -264,13 +274,18 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
             name="cautious",
             fraction=0.25,
             trait_distribution=NormalTraitDistribution(
-                means={"openness": 0.4, "conscientiousness": 0.5,
-                       "extraversion": 0.4, "agreeableness": 0.3,
-                       "neuroticism": 0.8},
+                means={
+                    "openness": 0.4,
+                    "conscientiousness": 0.5,
+                    "extraversion": 0.4,
+                    "agreeableness": 0.3,
+                    "neuroticism": 0.8,
+                },
                 stds={"neuroticism": 0.08},
             ),
             decision_model_factory=lambda: UtilityModel(
-                utility_fn=utility, temperature=0.0,
+                utility_fn=utility,
+                temperature=0.0,
             ),
             initial_state_factory=lambda: AgentState(
                 beliefs={"bank_confidence": 0.6},
@@ -281,12 +296,17 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
             name="steady",
             fraction=0.55,
             trait_distribution=NormalTraitDistribution(
-                means={"openness": 0.5, "conscientiousness": 0.5,
-                       "extraversion": 0.5, "agreeableness": 0.7,
-                       "neuroticism": 0.5},
+                means={
+                    "openness": 0.5,
+                    "conscientiousness": 0.5,
+                    "extraversion": 0.5,
+                    "agreeableness": 0.7,
+                    "neuroticism": 0.5,
+                },
             ),
             decision_model_factory=lambda: SocialInfluenceModel(
-                individual_fn=utility, conformity_weight=0.6,
+                individual_fn=utility,
+                conformity_weight=0.6,
             ),
             initial_state_factory=lambda: AgentState(
                 beliefs={"bank_confidence": 0.6},
@@ -297,13 +317,18 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
             name="loyal",
             fraction=0.20,
             trait_distribution=NormalTraitDistribution(
-                means={"openness": 0.5, "conscientiousness": 0.8,
-                       "extraversion": 0.4, "agreeableness": 0.5,
-                       "neuroticism": 0.2},
+                means={
+                    "openness": 0.5,
+                    "conscientiousness": 0.8,
+                    "extraversion": 0.4,
+                    "agreeableness": 0.5,
+                    "neuroticism": 0.2,
+                },
                 stds={"neuroticism": 0.08},
             ),
             decision_model_factory=lambda: BoundedRationalityModel(
-                utility_fn=utility, aspiration=0.55,
+                utility_fn=utility,
+                aspiration=0.55,
             ),
             initial_state_factory=lambda: AgentState(
                 beliefs={"bank_confidence": 0.6},
@@ -345,12 +370,15 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
     if config.lender_of_last_resort:
         injection = config.liquidity_injection_frac * total_deposits
         central_bank = CentralBank(
-            "central_bank", bank, config.liquidity_threshold, injection,
+            "central_bank",
+            bank,
+            config.liquidity_threshold,
+            injection,
         )
 
     # --- Tracking state ---
     withdrawn: set[str] = set()
-    withdrawals_by_segment: dict[str, int] = {s: 0 for s in SEGMENTS}
+    withdrawals_by_segment: dict[str, int] = dict.fromkeys(SEGMENTS, 0)
     confidence_data: dict[str, Data] = {s: Data() for s in SEGMENTS}
     withdrawal_timeline: dict[str, Data] = {s: Data() for s in SEGMENTS}
     insurance = config.deposit_insurance
@@ -372,17 +400,16 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
 
     def stay_handler(ag: Agent, choice: Choice, event: Event):
         if ag.name in withdrawn:
-            return None
+            return
         health = env.shared_state.get("bank_health", 1.0)
         current = ag.state.beliefs.get("bank_confidence", 0.6)
-        ag.state.beliefs["bank_confidence"] = (
-            0.7 * current + 0.3 * (health * 2 - 1)
-        )
+        ag.state.beliefs["bank_confidence"] = 0.7 * current + 0.3 * (health * 2 - 1)
         if insurance:
             ag.state.beliefs["bank_confidence"] = max(
-                ag.state.beliefs["bank_confidence"], -0.2,
+                ag.state.beliefs["bank_confidence"],
+                -0.2,
             )
-        return None
+        return
 
     for agent in pop.agents:
         agent.on_action("withdraw", withdraw_handler)
@@ -392,7 +419,7 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
     health_probe, health_data = Probe.on(bank, "health_ratio", interval=0.5)
 
     # --- Build simulation ---
-    entities: list = [env, bank] + list(pop.agents)
+    entities: list = [env, bank, *list(pop.agents)]
     if central_bank:
         entities.append(central_bank)
 
@@ -410,12 +437,22 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
         if insurance:
             _schedule_confidence_clamp(sim, t + 0.005, pop.agents, withdrawn)
 
-        sim.schedule(broadcast_stimulus(
-            t + 0.01, env, "CheckBank", choices=["withdraw", "stay"],
-        ))
+        sim.schedule(
+            broadcast_stimulus(
+                t + 0.01,
+                env,
+                "CheckBank",
+                choices=["withdraw", "stay"],
+            )
+        )
         _schedule_confidence_sample(
-            sim, t + 0.02, pop.agents, seg_ranges,
-            confidence_data, withdrawal_timeline, withdrawals_by_segment,
+            sim,
+            t + 0.02,
+            pop.agents,
+            seg_ranges,
+            confidence_data,
+            withdrawal_timeline,
+            withdrawals_by_segment,
         )
         t += config.check_interval
 
@@ -434,21 +471,25 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
                 agent.state.beliefs["bank_confidence"] = -0.4
         return []
 
-    sim.schedule(Event.once(
-        time=Instant.from_seconds(config.rumor_time - 0.05),
-        event_type="Rumor",
-        fn=apply_rumor,
-    ))
+    sim.schedule(
+        Event.once(
+            time=Instant.from_seconds(config.rumor_time - 0.05),
+            event_type="Rumor",
+            fn=apply_rumor,
+        )
+    )
 
     # --- Central bank monitoring ---
     if central_bank:
         monitor_t = config.rumor_time
         while monitor_t <= config.sim_duration:
-            sim.schedule(Event(
-                time=Instant.from_seconds(monitor_t + 0.5),
-                event_type="MonitorBank",
-                target=central_bank,
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(monitor_t + 0.5),
+                    event_type="MonitorBank",
+                    target=central_bank,
+                )
+            )
             monitor_t += config.check_interval
 
     # --- Run ---
@@ -464,9 +505,7 @@ def run_scenario(name: str, config: BankRunConfig) -> ScenarioResult:
         total_withdrawals=len(withdrawn),
         withdrawals_by_segment=dict(withdrawals_by_segment),
         survived=bank.health_ratio > 0.05,
-        central_bank_injections=(
-            central_bank.injections if central_bank else 0
-        ),
+        central_bank_injections=(central_bank.injections if central_bank else 0),
     )
 
 
@@ -482,15 +521,18 @@ def _schedule_confidence_clamp(
         for agent in agents:
             if agent.name not in withdrawn:
                 agent.state.beliefs["bank_confidence"] = max(
-                    agent.state.beliefs.get("bank_confidence", 0.6), -0.2,
+                    agent.state.beliefs.get("bank_confidence", 0.6),
+                    -0.2,
                 )
         return []
 
-    sim.schedule(Event.once(
-        time=Instant.from_seconds(time),
-        event_type="ClampConfidence",
-        fn=clamp,
-    ))
+    sim.schedule(
+        Event.once(
+            time=Instant.from_seconds(time),
+            event_type="ClampConfidence",
+            fn=clamp,
+        )
+    )
 
 
 def _schedule_confidence_sample(
@@ -509,20 +551,22 @@ def _schedule_confidence_sample(
             seg_agents = [agents[i] for i in idx_range]
             if seg_agents:
                 avg_conf = sum(
-                    a.state.beliefs.get("bank_confidence", 0.6)
-                    for a in seg_agents
+                    a.state.beliefs.get("bank_confidence", 0.6) for a in seg_agents
                 ) / len(seg_agents)
                 confidence_data[seg_name].add_stat(avg_conf, event.time)
             withdrawal_timeline[seg_name].add_stat(
-                withdrawals_by_segment.get(seg_name, 0), event.time,
+                withdrawals_by_segment.get(seg_name, 0),
+                event.time,
             )
         return []
 
-    sim.schedule(Event.once(
-        time=Instant.from_seconds(time),
-        event_type="SampleConfidence",
-        fn=sample,
-    ))
+    sim.schedule(
+        Event.once(
+            time=Instant.from_seconds(time),
+            event_type="SampleConfidence",
+            fn=sample,
+        )
+    )
 
 
 # =============================================================================
@@ -555,13 +599,16 @@ def print_results(results: list[ScenarioResult]) -> None:
     print(f"\n{'=' * 78}")
     print(f"  {'SCENARIO COMPARISON':^74s}")
     print(f"{'=' * 78}")
-    print(f"  {'Scenario':<28s} {'Survived':>10s} {'Health':>8s} "
-          f"{'Withdrawals':>12s} {'CB Inj.':>8s}")
+    print(
+        f"  {'Scenario':<28s} {'Survived':>10s} {'Health':>8s} {'Withdrawals':>12s} {'CB Inj.':>8s}"
+    )
     print(f"  {'-' * 28} {'-' * 10} {'-' * 8} {'-' * 12} {'-' * 8}")
     for r in results:
         status = "Yes" if r.survived else "No"
-        print(f"  {r.name:<28s} {status:>10s} {r.final_health:>7.1%} "
-              f"{r.total_withdrawals:>12d} {r.central_bank_injections:>8d}")
+        print(
+            f"  {r.name:<28s} {status:>10s} {r.final_health:>7.1%} "
+            f"{r.total_withdrawals:>12d} {r.central_bank_injections:>8d}"
+        )
 
 
 # =============================================================================
@@ -572,6 +619,7 @@ def print_results(results: list[ScenarioResult]) -> None:
 def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
     """Generate a 4-panel chart comparing all scenarios."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -587,8 +635,7 @@ def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
         times = r.health_data.times()
         values = r.health_data.raw_values()
         if times:
-            ax.plot(times, values, linewidth=2, label=r.name,
-                    color=scenario_colors[i])
+            ax.plot(times, values, linewidth=2, label=r.name, color=scenario_colors[i])
     ax.axhline(y=0.5, color="gray", linestyle=":", alpha=0.5, label="CB threshold")
     ax.axvline(x=10.0, color="gray", linestyle="--", alpha=0.4)
     ax.annotate("Rumor", xy=(10, 0.95), fontsize=8, color="gray", ha="center")
@@ -605,8 +652,7 @@ def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
         data = r0.confidence_data.get(seg)
         if data and data.times():
             conf_mapped = [(v + 1) / 2 for v in data.raw_values()]
-            ax.plot(data.times(), conf_mapped, linewidth=1.5, label=seg,
-                    color=seg_colors[seg])
+            ax.plot(data.times(), conf_mapped, linewidth=1.5, label=seg, color=seg_colors[seg])
     ax.axhline(y=0.5, color="gray", linestyle=":", alpha=0.3)
     ax.axvline(x=10.0, color="gray", linestyle="--", alpha=0.4)
     ax.set_ylabel("Confidence (0-1)")
@@ -620,10 +666,10 @@ def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
     for seg in SEGMENTS:
         data = r0.withdrawal_data.get(seg)
         if data and data.times():
-            ax.fill_between(data.times(), data.raw_values(), alpha=0.3,
-                            color=seg_colors[seg])
-            ax.plot(data.times(), data.raw_values(), linewidth=1.5,
-                    label=seg, color=seg_colors[seg])
+            ax.fill_between(data.times(), data.raw_values(), alpha=0.3, color=seg_colors[seg])
+            ax.plot(
+                data.times(), data.raw_values(), linewidth=1.5, label=seg, color=seg_colors[seg]
+            )
     ax.axvline(x=10.0, color="gray", linestyle="--", alpha=0.4)
     ax.set_xlabel("Time (days)")
     ax.set_ylabel("Cumulative Withdrawals")
@@ -635,11 +681,17 @@ def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
     ax = axes[1, 1]
     names = [r.name.replace(". ", ".\n") for r in results]
     healths = [r.final_health for r in results]
-    bars = ax.bar(names, healths, color=scenario_colors[:len(results)], alpha=0.85)
-    for bar, h in zip(bars, healths):
+    bars = ax.bar(names, healths, color=scenario_colors[: len(results)], alpha=0.85)
+    for bar, h in zip(bars, healths, strict=False):
         label = f"{h:.0%}"
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.02,
-                label, ha="center", fontsize=11, fontweight="bold")
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.02,
+            label,
+            ha="center",
+            fontsize=11,
+            fontweight="bold",
+        )
     ax.set_ylabel("Final Health Ratio")
     ax.set_title("Scenario Comparison")
     ax.set_ylim(0, 1.15)
@@ -647,7 +699,9 @@ def visualize_results(results: list[ScenarioResult], output_dir: Path) -> None:
 
     fig.suptitle(
         "Bank Run & Financial Contagion — Diamond-Dybvig Model",
-        fontsize=14, fontweight="bold", y=0.98,
+        fontsize=14,
+        fontweight="bold",
+        y=0.98,
     )
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     path = output_dir / "bank_run.png"

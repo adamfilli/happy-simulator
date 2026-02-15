@@ -1,14 +1,11 @@
 """Tests for PaxosNode (single-decree Paxos)."""
 
-import pytest
-
+from happysimulator.components.consensus.paxos import Ballot, PaxosNode, PaxosStats
+from happysimulator.components.network import Network
 from happysimulator.core.clock import Clock
-from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
 from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.paxos import PaxosNode, PaxosStats, Ballot
-from happysimulator.components.network import Network
 
 
 def make_clock(t=0.0):
@@ -138,11 +135,11 @@ class TestPaxosSelfPromise:
 
     def test_self_promise_in_phase1(self):
         """start_phase1() includes a self-promise in phase1 responses."""
-        nodes, _, clock = make_paxos_cluster(3)
+        nodes, _, _clock = make_paxos_cluster(3)
         node = nodes[0]
         node.propose("val")
 
-        events = node.start_phase1()
+        node.start_phase1()
 
         # Check self-promise was recorded
         ballot_num = node._current_ballot.number
@@ -162,11 +159,13 @@ class TestPaxosPrepareHandler:
             time=Instant.from_seconds(1.0),
             event_type="PaxosPrepare",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(prepare_event)
@@ -188,11 +187,13 @@ class TestPaxosPrepareHandler:
             time=Instant.from_seconds(1.0),
             event_type="PaxosPrepare",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(prepare_event)
@@ -214,12 +215,14 @@ class TestPaxosAcceptHandler:
             time=Instant.from_seconds(1.0),
             event_type="PaxosAccept",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "value": "hello",
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "value": "hello",
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(accept_event)
@@ -241,12 +244,14 @@ class TestPaxosAcceptHandler:
             time=Instant.from_seconds(1.0),
             event_type="PaxosAccept",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "value": "hello",
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "value": "hello",
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(accept_event)

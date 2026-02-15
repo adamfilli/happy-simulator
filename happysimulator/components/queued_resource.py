@@ -19,14 +19,18 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.clock import Clock
 from happysimulator.components.queue import Queue
 from happysimulator.components.queue_driver import QueueDriver
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
+from happysimulator.core.entity import Entity
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.clock import Clock
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +40,7 @@ class _QueuedResourceWorkerAdapter(Entity):
     """Internal entity that bridges the queue driver to the resource's logic."""
 
     name: str
-    _resource: "QueuedResource"
+    _resource: QueuedResource
 
     def handle_event(self, event: Event):
         return self._resource.handle_queued_event(event)
@@ -82,7 +86,9 @@ class QueuedResource(Entity, ABC):
         self._queue.egress = self._driver
         logger.debug(
             "[%s] QueuedResource initialized with queue=%s driver=%s",
-            name, self._queue.name, self._driver.name
+            name,
+            self._queue.name,
+            self._driver.name,
         )
 
     @property
@@ -139,7 +145,14 @@ class QueuedResource(Entity, ABC):
     @abstractmethod
     def handle_queued_event(
         self, event: Event
-    ) -> Generator[float | tuple[float, list[Event] | Event | None], None, list[Event] | Event | None] | list[Event] | Event | None:
+    ) -> (
+        Generator[
+            float | tuple[float, list[Event] | Event | None], None, list[Event] | Event | None
+        ]
+        | list[Event]
+        | Event
+        | None
+    ):
         """Handle a dequeued work item.
 
         Subclasses implement their server behavior here.

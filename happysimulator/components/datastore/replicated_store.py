@@ -23,10 +23,10 @@ Example:
     )
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass, field
-from typing import Any, Generator, Optional
 from enum import Enum
-import heapq
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -207,12 +207,12 @@ class ReplicatedStore(Entity):
         """Get number of responses required for given consistency."""
         if consistency == ConsistencyLevel.ONE:
             return 1
-        elif consistency == ConsistencyLevel.QUORUM:
+        if consistency == ConsistencyLevel.QUORUM:
             return self.quorum_size
-        else:  # ALL
-            return len(self._replicas)
+        # ALL
+        return len(self._replicas)
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value with configured read consistency.
 
         Reads from multiple replicas in parallel and returns the
@@ -229,7 +229,6 @@ class ReplicatedStore(Entity):
         """
         self._reads += 1
         required = self._required_responses(self._read_consistency)
-        start_time = 0.0
         total_latency = 0.0
 
         # Collect responses from replicas
@@ -379,16 +378,15 @@ class ReplicatedStore(Entity):
         status = []
         for i, replica in enumerate(self._replicas):
             info = {
-                'index': i,
-                'name': replica.name,
-                'size': replica.size if hasattr(replica, 'size') else 0,
+                "index": i,
+                "name": replica.name,
+                "size": replica.size if hasattr(replica, "size") else 0,
             }
-            if hasattr(replica, 'stats'):
-                info['reads'] = replica.stats.reads
-                info['writes'] = replica.stats.writes
+            if hasattr(replica, "stats"):
+                info["reads"] = replica.stats.reads
+                info["writes"] = replica.stats.writes
             status.append(info)
         return status
 
     def handle_event(self, event: Event) -> None:
         """ReplicatedStore can handle events for store operations."""
-        pass

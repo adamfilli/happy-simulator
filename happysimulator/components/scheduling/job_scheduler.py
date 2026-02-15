@@ -119,7 +119,8 @@ class JobScheduler(Entity):
 
         logger.debug(
             "[%s] JobScheduler initialized: tick_interval=%.1fs",
-            name, tick_interval,
+            name,
+            tick_interval,
         )
 
     @property
@@ -135,10 +136,7 @@ class JobScheduler(Entity):
     @property
     def running_jobs(self) -> list[str]:
         """Names of currently running jobs."""
-        return [
-            name for name, state in self._job_states.items()
-            if state.is_running
-        ]
+        return [name for name, state in self._job_states.items() if state.is_running]
 
     @property
     def is_running(self) -> bool:
@@ -169,8 +167,13 @@ class JobScheduler(Entity):
             raise ValueError(f"Job '{job.name}' already exists")
         self._jobs[job.name] = job
         self._job_states[job.name] = JobState()
-        logger.debug("[%s] Added job: %s (interval=%.1fs, priority=%d)",
-                     self.name, job.name, job.interval, job.priority)
+        logger.debug(
+            "[%s] Added job: %s (interval=%.1fs, priority=%d)",
+            self.name,
+            job.name,
+            job.interval,
+            job.priority,
+        )
 
     def remove_job(self, name: str) -> None:
         """Remove a job from the scheduler.
@@ -271,6 +274,7 @@ class JobScheduler(Entity):
 
             # Add completion hook
             job_name = job.name
+
             def on_complete(finish_time: Instant, _name=job_name) -> Event:
                 return Event(
                     time=finish_time,
@@ -338,9 +342,11 @@ class JobScheduler(Entity):
                 return False
             # If this job has run before, dep must have completed after
             state = self._job_states[job.name]
-            if state.last_run_time is not None:
-                if dep_state.last_completion_time <= state.last_run_time:
-                    return False
+            if (
+                state.last_run_time is not None
+                and dep_state.last_completion_time <= state.last_run_time
+            ):
+                return False
         return True
 
     def _handle_job_complete(self, event: Event) -> None:

@@ -48,15 +48,13 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     Instant,
     LatencyTracker,
-    Probe,
     Simulation,
     SimulationSummary,
     Source,
@@ -68,6 +66,8 @@ from happysimulator.components.storage import (
     WriteAheadLog,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # WAL Worker Entity
@@ -105,9 +105,7 @@ class WALWorker(Entity):
         _seq = yield from self.wal.append(key, value)
         self.writes_completed += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="WriteComplete")
-        ]
+        return [self.forward(event, self.downstream, event_type="WriteComplete")]
 
 
 # =============================================================================
@@ -212,8 +210,8 @@ def run_wal_sync_comparison(
         wal = WriteAheadLog(
             f"WAL_{name}",
             sync_policy=policy,
-            write_latency=0.0001,   # 100us per append
-            sync_latency=0.001,     # 1ms per fsync
+            write_latency=0.0001,  # 100us per append
+            sync_latency=0.001,  # 1ms per fsync
         )
         policy_seed = seed + i if seed is not None else None
         result = run_single_policy(
@@ -243,13 +241,15 @@ def print_summary(comparison: ComparisonResult) -> None:
     print("WAL SYNC POLICY COMPARISON")
     print("=" * 78)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:       {comparison.duration_s}s")
     print(f"  Write rate:     {comparison.write_rate} writes/s")
-    print(f"  Write latency:  0.1ms per append")
-    print(f"  Sync latency:   1.0ms per fsync")
+    print("  Write latency:  0.1ms per append")
+    print("  Sync latency:   1.0ms per fsync")
 
-    print(f"\n{'Policy':<22} {'Writes':>8} {'Syncs':>8} {'Sync Lat (s)':>14} {'Avg Lat (ms)':>14} {'p99 Lat (ms)':>14}")
+    print(
+        f"\n{'Policy':<22} {'Writes':>8} {'Syncs':>8} {'Sync Lat (s)':>14} {'Avg Lat (ms)':>14} {'p99 Lat (ms)':>14}"
+    )
     print("-" * 78)
 
     for r in comparison.results:
@@ -281,16 +281,28 @@ def print_summary(comparison: ComparisonResult) -> None:
         print("Observations:")
         print(f"  - SyncEveryWrite performed {ew_syncs} syncs (one per write)")
         if p_syncs > 0:
-            print(f"  - SyncPeriodic reduced syncs by {(1 - p_syncs / ew_syncs) * 100:.0f}% ({p_syncs} syncs)")
+            print(
+                f"  - SyncPeriodic reduced syncs by {(1 - p_syncs / ew_syncs) * 100:.0f}% ({p_syncs} syncs)"
+            )
         if b_syncs > 0:
-            print(f"  - SyncOnBatch reduced syncs by {(1 - b_syncs / ew_syncs) * 100:.0f}% ({b_syncs} syncs)")
+            print(
+                f"  - SyncOnBatch reduced syncs by {(1 - b_syncs / ew_syncs) * 100:.0f}% ({b_syncs} syncs)"
+            )
 
         ew_lat = every_write.tracker.mean_latency() * 1000
         p_lat = periodic.tracker.mean_latency() * 1000
         b_lat = batch.tracker.mean_latency() * 1000
         if ew_lat > 0:
-            print(f"  - Periodic policy latency is {ew_lat / p_lat:.1f}x lower than every-write" if p_lat > 0 else "")
-            print(f"  - Batch policy latency is {ew_lat / b_lat:.1f}x lower than every-write" if b_lat > 0 else "")
+            print(
+                f"  - Periodic policy latency is {ew_lat / p_lat:.1f}x lower than every-write"
+                if p_lat > 0
+                else ""
+            )
+            print(
+                f"  - Batch policy latency is {ew_lat / b_lat:.1f}x lower than every-write"
+                if b_lat > 0
+                else ""
+            )
 
     print("\n" + "=" * 78)
 
@@ -304,6 +316,7 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     """Generate bar chart visualization comparing the three policies."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -314,14 +327,12 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
 
     names = [r.policy_name for r in comparison.results]
     syncs = [r.wal.stats.syncs for r in comparison.results]
-    writes = [r.wal.stats.writes for r in comparison.results]
+    [r.wal.stats.writes for r in comparison.results]
     avg_latencies = [
-        r.tracker.mean_latency() * 1000 if r.tracker.count > 0 else 0.0
-        for r in comparison.results
+        r.tracker.mean_latency() * 1000 if r.tracker.count > 0 else 0.0 for r in comparison.results
     ]
     p99_latencies = [
-        r.tracker.p99() * 1000 if r.tracker.count > 0 else 0.0
-        for r in comparison.results
+        r.tracker.p99() * 1000 if r.tracker.count > 0 else 0.0 for r in comparison.results
     ]
 
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
@@ -330,9 +341,16 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     # Chart 1: Total syncs
     ax = axes[0]
     bars = ax.bar(names, syncs, color=colors, edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, syncs):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                str(val), ha="center", va="bottom", fontsize=10, fontweight="bold")
+    for bar, val in zip(bars, syncs, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            str(val),
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
     ax.set_ylabel("Number of fsyncs")
     ax.set_title("Sync Operations")
     ax.grid(True, alpha=0.3, axis="y")
@@ -340,9 +358,16 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     # Chart 2: Average write latency
     ax = axes[1]
     bars = ax.bar(names, avg_latencies, color=colors, edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, avg_latencies):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
-                f"{val:.3f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    for bar, val in zip(bars, avg_latencies, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.01,
+            f"{val:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
     ax.set_ylabel("Average Latency (ms)")
     ax.set_title("Write Latency (avg)")
     ax.grid(True, alpha=0.3, axis="y")
@@ -350,9 +375,16 @@ def visualize_results(comparison: ComparisonResult, output_dir: Path) -> None:
     # Chart 3: p99 write latency
     ax = axes[2]
     bars = ax.bar(names, p99_latencies, color=colors, edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, p99_latencies):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.01,
-                f"{val:.3f}", ha="center", va="bottom", fontsize=10, fontweight="bold")
+    for bar, val in zip(bars, p99_latencies, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.01,
+            f"{val:.3f}",
+            ha="center",
+            va="bottom",
+            fontsize=10,
+            fontweight="bold",
+        )
     ax.set_ylabel("p99 Latency (ms)")
     ax.set_title("Write Latency (p99)")
     ax.grid(True, alpha=0.3, axis="y")
@@ -381,7 +413,9 @@ if __name__ == "__main__":
     parser.add_argument("--duration", type=float, default=10.0, help="Simulation duration (s)")
     parser.add_argument("--rate", type=float, default=500.0, help="Write rate (writes/s)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/wal_sync_policies", help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/wal_sync_policies", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 

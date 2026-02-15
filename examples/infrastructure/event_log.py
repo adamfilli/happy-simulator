@@ -25,14 +25,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
     Instant,
-    Simulation,
     SimFuture,
+    Simulation,
     Source,
 )
 from happysimulator.components.streaming.event_log import (
@@ -40,6 +40,8 @@ from happysimulator.components.streaming.event_log import (
     TimeRetention,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Client entities
@@ -56,7 +58,9 @@ class LogWriter(Entity):
         self._count = 0
         self.latencies: list[tuple[float, float]] = []
 
-    def handle_event(self, event: Event) -> Generator[float | SimFuture | tuple[float, list[Event]], None, None]:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float | SimFuture | tuple[float, list[Event]]]:
         self._count += 1
         key = f"key-{self._count % self._key_space}"
 
@@ -65,7 +69,11 @@ class LogWriter(Entity):
             time=self.now,
             event_type="Append",
             target=self.log,
-            context={"key": key, "value": {"seq": self._count, "writer": self.name}, "reply_future": reply},
+            context={
+                "key": key,
+                "value": {"seq": self._count, "writer": self.name},
+                "reply_future": reply,
+            },
         )
         start = self.now
         yield 0.0, [append_event]
@@ -110,8 +118,10 @@ def run_event_log(
     writers = [LogWriter(f"writer-{i}", log) for i in range(num_writers)]
     sources = [
         Source.constant(
-            rate=write_rate, target=w,
-            event_type="NewRecord", stop_after=duration_s,
+            rate=write_rate,
+            target=w,
+            event_type="NewRecord",
+            stop_after=duration_s,
         )
         for w in writers
     ]
@@ -140,7 +150,9 @@ def print_summary(results: list[LogResult]) -> None:
 
     for r in results:
         log = r.log
-        print(f"\n  Config: partitions={log.num_partitions}, retention={'yes' if r.retention else 'no'}")
+        print(
+            f"\n  Config: partitions={log.num_partitions}, retention={'yes' if r.retention else 'no'}"
+        )
         print(f"  Total appended: {log.stats.records_appended:,}")
         print(f"  Total expired:  {log.stats.records_expired:,}")
         print(f"  Current total:  {log.total_records:,}")
@@ -173,6 +185,7 @@ def print_summary(results: list[LogResult]) -> None:
 def visualize_results(results: list[LogResult], output_dir: Path) -> None:
     """Generate partition distribution charts."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -182,7 +195,7 @@ def visualize_results(results: list[LogResult], output_dir: Path) -> None:
     if len(results) == 1:
         axes = [axes]
 
-    for ax, r in zip(axes, results):
+    for ax, r in zip(axes, results, strict=False):
         log = r.log
         pids = [p.id for p in log.partitions]
         counts = [len(p.records) for p in log.partitions]
@@ -232,7 +245,9 @@ if __name__ == "__main__":
     # With retention
     print("  With time retention (5s)...")
     r2 = run_event_log(
-        duration_s=args.duration, write_rate=args.rate, seed=args.seed,
+        duration_s=args.duration,
+        write_rate=args.rate,
+        seed=args.seed,
         retention_s=5.0,
     )
     results.append(r2)

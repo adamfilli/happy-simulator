@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -16,6 +16,9 @@ from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 @dataclass
 class ReliableServer(Entity):
@@ -26,7 +29,7 @@ class ReliableServer(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -41,7 +44,7 @@ class FailingServer(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         if self.requests_received > self.fail_after:
             # Simulate failure by not completing normally
@@ -59,7 +62,7 @@ class SlowServer(Entity):
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 

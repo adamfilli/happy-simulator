@@ -4,12 +4,8 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from happysimulator.components.industrial.breakdown import BreakdownScheduler
-from happysimulator.components.common import Sink
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
@@ -29,7 +25,6 @@ class DummyMachine(Entity):
 
 
 class TestBreakdownBasics:
-
     def test_creates_with_defaults(self):
         machine = DummyMachine()
         scheduler = BreakdownScheduler("bd", target=machine)
@@ -41,7 +36,8 @@ class TestBreakdownBasics:
         random.seed(42)
         machine = DummyMachine()
         scheduler = BreakdownScheduler(
-            "bd", target=machine,
+            "bd",
+            target=machine,
             mean_time_to_failure=10.0,
             mean_repair_time=1.0,
         )
@@ -63,7 +59,8 @@ class TestBreakdownBasics:
         random.seed(42)
         machine = DummyMachine()
         scheduler = BreakdownScheduler(
-            "bd", target=machine,
+            "bd",
+            target=machine,
             mean_time_to_failure=1.0,
             mean_repair_time=0.5,
         )
@@ -85,7 +82,8 @@ class TestBreakdownBasics:
         random.seed(42)
         machine = DummyMachine()
         scheduler = BreakdownScheduler(
-            "bd", target=machine,
+            "bd",
+            target=machine,
             mean_time_to_failure=10.0,
             mean_repair_time=1.0,
         )

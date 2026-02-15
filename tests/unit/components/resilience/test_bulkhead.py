@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -12,6 +12,9 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass
@@ -25,7 +28,7 @@ class SlowServer(Entity):
     active_connections: int = field(default=0, init=False)
     peak_connections: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         self.active_connections += 1
         if self.active_connections > self.peak_connections:
@@ -114,7 +117,7 @@ class TestBulkheadConcurrencyLimit:
         )
 
         # Send 3 concurrent requests (within limit of 5)
-        for i in range(3):
+        for _i in range(3):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -142,7 +145,7 @@ class TestBulkheadConcurrencyLimit:
         )
 
         # Send 5 concurrent requests (limit is 2, no queue)
-        for i in range(5):
+        for _i in range(5):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -171,7 +174,7 @@ class TestBulkheadConcurrencyLimit:
         )
 
         # Send many concurrent requests
-        for i in range(10):
+        for _i in range(10):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -202,7 +205,7 @@ class TestBulkheadQueueing:
         )
 
         # Send 5 concurrent requests (2 active, 3 queued)
-        for i in range(5):
+        for _i in range(5):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -232,7 +235,7 @@ class TestBulkheadQueueing:
         )
 
         # Send 6 requests (2 active, 2 queued, 2 rejected)
-        for i in range(6):
+        for _i in range(6):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -266,7 +269,7 @@ class TestBulkheadQueueing:
         )
 
         # Send 3 requests (1 active, 2 queued)
-        for i in range(3):
+        for _i in range(3):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",
@@ -318,7 +321,7 @@ class TestBulkheadProperties:
         )
 
         # Send 8 concurrent requests
-        for i in range(8):
+        for _i in range(8):
             request = Event(
                 time=Instant.Epoch,
                 event_type="request",

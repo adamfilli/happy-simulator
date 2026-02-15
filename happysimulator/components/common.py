@@ -6,9 +6,13 @@ to write boilerplate event-collecting classes in every example or test.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from happysimulator.core.event import Event
+    from happysimulator.core.temporal import Instant
 
 
 class Sink(Entity):

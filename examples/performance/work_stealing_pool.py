@@ -41,8 +41,9 @@ from happysimulator.components.scheduling import WorkStealingPool
 class SkewedTaskProvider(EventProvider):
     """Generates tasks with bimodal processing times."""
 
-    def __init__(self, target: Entity, fast_pct: float = 0.9,
-                 fast_time: float = 0.01, slow_time: float = 0.1):
+    def __init__(
+        self, target: Entity, fast_pct: float = 0.9, fast_time: float = 0.01, slow_time: float = 0.1
+    ):
         self._target = target
         self._fast_pct = fast_pct
         self._fast_time = fast_time
@@ -54,17 +55,21 @@ class SkewedTaskProvider(EventProvider):
         is_fast = random.random() < self._fast_pct
         processing_time = self._fast_time if is_fast else self._slow_time
 
-        return [Event(
-            time=time, event_type="Task", target=self._target,
-            context={
-                "created_at": time,
-                "metadata": {
-                    "processing_time": processing_time,
-                    "task_id": self._count,
-                    "is_fast": is_fast,
+        return [
+            Event(
+                time=time,
+                event_type="Task",
+                target=self._target,
+                context={
+                    "created_at": time,
+                    "metadata": {
+                        "processing_time": processing_time,
+                        "task_id": self._count,
+                        "is_fast": is_fast,
+                    },
                 },
-            },
-        )]
+            )
+        ]
 
 
 def run_work_stealing_demo(
@@ -78,16 +83,20 @@ def run_work_stealing_demo(
 
     sink = LatencyTracker(name="Sink")
     pool = WorkStealingPool(
-        name="Pool", num_workers=num_workers, downstream=sink,
+        name="Pool",
+        num_workers=num_workers,
+        downstream=sink,
         default_processing_time=0.01,
     )
 
     provider = SkewedTaskProvider(pool)
     arrival = ConstantArrivalTimeProvider(
-        ConstantRateProfile(rate=rate), start_time=Instant.Epoch,
+        ConstantRateProfile(rate=rate),
+        start_time=Instant.Epoch,
     )
     source = Source(
-        name="Traffic", event_provider=provider,
+        name="Traffic",
+        event_provider=provider,
         arrival_time_provider=arrival,
     )
 
@@ -95,7 +104,7 @@ def run_work_stealing_demo(
         start_time=Instant.Epoch,
         duration=duration_s + 2.0,
         sources=[source],
-        entities=[pool] + pool.workers + [sink],
+        entities=[pool, *pool.workers, sink],
     )
     summary = sim.run()
 
@@ -103,29 +112,31 @@ def run_work_stealing_demo(
     print("=" * 60)
     print("WORK-STEALING POOL RESULTS")
     print("=" * 60)
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Workers: {num_workers}")
     print(f"  Rate: {rate} tasks/s")
-    print(f"  Task mix: 90% fast (10ms), 10% slow (100ms)")
+    print("  Task mix: 90% fast (10ms), 10% slow (100ms)")
 
-    print(f"\nPool stats:")
+    print("\nPool stats:")
     print(f"  Tasks submitted: {pool.stats.tasks_submitted}")
     print(f"  Tasks completed: {pool.stats.tasks_completed}")
     print(f"  Total steals: {pool.stats.total_steals}")
     print(f"  Steal attempts: {pool.stats.total_steal_attempts}")
 
-    print(f"\nPer-worker breakdown:")
+    print("\nPer-worker breakdown:")
     for i, ws in enumerate(pool.worker_stats):
-        print(f"  Worker {i}: completed={ws.tasks_completed}, "
-              f"stolen={ws.tasks_stolen}, "
-              f"processing={ws.total_processing_time:.2f}s")
+        print(
+            f"  Worker {i}: completed={ws.tasks_completed}, "
+            f"stolen={ws.tasks_stolen}, "
+            f"processing={ws.total_processing_time:.2f}s"
+        )
 
     if sink.count > 0:
-        print(f"\nLatency:")
+        print("\nLatency:")
         print(f"  Count: {sink.count}")
-        print(f"  Mean: {sink.mean_latency()*1000:.1f}ms")
-        print(f"  p50:  {sink.p50()*1000:.1f}ms")
-        print(f"  p99:  {sink.p99()*1000:.1f}ms")
+        print(f"  Mean: {sink.mean_latency() * 1000:.1f}ms")
+        print(f"  p50:  {sink.p50() * 1000:.1f}ms")
+        print(f"  p99:  {sink.p99() * 1000:.1f}ms")
 
     print(f"\n{summary}")
     print("=" * 60)

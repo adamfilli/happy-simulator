@@ -48,7 +48,7 @@ class TestBarrierSingleParty:
         barrier = Barrier(name="test", parties=1)
 
         gen = barrier.wait()
-        result = list(gen)
+        list(gen)
 
         # Should return immediately with index 0 (leader)
         assert barrier.waiting == 0

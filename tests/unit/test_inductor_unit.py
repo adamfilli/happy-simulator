@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
-
 from happysimulator.components.common import Sink
 from happysimulator.components.rate_limiter.inductor import Inductor, InductorStats
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
@@ -66,7 +63,10 @@ class TestInductorBurstQueuing:
     def test_burst_events_get_queued(self):
         sink = Sink()
         inductor = Inductor(
-            "ind", downstream=sink, time_constant=2.0, queue_capacity=10_000,
+            "ind",
+            downstream=sink,
+            time_constant=2.0,
+            queue_capacity=10_000,
         )
 
         # High rate to create burst behaviour
@@ -152,7 +152,10 @@ class TestInductorQueueOverflow:
     def test_queue_overflow_drops(self):
         sink = Sink()
         inductor = Inductor(
-            "ind", downstream=sink, time_constant=10.0, queue_capacity=5,
+            "ind",
+            downstream=sink,
+            time_constant=10.0,
+            queue_capacity=5,
         )
 
         # Low rate first so EWMA settles to a slow interval,
@@ -166,7 +169,10 @@ class TestInductorQueueOverflow:
 
         profile = _BurstProfile()
         source = Source.with_profile(
-            profile, target=inductor, poisson=False, name="src",
+            profile,
+            target=inductor,
+            poisson=False,
+            name="src",
         )
 
         sim = Simulation(
@@ -186,7 +192,10 @@ class TestInductorInvariants:
     def test_received_equals_forwarded_plus_queued_plus_dropped(self):
         sink = Sink()
         inductor = Inductor(
-            "ind", downstream=sink, time_constant=2.0, queue_capacity=50,
+            "ind",
+            downstream=sink,
+            time_constant=2.0,
+            queue_capacity=50,
         )
 
         source = Source.constant(rate=100.0, target=inductor, name="src")

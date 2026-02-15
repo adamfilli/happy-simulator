@@ -21,11 +21,9 @@ Reference:
 
 from __future__ import annotations
 
-import bisect
 import math
 import sys
-from dataclasses import dataclass, field
-from typing import Iterator
+from dataclasses import dataclass
 
 from happysimulator.sketching.base import QuantileSketch
 
@@ -36,10 +34,11 @@ class _Centroid:
 
     Represents a group of data points by their mean and count.
     """
+
     mean: float
     count: int
 
-    def merge(self, other: "_Centroid") -> "_Centroid":
+    def merge(self, other: _Centroid) -> _Centroid:
         """Merge two centroids into one."""
         total = self.count + other.count
         new_mean = (self.mean * self.count + other.mean * other.count) / total
@@ -256,7 +255,7 @@ class TDigest(QuantileSketch):
                         t = target_count / (centroid.count / 2)
                         return self._min_value + t * (centroid.mean - self._min_value)
                     return centroid.mean
-                elif i == len(self._centroids) - 1:
+                if i == len(self._centroids) - 1:
                     # Last centroid: interpolate to max
                     if self._max_value is not None:
                         remaining = self._total_count - running_count
@@ -264,16 +263,14 @@ class TDigest(QuantileSketch):
                             t = (target_count - running_count - remaining / 2) / (remaining / 2)
                             return centroid.mean + t * (self._max_value - centroid.mean)
                     return centroid.mean
-                else:
-                    # Middle centroid: interpolate between adjacent centroids
-                    prev = self._centroids[i - 1]
-                    t = (target_count - left_weight) / centroid.count
-                    if t < 0.5:
-                        # Closer to previous centroid
-                        return prev.mean + (centroid.mean - prev.mean) * (0.5 + t)
-                    else:
-                        # Closer to this centroid
-                        return centroid.mean
+                # Middle centroid: interpolate between adjacent centroids
+                prev = self._centroids[i - 1]
+                t = (target_count - left_weight) / centroid.count
+                if t < 0.5:
+                    # Closer to previous centroid
+                    return prev.mean + (centroid.mean - prev.mean) * (0.5 + t)
+                # Closer to this centroid
+                return centroid.mean
 
             running_count += centroid.count
 
@@ -312,14 +309,13 @@ class TDigest(QuantileSketch):
                         t = (value - self._min_value) / (centroid.mean - self._min_value)
                         return t * (centroid.count / 2) / self._total_count
                     return 0.0
-                else:
-                    # Between previous and this centroid
-                    prev = self._centroids[i - 1]
-                    if prev.mean < value < centroid.mean:
-                        # Linear interpolation
-                        t = (value - prev.mean) / (centroid.mean - prev.mean)
-                        partial = t * centroid.count / 2
-                        return (count_below + partial) / self._total_count
+                # Between previous and this centroid
+                prev = self._centroids[i - 1]
+                if prev.mean < value < centroid.mean:
+                    # Linear interpolation
+                    t = (value - prev.mean) / (centroid.mean - prev.mean)
+                    partial = t * centroid.count / 2
+                    return (count_below + partial) / self._total_count
 
                 return count_below / self._total_count
 
@@ -327,7 +323,7 @@ class TDigest(QuantileSketch):
 
         return 1.0
 
-    def merge(self, other: "TDigest") -> None:
+    def merge(self, other: TDigest) -> None:
         """Merge another T-Digest into this one.
 
         Args:
@@ -348,12 +344,14 @@ class TDigest(QuantileSketch):
 
         # Update stats
         self._total_count += other._total_count
-        if other._min_value is not None:
-            if self._min_value is None or other._min_value < self._min_value:
-                self._min_value = other._min_value
-        if other._max_value is not None:
-            if self._max_value is None or other._max_value > self._max_value:
-                self._max_value = other._max_value
+        if other._min_value is not None and (
+            self._min_value is None or other._min_value < self._min_value
+        ):
+            self._min_value = other._min_value
+        if other._max_value is not None and (
+            self._max_value is None or other._max_value > self._max_value
+        ):
+            self._max_value = other._max_value
 
         # Re-compress
         self._compress()

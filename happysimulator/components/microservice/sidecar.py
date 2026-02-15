@@ -19,9 +19,9 @@ Example:
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
 from enum import Enum
-from typing import Generator
 
 from happysimulator.components.rate_limiter.policy import RateLimiterPolicy
 from happysimulator.core.entity import Entity
@@ -102,9 +102,13 @@ class Sidecar(Entity):
         super().__init__(name)
 
         if circuit_failure_threshold < 1:
-            raise ValueError(f"circuit_failure_threshold must be >= 1, got {circuit_failure_threshold}")
+            raise ValueError(
+                f"circuit_failure_threshold must be >= 1, got {circuit_failure_threshold}"
+            )
         if circuit_success_threshold < 1:
-            raise ValueError(f"circuit_success_threshold must be >= 1, got {circuit_success_threshold}")
+            raise ValueError(
+                f"circuit_success_threshold must be >= 1, got {circuit_success_threshold}"
+            )
         if circuit_timeout <= 0:
             raise ValueError(f"circuit_timeout must be > 0, got {circuit_timeout}")
         if request_timeout <= 0:
@@ -186,7 +190,9 @@ class Sidecar(Entity):
             self._circuit_success_count = 0
             logger.info("[%s] Circuit: OPEN -> HALF_OPEN", self.name)
 
-    def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event] | None:
+    def handle_event(
+        self, event: Event
+    ) -> Generator[float, None, list[Event]] | list[Event] | None:
         """Route incoming events through the sidecar pipeline.
 
         Args:
@@ -211,11 +217,12 @@ class Sidecar(Entity):
         attempt = event.context.get("metadata", {}).get("_sc_retry_attempt", 0)
 
         # 1. Rate limit check
-        if self._rate_limit_policy is not None:
-            if not self._rate_limit_policy.try_acquire(self.now):
-                self._rate_limited += 1
-                logger.debug("[%s] Request rate limited", self.name)
-                return None
+        if self._rate_limit_policy is not None and not self._rate_limit_policy.try_acquire(
+            self.now
+        ):
+            self._rate_limited += 1
+            logger.debug("[%s] Request rate limited", self.name)
+            return None
 
         # 2. Circuit breaker check
         self._check_circuit_timeout()
@@ -321,7 +328,7 @@ class Sidecar(Entity):
         # Retry if attempts remaining
         if attempt < self._max_retries:
             self._retries += 1
-            delay = self._retry_base_delay * (2 ** attempt)
+            delay = self._retry_base_delay * (2**attempt)
 
             # Schedule retry after backoff delay
             retry_event = Event(

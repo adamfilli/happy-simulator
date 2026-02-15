@@ -7,7 +7,7 @@ about capacity, architecture, and configuration.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from happysimulator.ai.result import SimulationResult
@@ -80,24 +80,24 @@ def _check_queue_saturation(
 
         # Queue depth more than doubled and is meaningfully non-zero
         if late_mean > max(early_mean * 2, 5):
-            recommendations.append(Recommendation(
-                category="capacity",
-                description=(
-                    f"Queue depth for '{name}' is growing over time "
-                    f"(early mean: {early_mean:.1f}, late mean: {late_mean:.1f}), "
-                    f"indicating the system is saturated."
-                ),
-                confidence="high",
-                suggested_change=(
-                    "Increase service capacity (more servers or higher concurrency) "
-                    "or reduce arrival rate."
-                ),
-            ))
+            recommendations.append(
+                Recommendation(
+                    category="capacity",
+                    description=(
+                        f"Queue depth for '{name}' is growing over time "
+                        f"(early mean: {early_mean:.1f}, late mean: {late_mean:.1f}), "
+                        f"indicating the system is saturated."
+                    ),
+                    confidence="high",
+                    suggested_change=(
+                        "Increase service capacity (more servers or higher concurrency) "
+                        "or reduce arrival rate."
+                    ),
+                )
+            )
 
 
-def _check_tail_latency(
-    result: SimulationResult, recommendations: list[Recommendation]
-) -> None:
+def _check_tail_latency(result: SimulationResult, recommendations: list[Recommendation]) -> None:
     """Detect high tail latency ratio."""
     if result.latency is None or result.latency.count() < 20:
         return
@@ -110,20 +110,22 @@ def _check_tail_latency(
 
     ratio = p99 / p50
     if ratio > 10:
-        recommendations.append(Recommendation(
-            category="configuration",
-            description=(
-                f"Tail latency is very high relative to median: "
-                f"p99={p99:.4f}s is {ratio:.0f}x the p50={p50:.4f}s. "
-                f"This suggests high variance or occasional queueing delays."
-            ),
-            confidence="medium",
-            suggested_change=(
-                "Investigate sources of variance: service time distribution, "
-                "queue buildup during bursts, or resource contention. "
-                "Consider adding concurrency or using a less variable service time."
-            ),
-        ))
+        recommendations.append(
+            Recommendation(
+                category="configuration",
+                description=(
+                    f"Tail latency is very high relative to median: "
+                    f"p99={p99:.4f}s is {ratio:.0f}x the p50={p50:.4f}s. "
+                    f"This suggests high variance or occasional queueing delays."
+                ),
+                confidence="medium",
+                suggested_change=(
+                    "Investigate sources of variance: service time distribution, "
+                    "queue buildup during bursts, or resource contention. "
+                    "Consider adding concurrency or using a less variable service time."
+                ),
+            )
+        )
 
 
 def _check_phase_transitions(
@@ -136,20 +138,22 @@ def _check_phase_transitions(
     for metric_name, phases in result.analysis.phases.items():
         for phase in phases:
             if phase.label in ("degraded", "overloaded"):
-                recommendations.append(Recommendation(
-                    category="capacity",
-                    description=(
-                        f"Metric '{metric_name}' entered a '{phase.label}' phase "
-                        f"from t={phase.start_s:.1f}s to t={phase.end_s:.1f}s "
-                        f"(mean={phase.mean:.4f})."
-                    ),
-                    confidence="high",
-                    suggested_change=(
-                        f"Plan capacity to handle load levels that cause the "
-                        f"transition around t={phase.start_s:.1f}s. "
-                        f"Consider auto-scaling or load shedding."
-                    ),
-                ))
+                recommendations.append(
+                    Recommendation(
+                        category="capacity",
+                        description=(
+                            f"Metric '{metric_name}' entered a '{phase.label}' phase "
+                            f"from t={phase.start_s:.1f}s to t={phase.end_s:.1f}s "
+                            f"(mean={phase.mean:.4f})."
+                        ),
+                        confidence="high",
+                        suggested_change=(
+                            f"Plan capacity to handle load levels that cause the "
+                            f"transition around t={phase.start_s:.1f}s. "
+                            f"Consider auto-scaling or load shedding."
+                        ),
+                    )
+                )
                 break  # One recommendation per metric
 
 
@@ -166,16 +170,18 @@ def _check_underutilization(
 
         # If queue is essentially always empty, system may be overprovisioned
         if mean_depth < 0.5 and max_depth < 3:
-            recommendations.append(Recommendation(
-                category="capacity",
-                description=(
-                    f"Queue '{name}' is nearly always empty "
-                    f"(mean depth: {mean_depth:.2f}, max: {max_depth:.1f}), "
-                    f"suggesting the system is overprovisioned."
-                ),
-                confidence="low",
-                suggested_change=(
-                    "Consider reducing server count or concurrency to save resources, "
-                    "unless headroom is intentional for burst handling."
-                ),
-            ))
+            recommendations.append(
+                Recommendation(
+                    category="capacity",
+                    description=(
+                        f"Queue '{name}' is nearly always empty "
+                        f"(mean depth: {mean_depth:.2f}, max: {max_depth:.1f}), "
+                        f"suggesting the system is overprovisioned."
+                    ),
+                    confidence="low",
+                    suggested_change=(
+                        "Consider reducing server count or concurrency to save resources, "
+                        "unless headroom is intentional for burst handling."
+                    ),
+                )
+            )

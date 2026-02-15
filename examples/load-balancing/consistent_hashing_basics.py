@@ -35,18 +35,18 @@ requests spread randomly, causing frequent cache misses.
 from __future__ import annotations
 
 import random
+
+# Import from common (sibling module)
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
     ConstantRateProfile,
-    Data,
     Entity,
     Event,
     Instant,
-    Probe,
     Simulation,
     Source,
 )
@@ -55,17 +55,14 @@ from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 from happysimulator.components.load_balancer.strategies import ConsistentHash, RoundRobin
 from happysimulator.distributions.uniform import UniformDistribution
 
-# Import from common (sibling module)
-import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from common import (
+    AggregateMetrics,
     CachingServer,
     CustomerRequestProvider,
-    AggregateMetrics,
     collect_aggregate_metrics,
     create_customer_consistent_hash,
 )
-
 
 # =============================================================================
 # Configuration
@@ -260,7 +257,7 @@ def run_scenario(
 
 def run_comparison(config: BasicConfig) -> ComparisonResult:
     """Run both strategies and return comparison results."""
-    print(f"Running Consistent Hash scenario...")
+    print("Running Consistent Hash scenario...")
     consistent_result = run_scenario(
         strategy_name="ConsistentHash",
         strategy=create_customer_consistent_hash(virtual_nodes=100),
@@ -268,7 +265,7 @@ def run_comparison(config: BasicConfig) -> ComparisonResult:
     )
     print(f"  Hit rate: {consistent_result.final_metrics.aggregate_hit_rate:.1%}")
 
-    print(f"Running Round Robin scenario...")
+    print("Running Round Robin scenario...")
     round_robin_result = run_scenario(
         strategy_name="RoundRobin",
         strategy=RoundRobin(),
@@ -304,10 +301,14 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     rr_times = [t for t, _ in result.round_robin.hit_rate_over_time]
     rr_rates = [r for _, r in result.round_robin.hit_rate_over_time]
 
-    ax.plot(ch_times, ch_rates, 'b-', linewidth=2, label='Consistent Hash')
-    ax.plot(rr_times, rr_rates, 'r--', linewidth=2, label='Round Robin')
-    ax.axhline(y=1/result.config.num_servers, color='gray', linestyle=':',
-               label=f'Theoretical RR ({1/result.config.num_servers:.1%})')
+    ax.plot(ch_times, ch_rates, "b-", linewidth=2, label="Consistent Hash")
+    ax.plot(rr_times, rr_rates, "r--", linewidth=2, label="Round Robin")
+    ax.axhline(
+        y=1 / result.config.num_servers,
+        color="gray",
+        linestyle=":",
+        label=f"Theoretical RR ({1 / result.config.num_servers:.1%})",
+    )
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("Aggregate Cache Hit Rate")
     ax.set_title("Cache Hit Rate Over Time")
@@ -317,45 +318,49 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
 
     # Top-right: Final hit rate comparison (bar chart)
     ax = axes[0, 1]
-    strategies = ['Consistent Hash', 'Round Robin']
+    strategies = ["Consistent Hash", "Round Robin"]
     hit_rates = [
         result.consistent_hash.final_metrics.aggregate_hit_rate,
         result.round_robin.final_metrics.aggregate_hit_rate,
     ]
-    colors = ['steelblue', 'coral']
+    colors = ["steelblue", "coral"]
     bars = ax.bar(strategies, hit_rates, color=colors, alpha=0.8)
 
-    for bar, rate in zip(bars, hit_rates):
+    for bar, rate in zip(bars, hit_rates, strict=False):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 0.02,
             f"{rate:.1%}",
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             fontsize=12,
-            fontweight='bold',
+            fontweight="bold",
         )
 
     ax.set_ylabel("Cache Hit Rate")
     ax.set_title("Final Cache Hit Rate Comparison")
     ax.set_ylim(0, 1.0)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Bottom-left: Per-server hit rates (Consistent Hash)
     ax = axes[1, 0]
     ch_server_rates = result.consistent_hash.final_metrics.per_server_hit_rates
     servers = list(ch_server_rates.keys())
     rates = list(ch_server_rates.values())
-    ax.bar(servers, rates, color='steelblue', alpha=0.8)
-    ax.axhline(y=result.consistent_hash.final_metrics.aggregate_hit_rate,
-               color='blue', linestyle='--', label='Aggregate')
+    ax.bar(servers, rates, color="steelblue", alpha=0.8)
+    ax.axhline(
+        y=result.consistent_hash.final_metrics.aggregate_hit_rate,
+        color="blue",
+        linestyle="--",
+        label="Aggregate",
+    )
     ax.set_xlabel("Server")
     ax.set_ylabel("Hit Rate")
     ax.set_title("Per-Server Hit Rate (Consistent Hash)")
     ax.legend()
     ax.set_ylim(0, 1.0)
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     # Bottom-right: Per-server request counts
     ax = axes[1, 1]
@@ -365,10 +370,22 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     x = list(range(len(servers)))
     width = 0.35
 
-    ax.bar([i - width/2 for i in x], [ch_counts[s] for s in servers],
-           width, label='Consistent Hash', color='steelblue', alpha=0.8)
-    ax.bar([i + width/2 for i in x], [rr_counts[s] for s in servers],
-           width, label='Round Robin', color='coral', alpha=0.8)
+    ax.bar(
+        [i - width / 2 for i in x],
+        [ch_counts[s] for s in servers],
+        width,
+        label="Consistent Hash",
+        color="steelblue",
+        alpha=0.8,
+    )
+    ax.bar(
+        [i + width / 2 for i in x],
+        [rr_counts[s] for s in servers],
+        width,
+        label="Round Robin",
+        color="coral",
+        alpha=0.8,
+    )
 
     ax.set_xlabel("Server")
     ax.set_ylabel("Request Count")
@@ -376,8 +393,8 @@ def visualize_results(result: ComparisonResult, output_dir: Path) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(servers)
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
-    ax.tick_params(axis='x', rotation=45)
+    ax.grid(True, alpha=0.3, axis="y")
+    ax.tick_params(axis="x", rotation=45)
 
     fig.tight_layout()
     fig.savefig(output_dir / "consistent_hashing_basics.png", dpi=150)
@@ -392,7 +409,7 @@ def print_summary(result: ComparisonResult) -> None:
     print("=" * 70)
 
     config = result.config
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Arrival rate: {config.arrival_rate} req/s")
     print(f"  Duration: {config.duration_s}s")
     print(f"  Unique customers: {config.num_customers}")
@@ -403,34 +420,39 @@ def print_summary(result: ComparisonResult) -> None:
     ch = result.consistent_hash.final_metrics
     rr = result.round_robin.final_metrics
 
-    print(f"\nConsistent Hash Results:")
+    print("\nConsistent Hash Results:")
     print(f"  Total requests: {ch.total_requests}")
     print(f"  Cache hits: {ch.total_hits} ({ch.aggregate_hit_rate:.1%})")
     print(f"  Cache misses: {ch.total_misses}")
     print(f"  Datastore reads: {result.consistent_hash.datastore_reads}")
 
-    print(f"\nRound Robin Results:")
+    print("\nRound Robin Results:")
     print(f"  Total requests: {rr.total_requests}")
     print(f"  Cache hits: {rr.total_hits} ({rr.aggregate_hit_rate:.1%})")
     print(f"  Cache misses: {rr.total_misses}")
     print(f"  Datastore reads: {result.round_robin.datastore_reads}")
 
-    print(f"\nComparison:")
-    improvement = ch.aggregate_hit_rate / rr.aggregate_hit_rate if rr.aggregate_hit_rate > 0 else float('inf')
+    print("\nComparison:")
+    improvement = (
+        ch.aggregate_hit_rate / rr.aggregate_hit_rate if rr.aggregate_hit_rate > 0 else float("inf")
+    )
     print(f"  Hit rate improvement: {improvement:.1f}x")
-    datastore_reduction = 1 - (result.consistent_hash.datastore_reads / result.round_robin.datastore_reads) \
-        if result.round_robin.datastore_reads > 0 else 0
+    datastore_reduction = (
+        1 - (result.consistent_hash.datastore_reads / result.round_robin.datastore_reads)
+        if result.round_robin.datastore_reads > 0
+        else 0
+    )
     print(f"  Datastore read reduction: {datastore_reduction:.1%}")
 
     print("\n" + "=" * 70)
     print("KEY INSIGHT:")
     print("-" * 70)
-    print(f"\nConsistent hashing routes each customer to the same server,")
+    print("\nConsistent hashing routes each customer to the same server,")
     print(f"resulting in a {ch.aggregate_hit_rate:.1%} cache hit rate.")
     print(f"\nRound robin spreads requests randomly across {config.num_servers} servers,")
     print(f"resulting in only a {rr.aggregate_hit_rate:.1%} hit rate (~1/{config.num_servers}).")
     print(f"\nThis {improvement:.1f}x improvement translates to {datastore_reduction:.1%} fewer")
-    print(f"datastore reads, reducing backend load and latency.")
+    print("datastore reads, reducing backend load and latency.")
     print("=" * 70)
 
 
@@ -452,8 +474,9 @@ if __name__ == "__main__":
     parser.add_argument("--cache-capacity", type=int, default=100, help="Cache capacity per server")
     parser.add_argument("--cache-ttl", type=float, default=30.0, help="Cache TTL (s)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/load-balancing",
-                        help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/load-balancing", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
 
     args = parser.parse_args()

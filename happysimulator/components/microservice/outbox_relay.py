@@ -19,8 +19,9 @@ Example:
 """
 
 import logging
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -179,9 +180,7 @@ class OutboxRelay(Entity):
         logger.debug("[%s] Entry written: id=%d", self.name, entry_id)
         return entry_id
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]] | list[Event]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event]:
         """Handle poll events and prime the poll loop.
 
         Args:
@@ -204,7 +203,7 @@ class OutboxRelay(Entity):
         self._poll_cycles += 1
 
         # Collect pending entries up to batch_size
-        pending = [e for e in self._entries if not e.relayed][:self._batch_size]
+        pending = [e for e in self._entries if not e.relayed][: self._batch_size]
 
         relay_events: list[Event] = []
         for entry in pending:

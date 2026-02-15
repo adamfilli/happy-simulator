@@ -33,7 +33,7 @@ class LWWRegister:
         timestamp: Initial timestamp (default None = never written).
     """
 
-    __slots__ = ("_node_id", "_value", "_timestamp")
+    __slots__ = ("_node_id", "_timestamp", "_value")
 
     def __init__(
         self,
@@ -121,7 +121,4 @@ class LWWRegister:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, LWWRegister):
             return NotImplemented
-        return (
-            self._value == other._value
-            and self._timestamp == other._timestamp
-        )
+        return self._value == other._value and self._timestamp == other._timestamp

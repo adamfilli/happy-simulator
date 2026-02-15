@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import pytest
-
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.shift_schedule import (
     Shift,
-    ShiftSchedule,
     ShiftedServer,
+    ShiftSchedule,
 )
-from happysimulator.components.common import Sink
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestShiftSchedule:
-
     def test_creates_schedule(self):
         schedule = ShiftSchedule(
             shifts=[
@@ -28,16 +25,12 @@ class TestShiftSchedule:
         assert len(schedule.shifts) == 3
 
     def test_capacity_at_within_shift(self):
-        schedule = ShiftSchedule(
-            shifts=[Shift(0, 10, 2), Shift(10, 20, 4)]
-        )
+        schedule = ShiftSchedule(shifts=[Shift(0, 10, 2), Shift(10, 20, 4)])
         assert schedule.capacity_at(5.0) == 2
         assert schedule.capacity_at(15.0) == 4
 
     def test_capacity_at_boundary(self):
-        schedule = ShiftSchedule(
-            shifts=[Shift(0, 10, 2), Shift(10, 20, 4)]
-        )
+        schedule = ShiftSchedule(shifts=[Shift(0, 10, 2), Shift(10, 20, 4)])
         assert schedule.capacity_at(0.0) == 2
         assert schedule.capacity_at(10.0) == 4
 
@@ -51,15 +44,12 @@ class TestShiftSchedule:
         assert schedule.capacity_at(15.0) == 4
 
     def test_transition_times(self):
-        schedule = ShiftSchedule(
-            shifts=[Shift(0, 8, 2), Shift(8, 16, 4)]
-        )
+        schedule = ShiftSchedule(shifts=[Shift(0, 8, 2), Shift(8, 16, 4)])
         times = schedule.transition_times()
         assert times == [0, 8, 16]
 
 
 class TestShiftedServer:
-
     def test_creates_with_schedule(self):
         schedule = ShiftSchedule(shifts=[Shift(0, 100, 2)])
         server = ShiftedServer("server", schedule=schedule)
@@ -70,8 +60,10 @@ class TestShiftedServer:
         sink = Sink()
         schedule = ShiftSchedule(shifts=[Shift(0, 100, 2)])
         server = ShiftedServer(
-            "server", schedule=schedule,
-            service_time=0.01, downstream=sink,
+            "server",
+            schedule=schedule,
+            service_time=0.01,
+            downstream=sink,
         )
 
         sim = Simulation(
@@ -110,17 +102,15 @@ class TestShiftedServer:
             end_time=Instant.from_seconds(10.0),
             entities=[server],
         )
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="Item", target=server)
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=server))
 
         # Hook to record capacity changes
         sim.control.on_event(
-            lambda event: capacity_log.append(
-                (event.time.to_seconds(), server.current_capacity)
+            lambda event: (
+                capacity_log.append((event.time.to_seconds(), server.current_capacity))
+                if event.event_type == "_ShiftChange"
+                else None
             )
-            if event.event_type == "_ShiftChange"
-            else None
         )
         sim.run()
 
@@ -137,9 +127,7 @@ class TestShiftedServer:
             end_time=Instant.from_seconds(1.0),
             entities=[server],
         )
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="Item", target=server)
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="Item", target=server))
         sim.run()
 
         assert server.processed == 1

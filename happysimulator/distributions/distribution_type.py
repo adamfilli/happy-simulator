@@ -13,5 +13,6 @@ class DistributionType(Enum):
     POISSON: Exponential inter-arrival times (memoryless, random).
     CONSTANT: Deterministic inter-arrival times (perfectly regular).
     """
+
     POISSON = auto()
     CONSTANT = auto()

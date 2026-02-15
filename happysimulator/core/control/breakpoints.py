@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import operator
 from dataclasses import dataclass, field
-from typing import Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from happysimulator.core.control.state import BreakpointContext
-from happysimulator.core.temporal import Instant
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.core.control.state import BreakpointContext
+    from happysimulator.core.temporal import Instant
 
 
 @runtime_checkable
@@ -56,6 +59,7 @@ class TimeBreakpoint:
         time: The simulation time at which to break.
         one_shot: If True (default), removed after first trigger.
     """
+
     time: Instant
     one_shot: bool = True
 
@@ -74,6 +78,7 @@ class EventCountBreakpoint:
         count: The event count threshold.
         one_shot: If True (default), removed after first trigger.
     """
+
     count: int
     one_shot: bool = True
 
@@ -93,6 +98,7 @@ class ConditionBreakpoint:
         description: Human-readable description for listing breakpoints.
         one_shot: If True, removed after first trigger. Defaults to False.
     """
+
     fn: Callable[[BreakpointContext], bool] = field(repr=False)
     description: str = "custom condition"
     one_shot: bool = False
@@ -121,6 +127,7 @@ class MetricBreakpoint:
     Raises:
         ValueError: If the operator string is not recognized.
     """
+
     entity_name: str
     attribute: str
     operator: str
@@ -165,6 +172,7 @@ class EventTypeBreakpoint:
         event_type: The event_type string to match.
         one_shot: If True, removed after first trigger. Defaults to False.
     """
+
     event_type: str
     one_shot: bool = False
 

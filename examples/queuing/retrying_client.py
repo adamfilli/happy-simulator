@@ -55,9 +55,9 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -74,6 +74,8 @@ from happysimulator import (
     Source,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Queued Server with Exponential Service Time
@@ -145,6 +147,7 @@ class QueuedServer(QueuedResource):
 @dataclass
 class InFlightRequest:
     """Tracks state for an in-flight request."""
+
     request_id: int
     created_at: Instant
     attempt: int
@@ -230,9 +233,9 @@ class RetryingClient(Entity):
 
         if event_type == "NewRequest":
             return self._handle_new_request(event)
-        elif event_type == "Completion":
+        if event_type == "Completion":
             return self._handle_completion(event)
-        elif event_type == "Timeout":
+        if event_type == "Timeout":
             return self._handle_timeout(event)
 
         return []
@@ -376,6 +379,7 @@ class ClientRequestProvider(EventProvider):
 @dataclass
 class SimulationResult:
     """Results from the retrying client simulation."""
+
     client: RetryingClient
     server: QueuedServer
     queue_depth_data: Data
@@ -464,19 +468,19 @@ def print_summary(result: SimulationResult, timeout_s: float, mean_service_s: fl
     # Expected timeout rate for exponential distribution
     expected_timeout_rate = math.exp(-timeout_s / mean_service_s)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Mean service time: {mean_service_s * 1000:.0f}ms")
     print(f"  Client timeout: {timeout_s * 1000:.0f}ms")
     print(f"  Max retries: {client.max_retries}")
     print(f"  Expected timeout rate: {expected_timeout_rate * 100:.1f}%")
 
-    print(f"\nRequest Flow:")
+    print("\nRequest Flow:")
     print(f"  Requests generated (by source): {result.requests_generated}")
     print(f"  Requests received (by client):  {client.stats_requests_received}")
     print(f"  Attempts sent to server:        {client.stats_attempts_sent}")
     print(f"  Server processed:               {result.server.stats_processed}")
 
-    print(f"\nOutcomes:")
+    print("\nOutcomes:")
     print(f"  Completions (success):  {client.stats_completions}")
     print(f"  Timeouts:               {client.stats_timeouts}")
     print(f"  Retries:                {client.stats_retries}")
@@ -493,12 +497,12 @@ def print_summary(result: SimulationResult, timeout_s: float, mean_service_s: fl
         print(f"Retry amplification: {retry_amplification:.2f}x")
 
     # Goodput statistics
-    goodput_times, goodput_counts = client.goodput_time_series(bucket_size_s=1.0)
+    _goodput_times, goodput_counts = client.goodput_time_series(bucket_size_s=1.0)
     if goodput_counts:
         avg_goodput = sum(goodput_counts) / len(goodput_counts)
         max_goodput = max(goodput_counts)
         min_goodput = min(goodput_counts)
-        print(f"\nGoodput (successful completions/second):")
+        print("\nGoodput (successful completions/second):")
         print(f"  Average: {avg_goodput:.1f} req/s")
         print(f"  Min:     {min_goodput} req/s")
         print(f"  Max:     {max_goodput} req/s")
@@ -512,7 +516,7 @@ def print_summary(result: SimulationResult, timeout_s: float, mean_service_s: fl
         p99_idx = int(len(sorted_service_times) * 0.99)
         p99 = sorted_service_times[min(p99_idx, len(sorted_service_times) - 1)]
 
-        print(f"\nServer Service Time (processing only):")
+        print("\nServer Service Time (processing only):")
         print(f"  Average: {avg * 1000:.1f}ms")
         print(f"  p50:     {p50 * 1000:.1f}ms")
         print(f"  p99:     {p99 * 1000:.1f}ms")
@@ -525,7 +529,7 @@ def print_summary(result: SimulationResult, timeout_s: float, mean_service_s: fl
         p99_idx = int(len(sorted_latencies) * 0.99)
         p99 = sorted_latencies[min(p99_idx, len(sorted_latencies) - 1)]
 
-        print(f"\nEnd-to-End Latency (from creation to completion):")
+        print("\nEnd-to-End Latency (from creation to completion):")
         print(f"  Average: {avg * 1000:.1f}ms")
         print(f"  p50:     {p50 * 1000:.1f}ms")
         print(f"  p99:     {p99 * 1000:.1f}ms")
@@ -536,7 +540,7 @@ def print_summary(result: SimulationResult, timeout_s: float, mean_service_s: fl
         for attempts in client.attempts_per_request:
             attempt_counts[attempts] += 1
 
-        print(f"\nAttempts per successful request:")
+        print("\nAttempts per successful request:")
         for attempts in sorted(attempt_counts.keys()):
             count = attempt_counts[attempts]
             pct = count / len(client.attempts_per_request) * 100
@@ -559,10 +563,10 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[0, 0]
     q_times = [t for (t, _) in result.queue_depth_data.values]
     q_depths = [v for (_, v) in result.queue_depth_data.values]
-    ax.plot(q_times, q_depths, 'b-', linewidth=1)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Queue Depth')
-    ax.set_title('Server Queue Depth Over Time')
+    ax.plot(q_times, q_depths, "b-", linewidth=1)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Queue Depth")
+    ax.set_title("Server Queue Depth Over Time")
     ax.grid(True, alpha=0.3)
 
     # Server service time over time (binned by second)
@@ -571,20 +575,25 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Bin service times by second and compute average
     service_buckets: dict[int, list[float]] = defaultdict(list)
-    for t, lat in zip(server_times_s, server_latencies_s):
+    for t, lat in zip(server_times_s, server_latencies_s, strict=False):
         bucket = int(t)
         service_buckets[bucket].append(lat)
 
     service_bucket_times = sorted(service_buckets.keys())
-    service_bucket_avg = [sum(service_buckets[b]) / len(service_buckets[b]) * 1000
-                         for b in service_bucket_times]
+    service_bucket_avg = [
+        sum(service_buckets[b]) / len(service_buckets[b]) * 1000 for b in service_bucket_times
+    ]
 
-    ax.plot(service_bucket_times, service_bucket_avg, 'g-', linewidth=1.5, marker='o', markersize=3)
-    ax.axhline(y=server.mean_service_time_s * 1000, color='r', linestyle='--',
-               label=f'Expected Mean ({server.mean_service_time_s * 1000:.0f}ms)')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Avg Service Time (ms)')
-    ax.set_title('Server Service Time Over Time (1s avg)')
+    ax.plot(service_bucket_times, service_bucket_avg, "g-", linewidth=1.5, marker="o", markersize=3)
+    ax.axhline(
+        y=server.mean_service_time_s * 1000,
+        color="r",
+        linestyle="--",
+        label=f"Expected Mean ({server.mean_service_time_s * 1000:.0f}ms)",
+    )
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Avg Service Time (ms)")
+    ax.set_title("Server Service Time Over Time (1s avg)")
     ax.legend()
     ax.grid(True, alpha=0.3)
 
@@ -594,40 +603,53 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Bin latencies by second and compute average
     latency_buckets: dict[int, list[float]] = defaultdict(list)
-    for t, lat in zip(client_times_s, client_latencies_s):
+    for t, lat in zip(client_times_s, client_latencies_s, strict=False):
         bucket = int(t)
         latency_buckets[bucket].append(lat)
 
     bucket_times = sorted(latency_buckets.keys())
-    bucket_avg_latencies = [sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000
-                           for b in bucket_times]
+    bucket_avg_latencies = [
+        sum(latency_buckets[b]) / len(latency_buckets[b]) * 1000 for b in bucket_times
+    ]
 
-    ax.plot(bucket_times, bucket_avg_latencies, 'b-', linewidth=1.5, marker='o', markersize=3)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Avg Latency (ms)')
-    ax.set_title('Client End-to-End Latency Over Time (1s avg)')
+    ax.plot(bucket_times, bucket_avg_latencies, "b-", linewidth=1.5, marker="o", markersize=3)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Avg Latency (ms)")
+    ax.set_title("Client End-to-End Latency Over Time (1s avg)")
     ax.grid(True, alpha=0.3)
 
     # Goodput over time
     ax = axes[1, 1]
     goodput_times, goodput_counts = client.goodput_time_series(bucket_size_s=1.0)
-    ax.plot(goodput_times, goodput_counts, 'g-', linewidth=1.5, marker='o', markersize=3)
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Completions / second')
-    ax.set_title('Goodput Over Time (successful completions per second)')
+    ax.plot(goodput_times, goodput_counts, "g-", linewidth=1.5, marker="o", markersize=3)
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("Completions / second")
+    ax.set_title("Goodput Over Time (successful completions per second)")
     ax.grid(True, alpha=0.3)
 
     # Latency histograms (server vs client)
     ax = axes[2, 0]
-    ax.hist([lat * 1000 for lat in server_latencies_s], bins=50, alpha=0.5,
-            label='Server Service Time', color='green', edgecolor='darkgreen')
-    ax.hist([lat * 1000 for lat in client_latencies_s], bins=50, alpha=0.5,
-            label='Client End-to-End', color='blue', edgecolor='darkblue')
-    ax.set_xlabel('Latency (ms)')
-    ax.set_ylabel('Count')
-    ax.set_title('Latency Distribution Comparison')
+    ax.hist(
+        [lat * 1000 for lat in server_latencies_s],
+        bins=50,
+        alpha=0.5,
+        label="Server Service Time",
+        color="green",
+        edgecolor="darkgreen",
+    )
+    ax.hist(
+        [lat * 1000 for lat in client_latencies_s],
+        bins=50,
+        alpha=0.5,
+        label="Client End-to-End",
+        color="blue",
+        edgecolor="darkblue",
+    )
+    ax.set_xlabel("Latency (ms)")
+    ax.set_ylabel("Count")
+    ax.set_title("Latency Distribution Comparison")
     ax.legend()
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     # Attempts distribution
     ax = axes[2, 1]
@@ -637,12 +659,12 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     attempts_list = sorted(attempt_counts.keys())
     counts = [attempt_counts[a] for a in attempts_list]
-    ax.bar(attempts_list, counts, edgecolor='black', alpha=0.7)
-    ax.set_xlabel('Number of Attempts')
-    ax.set_ylabel('Successful Requests')
-    ax.set_title('Attempts per Successful Request')
+    ax.bar(attempts_list, counts, edgecolor="black", alpha=0.7)
+    ax.set_xlabel("Number of Attempts")
+    ax.set_ylabel("Successful Requests")
+    ax.set_title("Attempts per Successful Request")
     ax.set_xticks(attempts_list)
-    ax.grid(True, alpha=0.3, axis='y')
+    ax.grid(True, alpha=0.3, axis="y")
 
     fig.tight_layout()
     fig.savefig(output_dir / "retrying_client_results.png", dpi=150)

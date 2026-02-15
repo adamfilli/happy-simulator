@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
 import pytest
 
-from happysimulator.components.client.client import Client, ClientStats
+from happysimulator.components.client.client import Client
 from happysimulator.components.client.retry import (
-    NoRetry,
-    FixedRetry,
     ExponentialBackoff,
+    FixedRetry,
+    NoRetry,
 )
 from happysimulator.components.server.server import Server
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.distributions.constant import ConstantLatency
@@ -24,10 +23,16 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
+
 
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -37,12 +42,13 @@ class ConstantRateProfile(Profile):
 @dataclass
 class EchoServer(Entity):
     """Simple server that echoes back requests after a delay."""
+
     name: str
     response_time: float = 0.010
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -50,23 +56,25 @@ class EchoServer(Entity):
 @dataclass
 class SlowServer(Entity):
     """Server with configurable response time."""
+
     name: str
     response_time: float = 1.0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         yield self.response_time
 
 
 @dataclass
 class FailingServer(Entity):
     """Server that fails after specified number of requests."""
+
     name: str
     fail_until: int = 2
     response_time: float = 0.010
 
     requests_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.response_time
 
@@ -79,7 +87,7 @@ class ClientRequestProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 

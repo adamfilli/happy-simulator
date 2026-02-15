@@ -38,25 +38,24 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
     FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
     QueuedResource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 from happysimulator.components.industrial import InspectionStation, PerishableInventory
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -139,9 +138,7 @@ class Station(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time
         self._processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 # =============================================================================
@@ -212,8 +209,8 @@ def run_pharmacy_simulation(config: PharmacyConfig | None = None) -> PharmacyRes
     stop_after = Instant.from_seconds(config.duration_s)
     rx_provider = PrescriptionProvider(dropoff, stop_after)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Prescriptions",
@@ -264,24 +261,26 @@ def print_summary(result: PharmacyResult) -> None:
     print("PHARMACY SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 3600:.0f} hours")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f}/min")
     print(f"  Verification rate:   {config.verification_pass_rate:.0%} pass")
 
     total = result.rx_provider.generated
 
-    print(f"\nPrescription Flow:")
+    print("\nPrescription Flow:")
     print(f"  Arrived:             {total}")
     print(f"  Dropped off:         {result.dropoff.processed}")
     print(f"  Data entries:        {result.data_entry.processed} (incl. rework)")
     v_stats = result.verification.stats
-    print(f"  Verified:            {v_stats.inspected} (pass: {v_stats.passed}, fail: {v_stats.failed})")
+    print(
+        f"  Verified:            {v_stats.inspected} (pass: {v_stats.passed}, fail: {v_stats.failed})"
+    )
     print(f"  Filled:              {result.filling.processed}")
     print(f"  Picked up:           {result.pickup.processed}")
 
     inv = result.inventory.stats
-    print(f"\nInventory:")
+    print("\nInventory:")
     print(f"  Current stock:       {inv.current_stock}")
     print(f"  Consumed:            {inv.total_consumed}")
     print(f"  Spoiled:             {inv.total_spoiled}")
@@ -291,7 +290,7 @@ def print_summary(result: PharmacyResult) -> None:
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nEnd-to-End Latency:")
+        print("\nEnd-to-End Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.1f} min")
         print(f"  p50:     {result.sink.p50() / 60:.1f} min")

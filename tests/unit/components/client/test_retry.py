@@ -7,11 +7,11 @@ import random
 import pytest
 
 from happysimulator.components.client.retry import (
-    RetryPolicy,
-    NoRetry,
-    FixedRetry,
-    ExponentialBackoff,
     DecorrelatedJitter,
+    ExponentialBackoff,
+    FixedRetry,
+    NoRetry,
+    RetryPolicy,
 )
 
 
@@ -132,16 +132,12 @@ class TestExponentialBackoff:
     def test_rejects_multiplier_less_than_one(self):
         """ExponentialBackoff rejects multiplier < 1."""
         with pytest.raises(ValueError):
-            ExponentialBackoff(
-                max_attempts=3, initial_delay=0.1, max_delay=10.0, multiplier=0.5
-            )
+            ExponentialBackoff(max_attempts=3, initial_delay=0.1, max_delay=10.0, multiplier=0.5)
 
     def test_rejects_negative_jitter(self):
         """ExponentialBackoff rejects negative jitter."""
         with pytest.raises(ValueError):
-            ExponentialBackoff(
-                max_attempts=3, initial_delay=0.1, max_delay=10.0, jitter=-0.1
-            )
+            ExponentialBackoff(max_attempts=3, initial_delay=0.1, max_delay=10.0, jitter=-0.1)
 
     def test_should_retry_respects_max_attempts(self):
         """should_retry returns True until max_attempts reached."""
@@ -285,7 +281,7 @@ class TestDecorrelatedJitter:
 
         # Should have variation (not monotonically increasing like exponential)
         # Check that delays can decrease
-        has_decrease = any(delays[i] < delays[i-1] for i in range(1, len(delays)))
+        has_decrease = any(delays[i] < delays[i - 1] for i in range(1, len(delays)))
         assert has_decrease, "Decorrelated jitter should sometimes decrease"
 
     def test_reset_restores_initial_state(self):

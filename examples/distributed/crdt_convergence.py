@@ -60,16 +60,20 @@ def main():
     for i in range(10):
         t = 0.5 + i * 0.5
         target = store_a if i % 2 == 0 else store_b
-        write_events.append(Event(
-            time=Instant.from_seconds(t),
-            event_type="Write",
-            target=target,
-            context={"metadata": {
-                "key": "page-views",
-                "operation": "increment",
-                "value": 1,
-            }},
-        ))
+        write_events.append(
+            Event(
+                time=Instant.from_seconds(t),
+                event_type="Write",
+                target=target,
+                context={
+                    "metadata": {
+                        "key": "page-views",
+                        "operation": "increment",
+                        "value": 1,
+                    }
+                },
+            )
+        )
 
     # Phase 2: Partition at t=5.0, writes during partition (t=5 to t=10)
     partition = None
@@ -88,16 +92,20 @@ def main():
     for i in range(10):
         t = 5.5 + i * 0.5
         target = store_a if i % 2 == 0 else store_b
-        write_events.append(Event(
-            time=Instant.from_seconds(t),
-            event_type="Write",
-            target=target,
-            context={"metadata": {
-                "key": "page-views",
-                "operation": "increment",
-                "value": 1,
-            }},
-        ))
+        write_events.append(
+            Event(
+                time=Instant.from_seconds(t),
+                event_type="Write",
+                target=target,
+                context={
+                    "metadata": {
+                        "key": "page-views",
+                        "operation": "increment",
+                        "value": 1,
+                    }
+                },
+            )
+        )
 
     # Phase 3: Heal partition at t=10.0
     heal_event = Event.once(
@@ -109,20 +117,24 @@ def main():
     # Schedule gossip ticks (non-daemon so sim processes them)
     gossip_events = []
     for t in range(1, 20):
-        gossip_events.append(Event(
-            time=Instant.from_seconds(float(t)),
-            event_type="GossipTick",
-            target=store_a,
-            daemon=False,
-        ))
-        gossip_events.append(Event(
-            time=Instant.from_seconds(float(t) + 0.5),
-            event_type="GossipTick",
-            target=store_b,
-            daemon=False,
-        ))
+        gossip_events.append(
+            Event(
+                time=Instant.from_seconds(float(t)),
+                event_type="GossipTick",
+                target=store_a,
+                daemon=False,
+            )
+        )
+        gossip_events.append(
+            Event(
+                time=Instant.from_seconds(float(t) + 0.5),
+                event_type="GossipTick",
+                target=store_b,
+                daemon=False,
+            )
+        )
 
-    sim.schedule(write_events + [partition_event, heal_event] + gossip_events)
+    sim.schedule([*write_events, partition_event, heal_event, *gossip_events])
 
     # --- Snapshot before gossip convergence ---
     # Run first part (through partition)
@@ -147,7 +159,7 @@ def main():
         print(f"Converged: {converged}")
         if converged:
             print(f"Final merged value: {val_a.value}")
-            print(f"  (= 20 total increments across both nodes)")
+            print("  (= 20 total increments across both nodes)")
     else:
         print("No counter data found.")
     print()

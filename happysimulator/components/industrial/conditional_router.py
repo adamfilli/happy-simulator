@@ -11,10 +11,13 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +101,7 @@ class ConditionalRouter(Entity):
         """
         routes: list[tuple[Callable[[Event], bool], Entity]] = []
         for value, target in mapping.items():
-            routes.append(
-                (lambda e, v=value, f=field: e.context.get(f) == v, target)
-            )
+            routes.append((lambda e, v=value, f=field: e.context.get(f) == v, target))
         return cls(name, routes=routes, default=default)
 
     def handle_event(self, event: Event) -> list[Event]:
@@ -134,6 +135,7 @@ class ConditionalRouter(Entity):
         if not self.drop_unmatched:
             logger.warning(
                 "[%s] No matching route for event type=%s, dropped",
-                self.name, event.event_type,
+                self.name,
+                event.event_type,
             )
         return []

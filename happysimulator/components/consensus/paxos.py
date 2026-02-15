@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +35,7 @@ class Ballot:
         number: The ballot sequence number.
         node_id: The proposer's identifier for tie-breaking.
     """
+
     number: int
     node_id: str
 
@@ -53,6 +53,7 @@ class PaxosStats:
         accepts_received: Number of accepted responses received.
         decided_value: The decided value, or None if not yet decided.
     """
+
     proposals_started: int = 0
     proposals_succeeded: int = 0
     proposals_failed: int = 0
@@ -209,7 +210,9 @@ class PaxosNode(Entity):
             self._promised_ballot = ballot
             response = {
                 "from": self.name,
-                "accepted_ballot": (self._accepted_ballot.number, self._accepted_ballot.node_id) if self._accepted_ballot else None,
+                "accepted_ballot": (self._accepted_ballot.number, self._accepted_ballot.node_id)
+                if self._accepted_ballot
+                else None,
                 "accepted_value": self._accepted_value,
             }
             # Add to our own phase1 responses
@@ -220,7 +223,7 @@ class PaxosNode(Entity):
     def _handle_prepare(self, event: Event) -> list[Event]:
         metadata = event.context.get("metadata", {})
         ballot = Ballot(metadata["ballot_number"], metadata["ballot_node"])
-        sender_name = metadata.get("source")
+        metadata.get("source")
 
         # Find sender entity
         sender = self._find_peer(metadata.get("source"))
@@ -253,8 +256,12 @@ class PaxosNode(Entity):
                 "ballot_number": ballot.number,
                 "ballot_node": ballot.node_id,
                 "from": self.name,
-                "accepted_ballot_number": self._accepted_ballot.number if self._accepted_ballot else None,
-                "accepted_ballot_node": self._accepted_ballot.node_id if self._accepted_ballot else None,
+                "accepted_ballot_number": self._accepted_ballot.number
+                if self._accepted_ballot
+                else None,
+                "accepted_ballot_node": self._accepted_ballot.node_id
+                if self._accepted_ballot
+                else None,
                 "accepted_value": self._accepted_value,
             },
             daemon=True,
@@ -346,10 +353,9 @@ class PaxosNode(Entity):
 
         for resp in responses:
             ab = resp.get("accepted_ballot")
-            if ab is not None:
-                if highest_accepted_ballot is None or ab > highest_accepted_ballot:
-                    highest_accepted_ballot = ab
-                    chosen_value = resp["accepted_value"]
+            if ab is not None and (highest_accepted_ballot is None or ab > highest_accepted_ballot):
+                highest_accepted_ballot = ab
+                chosen_value = resp["accepted_value"]
 
         ballot = Ballot(ballot_number, self.name)
         # Update proposed value with consensus value
@@ -445,7 +451,7 @@ class PaxosNode(Entity):
             self._decided = True
             self._decided_value = value
             logger.debug("[%s] Learned decided value: %r", self.name, value)
-        return None
+        return
 
     def _decide(self, ballot_number: int, value: Any) -> list[Event]:
         if self._decided:
@@ -497,7 +503,4 @@ class PaxosNode(Entity):
         )
 
     def __repr__(self) -> str:
-        return (
-            f"PaxosNode({self.name}, decided={self._decided}, "
-            f"ballot={self._current_ballot})"
-        )
+        return f"PaxosNode({self.name}, decided={self._decided}, ballot={self._current_ballot})"

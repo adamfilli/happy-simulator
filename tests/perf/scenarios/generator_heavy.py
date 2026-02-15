@@ -36,7 +36,9 @@ class _MultiYieldServer(QueuedResource):
     def handle_queued_event(self, event: Event):
         for _ in range(YIELDS_PER_EVENT):
             yield 0.0
-        return [Event(time=self.now, event_type="Done", target=self._downstream, context=event.context)]
+        return [
+            Event(time=self.now, event_type="Done", target=self._downstream, context=event.context)
+        ]
 
 
 def _build_and_run(event_count: int) -> tuple[int, float]:

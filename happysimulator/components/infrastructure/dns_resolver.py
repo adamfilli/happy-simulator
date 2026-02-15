@@ -16,10 +16,14 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +249,6 @@ class DNSResolver(Entity):
 
     def handle_event(self, event: Event) -> None:
         """DNSResolver does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

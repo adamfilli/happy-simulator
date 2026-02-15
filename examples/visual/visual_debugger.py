@@ -10,15 +10,14 @@ and drain during quiet periods.
 
 from dataclasses import dataclass
 
-from happysimulator.core.simulation import Simulation
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
-from happysimulator.load.source import Source
-from happysimulator.load.profile import Profile
 from happysimulator.components.common import Sink
 from happysimulator.components.queued_resource import QueuedResource
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.probe import Probe
-from happysimulator.visual import serve, Chart
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
+from happysimulator.visual import Chart, serve
 
 
 @dataclass(frozen=True)
@@ -79,10 +78,20 @@ sim = Simulation(
     duration=60.0,
 )
 
-serve(sim, charts=[
-    Chart(depth_data, title="Queue Depth", y_label="items"),
-    Chart(depth_data, title="P99 Queue Depth",
-          transform="p99", window_s=1.0, y_label="items", color="#f59e0b"),
-    Chart.from_probe(depth_probe, title="Mean Queue Depth",
-          transform="mean", window_s=0.5, color="#10b981"),
-])
+serve(
+    sim,
+    charts=[
+        Chart(depth_data, title="Queue Depth", y_label="items"),
+        Chart(
+            depth_data,
+            title="P99 Queue Depth",
+            transform="p99",
+            window_s=1.0,
+            y_label="items",
+            color="#f59e0b",
+        ),
+        Chart.from_probe(
+            depth_probe, title="Mean Queue Depth", transform="mean", window_s=0.5, color="#10b981"
+        ),
+    ],
+)

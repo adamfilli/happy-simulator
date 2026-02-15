@@ -10,12 +10,16 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
-from happysimulator.core.entity import Entity
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.entity import Entity
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +87,7 @@ class InspectionStation(QueuedResource):
             failed=self._failed,
         )
 
-    def handle_queued_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]]:
+    def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.inspection_time
 
         self._inspected += 1

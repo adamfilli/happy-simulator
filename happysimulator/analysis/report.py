@@ -7,19 +7,21 @@ to_prompt_context() method formats the analysis for inclusion in LLM prompts.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.summary import SimulationSummary
-from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
 from happysimulator.analysis.phases import Phase, detect_phases
+
+if TYPE_CHECKING:
+    from happysimulator.instrumentation.data import Data
+    from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
+    from happysimulator.instrumentation.summary import SimulationSummary
 
 
 @dataclass
 class MetricSummary:
     """Pre-computed statistics for a named metric."""
+
     name: str
     count: int
     mean: float
@@ -51,6 +53,7 @@ class MetricSummary:
 @dataclass
 class Anomaly:
     """A detected anomaly with context for reasoning."""
+
     time_s: float
     metric: str
     description: str
@@ -70,6 +73,7 @@ class Anomaly:
 @dataclass
 class CausalChain:
     """A chain of causally-related observations."""
+
     trigger_description: str
     effects: list[str]
     duration_s: float
@@ -85,6 +89,7 @@ class CausalChain:
 @dataclass
 class SimulationAnalysis:
     """Structured analysis of a simulation run, designed for AI/LLM consumption."""
+
     summary: SimulationSummary
     phases: dict[str, list[Phase]] = field(default_factory=dict)
     metrics: dict[str, MetricSummary] = field(default_factory=dict)
@@ -94,13 +99,8 @@ class SimulationAnalysis:
     def to_dict(self) -> dict[str, Any]:
         return {
             "summary": self.summary.to_dict(),
-            "phases": {
-                name: [p.to_dict() for p in phases]
-                for name, phases in self.phases.items()
-            },
-            "metrics": {
-                name: ms.to_dict() for name, ms in self.metrics.items()
-            },
+            "phases": {name: [p.to_dict() for p in phases] for name, phases in self.phases.items()},
+            "metrics": {name: ms.to_dict() for name, ms in self.metrics.items()},
             "anomalies": [a.to_dict() for a in self.anomalies],
             "causal_chains": [c.to_dict() for c in self.causal_chains],
         }
@@ -128,8 +128,9 @@ class SimulationAnalysis:
         # Anomalies (high priority)
         if self.anomalies:
             sections.append("## Anomalies Detected")
-            for a in self.anomalies:
-                sections.append(f"- [{a.severity}] t={a.time_s:.1f}s: {a.description}")
+            sections.extend(
+                f"- [{a.severity}] t={a.time_s:.1f}s: {a.description}" for a in self.anomalies
+            )
             sections.append("")
 
         # Causal chains (high priority)
@@ -137,8 +138,7 @@ class SimulationAnalysis:
             sections.append("## Causal Chains")
             for chain in self.causal_chains:
                 sections.append(f"- Trigger: {chain.trigger_description}")
-                for effect in chain.effects:
-                    sections.append(f"  -> {effect}")
+                sections.extend(f"  -> {effect}" for effect in chain.effects)
                 sections.append(f"  Duration: {chain.duration_s:.1f}s")
             sections.append("")
 
@@ -147,11 +147,11 @@ class SimulationAnalysis:
             sections.append("## Phase Analysis")
             for metric_name, phases in self.phases.items():
                 sections.append(f"### {metric_name}")
-                for p in phases:
-                    sections.append(
-                        f"- [{p.label}] {p.start_s:.1f}s-{p.end_s:.1f}s: "
-                        f"mean={p.mean:.4f}, std={p.std:.4f}"
-                    )
+                sections.extend(
+                    f"- [{p.label}] {p.start_s:.1f}s-{p.end_s:.1f}s: "
+                    f"mean={p.mean:.4f}, std={p.std:.4f}"
+                    for p in phases
+                )
             sections.append("")
 
         # Metric summaries (lower priority, truncate if needed)
@@ -163,11 +163,10 @@ class SimulationAnalysis:
                     f"p95={ms.p95:.4f}, p99={ms.p99:.4f}, n={ms.count}"
                 )
                 if ms.by_phase:
-                    for phase_data in ms.by_phase:
-                        metric_section.append(
-                            f"    [{phase_data.get('label', '?')}] "
-                            f"mean={phase_data.get('mean', 0):.4f}"
-                        )
+                    metric_section.extend(
+                        f"    [{phase_data.get('label', '?')}] mean={phase_data.get('mean', 0):.4f}"
+                        for phase_data in ms.by_phase
+                    )
             metric_section.append("")
 
             # Check if adding metrics would exceed budget
@@ -194,7 +193,7 @@ class SimulationAnalysis:
 
         result = "\n".join(sections)
         if len(result) > max_chars:
-            result = result[:max_chars - 20] + "\n\n[truncated]"
+            result = result[: max_chars - 20] + "\n\n[truncated]"
         return result
 
 
@@ -257,14 +256,16 @@ def analyze(
             for phase in phases[name]:
                 phase_data = data.between(phase.start_s, phase.end_s)
                 if phase_data.count() > 0:
-                    by_phase.append({
-                        "label": phase.label,
-                        "start_s": phase.start_s,
-                        "end_s": phase.end_s,
-                        "mean": phase_data.mean(),
-                        "p50": phase_data.percentile(0.50),
-                        "p99": phase_data.percentile(0.99),
-                    })
+                    by_phase.append(
+                        {
+                            "label": phase.label,
+                            "start_s": phase.start_s,
+                            "end_s": phase.end_s,
+                            "mean": phase_data.mean(),
+                            "p50": phase_data.percentile(0.50),
+                            "p99": phase_data.percentile(0.99),
+                        }
+                    )
 
         metric_summaries[name] = MetricSummary(
             name=name,
@@ -313,25 +314,27 @@ def _detect_anomalies(
 
         # Use bucketed data to detect per-window anomalies
         bucketed = data.bucket(window_s=5.0)
-        for t, m in zip(bucketed.times(), bucketed.means()):
+        for t, m in zip(bucketed.times(), bucketed.means(), strict=False):
             deviation = abs(m - overall_mean) / overall_std
             if deviation > threshold:
                 severity = "critical" if deviation > threshold * 2 else "warning"
-                anomalies.append(Anomaly(
-                    time_s=t,
-                    metric=name,
-                    description=(
-                        f"{name} at t={t:.1f}s: mean={m:.4f} "
-                        f"({deviation:.1f}x std from overall mean {overall_mean:.4f})"
-                    ),
-                    severity=severity,
-                    context={
-                        "window_mean": round(m, 6),
-                        "overall_mean": round(overall_mean, 6),
-                        "overall_std": round(overall_std, 6),
-                        "deviation_stds": round(deviation, 2),
-                    },
-                ))
+                anomalies.append(
+                    Anomaly(
+                        time_s=t,
+                        metric=name,
+                        description=(
+                            f"{name} at t={t:.1f}s: mean={m:.4f} "
+                            f"({deviation:.1f}x std from overall mean {overall_mean:.4f})"
+                        ),
+                        severity=severity,
+                        context={
+                            "window_mean": round(m, 6),
+                            "overall_mean": round(overall_mean, 6),
+                            "overall_std": round(overall_std, 6),
+                            "deviation_stds": round(deviation, 2),
+                        },
+                    )
+                )
 
     # Sort by time
     anomalies.sort(key=lambda a: a.time_s)
@@ -357,20 +360,20 @@ def _detect_causal_chains(
         if qp.label in ("degraded", "overloaded"):
             # Find a latency phase that starts around the same time
             for lp in lat_phases:
-                if lp.label in ("degraded", "overloaded"):
-                    # If queue degradation starts before or near latency degradation
-                    if abs(qp.start_s - lp.start_s) < 15.0:
-                        effects = [
-                            f"Queue depth entered '{qp.label}' state (mean={qp.mean:.2f})",
-                            f"Latency entered '{lp.label}' state (mean={lp.mean:.4f}s)",
-                        ]
-                        start = min(qp.start_s, lp.start_s)
-                        end = max(qp.end_s, lp.end_s)
-                        chains.append(CausalChain(
+                if lp.label in ("degraded", "overloaded") and abs(qp.start_s - lp.start_s) < 15.0:
+                    effects = [
+                        f"Queue depth entered '{qp.label}' state (mean={qp.mean:.2f})",
+                        f"Latency entered '{lp.label}' state (mean={lp.mean:.4f}s)",
+                    ]
+                    start = min(qp.start_s, lp.start_s)
+                    end = max(qp.end_s, lp.end_s)
+                    chains.append(
+                        CausalChain(
                             trigger_description=f"System degradation starting at t={start:.1f}s",
                             effects=effects,
                             duration_s=end - start,
-                        ))
-                        break  # Only one chain per queue phase
+                        )
+                    )
+                    break  # Only one chain per queue phase
 
     return chains

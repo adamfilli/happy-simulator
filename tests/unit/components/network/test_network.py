@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-import pytest
-
 from happysimulator.components.network.link import NetworkLink
 from happysimulator.components.network.network import LinkStats, Network, Partition
 from happysimulator.core.entity import Entity
@@ -24,7 +22,7 @@ class CollectorEntity(Entity):
 
     def handle_event(self, event: Event):
         self.received.append(event)
-        return None
+        return
 
 
 @dataclass
@@ -573,7 +571,7 @@ class TestPartitionHandle:
         network.add_bidirectional_link(a, c, link_ac)
 
         p_ab = network.partition([a], [b])
-        p_ac = network.partition([a], [c])
+        network.partition([a], [c])
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -592,9 +590,7 @@ class TestPartitionHandle:
         sim.schedule(event1)
 
         # A -> C should still be blocked
-        event2 = Event(
-            time=Instant.from_seconds(0.1), event_type="Msg", target=network
-        )
+        event2 = Event(time=Instant.from_seconds(0.1), event_type="Msg", target=network)
         event2.context["metadata"]["source"] = "A"
         event2.context["metadata"]["destination"] = "C"
         sim.schedule(event2)
@@ -635,9 +631,7 @@ class TestAsymmetricPartitions:
         sim.schedule(event1)
 
         # B -> A should work
-        event2 = Event(
-            time=Instant.from_seconds(0.1), event_type="Msg", target=network
-        )
+        event2 = Event(time=Instant.from_seconds(0.1), event_type="Msg", target=network)
         event2.context["metadata"]["source"] = "B"
         event2.context["metadata"]["destination"] = "A"
         sim.schedule(event2)
@@ -693,7 +687,7 @@ class TestAsymmetricPartitions:
         network.add_bidirectional_link(a, c, link_ac)
 
         # Symmetric partition between A and B
-        p_sym = network.partition([a], [b])
+        network.partition([a], [b])
         # Asymmetric partition: A -X-> C (A cannot send to C)
         p_asym = network.partition([a], [c], asymmetric=True)
 

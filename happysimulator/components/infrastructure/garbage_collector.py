@@ -17,11 +17,13 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +307,10 @@ class GarbageCollector(Entity):
 
         logger.debug(
             "[%s] GC collection #%d: pause=%.4fs, pressure=%.2f",
-            self.name, self._collection_count, pause, pressure,
+            self.name,
+            self._collection_count,
+            pause,
+            pressure,
         )
         return pause
 

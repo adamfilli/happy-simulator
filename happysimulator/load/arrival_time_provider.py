@@ -47,7 +47,6 @@ class ArrivalTimeProvider(ABC):
         - Return 1.0 for deterministic arrivals (constant rate spacing)
         - Return exponential random for Poisson arrivals
         """
-        pass
 
     def next_arrival_time(self) -> Instant:
         """Compute the next event arrival time.
@@ -72,8 +71,7 @@ class ArrivalTimeProvider(ABC):
             t_next = t_start_sec + target_area / rate
             self.current_time = Instant.from_seconds(t_next)
             logger.debug(
-                "Next arrival computed (fast path): time=%.6f target_area=%.4f",
-                t_next, target_area
+                "Next arrival computed (fast path): time=%.6f target_area=%.4f", t_next, target_area
             )
             return self.current_time
 
@@ -120,7 +118,8 @@ class ArrivalTimeProvider(ABC):
         if not found_bracket:
             logger.error(
                 "Could not bracket arrival time: target_area=%.4f start=%.4f",
-                target_area, t_start_sec
+                target_area,
+                t_start_sec,
             )
             raise RuntimeError(
                 f"Could not find event with target area {target_area} starting at {t_start_sec}"
@@ -132,10 +131,8 @@ class ArrivalTimeProvider(ABC):
         if result.converged:
             self.current_time = Instant.from_seconds(result.root)
             logger.debug(
-                "Next arrival computed: time=%.6f target_area=%.4f",
-                result.root, target_area
+                "Next arrival computed: time=%.6f target_area=%.4f", result.root, target_area
             )
             return self.current_time
-        else:
-            logger.error("Root-finding failed for arrival time optimization")
-            raise RuntimeError("Optimization for next arrival time failed.")
+        logger.error("Root-finding failed for arrival time optimization")
+        raise RuntimeError("Optimization for next arrival time failed.")

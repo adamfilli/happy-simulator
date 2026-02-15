@@ -4,20 +4,27 @@ Entities are the building blocks of a simulation model. Each entity receives
 events via handle_event() and returns reactions (new events or generators).
 """
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
-from typing import Generator, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Union
 
-from happysimulator.core.temporal import Instant
-from happysimulator.core.clock import Clock
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.clock import Clock
+    from happysimulator.core.sim_future import SimFuture
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
-SimYield = Union[float, Tuple[float, list[Event], Event], "SimFuture"]
+SimYield = Union[float, tuple[float, list[Event], Event], "SimFuture"]
 """Type alias for generator yield values: delay, (delay, side_effects), or SimFuture."""
 
-SimReturn = Optional[Union[list[Event], Event]]
+SimReturn = list[Event] | Event | None
 """Type alias for generator return values: events to schedule on completion."""
 
 
@@ -39,7 +46,7 @@ class Entity(ABC):
 
     def __init__(self, name: str):
         self.name = name
-        self._clock: Optional[Clock] = None
+        self._clock: Clock | None = None
 
     def set_clock(self, clock: Clock) -> None:
         """Inject the simulation clock. Called automatically during setup."""
@@ -55,11 +62,15 @@ class Entity(ABC):
         """
         if self._clock is None:
             logger.error("[%s] Attempted to access time before clock injection", self.name)
-            raise RuntimeError(f"Entity {self.name} is not attached to a simulation (Clock is None).")
+            raise RuntimeError(
+                f"Entity {self.name} is not attached to a simulation (Clock is None)."
+            )
         return self._clock.now
 
     @abstractmethod
-    def handle_event(self, event: Event) -> Union[Generator[SimYield, None, SimReturn], list[Event], Event, None]:
+    def handle_event(
+        self, event: Event
+    ) -> Union[Generator[SimYield, None, SimReturn], list[Event], Event, None]:
         """Process an incoming event and return any resulting events.
 
         Returns:
@@ -69,7 +80,7 @@ class Entity(ABC):
         """
         raise NotImplementedError
 
-    def forward(self, event: Event, target: "Entity", event_type: str | None = None) -> Event:
+    def forward(self, event: Event, target: Entity, event_type: str | None = None) -> Event:
         """Create a forwarding event that preserves context.
 
         Args:
@@ -94,4 +105,3 @@ class Entity(ABC):
         other resource constraints. Returns True by default.
         """
         return True
-

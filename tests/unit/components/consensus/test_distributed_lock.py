@@ -1,16 +1,13 @@
 """Tests for DistributedLock with fencing tokens and leases."""
 
-import pytest
-
-from happysimulator.core.clock import Clock
-from happysimulator.core.event import Event
-from happysimulator.core.sim_future import SimFuture
-from happysimulator.core.temporal import Instant
 from happysimulator.components.consensus.distributed_lock import (
     DistributedLock,
     DistributedLockStats,
     LockGrant,
 )
+from happysimulator.core.clock import Clock
+from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 
 
 def make_clock(t=0.0):
@@ -168,10 +165,12 @@ class TestDistributedLockLeaseExpiry:
             time=Instant.from_seconds(10.0),
             event_type="LockLeaseExpiry",
             target=lock,
-            context={"metadata": {
-                "lock_name": "my-lock",
-                "fencing_token": grant.fencing_token,
-            }},
+            context={
+                "metadata": {
+                    "lock_name": "my-lock",
+                    "fencing_token": grant.fencing_token,
+                }
+            },
         )
         clock.update(Instant.from_seconds(10.0))
         lock.handle_event(expiry_event)

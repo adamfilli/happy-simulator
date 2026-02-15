@@ -56,10 +56,14 @@ class RequestProvider(EventProvider):
         if time > self._stop_after:
             return []
         self._count += 1
-        return [Event(
-            time=time, event_type="Request", target=self._target,
-            context={"created_at": time},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._target,
+                context={"created_at": time},
+            )
+        ]
 
 
 class AlwaysHealthyEvaluator:
@@ -83,12 +87,12 @@ def run_canary_deployment(
 
     # Baseline servers
     baseline_servers = [
-        Server(f"baseline_{i}", concurrency=3, service_time=ConstantLatency(0.05))
-        for i in range(3)
+        Server(f"baseline_{i}", concurrency=3, service_time=ConstantLatency(0.05)) for i in range(3)
     ]
     sink = LatencyTracker(name="Sink")
     lb = LoadBalancer(
-        name="LB", backends=baseline_servers,
+        name="LB",
+        backends=baseline_servers,
         strategy=WeightedRoundRobin(),
     )
 
@@ -108,10 +112,12 @@ def run_canary_deployment(
     # Traffic
     provider = RequestProvider(lb, stop_after=duration_s - 5.0)
     arrival = ConstantArrivalTimeProvider(
-        ConstantRateProfile(rate=30.0), start_time=Instant.Epoch,
+        ConstantRateProfile(rate=30.0),
+        start_time=Instant.Epoch,
     )
     source = Source(
-        name="Traffic", event_provider=provider,
+        name="Traffic",
+        event_provider=provider,
         arrival_time_provider=arrival,
     )
 
@@ -119,7 +125,7 @@ def run_canary_deployment(
         start_time=Instant.Epoch,
         duration=duration_s,
         sources=[source],
-        entities=[lb, deployer, sink] + baseline_servers,
+        entities=[lb, deployer, sink, *baseline_servers],
     )
 
     # Start deployment at t=5s
@@ -138,16 +144,18 @@ def run_canary_deployment(
     print("=" * 60)
     print(f"\nDeployment state: {deployer.state.status}")
     print(f"  Current stage: {deployer.state.current_stage}/{deployer.state.total_stages}")
-    print(f"  Canary traffic: {deployer.state.canary_traffic_pct*100:.0f}%")
+    print(f"  Canary traffic: {deployer.state.canary_traffic_pct * 100:.0f}%")
 
-    print(f"\nDeployer stats:")
+    print("\nDeployer stats:")
     print(f"  Deployments started: {deployer.stats.deployments_started}")
     print(f"  Deployments completed: {deployer.stats.deployments_completed}")
     print(f"  Deployments rolled back: {deployer.stats.deployments_rolled_back}")
     print(f"  Stages completed: {deployer.stats.stages_completed}")
-    print(f"  Evaluations: {deployer.stats.evaluations_performed} "
-          f"({deployer.stats.evaluations_passed} passed, "
-          f"{deployer.stats.evaluations_failed} failed)")
+    print(
+        f"  Evaluations: {deployer.stats.evaluations_performed} "
+        f"({deployer.stats.evaluations_passed} passed, "
+        f"{deployer.stats.evaluations_failed} failed)"
+    )
 
     print(f"\nCurrent backends: {[b.name for b in lb.all_backends]}")
 

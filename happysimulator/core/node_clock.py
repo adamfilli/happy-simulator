@@ -19,6 +19,7 @@ Usage::
     # Drifting clock: 1000 ppm = 1ms drift per second
     clock = NodeClock(LinearDrift(rate_ppm=1000))
 
+
     # In an entity:
     class RaftNode(Entity):
         def __init__(self, name, node_clock):
@@ -36,10 +37,12 @@ Usage::
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Duration, Instant
+
+if TYPE_CHECKING:
+    from happysimulator.core.clock import Clock
 
 
 @runtime_checkable

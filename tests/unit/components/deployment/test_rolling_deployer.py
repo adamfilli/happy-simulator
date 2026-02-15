@@ -1,17 +1,12 @@
 """Unit tests for RollingDeployer."""
 
-import pytest
-
+from happysimulator.components.deployment.rolling_deployer import (
+    RollingDeployer,
+)
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
-
-from happysimulator.components.deployment.rolling_deployer import (
-    DeploymentState,
-    RollingDeployer,
-    RollingDeployerStats,
-)
+from happysimulator.core.temporal import Instant
 
 
 class FakeBackend(Entity):
@@ -24,7 +19,7 @@ class FakeBackend(Entity):
     def handle_event(self, event):
         if not self._healthy:
             raise RuntimeError("Unhealthy")
-        return None
+        return
 
 
 class FakeLoadBalancer(Entity):
@@ -93,10 +88,12 @@ class TestDeployerCreation:
 
 class TestDeploymentStart:
     def test_start_captures_old_backends(self):
-        deployer, lb, _ = make_deployer(num_backends=3)
+        deployer, _lb, _ = make_deployer(num_backends=3)
         start_event = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start_event)
         assert deployer.state.status == "in_progress"
@@ -104,10 +101,12 @@ class TestDeploymentStart:
         assert deployer.stats.deployments_started == 1
 
     def test_start_triggers_batch_replace(self):
-        deployer, lb, _ = make_deployer()
+        deployer, _lb, _ = make_deployer()
         start_event = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(start_event)
         assert any(e.event_type == "_rolling_replace_batch" for e in result)
@@ -115,19 +114,23 @@ class TestDeploymentStart:
 
 class TestBatchReplacement:
     def test_batch_creates_new_instances(self):
-        deployer, lb, clock = make_deployer(num_backends=3, batch_size=1)
+        deployer, lb, _clock = make_deployer(num_backends=3, batch_size=1)
 
         # Start deployment
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         # Replace batch
         batch_event = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(batch_event)
 
@@ -137,17 +140,21 @@ class TestBatchReplacement:
         assert any(e.event_type == "_rolling_health_check" for e in result)
 
     def test_batch_size_controls_pace(self):
-        deployer, lb, clock = make_deployer(num_backends=4, batch_size=2)
+        deployer, lb, _clock = make_deployer(num_backends=4, batch_size=2)
 
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         batch_event = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch_event)
 
@@ -157,17 +164,21 @@ class TestBatchReplacement:
 
 class TestHealthChecking:
     def test_health_pass_increments_count(self):
-        deployer, lb, clock = make_deployer(healthy_threshold=2)
+        deployer, _lb, _clock = make_deployer(healthy_threshold=2)
 
         # Start and replace batch
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
         batch = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch)
 
@@ -175,7 +186,8 @@ class TestHealthChecking:
 
         # First health pass
         pass1 = Event(
-            time=Instant.Epoch, event_type="_rolling_health_pass",
+            time=Instant.Epoch,
+            event_type="_rolling_health_pass",
             target=deployer,
             context={"metadata": {"server_name": new_name}},
         )
@@ -183,17 +195,21 @@ class TestHealthChecking:
         assert deployer.stats.health_checks_passed == 1
 
     def test_health_threshold_triggers_removal(self):
-        deployer, lb, clock = make_deployer(num_backends=2, healthy_threshold=1)
+        deployer, _lb, _clock = make_deployer(num_backends=2, healthy_threshold=1)
 
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         batch = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch)
 
@@ -201,7 +217,8 @@ class TestHealthChecking:
 
         # Single pass meets threshold
         pass_event = Event(
-            time=Instant.Epoch, event_type="_rolling_health_pass",
+            time=Instant.Epoch,
+            event_type="_rolling_health_pass",
             target=deployer,
             context={"metadata": {"server_name": new_name}},
         )
@@ -214,17 +231,21 @@ class TestHealthChecking:
 
 class TestRollback:
     def test_rollback_on_too_many_failures(self):
-        deployer, lb, clock = make_deployer(num_backends=2, max_failures=0)
+        deployer, _lb, _clock = make_deployer(num_backends=2, max_failures=0)
 
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         batch = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch)
 
@@ -232,7 +253,8 @@ class TestRollback:
 
         # Timeout triggers failure
         timeout = Event(
-            time=Instant.Epoch, event_type="_rolling_health_timeout",
+            time=Instant.Epoch,
+            event_type="_rolling_health_timeout",
             target=deployer,
             context={"metadata": {"server_name": new_name}},
         )
@@ -240,24 +262,30 @@ class TestRollback:
         assert any(e.event_type == "_rolling_rollback" for e in result)
 
     def test_rollback_removes_new_restores_old(self):
-        deployer, lb, clock = make_deployer(num_backends=2)
+        deployer, lb, _clock = make_deployer(num_backends=2)
 
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         batch = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch)
-        count_with_new = len(lb.all_backends)
+        len(lb.all_backends)
 
         rollback = Event(
-            time=Instant.Epoch, event_type="_rolling_rollback",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_rollback",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(rollback)
         assert deployer.state.status == "rolled_back"
@@ -269,31 +297,38 @@ class TestStateTransitions:
         deployer, _, _ = make_deployer()
         assert deployer.state.status == "idle"
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
         assert deployer.state.status == "in_progress"
 
     def test_complete_deployment(self):
-        deployer, lb, clock = make_deployer(num_backends=1, healthy_threshold=1)
+        deployer, _lb, _clock = make_deployer(num_backends=1, healthy_threshold=1)
 
         # Full flow: start -> batch -> health pass -> batch (empty) -> complete
         start = Event(
-            time=Instant.Epoch, event_type="_rolling_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         batch = Event(
-            time=Instant.Epoch, event_type="_rolling_replace_batch",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_rolling_replace_batch",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(batch)
 
         new_name = deployer._current_batch_new[0].name
         pass_event = Event(
-            time=Instant.Epoch, event_type="_rolling_health_pass",
+            time=Instant.Epoch,
+            event_type="_rolling_health_pass",
             target=deployer,
             context={"metadata": {"server_name": new_name}},
         )

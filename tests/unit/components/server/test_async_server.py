@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
-from typing import Generator, List
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pytest
 
-from happysimulator.components.server.async_server import AsyncServer, AsyncServerStats
-from happysimulator.core.entity import Entity
+from happysimulator.components.server.async_server import AsyncServer
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -20,10 +19,14 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -38,7 +41,7 @@ class RequestProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -80,7 +83,7 @@ class TestAsyncServerBasics:
     def test_creates_with_custom_cpu_distribution(self):
         """AsyncServer can be created with custom CPU work distribution."""
         cpu_work = ConstantLatency(0.005)
-        server = AsyncServer(name="TestServer", cpu_work_distribution=cpu_work)
+        AsyncServer(name="TestServer", cpu_work_distribution=cpu_work)
         # The distribution is used internally
 
     def test_initial_statistics_are_zero(self):
@@ -162,9 +165,7 @@ class TestAsyncServerProcessing:
 
         # Schedule 3 requests at the same time
         for i in range(3):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -194,9 +195,7 @@ class TestAsyncServerConnections:
 
         # Schedule multiple requests at same time
         for i in range(5):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -222,9 +221,7 @@ class TestAsyncServerConnections:
 
         # Schedule 5 requests at the same time (only 2 can connect)
         for i in range(5):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -257,9 +254,7 @@ class TestAsyncServerConnections:
 
         # Schedule 10 requests at the same time
         for i in range(10):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 
@@ -403,7 +398,7 @@ class TestAsyncServerWithIOHandler:
 
         def io_handler(event: Event):
             io_calls.append(event.event_type)
-            return None
+            return
 
         server = AsyncServer(
             name="TestServer",
@@ -430,7 +425,7 @@ class TestAsyncServerWithIOHandler:
         """I/O handler can be a generator that yields delays."""
         io_times = []
 
-        def io_handler(event: Event) -> Generator[float, None, None]:
+        def io_handler(event: Event) -> Generator[float]:
             io_times.append(0.050)
             yield 0.050  # 50ms I/O wait
 
@@ -561,9 +556,7 @@ class TestAsyncServerHighConcurrency:
 
         # Schedule 100 requests at the same time
         for i in range(100):
-            sim.schedule(
-                Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server)
-            )
+            sim.schedule(Event(time=Instant.Epoch, event_type=f"Request-{i}", target=server))
 
         sim.run()
 

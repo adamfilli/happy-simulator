@@ -1,8 +1,6 @@
 """Tests for MerkleTree."""
 
-import pytest
-
-from happysimulator.sketching.merkle_tree import KeyRange, MerkleNode, MerkleTree
+from happysimulator.sketching.merkle_tree import KeyRange, MerkleTree
 
 
 class TestKeyRange:

@@ -1,7 +1,5 @@
 """Simulation control: pause/resume, stepping, breakpoints, and introspection."""
 
-from happysimulator.core.control.control import SimulationControl
-from happysimulator.core.control.state import BreakpointContext, SimulationState
 from happysimulator.core.control.breakpoints import (
     Breakpoint,
     ConditionBreakpoint,
@@ -10,15 +8,17 @@ from happysimulator.core.control.breakpoints import (
     MetricBreakpoint,
     TimeBreakpoint,
 )
+from happysimulator.core.control.control import SimulationControl
+from happysimulator.core.control.state import BreakpointContext, SimulationState
 
 __all__ = [
+    "Breakpoint",
+    "BreakpointContext",
+    "ConditionBreakpoint",
+    "EventCountBreakpoint",
+    "EventTypeBreakpoint",
+    "MetricBreakpoint",
     "SimulationControl",
     "SimulationState",
-    "BreakpointContext",
-    "Breakpoint",
     "TimeBreakpoint",
-    "EventCountBreakpoint",
-    "ConditionBreakpoint",
-    "MetricBreakpoint",
-    "EventTypeBreakpoint",
 ]

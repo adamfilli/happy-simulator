@@ -136,11 +136,15 @@ class TestVectorClockMerge:
         """Causally dominant version wins."""
         resolver = VectorClockMerge()
         v1 = VersionedValue(
-            value="old", timestamp=1.0, writer_id="n1",
+            value="old",
+            timestamp=1.0,
+            writer_id="n1",
             vector_clock={"n1": 1, "n2": 0},
         )
         v2 = VersionedValue(
-            value="new", timestamp=2.0, writer_id="n2",
+            value="new",
+            timestamp=2.0,
+            writer_id="n2",
             vector_clock={"n1": 1, "n2": 1},
         )
 
@@ -152,11 +156,15 @@ class TestVectorClockMerge:
         """Causally dominant version wins regardless of list order."""
         resolver = VectorClockMerge()
         v1 = VersionedValue(
-            value="old", timestamp=1.0, writer_id="n1",
+            value="old",
+            timestamp=1.0,
+            writer_id="n1",
             vector_clock={"n1": 1, "n2": 0},
         )
         v2 = VersionedValue(
-            value="new", timestamp=2.0, writer_id="n2",
+            value="new",
+            timestamp=2.0,
+            writer_id="n2",
             vector_clock={"n1": 1, "n2": 1},
         )
 
@@ -168,11 +176,15 @@ class TestVectorClockMerge:
         """Concurrent versions fall back to LWW when no merge_fn."""
         resolver = VectorClockMerge()
         v1 = VersionedValue(
-            value="from-1", timestamp=1.0, writer_id="n1",
+            value="from-1",
+            timestamp=1.0,
+            writer_id="n1",
             vector_clock={"n1": 1, "n2": 0},
         )
         v2 = VersionedValue(
-            value="from-2", timestamp=2.0, writer_id="n2",
+            value="from-2",
+            timestamp=2.0,
+            writer_id="n2",
             vector_clock={"n1": 0, "n2": 1},
         )
 
@@ -182,6 +194,7 @@ class TestVectorClockMerge:
 
     def test_concurrent_uses_merge_fn(self):
         """Concurrent versions use merge_fn when provided."""
+
         def merge(key, a, b):
             return VersionedValue(
                 value=f"{a.value}+{b.value}",
@@ -191,11 +204,15 @@ class TestVectorClockMerge:
 
         resolver = VectorClockMerge(merge_fn=merge)
         v1 = VersionedValue(
-            value="from-1", timestamp=1.0, writer_id="n1",
+            value="from-1",
+            timestamp=1.0,
+            writer_id="n1",
             vector_clock={"n1": 1, "n2": 0},
         )
         v2 = VersionedValue(
-            value="from-2", timestamp=2.0, writer_id="n2",
+            value="from-2",
+            timestamp=2.0,
+            writer_id="n2",
             vector_clock={"n1": 0, "n2": 1},
         )
 
@@ -208,7 +225,9 @@ class TestVectorClockMerge:
         resolver = VectorClockMerge()
         v1 = VersionedValue(value="a", timestamp=1.0, writer_id="n1")
         v2 = VersionedValue(
-            value="b", timestamp=2.0, writer_id="n2",
+            value="b",
+            timestamp=2.0,
+            writer_id="n2",
             vector_clock={"n2": 1},
         )
 
@@ -226,6 +245,7 @@ class TestCustomResolver:
 
     def test_delegates_to_function(self):
         """CustomResolver delegates to the user function."""
+
         def pick_first(key, versions):
             return versions[0]
 

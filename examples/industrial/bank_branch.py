@@ -42,7 +42,7 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -53,7 +53,6 @@ from happysimulator import (
     Instant,
     LatencyTracker,
     Probe,
-    QueuedResource,
     Simulation,
     SimulationSummary,
     Source,
@@ -64,6 +63,8 @@ from happysimulator.components.industrial import (
     RenegingQueuedResource,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -74,13 +75,13 @@ from happysimulator.components.industrial import (
 class BankConfig:
     """Configuration for the bank branch simulation."""
 
-    duration_s: float = 3600.0          # 1 hour of operation
-    arrival_rate_per_min: float = 1.5   # customers per minute
-    num_tellers: int = 2                # baseline teller count
-    peak_teller_extra: int = 1          # additional tellers during peak
-    peak_start_min: float = 20.0        # peak period start (minutes)
-    peak_end_min: float = 40.0          # peak period end (minutes)
-    balk_threshold: int = 8             # queue depth that triggers balking
+    duration_s: float = 3600.0  # 1 hour of operation
+    arrival_rate_per_min: float = 1.5  # customers per minute
+    num_tellers: int = 2  # baseline teller count
+    peak_teller_extra: int = 1  # additional tellers during peak
+    peak_start_min: float = 20.0  # peak period start (minutes)
+    peak_end_min: float = 40.0  # peak period end (minutes)
+    balk_threshold: int = 8  # queue depth that triggers balking
     default_patience_min: float = 10.0  # mean patience (minutes)
     seed: int = 42
 
@@ -197,9 +198,7 @@ class BankTeller(RenegingQueuedResource):
     def has_capacity(self) -> bool:
         return self._active < self._concurrency
 
-    def _handle_served_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event]]:
+    def _handle_served_event(self, event: Event) -> Generator[float, None, list[Event]]:
         """Process a customer with type-dependent exponential service time."""
         customer_type = event.context.get("customer_type", "inquiry")
 
@@ -222,9 +221,7 @@ class BankTeller(RenegingQueuedResource):
         self._processed += 1
         self._service_time_total += service_time
 
-        return [
-            self.forward(event, self.downstream, event_type="Served")
-        ]
+        return [self.forward(event, self.downstream, event_type="Served")]
 
 
 # =============================================================================
@@ -300,8 +297,8 @@ def run_bank_simulation(config: BankConfig | None = None) -> BankResult:
         stop_after=stop_after,
     )
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     source = Source(
         name="Arrivals",
@@ -378,7 +375,7 @@ def print_summary(result: BankResult) -> None:
     print("BANK BRANCH SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 60:.0f} minutes")
     print(f"  Arrival rate:        {config.arrival_rate_per_min:.1f} customers/min")
     print(f"  Tellers (normal):    {config.num_tellers}")
@@ -393,7 +390,7 @@ def print_summary(result: BankResult) -> None:
     balked = result.balking_queue.balked
     completed = result.sink.count
 
-    print(f"\nCustomer Flow:")
+    print("\nCustomer Flow:")
     print(f"  Arrived:             {total_arrived}")
     print(f"  Balked (left queue): {balked} ({100 * balked / max(total_arrived, 1):.1f}%)")
     print(f"  Reneged (gave up):   {reneged} ({100 * reneged / max(total_arrived, 1):.1f}%)")
@@ -401,18 +398,18 @@ def print_summary(result: BankResult) -> None:
     print(f"  Completed (at sink): {completed}")
 
     if completed > 0:
-        print(f"\nService Latency (end-to-end, including wait):")
+        print("\nService Latency (end-to-end, including wait):")
         print(f"  Mean:    {result.sink.mean_latency() / 60:.2f} min")
         print(f"  p50:     {result.sink.p50() / 60:.2f} min")
         print(f"  p99:     {result.sink.p99() / 60:.2f} min")
 
     if result.teller.processed > 0:
         avg_service = result.teller._service_time_total / result.teller.processed
-        print(f"\nService Time (processing only):")
+        print("\nService Time (processing only):")
         print(f"  Mean:    {avg_service / 60:.2f} min")
         print(f"  Total:   {result.teller._service_time_total / 60:.1f} min")
 
-    print(f"\nQueue Depth:")
+    print("\nQueue Depth:")
     qd = result.queue_depth_data
     if len(qd.raw_values()) > 0:
         print(f"  Mean:    {qd.mean():.1f}")
@@ -431,31 +428,45 @@ def print_summary(result: BankResult) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Bank branch simulation")
     parser.add_argument(
-        "--duration", type=float, default=3600.0,
+        "--duration",
+        type=float,
+        default=3600.0,
         help="Simulation duration in seconds (default: 3600)",
     )
     parser.add_argument(
-        "--arrival-rate", type=float, default=1.5,
+        "--arrival-rate",
+        type=float,
+        default=1.5,
         help="Customer arrival rate per minute (default: 1.5)",
     )
     parser.add_argument(
-        "--tellers", type=int, default=2,
+        "--tellers",
+        type=int,
+        default=2,
         help="Number of tellers during normal hours (default: 2)",
     )
     parser.add_argument(
-        "--peak-extra", type=int, default=1,
+        "--peak-extra",
+        type=int,
+        default=1,
         help="Extra tellers during peak hours (default: 1)",
     )
     parser.add_argument(
-        "--balk-threshold", type=int, default=8,
+        "--balk-threshold",
+        type=int,
+        default=8,
         help="Queue depth that triggers balking (default: 8)",
     )
     parser.add_argument(
-        "--patience", type=float, default=10.0,
+        "--patience",
+        type=float,
+        default=10.0,
         help="Mean customer patience in minutes (default: 10)",
     )
     parser.add_argument(
-        "--seed", type=int, default=42,
+        "--seed",
+        type=int,
+        default=42,
         help="Random seed (default: 42, use -1 for random)",
     )
     args = parser.parse_args()

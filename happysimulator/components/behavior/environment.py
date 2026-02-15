@@ -12,17 +12,17 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
+from happysimulator.components.behavior.influence import DeGrootModel, InfluenceModel
+from happysimulator.components.behavior.social_network import SocialGraph
+from happysimulator.components.behavior.stats import EnvironmentStats
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.clock import Clock
-from happysimulator.core.temporal import Instant
 
-from happysimulator.components.behavior.agent import Agent
-from happysimulator.components.behavior.social_network import SocialGraph
-from happysimulator.components.behavior.influence import InfluenceModel, DeGrootModel
-from happysimulator.components.behavior.stats import EnvironmentStats
+if TYPE_CHECKING:
+    from happysimulator.components.behavior.agent import Agent
+    from happysimulator.core.clock import Clock
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class Environment(Entity):
         self._influence_rounds = 0
         self._state_changes = 0
 
-        for agent in (agents or []):
+        for agent in agents or []:
             self.register_agent(agent)
 
     def register_agent(self, agent: Agent) -> None:
@@ -100,11 +100,11 @@ class Environment(Entity):
     def handle_event(self, event: Event) -> list[Event] | None:
         if event.event_type == "BroadcastStimulus":
             return self._handle_broadcast(event)
-        elif event.event_type == "TargetedStimulus":
+        if event.event_type == "TargetedStimulus":
             return self._handle_targeted(event)
-        elif event.event_type == "InfluencePropagation":
+        if event.event_type == "InfluencePropagation":
             return self._handle_influence(event)
-        elif event.event_type == "StateChange":
+        if event.event_type == "StateChange":
             return self._handle_state_change(event)
         return None
 
@@ -117,12 +117,14 @@ class Environment(Entity):
         events: list[Event] = []
         for agent in self._agents.values():
             enriched = self._enrich_metadata(metadata, agent.name)
-            events.append(Event(
-                time=self.now,
-                event_type=stimulus_type,
-                target=agent,
-                context={"metadata": enriched},
-            ))
+            events.append(
+                Event(
+                    time=self.now,
+                    event_type=stimulus_type,
+                    target=agent,
+                    context={"metadata": enriched},
+                )
+            )
         return events
 
     def _handle_targeted(self, event: Event) -> list[Event]:
@@ -137,12 +139,14 @@ class Environment(Entity):
             agent = self._agents.get(name)
             if agent is not None:
                 enriched = self._enrich_metadata(metadata, agent.name)
-                events.append(Event(
-                    time=self.now,
-                    event_type=stimulus_type,
-                    target=agent,
-                    context={"metadata": enriched},
-                ))
+                events.append(
+                    Event(
+                        time=self.now,
+                        event_type=stimulus_type,
+                        target=agent,
+                        context={"metadata": enriched},
+                    )
+                )
         return events
 
     def _handle_influence(self, event: Event) -> list[Event]:
@@ -186,16 +190,20 @@ class Environment(Entity):
                 if self._agents.get(n) is not None
             ) / max(1, len(influencer_names))
 
-            events.append(Event(
-                time=self.now,
-                event_type="SocialMessage",
-                target=agent,
-                context={"metadata": {
-                    "topic": topic,
-                    "opinion": new_opinion,
-                    "credibility": avg_trust,
-                }},
-            ))
+            events.append(
+                Event(
+                    time=self.now,
+                    event_type="SocialMessage",
+                    target=agent,
+                    context={
+                        "metadata": {
+                            "topic": topic,
+                            "opinion": new_opinion,
+                            "credibility": avg_trust,
+                        }
+                    },
+                )
+            )
 
         return events
 
@@ -229,6 +237,8 @@ class Environment(Entity):
 
 class _DefaultRel:
     """Fallback relationship for trust computation."""
+
     trust = 0.5
+
 
 _default_rel = _DefaultRel()

@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +88,7 @@ class ConveyorBelt(Entity):
     def handle_event(self, event: Event) -> Generator[float, None, list[Event]] | list[Event]:
         if self._capacity > 0 and self._items_in_transit >= self._capacity:
             self._items_rejected += 1
-            logger.debug(
-                "[%s] Rejected item (at capacity %d)", self.name, self._capacity
-            )
+            logger.debug("[%s] Rejected item (at capacity %d)", self.name, self._capacity)
             return []
 
         self._items_in_transit += 1

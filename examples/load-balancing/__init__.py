@@ -15,31 +15,31 @@ Usage:
 """
 
 from .common import (
+    AggregateMetrics,
     CachingServer,
     CachingServerStats,
     CustomerRequestProvider,
-    AggregateMetrics,
     collect_aggregate_metrics,
     compute_key_distribution,
-    plot_hit_rate_comparison,
-    plot_key_distribution,
-    plot_fleet_change_impact,
-    customer_id_key_extractor,
     create_customer_consistent_hash,
     create_customer_ip_hash,
+    customer_id_key_extractor,
+    plot_fleet_change_impact,
+    plot_hit_rate_comparison,
+    plot_key_distribution,
 )
 
 __all__ = [
+    "AggregateMetrics",
     "CachingServer",
     "CachingServerStats",
     "CustomerRequestProvider",
-    "AggregateMetrics",
     "collect_aggregate_metrics",
     "compute_key_distribution",
-    "plot_hit_rate_comparison",
-    "plot_key_distribution",
-    "plot_fleet_change_impact",
-    "customer_id_key_extractor",
     "create_customer_consistent_hash",
     "create_customer_ip_hash",
+    "customer_id_key_extractor",
+    "plot_fleet_change_impact",
+    "plot_hit_rate_comparison",
+    "plot_key_distribution",
 ]

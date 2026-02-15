@@ -2,6 +2,7 @@
 
 import pytest
 
+from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.control.breakpoints import (
     ConditionBreakpoint,
     EventCountBreakpoint,
@@ -10,9 +11,8 @@ from happysimulator.core.control.breakpoints import (
     TimeBreakpoint,
 )
 from happysimulator.core.control.state import BreakpointContext
-from happysimulator.core.temporal import Instant
 from happysimulator.core.event import Event
-from happysimulator.core.callback_entity import NullEntity
+from happysimulator.core.temporal import Instant
 
 
 def _make_context(
@@ -39,6 +39,7 @@ def _make_context(
 # -------------------------------------------------------
 # TimeBreakpoint
 # -------------------------------------------------------
+
 
 class TestTimeBreakpoint:
     def test_triggers_at_exact_time(self):
@@ -74,6 +75,7 @@ class TestTimeBreakpoint:
 # EventCountBreakpoint
 # -------------------------------------------------------
 
+
 class TestEventCountBreakpoint:
     def test_triggers_at_exact_count(self):
         bp = EventCountBreakpoint(count=100)
@@ -98,6 +100,7 @@ class TestEventCountBreakpoint:
 # -------------------------------------------------------
 # ConditionBreakpoint
 # -------------------------------------------------------
+
 
 class TestConditionBreakpoint:
     def test_triggers_when_fn_returns_true(self):
@@ -124,6 +127,7 @@ class TestConditionBreakpoint:
 # MetricBreakpoint
 # -------------------------------------------------------
 
+
 class _FakeEntity:
     def __init__(self, name: str, **attrs):
         self.name = name
@@ -141,7 +145,10 @@ class TestMetricBreakpoint:
         entity = _FakeEntity("Server", depth=15)
         sim = _FakeSim([entity])
         bp = MetricBreakpoint(
-            entity_name="Server", attribute="depth", operator="gt", threshold=10,
+            entity_name="Server",
+            attribute="depth",
+            operator="gt",
+            threshold=10,
         )
         ctx = _make_context(simulation=sim)
         assert bp.should_break(ctx) is True
@@ -150,7 +157,10 @@ class TestMetricBreakpoint:
         entity = _FakeEntity("Server", depth=5)
         sim = _FakeSim([entity])
         bp = MetricBreakpoint(
-            entity_name="Server", attribute="depth", operator="gt", threshold=10,
+            entity_name="Server",
+            attribute="depth",
+            operator="gt",
+            threshold=10,
         )
         ctx = _make_context(simulation=sim)
         assert bp.should_break(ctx) is False
@@ -160,11 +170,18 @@ class TestMetricBreakpoint:
         sim = _FakeSim([entity])
 
         for op, expected in [
-            ("gt", False), ("ge", True), ("lt", False),
-            ("le", True), ("eq", True), ("ne", False),
+            ("gt", False),
+            ("ge", True),
+            ("lt", False),
+            ("le", True),
+            ("eq", True),
+            ("ne", False),
         ]:
             bp = MetricBreakpoint(
-                entity_name="X", attribute="val", operator=op, threshold=10,
+                entity_name="X",
+                attribute="val",
+                operator=op,
+                threshold=10,
             )
             ctx = _make_context(simulation=sim)
             assert bp.should_break(ctx) is expected, f"Failed for operator {op}"
@@ -172,13 +189,19 @@ class TestMetricBreakpoint:
     def test_invalid_operator_raises(self):
         with pytest.raises(ValueError, match="Unknown operator"):
             MetricBreakpoint(
-                entity_name="X", attribute="val", operator="??", threshold=10,
+                entity_name="X",
+                attribute="val",
+                operator="??",
+                threshold=10,
             )
 
     def test_missing_entity_returns_false(self):
         sim = _FakeSim([])
         bp = MetricBreakpoint(
-            entity_name="Missing", attribute="depth", operator="gt", threshold=10,
+            entity_name="Missing",
+            attribute="depth",
+            operator="gt",
+            threshold=10,
         )
         ctx = _make_context(simulation=sim)
         assert bp.should_break(ctx) is False
@@ -187,14 +210,20 @@ class TestMetricBreakpoint:
         entity = _FakeEntity("Server")
         sim = _FakeSim([entity])
         bp = MetricBreakpoint(
-            entity_name="Server", attribute="nonexistent", operator="gt", threshold=10,
+            entity_name="Server",
+            attribute="nonexistent",
+            operator="gt",
+            threshold=10,
         )
         ctx = _make_context(simulation=sim)
         assert bp.should_break(ctx) is False
 
     def test_one_shot_default_false(self):
         bp = MetricBreakpoint(
-            entity_name="X", attribute="val", operator="gt", threshold=10,
+            entity_name="X",
+            attribute="val",
+            operator="gt",
+            threshold=10,
         )
         assert bp.one_shot is False
 
@@ -202,6 +231,7 @@ class TestMetricBreakpoint:
 # -------------------------------------------------------
 # EventTypeBreakpoint
 # -------------------------------------------------------
+
 
 class TestEventTypeBreakpoint:
     def test_triggers_on_matching_type(self):

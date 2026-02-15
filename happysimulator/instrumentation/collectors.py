@@ -6,9 +6,13 @@ entities that every simulation example reimplements.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.instrumentation.data import Data, BucketedData
+from happysimulator.instrumentation.data import BucketedData, Data
+
+if TYPE_CHECKING:
+    from happysimulator.core.event import Event
 
 
 class LatencyTracker(Entity):

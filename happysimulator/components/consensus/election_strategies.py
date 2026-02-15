@@ -42,7 +42,10 @@ class ElectionStrategy(Protocol):
         ...
 
     def handle_election_message(
-        self, node_id: str, message_type: str, payload: dict[str, Any],
+        self,
+        node_id: str,
+        message_type: str,
+        payload: dict[str, Any],
         alive_members: list[str],
     ) -> dict[str, Any]:
         """Process an incoming election message.
@@ -72,7 +75,10 @@ class BullyStrategy:
         return True
 
     def get_election_messages(
-        self, node_id: str, alive_members: list[str], term: int,
+        self,
+        node_id: str,
+        alive_members: list[str],
+        term: int,
     ) -> list[dict[str, Any]]:
         higher = [m for m in alive_members if m > node_id]
         if not higher:
@@ -97,7 +103,10 @@ class BullyStrategy:
         ]
 
     def handle_election_message(
-        self, node_id: str, message_type: str, payload: dict[str, Any],
+        self,
+        node_id: str,
+        message_type: str,
+        payload: dict[str, Any],
         alive_members: list[str],
     ) -> dict[str, Any]:
         if message_type == "ElectionChallenge":
@@ -139,7 +148,10 @@ class RingStrategy:
         return True
 
     def get_election_messages(
-        self, node_id: str, alive_members: list[str], term: int,
+        self,
+        node_id: str,
+        alive_members: list[str],
+        term: int,
     ) -> list[dict[str, Any]]:
         # Start ring token with self
         ring = sorted([m for m in alive_members if m != node_id] + [node_id])
@@ -158,7 +170,10 @@ class RingStrategy:
         ]
 
     def handle_election_message(
-        self, node_id: str, message_type: str, payload: dict[str, Any],
+        self,
+        node_id: str,
+        message_type: str,
+        payload: dict[str, Any],
         alive_members: list[str],
     ) -> dict[str, Any]:
         if message_type == "ElectionToken":
@@ -227,7 +242,10 @@ class RandomizedStrategy:
         return True
 
     def get_election_messages(
-        self, node_id: str, alive_members: list[str], term: int,
+        self,
+        node_id: str,
+        alive_members: list[str],
+        term: int,
     ) -> list[dict[str, Any]]:
         ballot = random.randint(1, self._ballot_range)
         return [
@@ -245,7 +263,10 @@ class RandomizedStrategy:
         ]
 
     def handle_election_message(
-        self, node_id: str, message_type: str, payload: dict[str, Any],
+        self,
+        node_id: str,
+        message_type: str,
+        payload: dict[str, Any],
         alive_members: list[str],
     ) -> dict[str, Any]:
         if message_type == "ElectionBallot":
@@ -263,7 +284,9 @@ class RandomizedStrategy:
                             "term": payload.get("term", 0),
                         },
                     }
-                ] if sender else [],
+                ]
+                if sender
+                else [],
                 "leader": None,
                 "suppress_election": False,
             }

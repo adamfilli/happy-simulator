@@ -41,15 +41,15 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
     Event,
+    FIFOQueue,
     Instant,
     LatencyTracker,
     QueuedResource,
-    FIFOQueue,
     Resource,
     Simulation,
     SimulationSummary,
@@ -57,15 +57,18 @@ from happysimulator import (
 )
 from happysimulator.components.industrial import BatchProcessor
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class WarehouseConfig:
-    duration_s: float = 7200.0      # 2 hour shift
-    order_rate: float = 0.1         # orders per second (~360/hr)
+    duration_s: float = 7200.0  # 2 hour shift
+    order_rate: float = 0.1  # orders per second (~360/hr)
     # Batch picking
     batch_size: int = 10
     batch_timeout_s: float = 120.0  # flush partial batch after 2 min
@@ -75,12 +78,12 @@ class WarehouseConfig:
     num_pack_stations: int = 4
     num_docks: int = 2
     # Zone pick times (seconds)
-    zone_a_time: float = 60.0       # fast-moving items (30%)
-    zone_b_time: float = 120.0      # medium items (50%)
-    zone_c_time: float = 240.0      # bulk/slow items (20%)
+    zone_a_time: float = 60.0  # fast-moving items (30%)
+    zone_b_time: float = 120.0  # medium items (50%)
+    zone_c_time: float = 240.0  # bulk/slow items (20%)
     # Pack and ship times
-    pack_time: float = 90.0         # 1.5 min per order
-    ship_time: float = 60.0         # 1 min per order
+    pack_time: float = 90.0  # 1.5 min per order
+    ship_time: float = 60.0  # 1 min per order
     seed: int = 42
 
 
@@ -91,6 +94,7 @@ ZONE_WEIGHTS = {"A": 0.30, "B": 0.50, "C": 0.20}
 # =============================================================================
 # Zone Router
 # =============================================================================
+
 
 class ZoneRouter(Entity):
     """Assigns warehouse zone to each order and forwards to batch picker."""
@@ -119,21 +123,25 @@ class ZoneRouter(Entity):
         self.orders_routed += 1
         self.zone_counts[zone] = self.zone_counts.get(zone, 0) + 1
 
-        return [
-            Event(time=self.now, event_type="Order",
-                  target=self.downstream, context=ctx)
-        ]
+        return [Event(time=self.now, event_type="Order", target=self.downstream, context=ctx)]
 
 
 # =============================================================================
 # Pick Station (with Resource for pickers)
 # =============================================================================
 
+
 class PickStation(QueuedResource):
     """Picking stage that acquires a picker and picks by zone time."""
 
-    def __init__(self, name: str, pickers: Resource, downstream: Entity,
-                 zone_times: dict[str, float], concurrency: int):
+    def __init__(
+        self,
+        name: str,
+        pickers: Resource,
+        downstream: Entity,
+        zone_times: dict[str, float],
+        concurrency: int,
+    ):
         super().__init__(name, policy=FIFOQueue())
         self.pickers = pickers
         self.downstream = downstream
@@ -163,20 +171,20 @@ class PickStation(QueuedResource):
         self._active -= 1
         self.orders_picked += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Picked")
-        ]
+        return [self.forward(event, self.downstream, event_type="Picked")]
 
 
 # =============================================================================
 # Pack Station (with Resource for pack stations)
 # =============================================================================
 
+
 class PackStation(QueuedResource):
     """Packing stage that acquires a pack station resource."""
 
-    def __init__(self, name: str, stations: Resource, downstream: Entity,
-                 pack_time: float, concurrency: int):
+    def __init__(
+        self, name: str, stations: Resource, downstream: Entity, pack_time: float, concurrency: int
+    ):
         super().__init__(name, policy=FIFOQueue())
         self.stations = stations
         self.downstream = downstream
@@ -202,20 +210,20 @@ class PackStation(QueuedResource):
         self._active -= 1
         self.orders_packed += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Packed")
-        ]
+        return [self.forward(event, self.downstream, event_type="Packed")]
 
 
 # =============================================================================
 # Ship Station (with Resource for docks)
 # =============================================================================
 
+
 class ShipStation(QueuedResource):
     """Shipping stage that acquires a dock resource."""
 
-    def __init__(self, name: str, docks: Resource, downstream: Entity,
-                 ship_time: float, concurrency: int):
+    def __init__(
+        self, name: str, docks: Resource, downstream: Entity, ship_time: float, concurrency: int
+    ):
         super().__init__(name, policy=FIFOQueue())
         self.docks = docks
         self.downstream = downstream
@@ -237,14 +245,13 @@ class ShipStation(QueuedResource):
         self._active -= 1
         self.orders_shipped += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Shipped")
-        ]
+        return [self.forward(event, self.downstream, event_type="Shipped")]
 
 
 # =============================================================================
 # Main Simulation
 # =============================================================================
+
 
 @dataclass
 class WarehouseResult:
@@ -275,13 +282,19 @@ def run_warehouse_simulation(config: WarehouseConfig | None = None) -> Warehouse
 
     # Build pipeline from end to start
     ship_station = ShipStation(
-        "ShipStation", docks=docks, downstream=sink,
-        ship_time=config.ship_time, concurrency=config.num_docks,
+        "ShipStation",
+        docks=docks,
+        downstream=sink,
+        ship_time=config.ship_time,
+        concurrency=config.num_docks,
     )
 
     pack_station = PackStation(
-        "PackStation", stations=pack_stations_res, downstream=ship_station,
-        pack_time=config.pack_time, concurrency=config.num_pack_stations,
+        "PackStation",
+        stations=pack_stations_res,
+        downstream=ship_station,
+        pack_time=config.pack_time,
+        concurrency=config.num_pack_stations,
     )
 
     zone_times = {
@@ -291,13 +304,17 @@ def run_warehouse_simulation(config: WarehouseConfig | None = None) -> Warehouse
     }
 
     pick_station = PickStation(
-        "PickStation", pickers=pickers, downstream=pack_station,
-        zone_times=zone_times, concurrency=config.num_pickers,
+        "PickStation",
+        pickers=pickers,
+        downstream=pack_station,
+        zone_times=zone_times,
+        concurrency=config.num_pickers,
     )
 
     # Batch picker accumulates orders before dispatching to pick station
     batch_picker = BatchProcessor(
-        "BatchPicker", downstream=pick_station,
+        "BatchPicker",
+        downstream=pick_station,
         batch_size=config.batch_size,
         process_time=config.batch_process_time,
         timeout_s=config.batch_timeout_s,
@@ -306,14 +323,23 @@ def run_warehouse_simulation(config: WarehouseConfig | None = None) -> Warehouse
     zone_router = ZoneRouter("ZoneRouter", downstream=batch_picker)
 
     source = Source.poisson(
-        rate=config.order_rate, target=zone_router,
-        event_type="Order", name="Orders",
+        rate=config.order_rate,
+        target=zone_router,
+        event_type="Order",
+        name="Orders",
         stop_after=config.duration_s,
     )
 
     entities = [
-        zone_router, batch_picker, pick_station, pack_station, ship_station,
-        pickers, pack_stations_res, docks, sink,
+        zone_router,
+        batch_picker,
+        pick_station,
+        pack_station,
+        ship_station,
+        pickers,
+        pack_stations_res,
+        docks,
+        sink,
     ]
 
     sim = Simulation(
@@ -325,11 +351,17 @@ def run_warehouse_simulation(config: WarehouseConfig | None = None) -> Warehouse
     summary = sim.run()
 
     return WarehouseResult(
-        sink=sink, zone_router=zone_router, batch_picker=batch_picker,
-        pick_station=pick_station, pack_station=pack_station,
-        ship_station=ship_station, pickers=pickers,
-        pack_stations_res=pack_stations_res, docks=docks,
-        config=config, summary=summary,
+        sink=sink,
+        zone_router=zone_router,
+        batch_picker=batch_picker,
+        pick_station=pick_station,
+        pack_station=pack_station,
+        ship_station=ship_station,
+        pickers=pickers,
+        pack_stations_res=pack_stations_res,
+        docks=docks,
+        config=config,
+        summary=summary,
     )
 
 
@@ -339,45 +371,44 @@ def print_summary(result: WarehouseResult) -> None:
     print("=" * 65)
 
     c = result.config
-    print(f"\nConfiguration:")
-    print(f"  Duration: {c.duration_s/60:.0f} minutes")
-    print(f"  Order rate: {c.order_rate*3600:.0f} orders/hr")
+    print("\nConfiguration:")
+    print(f"  Duration: {c.duration_s / 60:.0f} minutes")
+    print(f"  Order rate: {c.order_rate * 3600:.0f} orders/hr")
     print(f"  Batch size: {c.batch_size}")
-    print(f"  Resources: {c.num_pickers} pickers, {c.num_pack_stations} pack stations, "
-          f"{c.num_docks} docks")
+    print(
+        f"  Resources: {c.num_pickers} pickers, {c.num_pack_stations} pack stations, "
+        f"{c.num_docks} docks"
+    )
 
-    print(f"\nZone Distribution:")
+    print("\nZone Distribution:")
     for zone, count in sorted(result.zone_router.zone_counts.items()):
         pct = count / max(result.zone_router.orders_routed, 1) * 100
         print(f"  Zone {zone}: {count} orders ({pct:.0f}%)")
 
     bp = result.batch_picker.stats
-    print(f"\nBatch Picking:")
+    print("\nBatch Picking:")
     print(f"  Batches formed: {bp.batches_processed}")
     print(f"  Items batch-picked: {bp.items_processed}")
     print(f"  Timeouts (partial batches): {bp.timeouts}")
 
-    print(f"\nPipeline Throughput:")
+    print("\nPipeline Throughput:")
     print(f"  Picked: {result.pick_station.orders_picked}")
     print(f"  Packed: {result.pack_station.orders_packed}")
     print(f"  Shipped: {result.ship_station.orders_shipped}")
 
-    print(f"\nResource Utilization:")
+    print("\nResource Utilization:")
     ps = result.pickers.stats
     pss = result.pack_stations_res.stats
     ds = result.docks.stats
-    print(f"  Pickers: {ps.peak_utilization*100:.0f}% peak, "
-          f"{ps.contentions} contentions")
-    print(f"  Pack stations: {pss.peak_utilization*100:.0f}% peak, "
-          f"{pss.contentions} contentions")
-    print(f"  Docks: {ds.peak_utilization*100:.0f}% peak, "
-          f"{ds.contentions} contentions")
+    print(f"  Pickers: {ps.peak_utilization * 100:.0f}% peak, {ps.contentions} contentions")
+    print(f"  Pack stations: {pss.peak_utilization * 100:.0f}% peak, {pss.contentions} contentions")
+    print(f"  Docks: {ds.peak_utilization * 100:.0f}% peak, {ds.contentions} contentions")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Orders completed: {result.sink.count}")
     if result.sink.count > 0:
-        print(f"  Avg fulfillment time: {result.sink.mean_latency()/60:.1f} min")
-        print(f"  p99 fulfillment time: {result.sink.p99()/60:.1f} min")
+        print(f"  Avg fulfillment time: {result.sink.mean_latency() / 60:.1f} min")
+        print(f"  p99 fulfillment time: {result.sink.p99() / 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 65)
@@ -385,12 +416,13 @@ def print_summary(result: WarehouseResult) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Warehouse fulfillment simulation")
-    parser.add_argument("--duration", type=float, default=7200.0,
-                        help="Duration in seconds (default: 7200)")
-    parser.add_argument("--order-rate", type=float, default=0.1,
-                        help="Order rate per second (default: 0.1)")
-    parser.add_argument("--batch-size", type=int, default=10,
-                        help="Batch pick size (default: 10)")
+    parser.add_argument(
+        "--duration", type=float, default=7200.0, help="Duration in seconds (default: 7200)"
+    )
+    parser.add_argument(
+        "--order-rate", type=float, default=0.1, help="Order rate per second (default: 0.1)"
+    )
+    parser.add_argument("--batch-size", type=int, default=10, help="Batch pick size (default: 10)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()

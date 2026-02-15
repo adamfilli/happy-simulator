@@ -22,11 +22,12 @@ Example:
     )
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Generator, Optional, Protocol
-from abc import abstractmethod
-import hashlib
 import bisect
+import hashlib
+from abc import abstractmethod
+from collections.abc import Generator
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -86,20 +87,18 @@ class RangeSharding:
                 if key < boundary:
                     return i
             return len(self._boundaries)
-        else:
-            # Simple alphabetical distribution
-            # Assumes keys are strings that can be compared
-            if not key:
-                return 0
-            # Use first character to determine shard
-            first_char = ord(key[0].lower())
-            # Map a-z (97-122) to shard indices
-            if first_char < 97:
-                return 0
-            elif first_char > 122:
-                return num_shards - 1
-            else:
-                return (first_char - 97) * num_shards // 26
+        # Simple alphabetical distribution
+        # Assumes keys are strings that can be compared
+        if not key:
+            return 0
+        # Use first character to determine shard
+        first_char = ord(key[0].lower())
+        # Map a-z (97-122) to shard indices
+        if first_char < 97:
+            return 0
+        if first_char > 122:
+            return num_shards - 1
+        return (first_char - 97) * num_shards // 26
 
 
 class ConsistentHashSharding:
@@ -218,8 +217,8 @@ class ShardedStore(Entity):
         self._reads = 0
         self._writes = 0
         self._deletes = 0
-        self._shard_reads: dict[int, int] = {i: 0 for i in range(len(shards))}
-        self._shard_writes: dict[int, int] = {i: 0 for i in range(len(shards))}
+        self._shard_reads: dict[int, int] = dict.fromkeys(range(len(shards)), 0)
+        self._shard_writes: dict[int, int] = dict.fromkeys(range(len(shards)), 0)
 
     @property
     def stats(self) -> ShardedStoreStats:
@@ -252,7 +251,7 @@ class ShardedStore(Entity):
         shard_idx = self._sharding_strategy.get_shard(key, len(self._shards))
         return shard_idx, self._shards[shard_idx]
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value from the appropriate shard.
 
         Args:
@@ -271,7 +270,7 @@ class ShardedStore(Entity):
         value = yield from shard.get(key)
         return value
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Store a value in the appropriate shard.
 
         Args:
@@ -300,7 +299,7 @@ class ShardedStore(Entity):
             True if key existed.
         """
         self._deletes += 1
-        shard_idx, shard = self._get_shard_for_key(key)
+        _shard_idx, shard = self._get_shard_for_key(key)
 
         result = yield from shard.delete(key)
         return result
@@ -324,7 +323,7 @@ class ShardedStore(Entity):
         """
         sizes = {}
         for i, shard in enumerate(self._shards):
-            if hasattr(shard, 'size'):
+            if hasattr(shard, "size"):
                 sizes[i] = shard.size
             else:
                 sizes[i] = 0
@@ -338,13 +337,11 @@ class ShardedStore(Entity):
         """
         all_keys = []
         for shard in self._shards:
-            if hasattr(shard, 'keys'):
+            if hasattr(shard, "keys"):
                 all_keys.extend(shard.keys())
         return all_keys
 
-    def scatter_gather(
-        self, keys: list[str]
-    ) -> Generator[float, None, dict[str, Any]]:
+    def scatter_gather(self, keys: list[str]) -> Generator[float, None, dict[str, Any]]:
         """Get multiple keys, optimizing for parallel shard access.
 
         Groups keys by shard and fetches from each shard.
@@ -379,4 +376,3 @@ class ShardedStore(Entity):
 
     def handle_event(self, event: Event) -> None:
         """ShardedStore can handle events for store operations."""
-        pass

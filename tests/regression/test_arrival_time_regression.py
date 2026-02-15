@@ -4,10 +4,9 @@ These values were captured from the working scipy implementation on 2026-01-31
 and should remain constant after scipy removal.
 """
 
-import pytest
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.profile import ConstantRateProfile, LinearRampProfile, SpikeProfile
 from happysimulator.core.temporal import Instant
+from happysimulator.load.profile import ConstantRateProfile, LinearRampProfile, SpikeProfile
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 
 
 class TestArrivalTimeRegression:
@@ -71,11 +70,36 @@ class TestArrivalTimeRegression:
     ]
 
     SPIKE_PROFILE_FIRST_30 = [
-        0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.799999999, 0.899999998, 0.999999998,
-        1.099999998, 1.199999998, 1.299999998, 1.399999998, 1.499999998, 1.599999998,
-        1.699999998, 1.799999998, 1.899999998, 1.999999997, 2.009999997, 2.019999996,
-        2.029999996, 2.039999995, 2.049999994, 2.059999994, 2.069999993, 2.079999993,
-        2.089999992, 2.099999991,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.799999999,
+        0.899999998,
+        0.999999998,
+        1.099999998,
+        1.199999998,
+        1.299999998,
+        1.399999998,
+        1.499999998,
+        1.599999998,
+        1.699999998,
+        1.799999998,
+        1.899999998,
+        1.999999997,
+        2.009999997,
+        2.019999996,
+        2.029999996,
+        2.039999995,
+        2.049999994,
+        2.059999994,
+        2.069999993,
+        2.079999993,
+        2.089999992,
+        2.099999991,
     ]
 
     def test_constant_rate_50_regression(self):
@@ -86,7 +110,7 @@ class TestArrivalTimeRegression:
         for i, expected in enumerate(self.CONSTANT_RATE_50_FIRST_10):
             actual = provider.next_arrival_time().to_seconds()
             assert abs(actual - expected) < 1e-8, (
-                f"Event {i+1}: Expected {expected}, got {actual}"
+                f"Event {i + 1}: Expected {expected}, got {actual}"
             )
 
     def test_constant_rate_100_regression(self):
@@ -97,7 +121,7 @@ class TestArrivalTimeRegression:
         for i, expected in enumerate(self.CONSTANT_RATE_100_FIRST_10):
             actual = provider.next_arrival_time().to_seconds()
             assert abs(actual - expected) < 1e-8, (
-                f"Event {i+1}: Expected {expected}, got {actual}"
+                f"Event {i + 1}: Expected {expected}, got {actual}"
             )
 
     def test_linear_ramp_up_regression(self):
@@ -108,7 +132,7 @@ class TestArrivalTimeRegression:
         for i, expected in enumerate(self.LINEAR_RAMP_10_100_FIRST_10):
             actual = provider.next_arrival_time().to_seconds()
             assert abs(actual - expected) < 1e-8, (
-                f"Event {i+1}: Expected {expected}, got {actual}"
+                f"Event {i + 1}: Expected {expected}, got {actual}"
             )
 
     def test_linear_ramp_down_regression(self):
@@ -119,7 +143,7 @@ class TestArrivalTimeRegression:
         for i, expected in enumerate(self.LINEAR_RAMP_100_10_FIRST_10):
             actual = provider.next_arrival_time().to_seconds()
             assert abs(actual - expected) < 1e-8, (
-                f"Event {i+1}: Expected {expected}, got {actual}"
+                f"Event {i + 1}: Expected {expected}, got {actual}"
             )
 
     def test_spike_profile_regression(self):
@@ -131,17 +155,14 @@ class TestArrivalTimeRegression:
         - baseline_rate=10 for t >= 3.0s (recovery)
         """
         profile = SpikeProfile(
-            baseline_rate=10.0,
-            spike_rate=100.0,
-            warmup_s=2.0,
-            spike_duration_s=1.0
+            baseline_rate=10.0, spike_rate=100.0, warmup_s=2.0, spike_duration_s=1.0
         )
         provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
 
         for i, expected in enumerate(self.SPIKE_PROFILE_FIRST_30):
             actual = provider.next_arrival_time().to_seconds()
             assert abs(actual - expected) < 1e-8, (
-                f"Event {i+1}: Expected {expected}, got {actual}"
+                f"Event {i + 1}: Expected {expected}, got {actual}"
             )
 
 
@@ -161,7 +182,7 @@ class TestArrivalTimeProperties:
                 actual_time = provider.next_arrival_time().to_seconds()
                 interval = actual_time - prev_time
                 assert abs(interval - expected_interval) < 1e-8, (
-                    f"Rate {rate}, Event {i+1}: Expected interval {expected_interval}, "
+                    f"Rate {rate}, Event {i + 1}: Expected interval {expected_interval}, "
                     f"got {interval}"
                 )
                 prev_time = actual_time
@@ -172,13 +193,13 @@ class TestArrivalTimeProperties:
         provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
 
         times = [provider.next_arrival_time().to_seconds() for _ in range(20)]
-        intervals = [times[i] - times[i-1] for i in range(1, len(times))]
+        intervals = [times[i] - times[i - 1] for i in range(1, len(times))]
 
         # Each interval should be less than or equal to the previous (roughly)
         # We allow some tolerance due to numerical effects
         for i in range(1, len(intervals)):
-            assert intervals[i] <= intervals[i-1] * 1.1, (
-                f"Interval {i+1} ({intervals[i]}) should be <= interval {i} ({intervals[i-1]})"
+            assert intervals[i] <= intervals[i - 1] * 1.1, (
+                f"Interval {i + 1} ({intervals[i]}) should be <= interval {i} ({intervals[i - 1]})"
             )
 
     def test_ramp_down_events_decelerate(self):
@@ -187,21 +208,18 @@ class TestArrivalTimeProperties:
         provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
 
         times = [provider.next_arrival_time().to_seconds() for _ in range(20)]
-        intervals = [times[i] - times[i-1] for i in range(1, len(times))]
+        intervals = [times[i] - times[i - 1] for i in range(1, len(times))]
 
         # Each interval should be greater than or equal to the previous (roughly)
         for i in range(1, len(intervals)):
-            assert intervals[i] >= intervals[i-1] * 0.9, (
-                f"Interval {i+1} ({intervals[i]}) should be >= interval {i} ({intervals[i-1]})"
+            assert intervals[i] >= intervals[i - 1] * 0.9, (
+                f"Interval {i + 1} ({intervals[i]}) should be >= interval {i} ({intervals[i - 1]})"
             )
 
     def test_spike_profile_rate_changes(self):
         """Verify spike profile shows rate changes at expected transitions."""
         profile = SpikeProfile(
-            baseline_rate=10.0,
-            spike_rate=100.0,
-            warmup_s=2.0,
-            spike_duration_s=1.0
+            baseline_rate=10.0, spike_rate=100.0, warmup_s=2.0, spike_duration_s=1.0
         )
         provider = ConstantArrivalTimeProvider(profile, start_time=Instant.Epoch)
 

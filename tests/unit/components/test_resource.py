@@ -2,7 +2,7 @@
 
 import pytest
 
-from happysimulator.components.resource import Resource, Grant, ResourceStats
+from happysimulator.components.resource import Grant, Resource, ResourceStats
 
 
 class TestResourceCreation:
@@ -168,7 +168,7 @@ class TestFIFOWaiterSatisfaction:
 
     def test_strict_fifo_blocks_if_head_cannot_be_satisfied(self):
         r = Resource("cpu", capacity=3)
-        g1 = r.try_acquire(3)
+        r.try_acquire(3)
 
         # Waiter 1 wants 2, waiter 2 wants 1
         f_big = r.acquire(2)
@@ -299,10 +299,10 @@ class TestMultiplePartialAcquires:
 
     def test_partial_acquires_exhaust_capacity(self):
         r = Resource("cpu", capacity=4)
-        g1 = r.try_acquire(1)
+        r.try_acquire(1)
         g2 = r.try_acquire(1)
-        g3 = r.try_acquire(1)
-        g4 = r.try_acquire(1)
+        r.try_acquire(1)
+        r.try_acquire(1)
         assert r.available == 0
         assert r.try_acquire(1) is None
 
@@ -314,9 +314,9 @@ class TestMultiplePartialAcquires:
 
     def test_float_capacity_partial_acquires(self):
         r = Resource("bw", capacity=10.0)
-        g1 = r.try_acquire(3.5)
-        g2 = r.try_acquire(3.5)
+        r.try_acquire(3.5)
+        r.try_acquire(3.5)
         assert r.available == pytest.approx(3.0)
-        g3 = r.try_acquire(3.0)
+        r.try_acquire(3.0)
         assert r.available == pytest.approx(0.0)
         assert r.try_acquire(0.1) is None

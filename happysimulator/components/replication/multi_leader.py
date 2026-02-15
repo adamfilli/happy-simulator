@@ -13,7 +13,8 @@ Based on patterns from CouchDB, Dynamo, and Riak.
 Example::
 
     from happysimulator.components.replication import (
-        LeaderNode, LastWriterWins,
+        LeaderNode,
+        LastWriterWins,
     )
 
     leaders = [LeaderNode(f"dc-{i}", ...) for i in range(3)]
@@ -26,19 +27,23 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.logical_clocks import VectorClock
-from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.datastore.kv_store import KVStore
 from happysimulator.components.replication.conflict_resolver import (
     ConflictResolver,
     LastWriterWins,
     VersionedValue,
 )
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.logical_clocks import VectorClock
 from happysimulator.sketching.merkle_tree import MerkleTree
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.datastore.kv_store import KVStore
+    from happysimulator.core.sim_future import SimFuture
 
 logger = logging.getLogger(__name__)
 
@@ -178,15 +183,20 @@ class LeaderNode(Entity):
         if self._anti_entropy_interval <= 0 or not self._peers:
             return None
         return Event(
-            time=self.now if self.now.to_seconds() > 0 else self.now.__class__.from_seconds(self._anti_entropy_interval),
+            time=self.now
+            if self.now.to_seconds() > 0
+            else self.now.__class__.from_seconds(self._anti_entropy_interval),
             event_type="AntiEntropy",
             target=self,
             daemon=True,
         )
 
     def handle_event(
-        self, event: Event,
-    ) -> Generator[float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
+        self,
+        event: Event,
+    ) -> Generator[
+        float | SimFuture | tuple[float, list[Event] | Event], None, list[Event] | Event | None
+    ]:
         """Route events by type."""
         if event.event_type == "Write":
             return (yield from self._handle_write(event))
@@ -203,7 +213,8 @@ class LeaderNode(Entity):
         return None
 
     def _handle_write(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Process a local write: stamp with VectorClock, apply, replicate."""
         metadata = event.context.get("metadata", {})
@@ -236,16 +247,20 @@ class LeaderNode(Entity):
         # Replicate to all peers
         events = []
         for peer in self._peers:
-            events.append(self._network.send(
-                self, peer, "Replicate",
-                payload={
-                    "key": key,
-                    "value": value,
-                    "timestamp": timestamp,
-                    "writer_id": self.name,
-                    "vector_clock": vc_snapshot,
-                },
-            ))
+            events.append(
+                self._network.send(
+                    self,
+                    peer,
+                    "Replicate",
+                    payload={
+                        "key": key,
+                        "value": value,
+                        "timestamp": timestamp,
+                        "writer_id": self.name,
+                        "vector_clock": vc_snapshot,
+                    },
+                )
+            )
             self._replications_sent += 1
 
         if events:
@@ -256,7 +271,8 @@ class LeaderNode(Entity):
         return None
 
     def _handle_read(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float, None, list[Event] | Event | None]:
         """Serve a read from the local store."""
         metadata = event.context.get("metadata", {})
@@ -271,7 +287,8 @@ class LeaderNode(Entity):
         return None
 
     def _handle_replicate(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float, None, list[Event] | Event | None]:
         """Process a replication message from a peer."""
         metadata = event.context.get("metadata", {})
@@ -328,7 +345,8 @@ class LeaderNode(Entity):
         return None
 
     def _handle_anti_entropy(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Periodic anti-entropy: pick a random peer and exchange data."""
         if not self._peers:
@@ -348,7 +366,9 @@ class LeaderNode(Entity):
             }
 
         ae_event = self._network.send(
-            self, peer, "AntiEntropyRequest",
+            self,
+            peer,
+            "AntiEntropyRequest",
             payload={
                 "root_hash": self._merkle.root_hash,
                 "versions": data_to_send,
@@ -369,7 +389,8 @@ class LeaderNode(Entity):
         return None
 
     def _handle_anti_entropy_request(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float | tuple[float, list[Event] | Event], None, list[Event] | Event | None]:
         """Respond to an anti-entropy request: reconcile their data, send ours."""
         metadata = event.context.get("metadata", {})
@@ -434,14 +455,17 @@ class LeaderNode(Entity):
             }
 
         resp = self._network.send(
-            self, requester, "AntiEntropyResponse",
+            self,
+            requester,
+            "AntiEntropyResponse",
             payload={"versions": data_to_send},
         )
         yield 0.0, [resp]
         return None
 
     def _handle_anti_entropy_response(
-        self, event: Event,
+        self,
+        event: Event,
     ) -> Generator[float, None, list[Event] | Event | None]:
         """Reconcile data from a peer's anti-entropy response."""
         metadata = event.context.get("metadata", {})

@@ -1,7 +1,5 @@
 """Tests for ORSet CRDT."""
 
-import pytest
-
 from happysimulator.components.crdt.or_set import ORSet
 from happysimulator.components.crdt.protocol import CRDT
 

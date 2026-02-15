@@ -146,9 +146,9 @@ from __future__ import annotations
 import math
 import random
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -171,8 +171,11 @@ from happysimulator.components.rate_limiter import (
     NullRateLimiter,
     RateLimitedEntity,
 )
-from happysimulator.distributions.latency_distribution import LatencyDistribution
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 # =============================================================================
 # Batch Tracking
@@ -422,16 +425,13 @@ def percentile_sorted(sorted_values: list[float], p: float) -> float:
     return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
 
 
-def create_latency_distribution(
-    dist_type: str, mean_latency: float
-) -> LatencyDistribution:
+def create_latency_distribution(dist_type: str, mean_latency: float) -> LatencyDistribution:
     """Create a latency distribution by type name."""
     if dist_type == "constant":
         return ConstantLatency(mean_latency)
-    elif dist_type == "exponential":
+    if dist_type == "exponential":
         return ExponentialLatency(mean_latency)
-    else:
-        raise ValueError(f"Unknown distribution type: {dist_type}")
+    raise ValueError(f"Unknown distribution type: {dist_type}")
 
 
 # =============================================================================
@@ -563,8 +563,12 @@ def run_simulation(
     )
 
     # Create probes for queue depths and worker utilization
-    exec1_probes, exec1_data = Probe.on_many(executor1, ["depth", "in_flight"], interval=probe_interval_s)
-    exec2_probes, exec2_data = Probe.on_many(executor2, ["depth", "in_flight"], interval=probe_interval_s)
+    exec1_probes, exec1_data = Probe.on_many(
+        executor1, ["depth", "in_flight"], interval=probe_interval_s
+    )
+    exec2_probes, exec2_data = Probe.on_many(
+        executor2, ["depth", "in_flight"], interval=probe_interval_s
+    )
     queue1_depth_data = exec1_data["depth"]
     queue2_depth_data = exec2_data["depth"]
     executor1_utilization_data = exec1_data["in_flight"]
@@ -573,7 +577,11 @@ def run_simulation(
     # Collect entities — always include rate limiters (LeakyBucket
     # self-schedules leak events that need entity registration)
     entities: list[Entity] = [
-        executor1, executor2, sink, rate_limiter1, rate_limiter2,
+        executor1,
+        executor2,
+        sink,
+        rate_limiter1,
+        rate_limiter2,
     ]
 
     # Run simulation with drain time
@@ -745,7 +753,7 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
         # Bucket completions per second
         completion_buckets: dict[int, int] = defaultdict(int)
         for t in times_s:
-            bucket = int(math.floor(t))
+            bucket = math.floor(t)
             completion_buckets[bucket] += 1
 
         throughput_times = sorted(completion_buckets.keys())
@@ -774,13 +782,13 @@ def print_summary(result: SimulationResult) -> None:
     print("METRIC COLLECTION PIPELINE RESULTS")
     print("=" * 60)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Batch interval: {result.batch_interval}s")
     print(f"  Tasks per batch: {result.tasks_per_batch}")
     print(f"  Executor1 workers: {result.executor1.concurrency}")
     print(f"  Executor2 workers: {result.executor2.concurrency}")
 
-    print(f"\nTasks:")
+    print("\nTasks:")
     print(f"  Generated: {result.total_tasks_generated}")
     print(f"  Executor1 processed: {result.executor1.stats_processed}")
     print(f"  Executor2 processed: {result.executor2.stats_processed}")
@@ -789,7 +797,7 @@ def print_summary(result: SimulationResult) -> None:
     # Batch statistics
     batch_durations = result.batch_tracker.batch_durations_seconds()
     if batch_durations:
-        print(f"\nBatches:")
+        print("\nBatches:")
         print(f"  Completed: {len(batch_durations)}")
 
         durations = [d[1] for d in batch_durations]
@@ -805,7 +813,7 @@ def print_summary(result: SimulationResult) -> None:
         print(f"  Max duration: {max_duration:.3f}s")
         print(f"  Over deadline ({deadline}s): {batches_over_deadline}")
 
-        print(f"\n  Per-batch durations:")
+        print("\n  Per-batch durations:")
         for batch_id, duration in batch_durations:
             status = "OK" if duration <= deadline else "OVER"
             print(f"    Batch {batch_id}: {duration:.3f}s [{status}]")
@@ -814,7 +822,7 @@ def print_summary(result: SimulationResult) -> None:
     latencies = result.sink.latencies_s
     if latencies:
         sorted_latencies = sorted(latencies)
-        print(f"\nPer-Task Latency:")
+        print("\nPer-Task Latency:")
         print(f"  Average: {sum(latencies) / len(latencies):.4f}s")
         print(f"  p0 (min): {percentile_sorted(sorted_latencies, 0.0):.4f}s")
         print(f"  p50: {percentile_sorted(sorted_latencies, 0.50):.4f}s")
@@ -833,9 +841,7 @@ def print_summary(result: SimulationResult) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Metric collection pipeline simulation"
-    )
+    parser = argparse.ArgumentParser(description="Metric collection pipeline simulation")
 
     # Simulation parameters
     parser.add_argument(
@@ -936,12 +942,20 @@ if __name__ == "__main__":
     print(f"  Duration: {args.duration}s")
     print(f"  Batch interval: {args.batch_interval}s")
     print(f"  Tasks per batch: {args.tasks_per_batch}")
-    print(f"  Executor1: {args.executor1_workers} workers, {args.executor1_latency}s mean ({args.executor1_dist})")
-    print(f"  Executor2: {args.executor2_workers} workers, {args.executor2_latency}s mean ({args.executor2_dist})")
+    print(
+        f"  Executor1: {args.executor1_workers} workers, {args.executor1_latency}s mean ({args.executor1_dist})"
+    )
+    print(
+        f"  Executor2: {args.executor2_workers} workers, {args.executor2_latency}s mean ({args.executor2_dist})"
+    )
     if args.rate_limit_stage1:
-        print(f"  Rate limit Stage 1: {args.rate_limit_stage1} req/s (leaky bucket, capacity={args.tasks_per_batch})")
+        print(
+            f"  Rate limit Stage 1: {args.rate_limit_stage1} req/s (leaky bucket, capacity={args.tasks_per_batch})"
+        )
     if args.rate_limit_stage2:
-        print(f"  Rate limit Stage 2: {args.rate_limit_stage2} req/s (leaky bucket, capacity={args.tasks_per_batch})")
+        print(
+            f"  Rate limit Stage 2: {args.rate_limit_stage2} req/s (leaky bucket, capacity={args.tasks_per_batch})"
+        )
 
     result = run_simulation(
         duration_s=args.duration,

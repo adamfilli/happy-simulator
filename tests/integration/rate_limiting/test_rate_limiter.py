@@ -20,24 +20,26 @@ Output:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable, List
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.common import Sink
 from happysimulator.components.rate_limiter import (
-    RateLimitedEntity,
-    TokenBucketPolicy,
     LeakyBucketPolicy,
+    RateLimitedEntity,
     SlidingWindowPolicy,
+    TokenBucketPolicy,
 )
 from happysimulator.core.event import Event
-from happysimulator.load.profile import Profile
-from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from pathlib import Path
 
 # --- Profile Definitions ---
 
@@ -45,15 +47,17 @@ from happysimulator.core.temporal import Instant
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant arrival rate profile."""
+
     rate: float
 
-    def get_rate(self, time: Instant) -> float:  # noqa: ARG002
+    def get_rate(self, time: Instant) -> float:
         return float(self.rate)
 
 
 @dataclass(frozen=True)
 class LinearRampProfile(Profile):
     """Linear ramp from start_rate to end_rate over t_end_s seconds."""
+
     t_end_s: float
     start_rate: float
     end_rate: float
@@ -69,6 +73,7 @@ class LinearRampProfile(Profile):
 @dataclass(frozen=True)
 class StepRateProfile(Profile):
     """Step function that switches from low to high rate at t_switch_s."""
+
     t_switch_s: float
     low: float
     high: float
@@ -93,14 +98,16 @@ def _write_csv(path: Path, header: Iterable[str], rows: Iterable[Iterable[object
     """Write data to a CSV file."""
     import csv
 
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(list(header))
         for row in rows:
             writer.writerow(list(row))
 
 
-def _bin_counts(times_s: list[float], duration_s: float, bin_s: float) -> tuple[list[float], list[float]]:
+def _bin_counts(
+    times_s: list[float], duration_s: float, bin_s: float
+) -> tuple[list[float], list[float]]:
     """Bin event times and return (bin_centers, events_per_second)."""
     if duration_s <= 0 or bin_s <= 0:
         return [], []
@@ -129,7 +136,12 @@ def _bin_counts(times_s: list[float], duration_s: float, bin_s: float) -> tuple[
         # Low constant load - should be fully forwarded
         ("constant_within_limit", ConstantRateProfile(rate=5.0), 20.0, 10.0),
         # Ramp up exceeding rate limit
-        ("ramp_exceeds_limit", LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0), 10.0, 5.0),
+        (
+            "ramp_exceeds_limit",
+            LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0),
+            10.0,
+            5.0,
+        ),
         # Step function - sudden increase
         ("step_overload", StepRateProfile(t_switch_s=30.0, low=3.0, high=15.0), 10.0, 5.0),
         # High constant load - significant queuing
@@ -166,8 +178,10 @@ def test_rate_limiter_with_profile(
 
     # Create source targeting the rate limiter
     source = Source.with_profile(
-        profile=profile, target=rate_limiter,
-        poisson=False, name=f"RequestSource_{test_name}",
+        profile=profile,
+        target=rate_limiter,
+        poisson=False,
+        name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -182,7 +196,7 @@ def test_rate_limiter_with_profile(
     # Extract time series data
     received_s = [t.to_seconds() for t in rate_limiter.received_times]
     forwarded_s = [t.to_seconds() for t in rate_limiter.forwarded_times]
-    dropped_s = [t.to_seconds() for t in rate_limiter.dropped_times]
+    [t.to_seconds() for t in rate_limiter.dropped_times]
 
     # Verify basic invariants
     total = rate_limiter.stats.forwarded + rate_limiter.queue_depth + rate_limiter.stats.dropped
@@ -220,15 +234,33 @@ def test_rate_limiter_with_profile(
     fig1, ax_rate = plt.subplots(figsize=(12, 5))
 
     ax_rate.plot(sample_times, sample_rates, "b-", label="Load profile (target)", linewidth=2)
-    ax_rate.axhline(y=refill_rate, color="r", linestyle="--", label=f"Rate limit ({refill_rate}/s)", linewidth=2)
+    ax_rate.axhline(
+        y=refill_rate, color="r", linestyle="--", label=f"Rate limit ({refill_rate}/s)", linewidth=2
+    )
     if recv_centers:
-        ax_rate.step(recv_centers, recv_rates, where="mid", alpha=0.7, label="Received (binned)", color="gray")
+        ax_rate.step(
+            recv_centers,
+            recv_rates,
+            where="mid",
+            alpha=0.7,
+            label="Received (binned)",
+            color="gray",
+        )
     if fwd_centers:
-        ax_rate.step(fwd_centers, fwd_rates, where="mid", alpha=0.9, label="Forwarded (binned)", color="green")
+        ax_rate.step(
+            fwd_centers,
+            fwd_rates,
+            where="mid",
+            alpha=0.9,
+            label="Forwarded (binned)",
+            color="green",
+        )
 
     ax_rate.set_xlabel("Time (s)")
     ax_rate.set_ylabel("Rate (events/s)")
-    ax_rate.set_title(f"Rate Limiter: {test_name}\n(capacity={bucket_capacity}, refill={refill_rate}/s)")
+    ax_rate.set_title(
+        f"Rate Limiter: {test_name}\n(capacity={bucket_capacity}, refill={refill_rate}/s)"
+    )
     ax_rate.legend(loc="upper left")
     ax_rate.grid(True, alpha=0.3)
     ax_rate.set_ylim(bottom=0)
@@ -241,11 +273,23 @@ def test_rate_limiter_with_profile(
     fig2, ax_cum = plt.subplots(figsize=(12, 5))
 
     if received_s:
-        ax_cum.step([0.0] + received_s, [0] + list(range(1, len(received_s) + 1)),
-                    where="post", label="Received", color="gray", alpha=0.7)
+        ax_cum.step(
+            [0.0, *received_s],
+            [0, *list(range(1, len(received_s) + 1))],
+            where="post",
+            label="Received",
+            color="gray",
+            alpha=0.7,
+        )
     if forwarded_s:
-        ax_cum.step([0.0] + forwarded_s, [0] + list(range(1, len(forwarded_s) + 1)),
-                    where="post", label="Forwarded", color="green", linewidth=2)
+        ax_cum.step(
+            [0.0, *forwarded_s],
+            [0, *list(range(1, len(forwarded_s) + 1))],
+            where="post",
+            label="Forwarded",
+            color="green",
+            linewidth=2,
+        )
 
     ax_cum.set_xlabel("Time (s)")
     ax_cum.set_ylabel("Cumulative events")
@@ -272,7 +316,7 @@ def test_rate_limiter_basic_functionality():
     )
 
     # Create a simulation to provide clock
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -305,7 +349,7 @@ def test_rate_limiter_empty_bucket():
         queue_capacity=100,
     )
 
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -314,7 +358,7 @@ def test_rate_limiter_empty_bucket():
 
     # Request should be queued since no tokens available
     event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    result = rate_limiter.handle_event(event)
+    rate_limiter.handle_event(event)
 
     # Should return a poll event (not a forward)
     assert rate_limiter.stats.queued == 1
@@ -333,7 +377,11 @@ def test_rate_limiter_empty_bucket():
         # Low constant load - should be fully forwarded (with delay)
         ("leaky_constant_within_limit", ConstantRateProfile(rate=3.0), 5.0),
         # Ramp up exceeding rate limit
-        ("leaky_ramp_exceeds_limit", LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0), 5.0),
+        (
+            "leaky_ramp_exceeds_limit",
+            LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0),
+            5.0,
+        ),
         # Step function - sudden increase
         ("leaky_step_overload", StepRateProfile(t_switch_s=30.0, low=3.0, high=15.0), 5.0),
     ],
@@ -364,8 +412,10 @@ def test_leaky_bucket_with_profile(
 
     # Create source targeting the rate limiter
     source = Source.with_profile(
-        profile=profile, target=rate_limiter,
-        poisson=False, name=f"RequestSource_{test_name}",
+        profile=profile,
+        target=rate_limiter,
+        poisson=False,
+        name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -417,11 +467,27 @@ def test_leaky_bucket_with_profile(
     fig1, ax_rate = plt.subplots(figsize=(12, 5))
 
     ax_rate.plot(sample_times, sample_rates, "b-", label="Load profile (target)", linewidth=2)
-    ax_rate.axhline(y=leak_rate, color="r", linestyle="--", label=f"Leak rate ({leak_rate}/s)", linewidth=2)
+    ax_rate.axhline(
+        y=leak_rate, color="r", linestyle="--", label=f"Leak rate ({leak_rate}/s)", linewidth=2
+    )
     if recv_centers:
-        ax_rate.step(recv_centers, recv_rates, where="mid", alpha=0.7, label="Received (binned)", color="gray")
+        ax_rate.step(
+            recv_centers,
+            recv_rates,
+            where="mid",
+            alpha=0.7,
+            label="Received (binned)",
+            color="gray",
+        )
     if fwd_centers:
-        ax_rate.step(fwd_centers, fwd_rates, where="mid", alpha=0.9, label="Forwarded (binned)", color="green")
+        ax_rate.step(
+            fwd_centers,
+            fwd_rates,
+            where="mid",
+            alpha=0.9,
+            label="Forwarded (binned)",
+            color="green",
+        )
 
     ax_rate.set_ylabel("Rate (events/s)")
     ax_rate.set_title(f"Leaky Bucket Rate Limiter: {test_name}\n(leak_rate={leak_rate}/s)")
@@ -448,7 +514,7 @@ def test_leaky_bucket_basic_functionality():
         queue_capacity=100,
     )
 
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -466,7 +532,7 @@ def test_leaky_bucket_basic_functionality():
 
     # Second request at t=0 should be queued (leaky bucket interval not elapsed)
     event2 = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    result2 = rate_limiter.handle_event(event2)
+    rate_limiter.handle_event(event2)
     assert rate_limiter.stats.queued == 1
 
 
@@ -481,7 +547,7 @@ def test_leaky_bucket_full_queue():
         queue_capacity=3,
     )
 
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -525,20 +591,32 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
     token_sink = Sink("token_sink")
     token_policy = TokenBucketPolicy(capacity=10.0, refill_rate=rate_limit)
     token_limiter = RateLimitedEntity(
-        name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
+        name="token_limiter",
+        downstream=token_sink,
+        policy=token_policy,
+        queue_capacity=10000,
     )
     token_source = Source.with_profile(
-        profile=profile, target=token_limiter, poisson=False, name="TokenSource",
+        profile=profile,
+        target=token_limiter,
+        poisson=False,
+        name="TokenSource",
     )
 
     # --- Leaky Bucket Setup ---
     leaky_sink = Sink("leaky_sink")
     leaky_policy = LeakyBucketPolicy(leak_rate=rate_limit)
     leaky_limiter = RateLimitedEntity(
-        name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
+        name="leaky_limiter",
+        downstream=leaky_sink,
+        policy=leaky_policy,
+        queue_capacity=10000,
     )
     leaky_source = Source.with_profile(
-        profile=profile, target=leaky_limiter, poisson=False, name="LeakySource",
+        profile=profile,
+        target=leaky_limiter,
+        poisson=False,
+        name="LeakySource",
     )
 
     # Run simulations
@@ -576,25 +654,55 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
 
     # Rate comparison
     ax_rate.plot(sample_times, sample_rates, "b-", label="Load profile", linewidth=2, alpha=0.7)
-    ax_rate.axhline(y=rate_limit, color="k", linestyle="--", label=f"Rate limit ({rate_limit}/s)", linewidth=2)
+    ax_rate.axhline(
+        y=rate_limit, color="k", linestyle="--", label=f"Rate limit ({rate_limit}/s)", linewidth=2
+    )
     if token_centers:
-        ax_rate.step(token_centers, token_rates, where="mid", label="Token bucket (forwarded)", color="green", linewidth=1.5)
+        ax_rate.step(
+            token_centers,
+            token_rates,
+            where="mid",
+            label="Token bucket (forwarded)",
+            color="green",
+            linewidth=1.5,
+        )
     if leaky_centers:
-        ax_rate.step(leaky_centers, leaky_rates, where="mid", label="Leaky bucket (forwarded)", color="purple", linewidth=1.5)
+        ax_rate.step(
+            leaky_centers,
+            leaky_rates,
+            where="mid",
+            label="Leaky bucket (forwarded)",
+            color="purple",
+            linewidth=1.5,
+        )
 
     ax_rate.set_ylabel("Rate (events/s)")
-    ax_rate.set_title("Token Bucket vs Leaky Bucket Rate Limiter Comparison\n(same rate limit, same load profile)")
+    ax_rate.set_title(
+        "Token Bucket vs Leaky Bucket Rate Limiter Comparison\n(same rate limit, same load profile)"
+    )
     ax_rate.legend(loc="upper left")
     ax_rate.grid(True, alpha=0.3)
     ax_rate.set_ylim(bottom=0)
 
     # Cumulative comparison
     if token_fwd_s:
-        ax_cum.step([0.0] + token_fwd_s, [0] + list(range(1, len(token_fwd_s) + 1)),
-                    where="post", label=f"Token bucket (total: {len(token_fwd_s)})", color="green", linewidth=2)
+        ax_cum.step(
+            [0.0, *token_fwd_s],
+            [0, *list(range(1, len(token_fwd_s) + 1))],
+            where="post",
+            label=f"Token bucket (total: {len(token_fwd_s)})",
+            color="green",
+            linewidth=2,
+        )
     if leaky_fwd_s:
-        ax_cum.step([0.0] + leaky_fwd_s, [0] + list(range(1, len(leaky_fwd_s) + 1)),
-                    where="post", label=f"Leaky bucket (total: {len(leaky_fwd_s)})", color="purple", linewidth=2)
+        ax_cum.step(
+            [0.0, *leaky_fwd_s],
+            [0, *list(range(1, len(leaky_fwd_s) + 1))],
+            where="post",
+            label=f"Leaky bucket (total: {len(leaky_fwd_s)})",
+            color="purple",
+            linewidth=2,
+        )
 
     ax_cum.set_xlabel("Time (s)")
     ax_cum.set_ylabel("Cumulative forwarded")
@@ -607,8 +715,12 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
 
     # Print comparison
     print("\n=== Token Bucket vs Leaky Bucket Comparison ===")
-    print(f"Token Bucket: forwarded={token_limiter.stats.forwarded}, queued={token_limiter.queue_depth}")
-    print(f"Leaky Bucket: forwarded={leaky_limiter.stats.forwarded}, queued={leaky_limiter.queue_depth}")
+    print(
+        f"Token Bucket: forwarded={token_limiter.stats.forwarded}, queued={token_limiter.queue_depth}"
+    )
+    print(
+        f"Leaky Bucket: forwarded={leaky_limiter.stats.forwarded}, queued={leaky_limiter.queue_depth}"
+    )
     print(f"Saved comparison plot to: {test_output_dir}")
 
 
@@ -623,11 +735,21 @@ def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):
         # Low constant load - should be fully forwarded
         ("sliding_constant_within_limit", ConstantRateProfile(rate=3.0), 1.0, 5),
         # Ramp up exceeding rate limit
-        ("sliding_ramp_exceeds_limit", LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0), 1.0, 5),
+        (
+            "sliding_ramp_exceeds_limit",
+            LinearRampProfile(t_end_s=60.0, start_rate=2.0, end_rate=20.0),
+            1.0,
+            5,
+        ),
         # Step function - sudden increase
         ("sliding_step_overload", StepRateProfile(t_switch_s=30.0, low=3.0, high=15.0), 1.0, 5),
         # Larger window with more requests allowed
-        ("sliding_large_window", LinearRampProfile(t_end_s=60.0, start_rate=5.0, end_rate=30.0), 2.0, 10),
+        (
+            "sliding_large_window",
+            LinearRampProfile(t_end_s=60.0, start_rate=5.0, end_rate=30.0),
+            2.0,
+            10,
+        ),
     ],
 )
 def test_sliding_window_with_profile(
@@ -662,8 +784,10 @@ def test_sliding_window_with_profile(
 
     # Create source targeting the rate limiter
     source = Source.with_profile(
-        profile=profile, target=rate_limiter,
-        poisson=False, name=f"RequestSource_{test_name}",
+        profile=profile,
+        target=rate_limiter,
+        poisson=False,
+        name=f"RequestSource_{test_name}",
     )
 
     # Run simulation
@@ -686,7 +810,9 @@ def test_sliding_window_with_profile(
 
     # Print summary
     print(f"\n=== {test_name} (Sliding Window) ===")
-    print(f"Window: {window_size_seconds}s, Max requests: {max_requests} (effective rate: {effective_rate_limit}/s)")
+    print(
+        f"Window: {window_size_seconds}s, Max requests: {max_requests} (effective rate: {effective_rate_limit}/s)"
+    )
     print(f"Received:  {rate_limiter.stats.received}")
     print(f"Forwarded: {rate_limiter.stats.forwarded}")
     print(f"Queued:    {rate_limiter.queue_depth}")
@@ -704,16 +830,37 @@ def test_sliding_window_with_profile(
     fig1, ax_rate = plt.subplots(figsize=(12, 5))
 
     ax_rate.plot(sample_times, sample_rates, "b-", label="Load profile (target)", linewidth=2)
-    ax_rate.axhline(y=effective_rate_limit, color="r", linestyle="--",
-                    label=f"Rate limit ({max_requests}/{window_size_seconds}s = {effective_rate_limit}/s)", linewidth=2)
+    ax_rate.axhline(
+        y=effective_rate_limit,
+        color="r",
+        linestyle="--",
+        label=f"Rate limit ({max_requests}/{window_size_seconds}s = {effective_rate_limit}/s)",
+        linewidth=2,
+    )
     if recv_centers:
-        ax_rate.step(recv_centers, recv_rates, where="mid", alpha=0.7, label="Received (binned)", color="gray")
+        ax_rate.step(
+            recv_centers,
+            recv_rates,
+            where="mid",
+            alpha=0.7,
+            label="Received (binned)",
+            color="gray",
+        )
     if fwd_centers:
-        ax_rate.step(fwd_centers, fwd_rates, where="mid", alpha=0.9, label="Forwarded (binned)", color="green")
+        ax_rate.step(
+            fwd_centers,
+            fwd_rates,
+            where="mid",
+            alpha=0.9,
+            label="Forwarded (binned)",
+            color="green",
+        )
 
     ax_rate.set_xlabel("Time (s)")
     ax_rate.set_ylabel("Rate (events/s)")
-    ax_rate.set_title(f"Sliding Window Rate Limiter: {test_name}\n(window={window_size_seconds}s, max={max_requests})")
+    ax_rate.set_title(
+        f"Sliding Window Rate Limiter: {test_name}\n(window={window_size_seconds}s, max={max_requests})"
+    )
     ax_rate.legend(loc="upper left")
     ax_rate.grid(True, alpha=0.3)
     ax_rate.set_ylim(bottom=0)
@@ -736,7 +883,7 @@ def test_sliding_window_basic_functionality():
         queue_capacity=100,
     )
 
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -772,7 +919,7 @@ def test_sliding_window_empty():
         queue_capacity=100,
     )
 
-    sim = Simulation(
+    Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
@@ -781,7 +928,7 @@ def test_sliding_window_empty():
 
     # First request should always be allowed
     event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    result = rate_limiter.handle_event(event)
+    rate_limiter.handle_event(event)
 
     assert rate_limiter.stats.forwarded == 1
     assert rate_limiter.stats.dropped == 0
@@ -804,30 +951,48 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
     token_sink = Sink("token_sink")
     token_policy = TokenBucketPolicy(capacity=10.0, refill_rate=rate_limit)
     token_limiter = RateLimitedEntity(
-        name="token_limiter", downstream=token_sink, policy=token_policy, queue_capacity=10000,
+        name="token_limiter",
+        downstream=token_sink,
+        policy=token_policy,
+        queue_capacity=10000,
     )
     token_source = Source.with_profile(
-        profile=profile, target=token_limiter, poisson=False, name="TokenSource",
+        profile=profile,
+        target=token_limiter,
+        poisson=False,
+        name="TokenSource",
     )
 
     # --- Leaky Bucket Setup ---
     leaky_sink = Sink("leaky_sink")
     leaky_policy = LeakyBucketPolicy(leak_rate=rate_limit)
     leaky_limiter = RateLimitedEntity(
-        name="leaky_limiter", downstream=leaky_sink, policy=leaky_policy, queue_capacity=10000,
+        name="leaky_limiter",
+        downstream=leaky_sink,
+        policy=leaky_policy,
+        queue_capacity=10000,
     )
     leaky_source = Source.with_profile(
-        profile=profile, target=leaky_limiter, poisson=False, name="LeakySource",
+        profile=profile,
+        target=leaky_limiter,
+        poisson=False,
+        name="LeakySource",
     )
 
     # --- Sliding Window Setup ---
     sliding_sink = Sink("sliding_sink")
     sliding_policy = SlidingWindowPolicy(window_size_seconds=1.0, max_requests=int(rate_limit))
     sliding_limiter = RateLimitedEntity(
-        name="sliding_limiter", downstream=sliding_sink, policy=sliding_policy, queue_capacity=10000,
+        name="sliding_limiter",
+        downstream=sliding_sink,
+        policy=sliding_policy,
+        queue_capacity=10000,
     )
     sliding_source = Source.with_profile(
-        profile=profile, target=sliding_limiter, poisson=False, name="SlidingSource",
+        profile=profile,
+        target=sliding_limiter,
+        poisson=False,
+        name="SlidingSource",
     )
 
     # Run simulations
@@ -875,30 +1040,73 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
 
     # Rate comparison
     ax_rate.plot(sample_times, sample_rates, "b-", label="Load profile", linewidth=2, alpha=0.7)
-    ax_rate.axhline(y=rate_limit, color="k", linestyle="--", label=f"Rate limit ({rate_limit}/s)", linewidth=2)
+    ax_rate.axhline(
+        y=rate_limit, color="k", linestyle="--", label=f"Rate limit ({rate_limit}/s)", linewidth=2
+    )
     if token_centers:
-        ax_rate.step(token_centers, token_rates, where="mid", label="Token bucket", color="green", linewidth=1.5)
+        ax_rate.step(
+            token_centers,
+            token_rates,
+            where="mid",
+            label="Token bucket",
+            color="green",
+            linewidth=1.5,
+        )
     if leaky_centers:
-        ax_rate.step(leaky_centers, leaky_rates, where="mid", label="Leaky bucket", color="purple", linewidth=1.5)
+        ax_rate.step(
+            leaky_centers,
+            leaky_rates,
+            where="mid",
+            label="Leaky bucket",
+            color="purple",
+            linewidth=1.5,
+        )
     if sliding_centers:
-        ax_rate.step(sliding_centers, sliding_rates, where="mid", label="Sliding window", color="orange", linewidth=1.5)
+        ax_rate.step(
+            sliding_centers,
+            sliding_rates,
+            where="mid",
+            label="Sliding window",
+            color="orange",
+            linewidth=1.5,
+        )
 
     ax_rate.set_ylabel("Rate (events/s)")
-    ax_rate.set_title("All Rate Limiters Comparison\n(Token Bucket vs Leaky Bucket vs Sliding Window)")
+    ax_rate.set_title(
+        "All Rate Limiters Comparison\n(Token Bucket vs Leaky Bucket vs Sliding Window)"
+    )
     ax_rate.legend(loc="upper left")
     ax_rate.grid(True, alpha=0.3)
     ax_rate.set_ylim(bottom=0)
 
     # Cumulative comparison
     if token_fwd_s:
-        ax_cum.step([0.0] + token_fwd_s, [0] + list(range(1, len(token_fwd_s) + 1)),
-                    where="post", label=f"Token bucket (total: {len(token_fwd_s)})", color="green", linewidth=2)
+        ax_cum.step(
+            [0.0, *token_fwd_s],
+            [0, *list(range(1, len(token_fwd_s) + 1))],
+            where="post",
+            label=f"Token bucket (total: {len(token_fwd_s)})",
+            color="green",
+            linewidth=2,
+        )
     if leaky_fwd_s:
-        ax_cum.step([0.0] + leaky_fwd_s, [0] + list(range(1, len(leaky_fwd_s) + 1)),
-                    where="post", label=f"Leaky bucket (total: {len(leaky_fwd_s)})", color="purple", linewidth=2)
+        ax_cum.step(
+            [0.0, *leaky_fwd_s],
+            [0, *list(range(1, len(leaky_fwd_s) + 1))],
+            where="post",
+            label=f"Leaky bucket (total: {len(leaky_fwd_s)})",
+            color="purple",
+            linewidth=2,
+        )
     if sliding_fwd_s:
-        ax_cum.step([0.0] + sliding_fwd_s, [0] + list(range(1, len(sliding_fwd_s) + 1)),
-                    where="post", label=f"Sliding window (total: {len(sliding_fwd_s)})", color="orange", linewidth=2)
+        ax_cum.step(
+            [0.0, *sliding_fwd_s],
+            [0, *list(range(1, len(sliding_fwd_s) + 1))],
+            where="post",
+            label=f"Sliding window (total: {len(sliding_fwd_s)})",
+            color="orange",
+            linewidth=2,
+        )
 
     ax_cum.set_xlabel("Time (s)")
     ax_cum.set_ylabel("Cumulative forwarded")
@@ -911,7 +1119,13 @@ def test_all_rate_limiters_comparison(test_output_dir: Path):
 
     # Print comparison
     print("\n=== All Rate Limiters Comparison ===")
-    print(f"Token Bucket:   forwarded={token_limiter.stats.forwarded}, queued={token_limiter.queue_depth}")
-    print(f"Leaky Bucket:   forwarded={leaky_limiter.stats.forwarded}, queued={leaky_limiter.queue_depth}")
-    print(f"Sliding Window: forwarded={sliding_limiter.stats.forwarded}, queued={sliding_limiter.queue_depth}")
+    print(
+        f"Token Bucket:   forwarded={token_limiter.stats.forwarded}, queued={token_limiter.queue_depth}"
+    )
+    print(
+        f"Leaky Bucket:   forwarded={leaky_limiter.stats.forwarded}, queued={leaky_limiter.queue_depth}"
+    )
+    print(
+        f"Sliding Window: forwarded={sliding_limiter.stats.forwarded}, queued={sliding_limiter.queue_depth}"
+    )
     print(f"Saved comparison plot to: {test_output_dir}")

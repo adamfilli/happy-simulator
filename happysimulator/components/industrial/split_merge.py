@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture, all_of
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +78,7 @@ class SplitMerge(Entity):
             fan_out=len(self.targets),
         )
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float | SimFuture, None, list[Event]]:
+    def handle_event(self, event: Event) -> Generator[float | SimFuture, None, list[Event]]:
         self._splits_initiated += 1
 
         # Create futures and sub-events

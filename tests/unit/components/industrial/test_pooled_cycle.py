@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
-from happysimulator.components.industrial.pooled_cycle import PooledCycleResource
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.pooled_cycle import PooledCycleResource
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestPooledCycleBasics:
-
     def test_creates_with_parameters(self):
         pool = PooledCycleResource("pool", pool_size=4, cycle_time=1.0)
         assert pool.pool_size == 4
@@ -55,7 +52,11 @@ class TestPooledCycleBasics:
     def test_rejects_when_queue_full(self):
         sink = Sink()
         pool = PooledCycleResource(
-            "pool", pool_size=1, cycle_time=1.0, downstream=sink, queue_capacity=1,
+            "pool",
+            pool_size=1,
+            cycle_time=1.0,
+            downstream=sink,
+            queue_capacity=1,
         )
 
         sim = Simulation(
@@ -103,7 +104,9 @@ class TestPooledCycleBasics:
         )
         sim.schedule(
             Event(
-                time=Instant.Epoch, event_type="Item", target=pool,
+                time=Instant.Epoch,
+                event_type="Item",
+                target=pool,
                 context={"created_at": Instant.Epoch, "payload": "test"},
             )
         )

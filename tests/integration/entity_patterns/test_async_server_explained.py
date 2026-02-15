@@ -31,8 +31,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import List
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -48,6 +47,8 @@ from happysimulator.load.profile import Profile
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # --- Profiles ---
 
@@ -55,6 +56,7 @@ from happysimulator.load.source import Source
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -67,6 +69,7 @@ class ConstantRateProfile(Profile):
 @dataclass
 class TimelineCollector(Entity):
     """Collects timeline data for visualization."""
+
     name: str
     sample_interval_s: float = 0.01  # 10ms resolution
 
@@ -125,6 +128,7 @@ class TimelineCollector(Entity):
 @dataclass
 class RequestTracker(Entity):
     """Tracks individual request lifecycle for timeline visualization."""
+
     name: str
 
     # List of (request_id, arrive_time, complete_time)
@@ -160,7 +164,7 @@ class TrackedRequestProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -196,7 +200,7 @@ class TrackedRequestProvider(EventProvider):
 
 def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
     """Write data to a CSV file."""
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
@@ -271,6 +275,7 @@ class TestAsyncServerExplained:
                         target=tracker,
                         context={"metadata": {"request_id": rid}},
                     )
+
                 return on_complete
 
             event.add_completion_hook(make_hook(request_id))
@@ -288,47 +293,71 @@ class TestAsyncServerExplained:
         ax = axes[0, 0]
         colors = plt.cm.Set3(range(len(tracker.request_timeline)))
         for i, (req_id, arrive, complete) in enumerate(sorted(tracker.request_timeline)):
-            ax.barh(req_id, complete - arrive, left=arrive, height=0.6,
-                   color=colors[i % len(colors)], edgecolor='black', linewidth=1)
-            ax.text(complete + 0.01, req_id, f'{(complete-arrive)*1000:.0f}ms',
-                   va='center', fontsize=9)
+            ax.barh(
+                req_id,
+                complete - arrive,
+                left=arrive,
+                height=0.6,
+                color=colors[i % len(colors)],
+                edgecolor="black",
+                linewidth=1,
+            )
+            ax.text(
+                complete + 0.01,
+                req_id,
+                f"{(complete - arrive) * 1000:.0f}ms",
+                va="center",
+                fontsize=9,
+            )
 
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Request ID')
-        ax.set_title('Request Timeline: CPU Work is SERIALIZED\n(Each request waits for previous to finish CPU work)')
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Request ID")
+        ax.set_title(
+            "Request Timeline: CPU Work is SERIALIZED\n(Each request waits for previous to finish CPU work)"
+        )
         ax.set_xlim(-0.02, 0.6)
-        ax.axvline(x=0, color='red', linestyle='--', alpha=0.5, label='All requests arrive')
-        ax.legend(loc='upper right')
-        ax.grid(True, alpha=0.3, axis='x')
+        ax.axvline(x=0, color="red", linestyle="--", alpha=0.5, label="All requests arrive")
+        ax.legend(loc="upper right")
+        ax.grid(True, alpha=0.3, axis="x")
 
         # Plot 2: CPU Queue Depth Over Time
         ax = axes[0, 1]
-        ax.fill_between(collector.timestamps, collector.async_cpu_queue_depth,
-                       alpha=0.5, color='coral', label='Waiting in CPU queue')
-        ax.plot(collector.timestamps, collector.async_cpu_queue_depth,
-               color='coral', linewidth=2)
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Queue Depth')
-        ax.set_title('CPU Queue: Requests waiting for their turn\n(Queue drains as CPU processes each request)')
+        ax.fill_between(
+            collector.timestamps,
+            collector.async_cpu_queue_depth,
+            alpha=0.5,
+            color="coral",
+            label="Waiting in CPU queue",
+        )
+        ax.plot(collector.timestamps, collector.async_cpu_queue_depth, color="coral", linewidth=2)
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Queue Depth")
+        ax.set_title(
+            "CPU Queue: Requests waiting for their turn\n(Queue drains as CPU processes each request)"
+        )
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 3: Active Connections Over Time
         ax = axes[1, 0]
-        ax.fill_between(collector.timestamps, collector.async_active_connections,
-                       alpha=0.5, color='steelblue')
-        ax.plot(collector.timestamps, collector.async_active_connections,
-               color='steelblue', linewidth=2)
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Active Connections')
-        ax.set_title('Active Connections: All 5 connected simultaneously\n(But only 1 uses CPU at a time)')
-        ax.axhline(y=5, color='red', linestyle='--', alpha=0.5, label='5 requests arrived')
+        ax.fill_between(
+            collector.timestamps, collector.async_active_connections, alpha=0.5, color="steelblue"
+        )
+        ax.plot(
+            collector.timestamps, collector.async_active_connections, color="steelblue", linewidth=2
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Active Connections")
+        ax.set_title(
+            "Active Connections: All 5 connected simultaneously\n(But only 1 uses CPU at a time)"
+        )
+        ax.axhline(y=5, color="red", linestyle="--", alpha=0.5, label="5 requests arrived")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 4: Explanation Text
         ax = axes[1, 1]
-        ax.axis('off')
+        ax.axis("off")
         explanation = """
         HOW ASYNC SERVER WORKS:
         ════════════════════════
@@ -357,20 +386,31 @@ class TestAsyncServerExplained:
         "Don't block the event loop!"
         Heavy CPU work should be offloaded to workers.
         """
-        ax.text(0.05, 0.95, explanation, transform=ax.transAxes, fontsize=10,
-               verticalalignment='top', fontfamily='monospace',
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax.text(
+            0.05,
+            0.95,
+            explanation,
+            transform=ax.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        fig.suptitle('AsyncServer: CPU Work Serialization Explained', fontsize=14, fontweight='bold')
+        fig.suptitle(
+            "AsyncServer: CPU Work Serialization Explained", fontsize=14, fontweight="bold"
+        )
         fig.tight_layout()
-        fig.savefig(test_output_dir / 'cpu_serialization_explained.png', dpi=150)
+        fig.savefig(test_output_dir / "cpu_serialization_explained.png", dpi=150)
         plt.close(fig)
 
         # Write data
         _write_csv(
-            test_output_dir / 'request_timeline.csv',
-            header=['request_id', 'arrive_time_s', 'complete_time_s', 'total_time_ms'],
-            rows=[[r[0], r[1], r[2], (r[2]-r[1])*1000] for r in sorted(tracker.request_timeline)]
+            test_output_dir / "request_timeline.csv",
+            header=["request_id", "arrive_time_s", "complete_time_s", "total_time_ms"],
+            rows=[
+                [r[0], r[1], r[2], (r[2] - r[1]) * 1000] for r in sorted(tracker.request_timeline)
+            ],
         )
 
         # Verify behavior
@@ -381,14 +421,17 @@ class TestAsyncServerExplained:
         # The cumulative completed count should show staggered completions
         # At ~0.1s: 1 complete, at ~0.2s: 2 complete, etc.
         # Verify this through the collector data
-        completed_at_times = list(zip(collector.timestamps, collector.async_completed))
+        completed_at_times = list(
+            zip(collector.timestamps, collector.async_completed, strict=False)
+        )
         # Find when each completion happened
         completion_count = 0
         for t, c in completed_at_times:
             if c > completion_count:
                 expected_time = c * 0.1  # Should complete at n * 0.1s
-                assert t == pytest.approx(expected_time, abs=0.02), \
+                assert t == pytest.approx(expected_time, abs=0.02), (
                     f"Request {c} should complete around {expected_time}s, got {t}s"
+                )
                 completion_count = c
 
         print(f"\nVisualization saved to: {test_output_dir / 'cpu_serialization_explained.png'}")
@@ -417,7 +460,7 @@ class TestAsyncServerExplained:
 
         duration_s = 2.0
         request_rate = 10.0  # 10 req/s
-        work_time = 0.100    # 100ms per request
+        work_time = 0.100  # 100ms per request
 
         # --- Run AsyncServer scenario ---
         async_server = AsyncServer(
@@ -476,7 +519,9 @@ class TestAsyncServerExplained:
             sources=[threaded_source],
             entities=[threaded_server, threaded_tracker, threaded_collector],
         )
-        threaded_sim.schedule(Event(time=Instant.Epoch, event_type="collect", target=threaded_collector))
+        threaded_sim.schedule(
+            Event(time=Instant.Epoch, event_type="collect", target=threaded_collector)
+        )
         threaded_sim.run()
 
         # --- Generate Comparison Visualization ---
@@ -484,13 +529,25 @@ class TestAsyncServerExplained:
 
         # Plot 1: Queue Depth Comparison
         ax = axes[0, 0]
-        ax.plot(async_collector.timestamps, async_collector.async_cpu_queue_depth,
-               color='coral', linewidth=2, label='AsyncServer (1 CPU)')
-        ax.plot(threaded_collector.timestamps, threaded_collector.server_queue_depth,
-               color='steelblue', linewidth=2, label='ThreadPool (4 workers)')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Queue Depth')
-        ax.set_title('Queue Depth Over Time\n(AsyncServer queues up, ThreadPool handles load easily)')
+        ax.plot(
+            async_collector.timestamps,
+            async_collector.async_cpu_queue_depth,
+            color="coral",
+            linewidth=2,
+            label="AsyncServer (1 CPU)",
+        )
+        ax.plot(
+            threaded_collector.timestamps,
+            threaded_collector.server_queue_depth,
+            color="steelblue",
+            linewidth=2,
+            label="ThreadPool (4 workers)",
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Queue Depth")
+        ax.set_title(
+            "Queue Depth Over Time\n(AsyncServer queues up, ThreadPool handles load easily)"
+        )
         ax.legend()
         ax.grid(True, alpha=0.3)
 
@@ -500,36 +557,60 @@ class TestAsyncServerExplained:
         threaded_latencies = [(r[2] - r[1]) * 1000 for r in threaded_tracker.request_timeline]
 
         if async_latencies:
-            ax.hist(async_latencies, bins=20, alpha=0.5, color='coral',
-                   label=f'AsyncServer (avg: {sum(async_latencies)/len(async_latencies):.0f}ms)', edgecolor='black')
+            ax.hist(
+                async_latencies,
+                bins=20,
+                alpha=0.5,
+                color="coral",
+                label=f"AsyncServer (avg: {sum(async_latencies) / len(async_latencies):.0f}ms)",
+                edgecolor="black",
+            )
         if threaded_latencies:
-            ax.hist(threaded_latencies, bins=20, alpha=0.5, color='steelblue',
-                   label=f'ThreadPool (avg: {sum(threaded_latencies)/len(threaded_latencies):.0f}ms)', edgecolor='black')
-        ax.axvline(x=100, color='green', linestyle='--', alpha=0.7, label='Work time (100ms)')
-        ax.set_xlabel('Response Time (ms)')
-        ax.set_ylabel('Count')
-        ax.set_title('Response Time Distribution\n(AsyncServer has high variance due to queueing)')
+            ax.hist(
+                threaded_latencies,
+                bins=20,
+                alpha=0.5,
+                color="steelblue",
+                label=f"ThreadPool (avg: {sum(threaded_latencies) / len(threaded_latencies):.0f}ms)",
+                edgecolor="black",
+            )
+        ax.axvline(x=100, color="green", linestyle="--", alpha=0.7, label="Work time (100ms)")
+        ax.set_xlabel("Response Time (ms)")
+        ax.set_ylabel("Count")
+        ax.set_title("Response Time Distribution\n(AsyncServer has high variance due to queueing)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 3: Cumulative Completions
         ax = axes[1, 0]
-        ax.plot(async_collector.timestamps, async_collector.async_completed,
-               color='coral', linewidth=2, label='AsyncServer')
-        ax.plot(threaded_collector.timestamps, threaded_collector.server_completed,
-               color='steelblue', linewidth=2, label='ThreadPool')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Requests Completed')
-        ax.set_title('Cumulative Completions\n(Both eventually complete all requests)')
+        ax.plot(
+            async_collector.timestamps,
+            async_collector.async_completed,
+            color="coral",
+            linewidth=2,
+            label="AsyncServer",
+        )
+        ax.plot(
+            threaded_collector.timestamps,
+            threaded_collector.server_completed,
+            color="steelblue",
+            linewidth=2,
+            label="ThreadPool",
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Requests Completed")
+        ax.set_title("Cumulative Completions\n(Both eventually complete all requests)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 4: Comparison Summary
         ax = axes[1, 1]
-        ax.axis('off')
+        ax.axis("off")
 
-        async_avg = sum(async_latencies)/len(async_latencies) if async_latencies else 0
-        threaded_avg = sum(threaded_latencies)/len(threaded_latencies) if threaded_latencies else 0
+        async_avg = sum(async_latencies) / len(async_latencies) if async_latencies else 0
+        threaded_avg = (
+            sum(threaded_latencies) / len(threaded_latencies) if threaded_latencies else 0
+        )
         async_max = max(async_latencies) if async_latencies else 0
         threaded_max = max(threaded_latencies) if threaded_latencies else 0
 
@@ -539,11 +620,11 @@ class TestAsyncServerExplained:
 
         WORKLOAD:
         • {request_rate:.0f} requests/second for {duration_s}s
-        • Each request needs {work_time*1000:.0f}ms of work
+        • Each request needs {work_time * 1000:.0f}ms of work
 
         ASYNC SERVER (Single Event Loop):
         ┌─────────────────────────────────┐
-        │ Capacity: {1/work_time:.0f} req/s (1 CPU)        │
+        │ Capacity: {1 / work_time:.0f} req/s (1 CPU)        │
         │ Completed: {async_server.stats.requests_completed}                    │
         │ Avg Latency: {async_avg:.0f}ms               │
         │ Max Latency: {async_max:.0f}ms               │
@@ -552,7 +633,7 @@ class TestAsyncServerExplained:
 
         THREAD POOL (4 Workers):
         ┌─────────────────────────────────┐
-        │ Capacity: {4/work_time:.0f} req/s (4 workers)    │
+        │ Capacity: {4 / work_time:.0f} req/s (4 workers)    │
         │ Completed: {threaded_server.stats.requests_completed}                    │
         │ Avg Latency: {threaded_avg:.0f}ms               │
         │ Max Latency: {threaded_max:.0f}ms               │
@@ -563,14 +644,24 @@ class TestAsyncServerExplained:
         AsyncServer excels at I/O-bound work (waiting),
         but struggles with CPU-bound work (computing).
         """
-        ax.text(0.05, 0.95, comparison, transform=ax.transAxes, fontsize=9,
-               verticalalignment='top', fontfamily='monospace',
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax.text(
+            0.05,
+            0.95,
+            comparison,
+            transform=ax.transAxes,
+            fontsize=9,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        fig.suptitle('AsyncServer vs ThreadPool: CPU-Bound Workload Comparison',
-                    fontsize=14, fontweight='bold')
+        fig.suptitle(
+            "AsyncServer vs ThreadPool: CPU-Bound Workload Comparison",
+            fontsize=14,
+            fontweight="bold",
+        )
         fig.tight_layout()
-        fig.savefig(test_output_dir / 'async_vs_threaded_comparison.png', dpi=150)
+        fig.savefig(test_output_dir / "async_vs_threaded_comparison.png", dpi=150)
         plt.close(fig)
 
         print(f"\nVisualization saved to: {test_output_dir / 'async_vs_threaded_comparison.png'}")
@@ -619,6 +710,7 @@ class TestAsyncServerExplained:
                 self.target = target
                 self.stop_after = stop_after
                 self.generated = 0
+
             def get_events(self, time):
                 if self.stop_after and time > self.stop_after:
                     return []
@@ -626,8 +718,11 @@ class TestAsyncServerExplained:
                 return [Event(time=time, event_type=f"Req-{self.generated}", target=self.target)]
 
         low_conn_provider = SimpleProvider(low_conn_server, Instant.from_seconds(duration_s))
-        low_conn_source = Source("source", low_conn_provider,
-            ConstantArrivalTimeProvider(ConstantRateProfile(request_rate), Instant.Epoch))
+        low_conn_source = Source(
+            "source",
+            low_conn_provider,
+            ConstantArrivalTimeProvider(ConstantRateProfile(request_rate), Instant.Epoch),
+        )
 
         low_conn_sim = Simulation(
             start_time=Instant.Epoch,
@@ -635,7 +730,9 @@ class TestAsyncServerExplained:
             sources=[low_conn_source],
             entities=[low_conn_server, low_conn_collector],
         )
-        low_conn_sim.schedule(Event(time=Instant.Epoch, event_type="collect", target=low_conn_collector))
+        low_conn_sim.schedule(
+            Event(time=Instant.Epoch, event_type="collect", target=low_conn_collector)
+        )
         low_conn_sim.run()
 
         # --- Slow CPU scenario ---
@@ -643,8 +740,11 @@ class TestAsyncServerExplained:
         slow_cpu_collector.set_targets(async_server=slow_cpu_server)
 
         slow_cpu_provider = SimpleProvider(slow_cpu_server, Instant.from_seconds(duration_s))
-        slow_cpu_source = Source("source", slow_cpu_provider,
-            ConstantArrivalTimeProvider(ConstantRateProfile(request_rate), Instant.Epoch))
+        slow_cpu_source = Source(
+            "source",
+            slow_cpu_provider,
+            ConstantArrivalTimeProvider(ConstantRateProfile(request_rate), Instant.Epoch),
+        )
 
         slow_cpu_sim = Simulation(
             start_time=Instant.Epoch,
@@ -652,7 +752,9 @@ class TestAsyncServerExplained:
             sources=[slow_cpu_source],
             entities=[slow_cpu_server, slow_cpu_collector],
         )
-        slow_cpu_sim.schedule(Event(time=Instant.Epoch, event_type="collect", target=slow_cpu_collector))
+        slow_cpu_sim.schedule(
+            Event(time=Instant.Epoch, event_type="collect", target=slow_cpu_collector)
+        )
         slow_cpu_sim.run()
 
         # --- Generate Visualization ---
@@ -660,44 +762,76 @@ class TestAsyncServerExplained:
 
         # Plot 1: Connection-Limited Server
         ax = axes[0, 0]
-        ax.plot(low_conn_collector.timestamps, low_conn_collector.async_active_connections,
-               color='steelblue', linewidth=2, label='Active Connections')
-        ax.axhline(y=5, color='red', linestyle='--', label='Max Connections (5)')
-        ax.fill_between(low_conn_collector.timestamps, low_conn_collector.async_active_connections,
-                       alpha=0.3, color='steelblue')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Connections')
-        ax.set_title(f'Connection-Limited (max=5)\nRejected: {low_conn_server.stats.requests_rejected} requests')
+        ax.plot(
+            low_conn_collector.timestamps,
+            low_conn_collector.async_active_connections,
+            color="steelblue",
+            linewidth=2,
+            label="Active Connections",
+        )
+        ax.axhline(y=5, color="red", linestyle="--", label="Max Connections (5)")
+        ax.fill_between(
+            low_conn_collector.timestamps,
+            low_conn_collector.async_active_connections,
+            alpha=0.3,
+            color="steelblue",
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Connections")
+        ax.set_title(
+            f"Connection-Limited (max=5)\nRejected: {low_conn_server.stats.requests_rejected} requests"
+        )
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 2: CPU-Limited Server
         ax = axes[0, 1]
-        ax.plot(slow_cpu_collector.timestamps, slow_cpu_collector.async_cpu_queue_depth,
-               color='coral', linewidth=2, label='CPU Queue Depth')
-        ax.fill_between(slow_cpu_collector.timestamps, slow_cpu_collector.async_cpu_queue_depth,
-                       alpha=0.3, color='coral')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Queue Depth')
-        ax.set_title(f'CPU-Limited (200ms/req = 5 req/s capacity)\nQueue builds up at {request_rate} req/s load')
+        ax.plot(
+            slow_cpu_collector.timestamps,
+            slow_cpu_collector.async_cpu_queue_depth,
+            color="coral",
+            linewidth=2,
+            label="CPU Queue Depth",
+        )
+        ax.fill_between(
+            slow_cpu_collector.timestamps,
+            slow_cpu_collector.async_cpu_queue_depth,
+            alpha=0.3,
+            color="coral",
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Queue Depth")
+        ax.set_title(
+            f"CPU-Limited (200ms/req = 5 req/s capacity)\nQueue builds up at {request_rate} req/s load"
+        )
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 3: Completions comparison
         ax = axes[1, 0]
-        ax.plot(low_conn_collector.timestamps, low_conn_collector.async_completed,
-               color='steelblue', linewidth=2, label='Connection-Limited')
-        ax.plot(slow_cpu_collector.timestamps, slow_cpu_collector.async_completed,
-               color='coral', linewidth=2, label='CPU-Limited')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Completed Requests')
-        ax.set_title('Cumulative Completions\n(Both are bottlenecked, different reasons)')
+        ax.plot(
+            low_conn_collector.timestamps,
+            low_conn_collector.async_completed,
+            color="steelblue",
+            linewidth=2,
+            label="Connection-Limited",
+        )
+        ax.plot(
+            slow_cpu_collector.timestamps,
+            slow_cpu_collector.async_completed,
+            color="coral",
+            linewidth=2,
+            label="CPU-Limited",
+        )
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Completed Requests")
+        ax.set_title("Cumulative Completions\n(Both are bottlenecked, different reasons)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 4: Explanation
         ax = axes[1, 1]
-        ax.axis('off')
+        ax.axis("off")
         explanation = f"""
         TWO WAYS TO BOTTLENECK AN ASYNC SERVER
         ═══════════════════════════════════════
@@ -733,13 +867,22 @@ class TestAsyncServerExplained:
 
             Throughput = 1 / CPU_time_per_request
         """
-        ax.text(0.02, 0.98, explanation, transform=ax.transAxes, fontsize=9,
-               verticalalignment='top', fontfamily='monospace',
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax.text(
+            0.02,
+            0.98,
+            explanation,
+            transform=ax.transAxes,
+            fontsize=9,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        fig.suptitle('AsyncServer: Connection Limit vs CPU Capacity', fontsize=14, fontweight='bold')
+        fig.suptitle(
+            "AsyncServer: Connection Limit vs CPU Capacity", fontsize=14, fontweight="bold"
+        )
         fig.tight_layout()
-        fig.savefig(test_output_dir / 'connection_vs_cpu_capacity.png', dpi=150)
+        fig.savefig(test_output_dir / "connection_vs_cpu_capacity.png", dpi=150)
         plt.close(fig)
 
         print(f"\nVisualization saved to: {test_output_dir / 'connection_vs_cpu_capacity.png'}")
@@ -766,7 +909,9 @@ class TestAsyncServerExplained:
                 super().__init__(*args, **kwargs)
                 self.slow_request_time = slow_request_time
                 self._slow_triggered = False
-                self.request_completions: list[tuple[float, float, bool]] = []  # (arrive, complete, was_slow)
+                self.request_completions: list[
+                    tuple[float, float, bool]
+                ] = []  # (arrive, complete, was_slow)
 
             def handle_event(self, event):
                 # Track if this is the slow request
@@ -782,8 +927,8 @@ class TestAsyncServerExplained:
                 return super().handle_event(event)
 
         # Create server with variable CPU time
-        from happysimulator.distributions.latency_distribution import LatencyDistribution
         from happysimulator.core.temporal import Duration
+        from happysimulator.distributions.latency_distribution import LatencyDistribution
 
         class VariableCPU(LatencyDistribution):
             def __init__(self, normal_time: float, slow_time: float):
@@ -822,15 +967,13 @@ class TestAsyncServerExplained:
         )
 
         # Schedule requests every 50ms for 1.5 seconds
-        request_id = 0
-        for t in range(0, 1500, 50):  # Every 50ms
+        for request_id, t in enumerate(range(0, 1500, 50), start=1):  # Every 50ms
             t_sec = t / 1000.0
-            request_id += 1
             rid = request_id
             arrive_time = t_sec
 
             # The request at t=0.5s will be slow
-            is_slow = (0.45 <= t_sec <= 0.55)
+            is_slow = 0.45 <= t_sec <= 0.55
             if is_slow:
                 variable_cpu.set_next_slow()
 
@@ -843,7 +986,8 @@ class TestAsyncServerExplained:
             def make_hook(r_id, arr_time, slow):
                 def on_complete(finish_time: Instant):
                     request_times.append((r_id, arr_time, finish_time.to_seconds(), slow))
-                    return None
+                    return
+
                 return on_complete
 
             event.add_completion_hook(make_hook(rid, arrive_time, is_slow))
@@ -861,59 +1005,81 @@ class TestAsyncServerExplained:
         # Plot 1: Request Timeline showing the blocking
         ax = axes[0, 0]
         for rid, arrive, complete, is_slow in request_times:
-            color = 'red' if is_slow else 'steelblue'
+            color = "red" if is_slow else "steelblue"
             alpha = 1.0 if is_slow else 0.6
-            ax.barh(rid, complete - arrive, left=arrive, height=0.8,
-                   color=color, alpha=alpha, edgecolor='black' if is_slow else 'none',
-                   linewidth=2 if is_slow else 0)
+            ax.barh(
+                rid,
+                complete - arrive,
+                left=arrive,
+                height=0.8,
+                color=color,
+                alpha=alpha,
+                edgecolor="black" if is_slow else "none",
+                linewidth=2 if is_slow else 0,
+            )
 
-        ax.axvline(x=0.5, color='red', linestyle='--', alpha=0.5)
-        ax.annotate('SLOW REQUEST\n(500ms CPU)', xy=(0.5, 12), fontsize=9,
-                   color='red', ha='center')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Request ID')
-        ax.set_title('Request Timeline: One Slow Request Blocks Everyone!\n(Red bar = 500ms blocking request)')
-        ax.grid(True, alpha=0.3, axis='x')
+        ax.axvline(x=0.5, color="red", linestyle="--", alpha=0.5)
+        ax.annotate("SLOW REQUEST\n(500ms CPU)", xy=(0.5, 12), fontsize=9, color="red", ha="center")
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("Request ID")
+        ax.set_title(
+            "Request Timeline: One Slow Request Blocks Everyone!\n(Red bar = 500ms blocking request)"
+        )
+        ax.grid(True, alpha=0.3, axis="x")
 
         # Plot 2: Response time over time
         ax = axes[0, 1]
-        latencies = [(arrive, (complete - arrive) * 1000, is_slow)
-                    for rid, arrive, complete, is_slow in request_times]
+        latencies = [
+            (arrive, (complete - arrive) * 1000, is_slow)
+            for rid, arrive, complete, is_slow in request_times
+        ]
 
         normal_lat = [(a, l) for a, l, s in latencies if not s]
         slow_lat = [(a, l) for a, l, s in latencies if s]
 
         if normal_lat:
-            ax.scatter([x[0] for x in normal_lat], [x[1] for x in normal_lat],
-                      c='steelblue', alpha=0.6, label='Normal requests', s=50)
+            ax.scatter(
+                [x[0] for x in normal_lat],
+                [x[1] for x in normal_lat],
+                c="steelblue",
+                alpha=0.6,
+                label="Normal requests",
+                s=50,
+            )
         if slow_lat:
-            ax.scatter([x[0] for x in slow_lat], [x[1] for x in slow_lat],
-                      c='red', s=100, marker='*', label='Slow request (500ms CPU)')
+            ax.scatter(
+                [x[0] for x in slow_lat],
+                [x[1] for x in slow_lat],
+                c="red",
+                s=100,
+                marker="*",
+                label="Slow request (500ms CPU)",
+            )
 
-        ax.axvline(x=0.5, color='red', linestyle='--', alpha=0.3)
-        ax.set_xlabel('Arrival Time (seconds)')
-        ax.set_ylabel('Response Time (ms)')
-        ax.set_title('Response Time vs Arrival Time\n(Spike after the blocking request)')
+        ax.axvline(x=0.5, color="red", linestyle="--", alpha=0.3)
+        ax.set_xlabel("Arrival Time (seconds)")
+        ax.set_ylabel("Response Time (ms)")
+        ax.set_title("Response Time vs Arrival Time\n(Spike after the blocking request)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 3: CPU Queue
         ax = axes[1, 0]
-        ax.fill_between(collector.timestamps, collector.async_cpu_queue_depth,
-                       alpha=0.5, color='coral')
-        ax.plot(collector.timestamps, collector.async_cpu_queue_depth,
-               color='coral', linewidth=2)
-        ax.axvline(x=0.5, color='red', linestyle='--', alpha=0.5, label='Slow request arrives')
-        ax.axvline(x=1.0, color='green', linestyle='--', alpha=0.5, label='Slow request completes')
-        ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('CPU Queue Depth')
-        ax.set_title('CPU Queue During Blocking\n(Queue builds up while slow request runs)')
+        ax.fill_between(
+            collector.timestamps, collector.async_cpu_queue_depth, alpha=0.5, color="coral"
+        )
+        ax.plot(collector.timestamps, collector.async_cpu_queue_depth, color="coral", linewidth=2)
+        ax.axvline(x=0.5, color="red", linestyle="--", alpha=0.5, label="Slow request arrives")
+        ax.axvline(x=1.0, color="green", linestyle="--", alpha=0.5, label="Slow request completes")
+        ax.set_xlabel("Time (seconds)")
+        ax.set_ylabel("CPU Queue Depth")
+        ax.set_title("CPU Queue During Blocking\n(Queue builds up while slow request runs)")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Plot 4: Explanation
         ax = axes[1, 1]
-        ax.axis('off')
+        ax.axis("off")
         explanation = """
         "DON'T BLOCK THE EVENT LOOP!"
         ══════════════════════════════
@@ -948,13 +1114,22 @@ class TestAsyncServerExplained:
         [OK] Set timeouts on operations
         [OK] Use worker pools for CPU tasks
         """
-        ax.text(0.02, 0.98, explanation, transform=ax.transAxes, fontsize=9,
-               verticalalignment='top', fontfamily='monospace',
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax.text(
+            0.02,
+            0.98,
+            explanation,
+            transform=ax.transAxes,
+            fontsize=9,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        fig.suptitle('AsyncServer: Event Loop Blocking Demonstration', fontsize=14, fontweight='bold')
+        fig.suptitle(
+            "AsyncServer: Event Loop Blocking Demonstration", fontsize=14, fontweight="bold"
+        )
         fig.tight_layout()
-        fig.savefig(test_output_dir / 'event_loop_blocking_demo.png', dpi=150)
+        fig.savefig(test_output_dir / "event_loop_blocking_demo.png", dpi=150)
         plt.close(fig)
 
         print(f"\nVisualization saved to: {test_output_dir / 'event_loop_blocking_demo.png'}")

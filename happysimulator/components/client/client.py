@@ -19,8 +19,9 @@ Example:
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Any, Callable, Generator
+from typing import Any
 
 from happysimulator.components.client.retry import NoRetry, RetryPolicy
 from happysimulator.core.entity import Entity
@@ -113,7 +114,7 @@ class Client(Entity):
         logger.debug(
             "[%s] Client initialized: target=%s, timeout=%s, retry_policy=%s",
             name,
-            target.name if hasattr(target, 'name') else str(target),
+            target.name if hasattr(target, "name") else str(target),
             timeout,
             type(self._retry_policy).__name__,
         )
@@ -257,13 +258,15 @@ class Client(Entity):
             self.name,
             request_id,
             attempt,
-            self._target.name if hasattr(self._target, 'name') else str(self._target),
+            self._target.name if hasattr(self._target, "name") else str(self._target),
         )
 
         # Create the actual request to target
         target_event = Event(
             time=self.now,
-            event_type=event.event_type if event.event_type != "request" else f"{self.name}_request",
+            event_type=event.event_type
+            if event.event_type != "request"
+            else f"{self.name}_request",
             target=self._target,
             context={
                 "metadata": {

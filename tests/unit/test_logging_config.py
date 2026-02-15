@@ -9,8 +9,6 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
 import happysimulator
 from happysimulator.logging_config import (
     LOGGER_NAME,
@@ -50,9 +48,7 @@ class TestEnableConsoleLogging:
         happysimulator.enable_console_logging()
 
         logger = _get_logger()
-        stream_handlers = [
-            h for h in logger.handlers if isinstance(h, logging.StreamHandler)
-        ]
+        stream_handlers = [h for h in logger.handlers if isinstance(h, logging.StreamHandler)]
         assert len(stream_handlers) >= 1
 
     def test_sets_level(self):
@@ -74,9 +70,7 @@ class TestEnableConsoleLogging:
 
     def test_custom_format(self, capfd):
         """Should respect custom format string."""
-        happysimulator.enable_console_logging(
-            level="INFO", format="[CUSTOM] %(message)s"
-        )
+        happysimulator.enable_console_logging(level="INFO", format="[CUSTOM] %(message)s")
 
         logger = logging.getLogger(f"{LOGGER_NAME}.test")
         logger.info("hello")
@@ -96,9 +90,7 @@ class TestEnableFileLogging:
         from logging.handlers import RotatingFileHandler
 
         logger = _get_logger()
-        rotating_handlers = [
-            h for h in logger.handlers if isinstance(h, RotatingFileHandler)
-        ]
+        rotating_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
         assert len(rotating_handlers) >= 1
 
     def test_creates_parent_directories(self, tmp_path):
@@ -126,9 +118,7 @@ class TestEnableFileLogging:
     def test_respects_max_bytes(self, tmp_path):
         """Should create handler with specified max_bytes."""
         log_file = tmp_path / "test.log"
-        handler = happysimulator.enable_file_logging(
-            log_file, max_bytes=1024, backup_count=3
-        )
+        handler = happysimulator.enable_file_logging(log_file, max_bytes=1024, backup_count=3)
 
         assert handler.maxBytes == 1024
         assert handler.backupCount == 3
@@ -145,17 +135,13 @@ class TestEnableTimedFileLogging:
         from logging.handlers import TimedRotatingFileHandler
 
         logger = _get_logger()
-        timed_handlers = [
-            h for h in logger.handlers if isinstance(h, TimedRotatingFileHandler)
-        ]
+        timed_handlers = [h for h in logger.handlers if isinstance(h, TimedRotatingFileHandler)]
         assert len(timed_handlers) >= 1
 
     def test_respects_when_parameter(self, tmp_path):
         """Should create handler with specified 'when' parameter."""
         log_file = tmp_path / "test.log"
-        handler = happysimulator.enable_timed_file_logging(
-            log_file, when="H", interval=6
-        )
+        handler = happysimulator.enable_timed_file_logging(log_file, when="H", interval=6)
 
         assert handler.when == "H"
         assert handler.interval == 6 * 60 * 60  # Converted to seconds
@@ -243,16 +229,12 @@ class TestConfigureFromEnv:
         from logging.handlers import RotatingFileHandler
 
         logger = _get_logger()
-        rotating_handlers = [
-            h for h in logger.handlers if isinstance(h, RotatingFileHandler)
-        ]
+        rotating_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
         assert len(rotating_handlers) >= 1
 
     def test_respects_hs_log_json_env(self, capfd):
         """Should enable JSON logging when HS_LOG_JSON=1."""
-        with mock.patch.dict(
-            os.environ, {"HS_LOGGING": "INFO", "HS_LOG_JSON": "1"}, clear=False
-        ):
+        with mock.patch.dict(os.environ, {"HS_LOGGING": "INFO", "HS_LOG_JSON": "1"}, clear=False):
             happysimulator.configure_from_env()
 
         logger = logging.getLogger(f"{LOGGER_NAME}.test")

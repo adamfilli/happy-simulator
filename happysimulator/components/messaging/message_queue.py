@@ -29,16 +29,23 @@ Example:
             queue.reject(event.context['message_id'], requeue=True)
 """
 
+from __future__ import annotations
+
 import logging
-from dataclasses import dataclass
-from typing import Any, Generator, Callable
-from collections import deque
-from enum import Enum
 import uuid
+from collections import deque
+from dataclasses import dataclass
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.messaging.dlq import DeadLetterQueue
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +119,7 @@ class MessageQueue(Entity):
         redelivery_delay: float = 30.0,
         max_redeliveries: int = 3,
         capacity: int | None = None,
-        dead_letter_queue: 'DeadLetterQueue | None' = None,
+        dead_letter_queue: DeadLetterQueue | None = None,
     ):
         """Initialize the message queue.
 
@@ -315,10 +322,10 @@ class MessageQueue(Entity):
             event_type="message_delivery",
             target=consumer,
             context={
-                'message_id': message_id,
-                'payload': msg.payload,
-                'delivery_count': msg.delivery_count,
-                'queue': self.name,
+                "message_id": message_id,
+                "payload": msg.payload,
+                "delivery_count": msg.delivery_count,
+                "queue": self.name,
             },
         )
 
@@ -425,7 +432,7 @@ class MessageQueue(Entity):
             time=redelivery_time,
             event_type="message_redelivery",
             target=self,
-            context={'message_id': message_id},
+            context={"message_id": message_id},
         )
 
     def get_message(self, message_id: str) -> Message | None:
@@ -444,7 +451,7 @@ class MessageQueue(Entity):
         event_type = event.event_type
 
         if event_type == "message_redelivery":
-            message_id = event.context.get('message_id')
+            message_id = event.context.get("message_id")
             if message_id:
                 self._redelivery_scheduled.discard(message_id)
                 delivery_event = yield from self._deliver_message(message_id)

@@ -30,8 +30,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -43,13 +42,15 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.infrastructure import (
+    ConcurrentGC,
     GarbageCollector,
     GCStats,
-    StopTheWorld,
-    ConcurrentGC,
     GenerationalGC,
+    StopTheWorld,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity
@@ -163,24 +164,46 @@ def run_simulation(
     """Compare GC strategies and their impact on request processing."""
     stw = _run_strategy(
         "StopTheWorld",
-        GarbageCollector("GC_STW", strategy=StopTheWorld(
-            base_pause_s=0.05, interval_s=10.0,
-        ), heap_pressure=0.6),
-        duration_s=duration_s, rate=rate, seed=seed,
+        GarbageCollector(
+            "GC_STW",
+            strategy=StopTheWorld(
+                base_pause_s=0.05,
+                interval_s=10.0,
+            ),
+            heap_pressure=0.6,
+        ),
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     concurrent = _run_strategy(
         "ConcurrentGC",
-        GarbageCollector("GC_Concurrent", strategy=ConcurrentGC(
-            pause_s=0.005, interval_s=2.0,
-        ), heap_pressure=0.6),
-        duration_s=duration_s, rate=rate, seed=seed,
+        GarbageCollector(
+            "GC_Concurrent",
+            strategy=ConcurrentGC(
+                pause_s=0.005,
+                interval_s=2.0,
+            ),
+            heap_pressure=0.6,
+        ),
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     generational = _run_strategy(
         "GenerationalGC",
-        GarbageCollector("GC_Gen", strategy=GenerationalGC(
-            minor_pause_s=0.002, major_pause_s=0.03, minor_interval_s=1.0,
-        ), heap_pressure=0.6),
-        duration_s=duration_s, rate=rate, seed=seed,
+        GarbageCollector(
+            "GC_Gen",
+            strategy=GenerationalGC(
+                minor_pause_s=0.002,
+                major_pause_s=0.03,
+                minor_interval_s=1.0,
+            ),
+            heap_pressure=0.6,
+        ),
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
 
     return SimulationResult(
@@ -208,11 +231,26 @@ def print_summary(result: SimulationResult) -> None:
 
     print(f"{'Requests processed':<30} " + " ".join(f"{r.requests:>15,}" for r in results))
     print(f"{'GC collections':<30} " + " ".join(f"{r.gc_stats.collections:>15,}" for r in results))
-    print(f"{'Total pause (ms)':<30} " + " ".join(f"{r.gc_stats.total_pause_s*1000:>15.1f}" for r in results))
-    print(f"{'Max pause (ms)':<30} " + " ".join(f"{r.gc_stats.max_pause_s*1000:>15.2f}" for r in results))
-    print(f"{'Avg pause (ms)':<30} " + " ".join(f"{r.gc_stats.avg_pause_s*1000:>15.2f}" for r in results))
-    print(f"{'Minor collections':<30} " + " ".join(f"{r.gc_stats.minor_collections:>15,}" for r in results))
-    print(f"{'Major collections':<30} " + " ".join(f"{r.gc_stats.major_collections:>15,}" for r in results))
+    print(
+        f"{'Total pause (ms)':<30} "
+        + " ".join(f"{r.gc_stats.total_pause_s * 1000:>15.1f}" for r in results)
+    )
+    print(
+        f"{'Max pause (ms)':<30} "
+        + " ".join(f"{r.gc_stats.max_pause_s * 1000:>15.2f}" for r in results)
+    )
+    print(
+        f"{'Avg pause (ms)':<30} "
+        + " ".join(f"{r.gc_stats.avg_pause_s * 1000:>15.2f}" for r in results)
+    )
+    print(
+        f"{'Minor collections':<30} "
+        + " ".join(f"{r.gc_stats.minor_collections:>15,}" for r in results)
+    )
+    print(
+        f"{'Major collections':<30} "
+        + " ".join(f"{r.gc_stats.major_collections:>15,}" for r in results)
+    )
 
     print("\n" + "=" * 72)
     print("INTERPRETATION:")

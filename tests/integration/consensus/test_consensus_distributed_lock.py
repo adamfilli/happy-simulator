@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import random
 
-import pytest
-
 from happysimulator.components.consensus.distributed_lock import (
     DistributedLock,
     LockGrant,
@@ -55,18 +53,22 @@ class TestDistributedLock:
             if grant and isinstance(grant, LockGrant):
                 released = lock.release("resource-1", grant.fencing_token)
                 results["released"] = released
-            return None
+            return
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="Acquire",
-            fn=do_acquire,
-        ))
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(1.0),
-            event_type="Release",
-            fn=do_release,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="Acquire",
+                fn=do_acquire,
+            )
+        )
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(1.0),
+                event_type="Release",
+                fn=do_release,
+            )
+        )
         sim.run()
 
         # Verify the grant
@@ -111,7 +113,7 @@ class TestDistributedLock:
             # B should be queued (future not yet resolved since A holds the lock)
             grants["B_future"] = future
             grants["B_was_queued"] = not future.is_resolved
-            return None
+            return
 
         def release_a(event):
             grant_a = grants.get("A")
@@ -121,26 +123,32 @@ class TestDistributedLock:
                 b_future = grants.get("B_future")
                 if b_future and b_future.is_resolved:
                     grants["B_resolved"] = b_future.value
-            return None
+            return
 
         # A acquires first
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="AcquireA",
-            fn=acquire_a,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="AcquireA",
+                fn=acquire_a,
+            )
+        )
         # B tries to acquire at the same time (will be queued)
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.2),
-            event_type="AcquireB",
-            fn=acquire_b,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.2),
+                event_type="AcquireB",
+                fn=acquire_b,
+            )
+        )
         # A releases at t=2.0, B should get the lock
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(2.0),
-            event_type="ReleaseA",
-            fn=release_a,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(2.0),
+                event_type="ReleaseA",
+                fn=release_a,
+            )
+        )
         sim.run()
 
         # A should have gotten the lock first
@@ -187,13 +195,15 @@ class TestDistributedLock:
                 assert grant is not None, f"Cycle {i}: lock not acquired"
                 tokens.append(grant.fencing_token)
                 lock.release("token-test", grant.fencing_token)
-            return None
+            return
 
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="TokenCycles",
-            fn=cycle,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="TokenCycles",
+                fn=cycle,
+            )
+        )
         sim.run()
 
         assert len(tokens) == 3, f"Expected 3 tokens, got {len(tokens)}"
@@ -201,8 +211,7 @@ class TestDistributedLock:
         # Tokens must be strictly increasing
         for i in range(1, len(tokens)):
             assert tokens[i] > tokens[i - 1], (
-                f"Token {tokens[i]} at position {i} is not > "
-                f"previous token {tokens[i - 1]}"
+                f"Token {tokens[i]} at position {i} is not > previous token {tokens[i - 1]}"
             )
 
         # Verify stats
@@ -236,20 +245,24 @@ class TestDistributedLock:
         def check_after_expiry(event):
             results["holder_after_expiry"] = lock.get_holder("expiring-lock")
             results["active_locks_after"] = lock.active_locks
-            return None
+            return
 
         # Acquire at t=0.1 (lease expires at t=2.1)
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(0.1),
-            event_type="AcquireLease",
-            fn=do_acquire,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(0.1),
+                event_type="AcquireLease",
+                fn=do_acquire,
+            )
+        )
         # Check at t=3.0 (after lease should have expired)
-        sim.schedule(Event.once(
-            time=Instant.from_seconds(3.0),
-            event_type="CheckExpiry",
-            fn=check_after_expiry,
-        ))
+        sim.schedule(
+            Event.once(
+                time=Instant.from_seconds(3.0),
+                event_type="CheckExpiry",
+                fn=check_after_expiry,
+            )
+        )
         sim.run()
 
         # Verify the lock was acquired
@@ -262,9 +275,7 @@ class TestDistributedLock:
         assert results.get("holder_after_expiry") is None, (
             f"Lock should have expired, but holder is {results.get('holder_after_expiry')}"
         )
-        assert results.get("active_locks_after") == 0, (
-            "Lock should not be active after expiry"
-        )
+        assert results.get("active_locks_after") == 0, "Lock should not be active after expiry"
         assert lock.stats.total_expirations == 1, (
             f"Expected 1 expiration, got {lock.stats.total_expirations}"
         )

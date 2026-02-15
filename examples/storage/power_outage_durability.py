@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import random
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -64,12 +64,14 @@ from happysimulator import (
 )
 from happysimulator.components.storage import (
     LSMTree,
-    WriteAheadLog,
     SyncEveryWrite,
     SyncOnBatch,
+    WriteAheadLog,
 )
 from happysimulator.core.control.breakpoints import TimeBreakpoint
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Writer Entity
@@ -99,7 +101,7 @@ class FanoutWriter(Entity):
         for db in self.databases:
             db.set_clock(clock)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         key = f"key_{self._counter:05d}"
         value = f"value_{self._counter}"
         self._counter += 1
@@ -192,12 +194,8 @@ def run_power_outage_demo(
 
     # --- Verify pre-crash state: both DBs have the same data ---
 
-    pre_crash_durable = sum(
-        1 for k in writer.keys_written if lsm_durable.get_sync(k) is not None
-    )
-    pre_crash_fast = sum(
-        1 for k in writer.keys_written if lsm_fast.get_sync(k) is not None
-    )
+    pre_crash_durable = sum(1 for k in writer.keys_written if lsm_durable.get_sync(k) is not None)
+    pre_crash_fast = sum(1 for k in writer.keys_written if lsm_fast.get_sync(k) is not None)
 
     # --- POWER OUTAGE: crash both nodes ---
 
@@ -211,12 +209,8 @@ def run_power_outage_demo(
 
     # --- Check what survived ---
 
-    surviving_durable = sum(
-        1 for k in writer.keys_written if lsm_durable.get_sync(k) is not None
-    )
-    surviving_fast = sum(
-        1 for k in writer.keys_written if lsm_fast.get_sync(k) is not None
-    )
+    surviving_durable = sum(1 for k in writer.keys_written if lsm_durable.get_sync(k) is not None)
+    surviving_fast = sum(1 for k in writer.keys_written if lsm_fast.get_sync(k) is not None)
 
     lost_durable = total_written - surviving_durable
     lost_fast = total_written - surviving_fast
@@ -268,39 +262,49 @@ def print_summary(results: dict) -> None:
 
     print(f"\nTotal writes acknowledged before crash: {total}")
 
-    print(f"\n--- Pre-crash verification ---")
+    print("\n--- Pre-crash verification ---")
     print(f"  Durable DB (SyncEveryWrite): {pre['durable']}/{total} keys present")
     print(f"  Fast DB    (SyncOnBatch):     {pre['fast']}/{total} keys present")
 
-    print(f"\n--- Power outage! ---")
+    print("\n--- Power outage! ---")
     cd = crash["durable"]
     cf = crash["fast"]
-    print(f"  Durable DB lost: {cd['memtable_entries_lost']} memtable + {cd['wal_entries_lost']} WAL entries")
-    print(f"  Fast DB    lost: {cf['memtable_entries_lost']} memtable + {cf['wal_entries_lost']} WAL entries")
+    print(
+        f"  Durable DB lost: {cd['memtable_entries_lost']} memtable + {cd['wal_entries_lost']} WAL entries"
+    )
+    print(
+        f"  Fast DB    lost: {cf['memtable_entries_lost']} memtable + {cf['wal_entries_lost']} WAL entries"
+    )
 
-    print(f"\n--- Recovery ---")
+    print("\n--- Recovery ---")
     rd = recovery["durable"]
     rf = recovery["fast"]
-    print(f"  Durable DB: replayed {rd['wal_entries_replayed']} WAL entries, {rd['sstable_keys']} SSTable keys")
-    print(f"  Fast DB:    replayed {rf['wal_entries_replayed']} WAL entries, {rf['sstable_keys']} SSTable keys")
+    print(
+        f"  Durable DB: replayed {rd['wal_entries_replayed']} WAL entries, {rd['sstable_keys']} SSTable keys"
+    )
+    print(
+        f"  Fast DB:    replayed {rf['wal_entries_replayed']} WAL entries, {rf['sstable_keys']} SSTable keys"
+    )
 
-    print(f"\n--- Post-recovery data ---")
+    print("\n--- Post-recovery data ---")
     print(f"  {'':30s} {'Durable':>10s} {'Fast':>10s}")
-    print(f"  {'-'*30} {'-'*10} {'-'*10}")
-    print(f"  {'Keys surviving':30s} {post['durable_surviving']:>10d} {post['fast_surviving']:>10d}")
+    print(f"  {'-' * 30} {'-' * 10} {'-' * 10}")
+    print(
+        f"  {'Keys surviving':30s} {post['durable_surviving']:>10d} {post['fast_surviving']:>10d}"
+    )
     print(f"  {'Keys LOST':30s} {post['durable_lost']:>10d} {post['fast_lost']:>10d}")
     print(f"  {'WAL syncs performed':30s} {wal['durable_syncs']:>10d} {wal['fast_syncs']:>10d}")
 
     if post["fast_lost"] > post["durable_lost"]:
         extra = post["fast_lost"] - post["durable_lost"]
         print(f"\n  ** The fast node lost {extra} MORE writes than the durable node.")
-        print(f"     These were acknowledged but not yet fsynced to disk.")
+        print("     These were acknowledged but not yet fsynced to disk.")
         if post["durable_lost"] > 0:
             print(f"     (The durable node's {post['durable_lost']} losses are writes")
-            print(f"      that were mid-fsync at the moment of the crash.)")
+            print("      that were mid-fsync at the moment of the crash.)")
         print(f"     Durability cost: {wal['durable_syncs']} syncs vs {wal['fast_syncs']} syncs.")
     elif post["durable_lost"] == 0 and post["fast_lost"] == 0:
-        print(f"\n  Both nodes recovered all data (crash aligned with sync boundary).")
+        print("\n  Both nodes recovered all data (crash aligned with sync boundary).")
 
     print("\n" + "=" * 70)
 
@@ -314,6 +318,7 @@ def visualize_results(results: dict, output_dir: Path) -> None:
     """Generate a comparison chart."""
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -323,7 +328,7 @@ def visualize_results(results: dict, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     post = results["post_recovery"]
-    total = results["total_written"]
+    results["total_written"]
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
@@ -335,15 +340,41 @@ def visualize_results(results: dict, output_dir: Path) -> None:
     colors_surviving = ["#2ecc71", "#3498db"]
     colors_lost = ["#e74c3c", "#e74c3c"]
 
-    bars_s = ax.bar(labels, surviving, color=colors_surviving, label="Surviving", edgecolor="black", alpha=0.85)
-    bars_l = ax.bar(labels, lost, bottom=surviving, color=colors_lost, label="Lost", edgecolor="black", alpha=0.85)
+    bars_s = ax.bar(
+        labels, surviving, color=colors_surviving, label="Surviving", edgecolor="black", alpha=0.85
+    )
+    bars_l = ax.bar(
+        labels,
+        lost,
+        bottom=surviving,
+        color=colors_lost,
+        label="Lost",
+        edgecolor="black",
+        alpha=0.85,
+    )
 
-    for bar_s, bar_l, s, l in zip(bars_s, bars_l, surviving, lost):
-        ax.text(bar_s.get_x() + bar_s.get_width() / 2, bar_s.get_height() / 2,
-                f"{s}", ha="center", va="center", fontsize=11, fontweight="bold", color="white")
+    for bar_s, bar_l, s, l in zip(bars_s, bars_l, surviving, lost, strict=False):
+        ax.text(
+            bar_s.get_x() + bar_s.get_width() / 2,
+            bar_s.get_height() / 2,
+            f"{s}",
+            ha="center",
+            va="center",
+            fontsize=11,
+            fontweight="bold",
+            color="white",
+        )
         if l > 0:
-            ax.text(bar_l.get_x() + bar_l.get_width() / 2, bar_s.get_height() + bar_l.get_height() / 2,
-                    f"{l} lost", ha="center", va="center", fontsize=11, fontweight="bold", color="white")
+            ax.text(
+                bar_l.get_x() + bar_l.get_width() / 2,
+                bar_s.get_height() + bar_l.get_height() / 2,
+                f"{l} lost",
+                ha="center",
+                va="center",
+                fontsize=11,
+                fontweight="bold",
+                color="white",
+            )
 
     ax.set_ylabel("Keys")
     ax.set_title("Data After Power Outage + Recovery")
@@ -355,9 +386,16 @@ def visualize_results(results: dict, output_dir: Path) -> None:
     wal = results["wal_stats"]
     sync_counts = [wal["durable_syncs"], wal["fast_syncs"]]
     bars = ax.bar(labels, sync_counts, color=["#e74c3c", "#2ecc71"], edgecolor="black", alpha=0.85)
-    for bar, val in zip(bars, sync_counts):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 5,
-                str(val), ha="center", va="bottom", fontsize=11, fontweight="bold")
+    for bar, val in zip(bars, sync_counts, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 5,
+            str(val),
+            ha="center",
+            va="bottom",
+            fontsize=11,
+            fontweight="bold",
+        )
     ax.set_ylabel("Number of fsyncs")
     ax.set_title("Durability Cost (fsync count)")
     ax.grid(True, alpha=0.3, axis="y")
@@ -381,11 +419,15 @@ if __name__ == "__main__":
         description="Demonstrate data loss from power outage with async WAL sync"
     )
     parser.add_argument("--rate", type=float, default=500.0, help="Write rate (writes/s)")
-    parser.add_argument("--crash-time", type=float, default=3.0, help="When the power outage happens (s)")
+    parser.add_argument(
+        "--crash-time", type=float, default=3.0, help="When the power outage happens (s)"
+    )
     parser.add_argument("--batch-size", type=int, default=50, help="SyncOnBatch batch size")
     parser.add_argument("--memtable-size", type=int, default=100, help="Memtable flush threshold")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--output", type=str, default="output/power_outage", help="Output directory")
+    parser.add_argument(
+        "--output", type=str, default="output/power_outage", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()
 

@@ -5,9 +5,9 @@ causes the source to produce payload events and schedule its next tick,
 creating a self-perpetuating loop until the simulation ends.
 """
 
+from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.core.entity import Entity
 
 
 class SourceEvent(Event):
@@ -25,8 +25,4 @@ class SourceEvent(Event):
     """
 
     def __init__(self, time: Instant, source_entity: Entity, daemon: bool = False):
-        super().__init__(
-            time=time,
-            event_type="source_event",
-            daemon=daemon,
-            target=source_entity)
+        super().__init__(time=time, event_type="source_event", daemon=daemon, target=source_entity)

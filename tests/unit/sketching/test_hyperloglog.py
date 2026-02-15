@@ -174,7 +174,7 @@ class TestHyperLogLogStandardError:
 
         for precision in [8, 10, 12, 14]:
             hll = HyperLogLog[int](precision=precision)
-            m = 2 ** precision
+            m = 2**precision
             expected = 1.04 / math.sqrt(m)
             assert hll.standard_error() == pytest.approx(expected, rel=0.01)
 
@@ -316,7 +316,7 @@ class TestHyperLogLogAccuracy:
     def test_accuracy_across_scales(self):
         """Accuracy is maintained across different cardinalities."""
         hll = HyperLogLog[int](precision=14, seed=42)
-        rng = random.Random(42)
+        random.Random(42)
 
         expected_error = hll.standard_error()
 
@@ -330,6 +330,5 @@ class TestHyperLogLogAccuracy:
 
             # Should be within 3x standard error most of the time
             assert relative_error < expected_error * 3, (
-                f"n={n}: expected error ~{expected_error:.2%}, "
-                f"got {relative_error:.2%}"
+                f"n={n}: expected error ~{expected_error:.2%}, got {relative_error:.2%}"
             )

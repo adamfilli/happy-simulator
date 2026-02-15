@@ -20,7 +20,7 @@ def sanitize_filename(filename: str) -> str:
     Returns:
         A filesystem-safe version of the input.
     """
-    sanitized = re.sub(r'[\/<>|:&;`?*\^%$#@!=+[\]{}(),\"\s]', '_', filename)
-    sanitized = re.sub(r'^\.*|\.*$', '', sanitized)
+    sanitized = re.sub(r"[\/<>|:&;`?*\^%$#@!=+[\]{}(),\"\s]", "_", filename)
+    sanitized = re.sub(r"^\.*|\.*$", "", sanitized)
     sanitized = sanitized[:255]
     return sanitized

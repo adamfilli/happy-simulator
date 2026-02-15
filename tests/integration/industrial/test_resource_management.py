@@ -6,19 +6,22 @@ in multi-component pipelines.
 
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.pooled_cycle import PooledCycleResource
 from happysimulator.components.industrial.preemptible_resource import (
     PreemptibleResource,
 )
 from happysimulator.components.industrial.split_merge import SplitMerge
-from happysimulator.components.common import Sink
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class EchoWorker(Entity):
@@ -42,8 +45,14 @@ class EchoWorker(Entity):
 class PriorityWorker(Entity):
     """Worker that acquires a PreemptibleResource with a given priority."""
 
-    def __init__(self, name: str, resource: PreemptibleResource, priority: float,
-                 hold_time: float, downstream: Entity):
+    def __init__(
+        self,
+        name: str,
+        resource: PreemptibleResource,
+        priority: float,
+        hold_time: float,
+        downstream: Entity,
+    ):
         super().__init__(name)
         self.resource = resource
         self.priority = priority
@@ -58,7 +67,9 @@ class PriorityWorker(Entity):
             self.preempted = True
 
         grant = yield self.resource.acquire(
-            amount=1, priority=self.priority, on_preempt=on_preempt,
+            amount=1,
+            priority=self.priority,
+            on_preempt=on_preempt,
         )
         self.acquired = True
         yield self.hold_time
@@ -76,8 +87,11 @@ class TestPooledCycleUnderLoad:
     def test_utilization_and_queueing(self):
         sink = Sink("output")
         pool = PooledCycleResource(
-            "pool", pool_size=3, cycle_time=0.5,
-            downstream=sink, queue_capacity=100,
+            "pool",
+            pool_size=3,
+            cycle_time=0.5,
+            downstream=sink,
+            queue_capacity=100,
         )
 
         source = Source.constant(rate=10.0, target=pool, stop_after=5.0)
@@ -97,8 +111,11 @@ class TestPooledCycleUnderLoad:
     def test_rejection_when_queue_full(self):
         sink = Sink("output")
         pool = PooledCycleResource(
-            "pool", pool_size=1, cycle_time=1.0,
-            downstream=sink, queue_capacity=2,
+            "pool",
+            pool_size=1,
+            cycle_time=1.0,
+            downstream=sink,
+            queue_capacity=2,
         )
 
         # Very high arrival rate to overflow queue
@@ -148,8 +165,7 @@ class TestPreemptibleResourcePriority:
         sink = Sink("done")
 
         workers = [
-            PriorityWorker(f"p{p}", resource, priority=float(p),
-                           hold_time=2.0, downstream=sink)
+            PriorityWorker(f"p{p}", resource, priority=float(p), hold_time=2.0, downstream=sink)
             for p in [10, 8, 5, 3, 1]
         ]
 
@@ -160,10 +176,13 @@ class TestPreemptibleResourcePriority:
         )
         # Schedule all workers with slight staggering
         for i, w in enumerate(workers):
-            sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.1),
-                event_type="Go", target=w,
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.1),
+                    event_type="Go",
+                    target=w,
+                )
+            )
         sim.run()
 
         # Highest priority (p=1) should have completed without preemption
@@ -189,11 +208,14 @@ class TestSplitMergeFanOut:
         )
         # Send 5 tasks
         for i in range(5):
-            sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.5),
-                event_type="Task", target=sm,
-                context={"task_id": i},
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.5),
+                    event_type="Task",
+                    target=sm,
+                    context={"task_id": i},
+                )
+            )
         sim.run()
 
         assert sm.stats.splits_initiated == 5
@@ -214,10 +236,14 @@ class TestSplitMergeFanOut:
             duration=3.0,
             entities=[sm, fast, slow, sink],
         )
-        sim.schedule(Event(
-            time=Instant.Epoch, event_type="Task", target=sm,
-            context={"created_at": Instant.Epoch},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.Epoch,
+                event_type="Task",
+                target=sm,
+                context={"created_at": Instant.Epoch},
+            )
+        )
         sim.run()
 
         assert sink.events_received == 1
@@ -256,10 +282,13 @@ class TestSplitMergeWithPooledCycleResource:
             entities=[sm, w1, w2, sink],
         )
         for i in range(3):
-            sim.schedule(Event(
-                time=Instant.from_seconds(i * 0.5),
-                event_type="Task", target=sm,
-            ))
+            sim.schedule(
+                Event(
+                    time=Instant.from_seconds(i * 0.5),
+                    event_type="Task",
+                    target=sm,
+                )
+            )
         sim.run()
 
         assert sm.stats.merges_completed == 3

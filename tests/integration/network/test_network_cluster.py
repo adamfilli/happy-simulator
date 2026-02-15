@@ -17,19 +17,19 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.network.conditions import datacenter_network
-from happysimulator.components.network.network import LinkStats, Network, Partition
+from happysimulator.components.network.network import LinkStats, Network
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
-from happysimulator.instrumentation.data import Data
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # =============================================================================
 # Entities
@@ -66,7 +66,7 @@ class GossipNode(Entity):
     def handle_event(self, event: Event) -> list[Event] | None:
         if event.event_type == "GossipTick":
             return self._handle_tick()
-        elif event.event_type == "Gossip":
+        if event.event_type == "Gossip":
             return self._handle_gossip(event)
         return None
 
@@ -91,9 +91,7 @@ class GossipNode(Entity):
 
         # Schedule next tick
         next_tick = Event(
-            time=Instant.from_seconds(
-                self.now.to_seconds() + self.gossip_interval
-            ),
+            time=Instant.from_seconds(self.now.to_seconds() + self.gossip_interval),
             event_type="GossipTick",
             target=self,
             daemon=True,
@@ -109,7 +107,7 @@ class GossipNode(Entity):
         if remote_value > self.counter:
             self.counter = remote_value
             self._record()
-        return None
+        return
 
     def _record(self) -> None:
         t = self.now.to_seconds() if self._clock is not None else 0.0
@@ -123,9 +121,7 @@ class TrafficSampler(Entity):
     name: str = "TrafficSampler"
     network: Network | None = None
     interval: float = 1.0
-    _samples: list[tuple[float, list[LinkStats]]] = field(
-        default_factory=list, init=False
-    )
+    _samples: list[tuple[float, list[LinkStats]]] = field(default_factory=list, init=False)
 
     def start(self) -> list[Event]:
         return [
@@ -148,9 +144,7 @@ class TrafficSampler(Entity):
         # Schedule next sample
         return [
             Event(
-                time=Instant.from_seconds(
-                    self.now.to_seconds() + self.interval
-                ),
+                time=Instant.from_seconds(self.now.to_seconds() + self.interval),
                 event_type="SampleTraffic",
                 target=self,
                 daemon=True,
@@ -170,8 +164,7 @@ def _build_cluster(
     network = Network(name="ClusterNetwork")
     node_names = ["A", "B", "C", "D", "E"]
     nodes = [
-        GossipNode(name=n, network=network, gossip_interval=gossip_interval)
-        for n in node_names
+        GossipNode(name=n, network=network, gossip_interval=gossip_interval) for n in node_names
     ]
 
     # Wire peers (everyone except self)
@@ -257,9 +250,7 @@ class TestGossipCluster:
         max_val_at_5 = max(values_at_5.values())
         min_val_at_5 = min(values_at_5.values())
         # All nodes should be close (within one gossip round of max)
-        assert max_val_at_5 - min_val_at_5 <= 3, (
-            f"Nodes not converged at t=5: {values_at_5}"
-        )
+        assert max_val_at_5 - min_val_at_5 <= 3, f"Nodes not converged at t=5: {values_at_5}"
 
         # Phase 2: Create partition {A,B} vs {C,D,E}
         group_ab = [node_map["A"], node_map["B"]]
@@ -286,9 +277,7 @@ class TestGossipCluster:
         )
 
         # CDE should be significantly ahead since they increment 3x faster
-        assert cde_max > ab_max, (
-            f"CDE group ({cde_max}) should be ahead of AB group ({ab_max})"
-        )
+        assert cde_max > ab_max, f"CDE group ({cde_max}) should be ahead of AB group ({ab_max})"
 
         # Phase 3: Heal partition and let reconverge
         partition_handle.heal()
@@ -301,9 +290,7 @@ class TestGossipCluster:
         final_max = max(final_values)
         final_min = min(final_values)
         # All nodes should be close to max (within a few gossip rounds)
-        assert final_max - final_min <= 6, (
-            f"Nodes did not reconverge: {final_values}"
-        )
+        assert final_max - final_min <= 6, f"Nodes did not reconverge: {final_values}"
         assert final_max >= max(ab_max, cde_max)
 
     def test_traffic_stats_reflect_partition(self):
@@ -436,13 +423,11 @@ class TestGossipCluster:
         # Phase 1: warm-up (0-5s)
         from happysimulator.core.control.breakpoints import TimeBreakpoint
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(5.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(5.0)))
         sim.run()
 
         # Record pre-partition stats
-        pre_partition_matrix = network.traffic_matrix()
+        network.traffic_matrix()
 
         # Phase 2: partition at t=5 {A,B} vs {C,D,E}
         partition_start = 5.0
@@ -450,9 +435,7 @@ class TestGossipCluster:
         group_cde = [node_map["C"], node_map["D"], node_map["E"]]
         partition_handle = network.partition(group_ab, group_cde)
 
-        sim.control.add_breakpoint(
-            TimeBreakpoint(time=Instant.from_seconds(20.0))
-        )
+        sim.control.add_breakpoint(TimeBreakpoint(time=Instant.from_seconds(20.0)))
         sim.control.resume()
 
         # Phase 3: heal at t=20
@@ -464,9 +447,7 @@ class TestGossipCluster:
 
         # Assertions: all nodes reconverge
         final_values = [n.counter for n in nodes]
-        assert len(set(final_values)) == 1, (
-            f"Nodes did not reconverge: {final_values}"
-        )
+        assert len(set(final_values)) == 1, f"Nodes did not reconverge: {final_values}"
 
         # Generate visualization
         _generate_cluster_visualization(
@@ -491,7 +472,6 @@ def _generate_cluster_visualization(
     matplotlib = pytest.importorskip("matplotlib")
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    import matplotlib.patches as mpatches
 
     fig, axes = plt.subplots(3, 1, figsize=(14, 12))
 
@@ -584,7 +564,7 @@ def _generate_cluster_visualization(
         "Partition start",
         xy=(partition_start, 0),
         xytext=(partition_start - 2, 0.3),
-        arrowprops=dict(arrowstyle="->", color="red"),
+        arrowprops={"arrowstyle": "->", "color": "red"},
         fontsize=9,
         color="red",
     )
@@ -592,7 +572,7 @@ def _generate_cluster_visualization(
         "Heal",
         xy=(partition_end, 0),
         xytext=(partition_end + 1, 0.3),
-        arrowprops=dict(arrowstyle="->", color="green"),
+        arrowprops={"arrowstyle": "->", "color": "green"},
         fontsize=9,
         color="green",
     )

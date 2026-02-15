@@ -37,7 +37,7 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -52,28 +52,31 @@ from happysimulator import (
 )
 from happysimulator.components.common import Counter
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class ParkingConfig:
-    duration_s: float = 7200.0      # 2 hours
+    duration_s: float = 7200.0  # 2 hours
     num_regular: int = 100
     num_premium: int = 20
     premium_probability: float = 0.15  # 15% want premium
     # Stay durations (seconds)
-    mean_stay_s: float = 3600.0     # 1 hour average
-    min_stay_s: float = 600.0       # 10 min minimum
-    max_stay_s: float = 10800.0     # 3 hour maximum
+    mean_stay_s: float = 3600.0  # 1 hour average
+    min_stay_s: float = 600.0  # 10 min minimum
+    max_stay_s: float = 10800.0  # 3 hour maximum
     # Pricing per hour
     regular_rate_per_hr: float = 3.0
     premium_rate_per_hr: float = 6.0
     # Arrival profile rates (per second)
-    morning_rate: float = 0.08      # ~288/hr early
-    peak_rate: float = 0.15         # ~540/hr midday
-    evening_rate: float = 0.04      # ~144/hr late
+    morning_rate: float = 0.08  # ~288/hr early
+    peak_rate: float = 0.15  # ~540/hr midday
+    evening_rate: float = 0.04  # ~144/hr late
     # Profile timing (as fraction of duration)
     peak_start_frac: float = 0.25
     peak_end_frac: float = 0.70
@@ -83,6 +86,7 @@ class ParkingConfig:
 # =============================================================================
 # Time-Varying Arrival Profile
 # =============================================================================
+
 
 class ParkingArrivalProfile(Profile):
     """Three-phase arrival profile: morning ramp, midday peak, evening decline."""
@@ -101,9 +105,9 @@ class ParkingArrivalProfile(Profile):
             # Ramp from morning to peak
             frac = t / self.peak_start if self.peak_start > 0 else 1.0
             return self.morning_rate + frac * (self.peak_rate - self.morning_rate)
-        elif t < self.peak_end:
+        if t < self.peak_end:
             return self.peak_rate
-        elif t < self.duration:
+        if t < self.duration:
             # Decline from peak to evening
             remaining = self.duration - self.peak_end
             frac = (t - self.peak_end) / remaining if remaining > 0 else 1.0
@@ -114,6 +118,7 @@ class ParkingArrivalProfile(Profile):
 # =============================================================================
 # Revenue Tracker
 # =============================================================================
+
 
 class RevenueTracker:
     """Tracks parking revenue by spot type."""
@@ -146,12 +151,19 @@ class RevenueTracker:
 # Parking Attendant (routes cars, handles balking)
 # =============================================================================
 
+
 class ParkingAttendant(Entity):
     """Routes arriving cars to appropriate spot type, with balking on full lot."""
 
-    def __init__(self, name: str, regular_spots: Resource, premium_spots: Resource,
-                 parked_car_handler: Entity, balk_counter: Counter,
-                 premium_probability: float):
+    def __init__(
+        self,
+        name: str,
+        regular_spots: Resource,
+        premium_spots: Resource,
+        parked_car_handler: Entity,
+        balk_counter: Counter,
+        premium_probability: float,
+    ):
         super().__init__(name)
         self.regular_spots = regular_spots
         self.premium_spots = premium_spots
@@ -175,8 +187,12 @@ class ParkingAttendant(Entity):
                 ctx["spot_grant"] = grant
                 self.cars_admitted += 1
                 return [
-                    Event(time=self.now, event_type="Parked",
-                          target=self.parked_car_handler, context=ctx)
+                    Event(
+                        time=self.now,
+                        event_type="Parked",
+                        target=self.parked_car_handler,
+                        context=ctx,
+                    )
                 ]
             # Premium full, try regular
             grant = self.regular_spots.try_acquire(1)
@@ -185,8 +201,12 @@ class ParkingAttendant(Entity):
                 ctx["spot_grant"] = grant
                 self.cars_admitted += 1
                 return [
-                    Event(time=self.now, event_type="Parked",
-                          target=self.parked_car_handler, context=ctx)
+                    Event(
+                        time=self.now,
+                        event_type="Parked",
+                        target=self.parked_car_handler,
+                        context=ctx,
+                    )
                 ]
         else:
             # Regular only
@@ -196,27 +216,36 @@ class ParkingAttendant(Entity):
                 ctx["spot_grant"] = grant
                 self.cars_admitted += 1
                 return [
-                    Event(time=self.now, event_type="Parked",
-                          target=self.parked_car_handler, context=ctx)
+                    Event(
+                        time=self.now,
+                        event_type="Parked",
+                        target=self.parked_car_handler,
+                        context=ctx,
+                    )
                 ]
 
         # Lot full - customer balks
         self.cars_balked += 1
-        return [
-            Event(time=self.now, event_type="Balked",
-                  target=self.balk_counter, context=ctx)
-        ]
+        return [Event(time=self.now, event_type="Balked", target=self.balk_counter, context=ctx)]
 
 
 # =============================================================================
 # Parked Car Handler (holds spot for random duration, then departs)
 # =============================================================================
 
+
 class ParkedCarHandler(Entity):
     """Holds a parking spot for a random duration, then releases it."""
 
-    def __init__(self, name: str, downstream: Entity, revenue_tracker: RevenueTracker,
-                 mean_stay_s: float, min_stay_s: float, max_stay_s: float):
+    def __init__(
+        self,
+        name: str,
+        downstream: Entity,
+        revenue_tracker: RevenueTracker,
+        mean_stay_s: float,
+        min_stay_s: float,
+        max_stay_s: float,
+    ):
         super().__init__(name)
         self.downstream = downstream
         self.revenue = revenue_tracker
@@ -242,14 +271,13 @@ class ParkedCarHandler(Entity):
         self.revenue.record_departure(spot_type, stay)
         self.departures += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Departed")
-        ]
+        return [self.forward(event, self.downstream, event_type="Departed")]
 
 
 # =============================================================================
 # Main Simulation
 # =============================================================================
+
 
 @dataclass
 class ParkingResult:
@@ -281,29 +309,41 @@ def run_parking_simulation(config: ParkingConfig | None = None) -> ParkingResult
 
     # Build pipeline
     parked_handler = ParkedCarHandler(
-        "ParkedCars", downstream=sink, revenue_tracker=revenue,
+        "ParkedCars",
+        downstream=sink,
+        revenue_tracker=revenue,
         mean_stay_s=config.mean_stay_s,
         min_stay_s=config.min_stay_s,
         max_stay_s=config.max_stay_s,
     )
 
     attendant = ParkingAttendant(
-        "Attendant", regular_spots=regular_spots, premium_spots=premium_spots,
-        parked_car_handler=parked_handler, balk_counter=balk_counter,
+        "Attendant",
+        regular_spots=regular_spots,
+        premium_spots=premium_spots,
+        parked_car_handler=parked_handler,
+        balk_counter=balk_counter,
         premium_probability=config.premium_probability,
     )
 
     # Time-varying arrival source
     profile = ParkingArrivalProfile(config)
     source = Source.with_profile(
-        profile=profile, target=attendant,
-        event_type="CarArrival", poisson=True,
-        name="Arrivals", stop_after=config.duration_s,
+        profile=profile,
+        target=attendant,
+        event_type="CarArrival",
+        poisson=True,
+        name="Arrivals",
+        stop_after=config.duration_s,
     )
 
     entities = [
-        attendant, parked_handler, regular_spots, premium_spots,
-        sink, balk_counter,
+        attendant,
+        parked_handler,
+        regular_spots,
+        premium_spots,
+        sink,
+        balk_counter,
     ]
 
     sim = Simulation(
@@ -315,10 +355,15 @@ def run_parking_simulation(config: ParkingConfig | None = None) -> ParkingResult
     summary = sim.run()
 
     return ParkingResult(
-        sink=sink, balk_counter=balk_counter, attendant=attendant,
-        parked_handler=parked_handler, regular_spots=regular_spots,
-        premium_spots=premium_spots, revenue=revenue,
-        config=config, summary=summary,
+        sink=sink,
+        balk_counter=balk_counter,
+        attendant=attendant,
+        parked_handler=parked_handler,
+        regular_spots=regular_spots,
+        premium_spots=premium_spots,
+        revenue=revenue,
+        config=config,
+        summary=summary,
     )
 
 
@@ -328,28 +373,30 @@ def print_summary(result: ParkingResult) -> None:
     print("=" * 65)
 
     c = result.config
-    print(f"\nConfiguration:")
-    print(f"  Duration: {c.duration_s/60:.0f} minutes")
+    print("\nConfiguration:")
+    print(f"  Duration: {c.duration_s / 60:.0f} minutes")
     print(f"  Spots: {c.num_regular} regular, {c.num_premium} premium")
-    print(f"  Pricing: ${c.regular_rate_per_hr:.2f}/hr regular, "
-          f"${c.premium_rate_per_hr:.2f}/hr premium")
+    print(
+        f"  Pricing: ${c.regular_rate_per_hr:.2f}/hr regular, "
+        f"${c.premium_rate_per_hr:.2f}/hr premium"
+    )
 
-    print(f"\nTraffic:")
+    print("\nTraffic:")
     total_arrivals = result.attendant.cars_admitted + result.attendant.cars_balked
     print(f"  Total arrivals: {total_arrivals}")
     print(f"  Admitted: {result.attendant.cars_admitted}")
-    print(f"  Balked (lot full): {result.attendant.cars_balked} "
-          f"({result.attendant.cars_balked / max(total_arrivals, 1) * 100:.1f}%)")
+    print(
+        f"  Balked (lot full): {result.attendant.cars_balked} "
+        f"({result.attendant.cars_balked / max(total_arrivals, 1) * 100:.1f}%)"
+    )
 
-    print(f"\nSpot Utilization:")
+    print("\nSpot Utilization:")
     rs = result.regular_spots.stats
     ps = result.premium_spots.stats
-    print(f"  Regular: {rs.peak_utilization*100:.0f}% peak, "
-          f"{rs.contentions} contentions")
-    print(f"  Premium: {ps.peak_utilization*100:.0f}% peak, "
-          f"{ps.contentions} contentions")
+    print(f"  Regular: {rs.peak_utilization * 100:.0f}% peak, {rs.contentions} contentions")
+    print(f"  Premium: {ps.peak_utilization * 100:.0f}% peak, {ps.contentions} contentions")
 
-    print(f"\nRevenue:")
+    print("\nRevenue:")
     rev = result.revenue
     print(f"  Regular: ${rev.regular_revenue:.2f} ({rev.regular_cars} cars)")
     print(f"  Premium: ${rev.premium_revenue:.2f} ({rev.premium_cars} cars)")
@@ -358,11 +405,11 @@ def print_summary(result: ParkingResult) -> None:
         avg_revenue = rev.total_revenue / result.parked_handler.departures
         print(f"  Avg per car: ${avg_revenue:.2f}")
 
-    print(f"\nDepartures:")
+    print("\nDepartures:")
     print(f"  Total: {result.sink.count}")
     if result.sink.count > 0:
-        print(f"  Avg stay: {result.sink.mean_latency()/60:.1f} min")
-        print(f"  p99 stay: {result.sink.p99()/60:.1f} min")
+        print(f"  Avg stay: {result.sink.mean_latency() / 60:.1f} min")
+        print(f"  p99 stay: {result.sink.p99() / 60:.1f} min")
 
     print(f"\n{result.summary}")
     print("=" * 65)
@@ -370,12 +417,15 @@ def print_summary(result: ParkingResult) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parking lot simulation")
-    parser.add_argument("--duration", type=float, default=7200.0,
-                        help="Duration in seconds (default: 7200)")
-    parser.add_argument("--regular", type=int, default=100,
-                        help="Number of regular spots (default: 100)")
-    parser.add_argument("--premium", type=int, default=20,
-                        help="Number of premium spots (default: 20)")
+    parser.add_argument(
+        "--duration", type=float, default=7200.0, help="Duration in seconds (default: 7200)"
+    )
+    parser.add_argument(
+        "--regular", type=int, default=100, help="Number of regular spots (default: 100)"
+    )
+    parser.add_argument(
+        "--premium", type=int, default=20, help="Number of premium spots (default: 20)"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()

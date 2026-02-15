@@ -52,7 +52,7 @@ class InMemoryTraceRecorder:
     """
 
     spans: list[dict[str, Any]] = field(default_factory=list)
-    
+
     def record(
         self,
         *,
@@ -73,15 +73,15 @@ class InMemoryTraceRecorder:
         if data:
             span["data"] = data
         self.spans.append(span)
-    
+
     def clear(self) -> None:
         """Clear all recorded spans."""
         self.spans.clear()
-    
+
     def filter_by_kind(self, kind: str) -> list[dict[str, Any]]:
         """Return spans matching the given kind."""
         return [s for s in self.spans if s["kind"] == kind]
-    
+
     def filter_by_event(self, event_id: str) -> list[dict[str, Any]]:
         """Return spans for a specific event ID."""
         return [s for s in self.spans if s.get("event_id") == event_id]
@@ -90,10 +90,10 @@ class InMemoryTraceRecorder:
 @dataclass
 class NullTraceRecorder:
     """No-op recorder that discards all traces.
-    
+
     Use when tracing is disabled for performance.
     """
-    
+
     def record(
         self,
         *,

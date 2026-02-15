@@ -6,15 +6,14 @@ from happysimulator import (
     Event,
     Instant,
     Network,
-    Simulation,
     SimFuture,
+    Simulation,
     datacenter_network,
 )
 from happysimulator.components.datastore import KVStore
 from happysimulator.components.replication.chain_replication import (
     ChainNode,
     ChainNodeRole,
-    ChainReplicationStats,
     build_chain,
 )
 
@@ -108,14 +107,17 @@ class TestChainWritePropagation:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=nodes[0],
-            context={"metadata": {
-                "key": "x", "value": 42, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": "x",
+                    "value": 42,
+                    "reply_future": reply_future,
+                }
+            },
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -148,14 +150,17 @@ class TestChainWritePropagation:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=nodes[0],
-            context={"metadata": {
-                "key": "y", "value": 99, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": "y",
+                    "value": 99,
+                    "reply_future": reply_future,
+                }
+            },
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -186,8 +191,7 @@ class TestChainWritePropagation:
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -223,8 +227,7 @@ class TestChainReads:
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -258,8 +261,7 @@ class TestCRAQ:
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -293,8 +295,7 @@ class TestCRAQ:
         )
 
         all_entities = [*nodes, network]
-        for n in nodes:
-            all_entities.append(n.store)
+        all_entities.extend(n.store for n in nodes)
 
         sim = Simulation(
             start_time=Instant.Epoch,

@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.microservice import (
     IdempotencyStore,
-    IdempotencyStoreStats,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass
@@ -27,7 +29,7 @@ class EchoServer(Entity):
     requests_received: int = field(default=0, init=False)
     keys_seen: list[str] = field(default_factory=list, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         key = event.context.get("metadata", {}).get("_is_key")
         if key:
@@ -78,7 +80,9 @@ class TestIdempotencyStoreCreation:
     def test_rejects_invalid_cleanup_interval(self):
         server = EchoServer(name="server")
         with pytest.raises(ValueError):
-            IdempotencyStore(name="x", target=server, key_extractor=lambda e: "k", cleanup_interval=0)
+            IdempotencyStore(
+                name="x", target=server, key_extractor=lambda e: "k", cleanup_interval=0
+            )
 
 
 class TestIdempotencyStoreBehavior:
@@ -129,7 +133,7 @@ class TestIdempotencyStoreBehavior:
         )
 
         # Send same key twice - second should be in-flight hit
-        for i in range(2):
+        for _i in range(2):
             event = Event(
                 time=Instant.Epoch,
                 event_type="request",

@@ -1,21 +1,17 @@
 """Tests for PrimaryBackupReplication."""
 
-import pytest
-
 from happysimulator import (
     CallbackEntity,
     Event,
     Instant,
     Network,
-    Simulation,
     SimFuture,
+    Simulation,
     datacenter_network,
 )
 from happysimulator.components.datastore import KVStore
 from happysimulator.components.replication.primary_backup import (
     BackupNode,
-    BackupStats,
-    PrimaryBackupStats,
     PrimaryNode,
     ReplicationMode,
 )
@@ -39,7 +35,10 @@ class TestPrimaryNodeCreation:
         store = KVStore("store")
         network = Network(name="net")
         primary = PrimaryNode(
-            "primary", store=store, backups=[], network=network,
+            "primary",
+            store=store,
+            backups=[],
+            network=network,
             mode=ReplicationMode.SYNC,
         )
 
@@ -84,11 +83,17 @@ class TestAsyncReplication:
         backup_store = KVStore("bs", write_latency=0.001, read_latency=0.001)
 
         primary = PrimaryNode(
-            "primary", store=primary_store, backups=[],
-            network=network, mode=ReplicationMode.ASYNC,
+            "primary",
+            store=primary_store,
+            backups=[],
+            network=network,
+            mode=ReplicationMode.ASYNC,
         )
         backup = BackupNode(
-            "backup", store=backup_store, network=network, primary=primary,
+            "backup",
+            store=backup_store,
+            network=network,
+            primary=primary,
         )
         primary._backups = [backup]
         primary._backup_lag = {backup.name: 0}
@@ -126,7 +131,10 @@ class TestAsyncReplication:
         store.put_sync("y", 99)
 
         primary = PrimaryNode(
-            "primary", store=store, backups=[], network=network,
+            "primary",
+            store=store,
+            backups=[],
+            network=network,
         )
 
         reply_future = SimFuture()
@@ -161,14 +169,23 @@ class TestSyncReplication:
         backup_store_2 = KVStore("bs2", write_latency=0.001, read_latency=0.001)
 
         primary = PrimaryNode(
-            "primary", store=primary_store, backups=[],
-            network=network, mode=ReplicationMode.SYNC,
+            "primary",
+            store=primary_store,
+            backups=[],
+            network=network,
+            mode=ReplicationMode.SYNC,
         )
         backup1 = BackupNode(
-            "backup1", store=backup_store_1, network=network, primary=primary,
+            "backup1",
+            store=backup_store_1,
+            network=network,
+            primary=primary,
         )
         backup2 = BackupNode(
-            "backup2", store=backup_store_2, network=network, primary=primary,
+            "backup2",
+            store=backup_store_2,
+            network=network,
+            primary=primary,
         )
         primary._backups = [backup1, backup2]
         primary._backup_lag = {backup1.name: 0, backup2.name: 0}
@@ -181,17 +198,28 @@ class TestSyncReplication:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=primary,
-            context={"metadata": {
-                "key": "x", "value": 42, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": "x",
+                    "value": 42,
+                    "reply_future": reply_future,
+                }
+            },
         )
 
         sim = Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(2.0),
             sources=[],
-            entities=[primary, backup1, backup2, network,
-                      primary_store, backup_store_1, backup_store_2],
+            entities=[
+                primary,
+                backup1,
+                backup2,
+                network,
+                primary_store,
+                backup_store_1,
+                backup_store_2,
+            ],
         )
         sim.schedule(write_event)
         sim.run()
@@ -216,14 +244,23 @@ class TestSemiSyncReplication:
         backup_store_2 = KVStore("bs2", write_latency=0.001, read_latency=0.001)
 
         primary = PrimaryNode(
-            "primary", store=primary_store, backups=[],
-            network=network, mode=ReplicationMode.SEMI_SYNC,
+            "primary",
+            store=primary_store,
+            backups=[],
+            network=network,
+            mode=ReplicationMode.SEMI_SYNC,
         )
         backup1 = BackupNode(
-            "backup1", store=backup_store_1, network=network, primary=primary,
+            "backup1",
+            store=backup_store_1,
+            network=network,
+            primary=primary,
         )
         backup2 = BackupNode(
-            "backup2", store=backup_store_2, network=network, primary=primary,
+            "backup2",
+            store=backup_store_2,
+            network=network,
+            primary=primary,
         )
         primary._backups = [backup1, backup2]
         primary._backup_lag = {backup1.name: 0, backup2.name: 0}
@@ -236,26 +273,34 @@ class TestSemiSyncReplication:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=primary,
-            context={"metadata": {
-                "key": "x", "value": 42, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": "x",
+                    "value": 42,
+                    "reply_future": reply_future,
+                }
+            },
         )
 
         sim = Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(2.0),
             sources=[],
-            entities=[primary, backup1, backup2, network,
-                      primary_store, backup_store_1, backup_store_2],
+            entities=[
+                primary,
+                backup1,
+                backup2,
+                network,
+                primary_store,
+                backup_store_1,
+                backup_store_2,
+            ],
         )
         sim.schedule(write_event)
         sim.run()
 
         # At least one backup should have the value
-        has_value = (
-            backup_store_1.get_sync("x") == 42
-            or backup_store_2.get_sync("x") == 42
-        )
+        has_value = backup_store_1.get_sync("x") == 42 or backup_store_2.get_sync("x") == 42
         assert has_value
 
         # Reply should be resolved
@@ -273,7 +318,10 @@ class TestBackupReads:
 
         primary = CallbackEntity("primary", fn=lambda e: None)
         backup = BackupNode(
-            "backup", store=backup_store, network=network, primary=primary,
+            "backup",
+            store=backup_store,
+            network=network,
+            primary=primary,
         )
 
         reply_future = SimFuture()

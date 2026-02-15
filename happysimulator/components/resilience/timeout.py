@@ -18,8 +18,8 @@ Example:
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -227,7 +227,7 @@ class TimeoutWrapper(Entity):
                 self.name,
                 request_id,
             )
-            return None
+            return
 
         request_info = self._in_flight[request_id]
 
@@ -238,7 +238,7 @@ class TimeoutWrapper(Entity):
                 self.name,
                 request_id,
             )
-            return None
+            return
 
         # Mark as completed
         request_info["completed"] = True
@@ -254,7 +254,7 @@ class TimeoutWrapper(Entity):
             response_time,
         )
 
-        return None
+        return
 
     def _handle_timeout(self, event: Event) -> list[Event] | Event | None:
         """Handle a timeout event."""

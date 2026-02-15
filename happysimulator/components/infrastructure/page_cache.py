@@ -16,10 +16,14 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +155,7 @@ class PageCache(Entity):
         """Move page to most-recently-used position."""
         self._pages.move_to_end(page_id)
 
-    def _evict_one(self) -> Generator[float, None, None]:
+    def _evict_one(self) -> Generator[float]:
         """Evict the least-recently-used page, flushing if dirty."""
         if not self._pages:
             return
@@ -164,18 +168,18 @@ class PageCache(Entity):
         del self._pages[oldest_id]
         self._evictions += 1
 
-    def _ensure_space(self) -> Generator[float, None, None]:
+    def _ensure_space(self) -> Generator[float]:
         """Evict pages until there is room for at least one new page."""
         while len(self._pages) >= self._capacity:
             yield from self._evict_one()
 
-    def _load_page(self, page_id: int) -> Generator[float, None, None]:
+    def _load_page(self, page_id: int) -> Generator[float]:
         """Load a page from disk into cache."""
         yield from self._ensure_space()
         yield self._disk_read_latency_s
         self._pages[page_id] = _CachedPage(page_id=page_id)
 
-    def read_page(self, page_id: int) -> Generator[float, None, None]:
+    def read_page(self, page_id: int) -> Generator[float]:
         """Read a page, serving from cache if present.
 
         On cache miss, loads from disk and optionally prefetches
@@ -198,7 +202,7 @@ class PageCache(Entity):
                 self._pages[ahead_id] = _CachedPage(page_id=ahead_id)
                 self._readaheads += 1
 
-    def write_page(self, page_id: int) -> Generator[float, None, None]:
+    def write_page(self, page_id: int) -> Generator[float]:
         """Write a page to cache, marking it dirty.
 
         If the page is already cached, it is updated in place.
@@ -230,7 +234,6 @@ class PageCache(Entity):
 
     def handle_event(self, event: Event) -> None:
         """PageCache does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return (

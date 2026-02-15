@@ -17,8 +17,9 @@ Example:
 """
 
 import heapq
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TypeVar, Optional, Callable, Generic
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
 from happysimulator.core.temporal import Instant
@@ -37,7 +38,7 @@ class DeadlineQueueStats:
 
 
 @dataclass(order=True)
-class _DeadlineEntry(Generic[T]):
+class _DeadlineEntry[T]:
     """Entry wrapper for deadline-based heap ordering."""
 
     deadline_ns: int  # Nanoseconds for comparison
@@ -145,7 +146,7 @@ class DeadlineQueue(QueuePolicy[T]):
         self._enqueued += 1
         return True
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         """Remove and return the item with earliest deadline.
 
         Automatically drops expired items until finding a valid one.
@@ -168,7 +169,7 @@ class DeadlineQueue(QueuePolicy[T]):
 
         return None
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         """Return the next non-expired item without removing it.
 
         Note: Does not remove expired items (use pop for that).

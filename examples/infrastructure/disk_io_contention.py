@@ -28,7 +28,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -42,13 +42,15 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.infrastructure import (
-    DiskIO,
-    DiskIOStats,
     HDD,
     SSD,
+    DiskIO,
+    DiskIOStats,
     NVMe,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity: IOWorkloadDriver
@@ -168,24 +170,30 @@ def run_simulation(
         random.seed(seed)
 
     hdd_result = _run_profile(
-        "HDD", DiskIO("HDD_Disk", profile=HDD()),
-        duration_s=duration_s, rate=rate,
+        "HDD",
+        DiskIO("HDD_Disk", profile=HDD()),
+        duration_s=duration_s,
+        rate=rate,
     )
 
     if seed is not None:
         random.seed(seed)
 
     ssd_result = _run_profile(
-        "SSD", DiskIO("SSD_Disk", profile=SSD()),
-        duration_s=duration_s, rate=rate,
+        "SSD",
+        DiskIO("SSD_Disk", profile=SSD()),
+        duration_s=duration_s,
+        rate=rate,
     )
 
     if seed is not None:
         random.seed(seed)
 
     nvme_result = _run_profile(
-        "NVMe", DiskIO("NVMe_Disk", profile=NVMe()),
-        duration_s=duration_s, rate=rate,
+        "NVMe",
+        DiskIO("NVMe_Disk", profile=NVMe()),
+        duration_s=duration_s,
+        rate=rate,
     )
 
     return SimulationResult(
@@ -210,7 +218,7 @@ def print_summary(result: SimulationResult) -> None:
     print(f"\n{header}")
     print("-" * len(header))
 
-    for label, stats in [
+    for _label, _stats in [
         ("HDD", result.hdd.stats),
         ("SSD", result.ssd.stats),
         ("NVMe", result.nvme.stats),
@@ -221,10 +229,18 @@ def print_summary(result: SimulationResult) -> None:
     print(f"{'Reads':<30} {h.reads:>12,} {s.reads:>12,} {n.reads:>12,}")
     print(f"{'Writes':<30} {h.writes:>12,} {s.writes:>12,} {n.writes:>12,}")
     print(f"{'Bytes read':<30} {h.bytes_read:>12,} {s.bytes_read:>12,} {n.bytes_read:>12,}")
-    print(f"{'Bytes written':<30} {h.bytes_written:>12,} {s.bytes_written:>12,} {n.bytes_written:>12,}")
-    print(f"{'Avg read latency (ms)':<30} {h.avg_read_latency_s*1000:>12.3f} {s.avg_read_latency_s*1000:>12.3f} {n.avg_read_latency_s*1000:>12.3f}")
-    print(f"{'Avg write latency (ms)':<30} {h.avg_write_latency_s*1000:>12.3f} {s.avg_write_latency_s*1000:>12.3f} {n.avg_write_latency_s*1000:>12.3f}")
-    print(f"{'Peak queue depth':<30} {h.peak_queue_depth:>12} {s.peak_queue_depth:>12} {n.peak_queue_depth:>12}")
+    print(
+        f"{'Bytes written':<30} {h.bytes_written:>12,} {s.bytes_written:>12,} {n.bytes_written:>12,}"
+    )
+    print(
+        f"{'Avg read latency (ms)':<30} {h.avg_read_latency_s * 1000:>12.3f} {s.avg_read_latency_s * 1000:>12.3f} {n.avg_read_latency_s * 1000:>12.3f}"
+    )
+    print(
+        f"{'Avg write latency (ms)':<30} {h.avg_write_latency_s * 1000:>12.3f} {s.avg_write_latency_s * 1000:>12.3f} {n.avg_write_latency_s * 1000:>12.3f}"
+    )
+    print(
+        f"{'Peak queue depth':<30} {h.peak_queue_depth:>12} {s.peak_queue_depth:>12} {n.peak_queue_depth:>12}"
+    )
 
     print("\n" + "=" * 72)
     print("INTERPRETATION:")
@@ -245,6 +261,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -270,8 +287,8 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ]
     x = range(len(profiles))
     w = 0.35
-    ax.bar([i - w/2 for i in x], read_lats, w, label="Read", color="#4C72B0")
-    ax.bar([i + w/2 for i in x], write_lats, w, label="Write", color="#DD8452")
+    ax.bar([i - w / 2 for i in x], read_lats, w, label="Read", color="#4C72B0")
+    ax.bar([i + w / 2 for i in x], write_lats, w, label="Write", color="#DD8452")
     ax.set_xticks(list(x))
     ax.set_xticklabels(profiles)
     ax.set_ylabel("Avg Latency (ms)")

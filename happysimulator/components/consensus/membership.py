@@ -17,16 +17,16 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any
 
+from happysimulator.components.consensus.phi_accrual_detector import PhiAccrualDetector
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.phi_accrual_detector import PhiAccrualDetector
 
 logger = logging.getLogger(__name__)
 
 
 class MemberState(Enum):
     """States a member can be in."""
+
     ALIVE = auto()
     SUSPECT = auto()
     DEAD = auto()
@@ -44,6 +44,7 @@ class MemberInfo:
         detector: Phi accrual detector for this member.
         state_change_time: Simulation time when state last changed.
     """
+
     name: str
     entity: Entity
     state: MemberState = MemberState.ALIVE
@@ -65,6 +66,7 @@ class MembershipStats:
         acks_received: Total acks received.
         updates_disseminated: Total membership updates piggybacked.
     """
+
     alive_count: int = 0
     suspect_count: int = 0
     dead_count: int = 0
@@ -136,12 +138,14 @@ class MembershipProtocol(Entity):
     def start(self) -> list[Event]:
         """Schedule the first probe tick."""
         random.shuffle(self._probe_order)
-        return [Event(
-            time=self.now + self._probe_interval,
-            event_type="MembershipProbeTick",
-            target=self,
-            daemon=True,
-        )]
+        return [
+            Event(
+                time=self.now + self._probe_interval,
+                event_type="MembershipProbeTick",
+                target=self,
+                daemon=True,
+            )
+        ]
 
     def handle_event(self, event: Event):
         handlers = {
@@ -165,9 +169,8 @@ class MembershipProtocol(Entity):
         for info in self._members.values():
             if info.state == MemberState.DEAD:
                 continue
-            if info.state == MemberState.ALIVE:
-                if not info.detector.is_available(now_s):
-                    self._suspect_member(info, now_s)
+            if info.state == MemberState.ALIVE and not info.detector.is_available(now_s):
+                self._suspect_member(info, now_s)
 
         # Pick next target to probe
         target = self._next_probe_target()
@@ -203,12 +206,14 @@ class MembershipProtocol(Entity):
             events.append(timeout)
 
         # Schedule next probe tick
-        events.append(Event(
-            time=self.now + self._probe_interval,
-            event_type="MembershipProbeTick",
-            target=self,
-            daemon=True,
-        ))
+        events.append(
+            Event(
+                time=self.now + self._probe_interval,
+                event_type="MembershipProbeTick",
+                target=self,
+                daemon=True,
+            )
+        )
         return events
 
     def _handle_ping(self, event: Event) -> list[Event]:
@@ -269,7 +274,7 @@ class MembershipProtocol(Entity):
         if target_name is None or target_name not in self._members:
             return []
 
-        target_info = self._members[target_name]
+        self._members[target_name]
 
         # If we already got an ack, skip
         if target_name not in self._pending_acks:
@@ -277,12 +282,12 @@ class MembershipProtocol(Entity):
 
         # Pick random delegates (excluding self and target)
         delegates = [
-            name for name in self._members
-            if name != target_name
-            and self._members[name].state != MemberState.DEAD
+            name
+            for name in self._members
+            if name != target_name and self._members[name].state != MemberState.DEAD
         ]
         random.shuffle(delegates)
-        delegates = delegates[:self._indirect_probe_count]
+        delegates = delegates[: self._indirect_probe_count]
 
         events: list[Event] = []
         for delegate_name in delegates:
@@ -331,31 +336,36 @@ class MembershipProtocol(Entity):
             if info.state == MemberState.SUSPECT:
                 info.state = MemberState.DEAD
                 info.state_change_time = self.now.to_seconds()
-                self._pending_updates.append({
-                    "member": suspect_name,
-                    "state": "dead",
-                    "incarnation": info.incarnation,
-                })
+                self._pending_updates.append(
+                    {
+                        "member": suspect_name,
+                        "state": "dead",
+                        "incarnation": info.incarnation,
+                    }
+                )
                 logger.debug("[%s] Member %s declared DEAD", self.name, suspect_name)
             if suspect_name in self._pending_acks:
                 del self._pending_acks[suspect_name]
-        return None
+        return
 
     def _suspect_member(self, info: MemberInfo, now_s: float) -> None:
         if info.state != MemberState.ALIVE:
             return
         info.state = MemberState.SUSPECT
         info.state_change_time = now_s
-        self._pending_updates.append({
-            "member": info.name,
-            "state": "suspect",
-            "incarnation": info.incarnation,
-        })
+        self._pending_updates.append(
+            {
+                "member": info.name,
+                "state": "suspect",
+                "incarnation": info.incarnation,
+            }
+        )
         logger.debug("[%s] Suspecting member %s", self.name, info.name)
 
     def _next_probe_target(self) -> str | None:
         alive = [
-            name for name in self._probe_order
+            name
+            for name in self._probe_order
             if name in self._members and self._members[name].state != MemberState.DEAD
         ]
         if not alive:

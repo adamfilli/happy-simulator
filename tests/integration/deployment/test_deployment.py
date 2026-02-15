@@ -2,8 +2,6 @@
 
 import random
 
-import pytest
-
 from happysimulator import (
     ConstantArrivalTimeProvider,
     ConstantLatency,
@@ -14,12 +12,10 @@ from happysimulator import (
     Simulation,
     Source,
 )
-from happysimulator.components.common import Sink
 from happysimulator.components.deployment import (
     AutoScaler,
     CanaryDeployer,
     CanaryStage,
-    ErrorRateEvaluator,
     RollingDeployer,
     TargetUtilization,
 )
@@ -40,10 +36,14 @@ class RequestProvider(EventProvider):
         if self._stop_after and time > self._stop_after:
             return []
         self._count += 1
-        return [Event(
-            time=time, event_type="Request", target=self._target,
-            context={"created_at": time},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._target,
+                context={"created_at": time},
+            )
+        ]
 
 
 def make_server(name: str) -> Server:
@@ -58,7 +58,9 @@ class TestAutoScalerEndToEnd:
         # Start with 1 server
         initial_server = make_server("server_0")
         lb = LoadBalancer(
-            name="lb", backends=[initial_server], strategy=RoundRobin(),
+            name="lb",
+            backends=[initial_server],
+            strategy=RoundRobin(),
         )
 
         scaler = AutoScaler(
@@ -74,9 +76,12 @@ class TestAutoScalerEndToEnd:
         )
 
         provider = RequestProvider(lb, stop_after=Instant.from_seconds(15.0))
-        arrival = ConstantArrivalTimeProvider(ConstantRateProfile(rate=20.0), start_time=Instant.Epoch)
+        arrival = ConstantArrivalTimeProvider(
+            ConstantRateProfile(rate=20.0), start_time=Instant.Epoch
+        )
         source = Source(
-            name="traffic", event_provider=provider,
+            name="traffic",
+            event_provider=provider,
             arrival_time_provider=arrival,
         )
 
@@ -115,7 +120,7 @@ class TestRollingDeployerEndToEnd:
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=30.0,
-            entities=[lb, deployer] + servers,
+            entities=[lb, deployer, *servers],
         )
         sim.schedule(deployer.deploy())
         sim.run()
@@ -155,7 +160,7 @@ class TestCanaryDeployerEndToEnd:
         sim = Simulation(
             start_time=Instant.Epoch,
             duration=30.0,
-            entities=[lb, deployer] + servers,
+            entities=[lb, deployer, *servers],
         )
         sim.schedule(deployer.deploy())
         sim.run()

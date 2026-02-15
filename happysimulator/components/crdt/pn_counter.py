@@ -29,7 +29,7 @@ class PNCounter:
         node_id: Identifier for this replica.
     """
 
-    __slots__ = ("_node_id", "_p", "_n")
+    __slots__ = ("_n", "_node_id", "_p")
 
     def __init__(self, node_id: str):
         self._node_id = node_id

@@ -17,7 +17,8 @@ Example:
 import hashlib
 import logging
 import random
-from typing import Callable, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -162,16 +163,16 @@ class LeastConnections:
     def _get_connections(self, backend: Entity) -> int:
         """Get the number of active connections for a backend."""
         # Try common property names
-        if hasattr(backend, 'active_connections'):
+        if hasattr(backend, "active_connections"):
             return backend.active_connections
-        if hasattr(backend, 'active_requests'):
+        if hasattr(backend, "active_requests"):
             return backend.active_requests
-        if hasattr(backend, 'in_flight_count'):
+        if hasattr(backend, "in_flight_count"):
             return backend.in_flight_count
         # Check for stats object
-        if hasattr(backend, 'stats'):
+        if hasattr(backend, "stats"):
             stats = backend.stats
-            if hasattr(stats, 'active_requests'):
+            if hasattr(stats, "active_requests"):
                 return stats.active_requests
         return 0
 
@@ -211,15 +212,15 @@ class WeightedLeastConnections:
 
     def _get_connections(self, backend: Entity) -> int:
         """Get the number of active connections for a backend."""
-        if hasattr(backend, 'active_connections'):
+        if hasattr(backend, "active_connections"):
             return backend.active_connections
-        if hasattr(backend, 'active_requests'):
+        if hasattr(backend, "active_requests"):
             return backend.active_requests
-        if hasattr(backend, 'in_flight_count'):
+        if hasattr(backend, "in_flight_count"):
             return backend.in_flight_count
-        if hasattr(backend, 'stats'):
+        if hasattr(backend, "stats"):
             stats = backend.stats
-            if hasattr(stats, 'active_requests'):
+            if hasattr(stats, "active_requests"):
                 return stats.active_requests
         return 0
 
@@ -268,8 +269,7 @@ class LeastResponseTime:
         if name in self._response_times:
             # Exponential moving average
             self._response_times[name] = (
-                self._alpha * response_time +
-                (1 - self._alpha) * self._response_times[name]
+                self._alpha * response_time + (1 - self._alpha) * self._response_times[name]
             )
         else:
             self._response_times[name] = response_time
@@ -425,9 +425,8 @@ class ConsistentHash:
         hash_value = self._hash(key)
 
         for ring_hash, backend_name in self._ring:
-            if ring_hash >= hash_value:
-                if backend_name in self._backends:
-                    return self._backends[backend_name]
+            if ring_hash >= hash_value and backend_name in self._backends:
+                return self._backends[backend_name]
 
         # Wrap around to first node
         first_name = self._ring[0][1]
@@ -447,15 +446,15 @@ class PowerOfTwoChoices:
 
     def _get_connections(self, backend: Entity) -> int:
         """Get the number of active connections for a backend."""
-        if hasattr(backend, 'active_connections'):
+        if hasattr(backend, "active_connections"):
             return backend.active_connections
-        if hasattr(backend, 'active_requests'):
+        if hasattr(backend, "active_requests"):
             return backend.active_requests
-        if hasattr(backend, 'in_flight_count'):
+        if hasattr(backend, "in_flight_count"):
             return backend.in_flight_count
-        if hasattr(backend, 'stats'):
+        if hasattr(backend, "stats"):
             stats = backend.stats
-            if hasattr(stats, 'active_requests'):
+            if hasattr(stats, "active_requests"):
                 return stats.active_requests
         return 0
 

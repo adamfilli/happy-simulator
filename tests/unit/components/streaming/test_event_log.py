@@ -5,13 +5,11 @@ import pytest
 from happysimulator import (
     Event,
     Instant,
-    Simulation,
     SimFuture,
+    Simulation,
 )
 from happysimulator.components.streaming.event_log import (
     EventLog,
-    EventLogStats,
-    Partition,
     Record,
     SizeRetention,
     TimeRetention,
@@ -19,7 +17,12 @@ from happysimulator.components.streaming.event_log import (
 
 
 def _make_log(**kwargs) -> EventLog:
-    defaults = dict(name="test-log", num_partitions=4, append_latency=0.001, read_latency=0.0005)
+    defaults = {
+        "name": "test-log",
+        "num_partitions": 4,
+        "append_latency": 0.001,
+        "read_latency": 0.0005,
+    }
     defaults.update(kwargs)
     return EventLog(**defaults)
 
@@ -107,12 +110,14 @@ class TestAppend:
         for i in range(5):
             f = SimFuture()
             futures.append(f)
-            events.append(Event(
-                time=Instant.from_seconds(0.1 + i * 0.01),
-                event_type="Append",
-                target=log,
-                context={"key": f"k{i}", "value": i, "reply_future": f},
-            ))
+            events.append(
+                Event(
+                    time=Instant.from_seconds(0.1 + i * 0.01),
+                    event_type="Append",
+                    target=log,
+                    context={"key": f"k{i}", "value": i, "reply_future": f},
+                )
+            )
 
         _run_sim([log], events)
 
@@ -123,14 +128,15 @@ class TestAppend:
         """Different keys route to different partitions."""
         log = _make_log(num_partitions=4)
 
-        events = []
-        for i in range(20):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": f"key-{i}", "value": i},
-            ))
+            )
+            for i in range(20)
+        ]
 
         _run_sim([log], events)
 
@@ -144,14 +150,15 @@ class TestAppend:
         """High watermarks track per partition."""
         log = _make_log(num_partitions=1)
 
-        events = []
-        for i in range(3):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "same-key", "value": i},
-            ))
+            )
+            for i in range(3)
+        ]
 
         _run_sim([log], events)
 
@@ -168,21 +175,29 @@ class TestRead:
         log = _make_log(num_partitions=1)
         read_reply = SimFuture()
 
-        events = []
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Read",
-            target=log,
-            context={"partition": 0, "offset": 0, "max_records": 10, "reply_future": read_reply},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Read",
+                target=log,
+                context={
+                    "partition": 0,
+                    "offset": 0,
+                    "max_records": 10,
+                    "reply_future": read_reply,
+                },
+            )
+        )
 
         _run_sim([log], events)
 
@@ -196,21 +211,29 @@ class TestRead:
         log = _make_log(num_partitions=1)
         read_reply = SimFuture()
 
-        events = []
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Read",
-            target=log,
-            context={"partition": 0, "offset": 3, "max_records": 10, "reply_future": read_reply},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Read",
+                target=log,
+                context={
+                    "partition": 0,
+                    "offset": 3,
+                    "max_records": 10,
+                    "reply_future": read_reply,
+                },
+            )
+        )
 
         _run_sim([log], events)
 
@@ -224,21 +247,24 @@ class TestRead:
         log = _make_log(num_partitions=1)
         read_reply = SimFuture()
 
-        events = []
-        for i in range(10):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(10)
+        ]
 
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Read",
-            target=log,
-            context={"partition": 0, "offset": 0, "max_records": 3, "reply_future": read_reply},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Read",
+                target=log,
+                context={"partition": 0, "offset": 0, "max_records": 3, "reply_future": read_reply},
+            )
+        )
 
         _run_sim([log], events)
 
@@ -249,12 +275,19 @@ class TestRead:
         log = _make_log(num_partitions=4)
         read_reply = SimFuture()
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Read",
-            target=log,
-            context={"partition": 0, "offset": 0, "max_records": 10, "reply_future": read_reply},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Read",
+                target=log,
+                context={
+                    "partition": 0,
+                    "offset": 0,
+                    "max_records": 10,
+                    "reply_future": read_reply,
+                },
+            )
+        ]
 
         _run_sim([log], events)
 
@@ -265,12 +298,19 @@ class TestRead:
         log = _make_log(num_partitions=2)
         read_reply = SimFuture()
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Read",
-            target=log,
-            context={"partition": 99, "offset": 0, "max_records": 10, "reply_future": read_reply},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Read",
+                target=log,
+                context={
+                    "partition": 99,
+                    "offset": 0,
+                    "max_records": 10,
+                    "reply_future": read_reply,
+                },
+            )
+        ]
 
         _run_sim([log], events)
 
@@ -305,15 +345,16 @@ class TestRetention:
             retention_check_interval=0.5,
         )
 
-        events = []
         # Append records at t=0.1
-        for i in range(5):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(5)
+        ]
 
         # Run long enough for retention to kick in
         _run_sim([log], events, end_s=3.0)
@@ -329,14 +370,15 @@ class TestRetention:
             retention_check_interval=0.5,
         )
 
-        events = []
-        for i in range(10):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(10)
+        ]
 
         _run_sim([log], events, end_s=3.0)
 
@@ -350,21 +392,29 @@ class TestStats:
     def test_stats_track_appends_and_reads(self):
         log = _make_log(num_partitions=1)
 
-        events = []
-        for i in range(3):
-            events.append(Event(
+        events = [
+            Event(
                 time=Instant.from_seconds(0.1 + i * 0.01),
                 event_type="Append",
                 target=log,
                 context={"key": "k", "value": i},
-            ))
+            )
+            for i in range(3)
+        ]
 
-        events.append(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="Read",
-            target=log,
-            context={"partition": 0, "offset": 0, "max_records": 10, "reply_future": SimFuture()},
-        ))
+        events.append(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="Read",
+                target=log,
+                context={
+                    "partition": 0,
+                    "offset": 0,
+                    "max_records": 10,
+                    "reply_future": SimFuture(),
+                },
+            )
+        )
 
         _run_sim([log], events)
 
@@ -375,12 +425,14 @@ class TestStats:
     def test_per_partition_appends(self):
         log = _make_log(num_partitions=1)
 
-        events = [Event(
-            time=Instant.from_seconds(0.1),
-            event_type="Append",
-            target=log,
-            context={"key": "k", "value": 1},
-        )]
+        events = [
+            Event(
+                time=Instant.from_seconds(0.1),
+                event_type="Append",
+                target=log,
+                context={"key": "k", "value": 1},
+            )
+        ]
 
         _run_sim([log], events)
 

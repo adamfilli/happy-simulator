@@ -62,7 +62,7 @@ class TestCPUScheduler:
         assert cpu.ready_queue_depth == 0
 
     def test_stats_initial(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         stats = cpu.stats
         assert isinstance(stats, CPUSchedulerStats)
         assert stats.tasks_completed == 0
@@ -70,7 +70,7 @@ class TestCPUScheduler:
         assert stats.total_cpu_time_s == 0.0
 
     def test_single_task_completes(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         gen = cpu.execute("task-1", cpu_time_s=0.02)
 
         # Exhaust the generator
@@ -85,7 +85,7 @@ class TestCPUScheduler:
         assert cpu.stats.total_cpu_time_s == pytest.approx(0.02)
 
     def test_task_yields_positive_delays(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         gen = cpu.execute("task-1", cpu_time_s=0.05)
 
         values = []
@@ -98,7 +98,7 @@ class TestCPUScheduler:
         assert all(v > 0 for v in values)
 
     def test_overhead_fraction_zero_single_task(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         gen = cpu.execute("task-1", cpu_time_s=0.02)
         try:
             while True:
@@ -111,12 +111,13 @@ class TestCPUScheduler:
         assert cpu.stats.overhead_fraction == 0.0
 
     def test_repr(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         assert "test_cpu" in repr(cpu)
 
     def test_handle_event_is_noop(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",
@@ -126,7 +127,7 @@ class TestCPUScheduler:
         assert result is None
 
     def test_peak_queue_depth(self):
-        cpu, sim = self._make_scheduler()
+        cpu, _sim = self._make_scheduler()
         # Start a task
         gen = cpu.execute("task-1", cpu_time_s=0.02)
         next(gen)  # start executing

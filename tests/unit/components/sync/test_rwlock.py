@@ -1,5 +1,7 @@
 """Tests for RWLock (Read-Write Lock)."""
 
+import contextlib
+
 import pytest
 
 from happysimulator.components.sync import RWLock
@@ -240,10 +242,8 @@ class TestRWLockContention:
 
         lock.release_write()
 
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         assert lock.active_readers == 1
         assert lock.is_write_locked is False
@@ -264,10 +264,8 @@ class TestRWLockContention:
         # Release second reader - writer should wake
         lock.release_read()
 
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         assert lock.is_write_locked is True
 
@@ -286,14 +284,10 @@ class TestRWLockContention:
         # Release writer - both readers should wake
         lock.release_write()
 
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen1)
-        except StopIteration:
-            pass
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen2)
-        except StopIteration:
-            pass
 
         assert lock.active_readers == 2
 

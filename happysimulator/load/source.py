@@ -11,16 +11,19 @@ payload generation and schedules the next SourceEvent.
 from __future__ import annotations
 
 import logging
-from typing import Callable, List
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.load.source_event import SourceEvent
-from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import ConstantRateProfile, Profile
+from happysimulator.load.source_event import SourceEvent
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.load.arrival_time_provider import ArrivalTimeProvider
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +36,10 @@ class SimpleEventProvider(EventProvider):
         provider = SimpleEventProvider(
             target=server,
             context_fn=lambda time, count: {
-                "created_at": time, "request_id": count, "priority": "high"
-            }
+                "created_at": time,
+                "request_id": count,
+                "priority": "high",
+            },
         )
 
     Args:
@@ -51,7 +56,7 @@ class SimpleEventProvider(EventProvider):
         target: Entity,
         event_type: str = "Request",
         stop_after: Instant | None = None,
-        context_fn: 'Callable[[Instant, int], dict] | None' = None,
+        context_fn: Callable[[Instant, int], dict] | None = None,
     ):
         self._target = target
         self._event_type = event_type
@@ -112,7 +117,7 @@ class Source(Entity):
         self._time_provider = arrival_time_provider
         self._nmb_generated = 0
 
-    def start(self, start_time: Instant) -> List[Event]:
+    def start(self, start_time: Instant) -> list[Event]:
         """Bootstrap the source by scheduling its first tick.
 
         Called by Simulation during initialization. Synchronizes the
@@ -120,21 +125,21 @@ class Source(Entity):
         """
         # Sync the provider to the simulation start time
         self._time_provider.current_time = start_time
-        
+
         try:
             # Calculate when the first event should happen
             first_time = self._time_provider.next_arrival_time()
-            
+
             logger.debug(f"[{self.name}] Source starting. First event at {first_time}")
-            
+
             # Return the first 'Tick'
             return [SourceEvent(time=first_time, source_entity=self)]
-            
+
         except RuntimeError:
             logger.warning(f"[{self.name}] Rate is zero indefinitely. Source will not start.")
             return []
 
-    def handle_event(self, event: Event) -> List[Event]:
+    def handle_event(self, event: Event) -> list[Event]:
         """Generate payload events and schedule the next tick.
 
         This implements the source's self-perpetuating loop:
@@ -155,7 +160,9 @@ class Source(Entity):
 
         logger.debug(
             "[%s] Generated %d payload event(s) (#%d total)",
-            self.name, len(payload_events), self._nmb_generated
+            self.name,
+            len(payload_events),
+            self._nmb_generated,
         )
 
         # --- B. Schedule Next Tick (Self-Perpetuation) ---
@@ -164,12 +171,14 @@ class Source(Entity):
             next_tick = SourceEvent(time=next_time, source_entity=self)
 
             logger.debug("[%s] Next tick scheduled for %r", self.name, next_time)
-            return payload_events + [next_tick]
+            return [*payload_events, next_tick]
 
         except RuntimeError:
-            logger.info("[%s] Source exhausted after %d events. Stopping.", self.name, self._nmb_generated)
+            logger.info(
+                "[%s] Source exhausted after %d events. Stopping.", self.name, self._nmb_generated
+            )
             return payload_events
-            
+
     @classmethod
     def constant(
         cls,

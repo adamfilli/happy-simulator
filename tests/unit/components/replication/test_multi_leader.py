@@ -1,19 +1,16 @@
 """Tests for MultiLeaderReplication."""
 
-import pytest
-
 from happysimulator import (
     Event,
     Instant,
     Network,
-    Simulation,
     SimFuture,
+    Simulation,
     datacenter_network,
 )
 from happysimulator.components.datastore import KVStore
 from happysimulator.components.replication.conflict_resolver import (
     LastWriterWins,
-    VectorClockMerge,
     VersionedValue,
 )
 from happysimulator.components.replication.multi_leader import (
@@ -87,14 +84,17 @@ class TestMultiLeaderWrite:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=leaders[0],
-            context={"metadata": {
-                "key": "x", "value": 42, "reply_future": reply_future,
-            }},
+            context={
+                "metadata": {
+                    "key": "x",
+                    "value": 42,
+                    "reply_future": reply_future,
+                }
+            },
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -115,7 +115,9 @@ class TestMultiLeaderWrite:
         network = Network(name="net")
         leaders = _make_leaders(2, network)
         network.add_bidirectional_link(
-            leaders[0], leaders[1], datacenter_network("link"),
+            leaders[0],
+            leaders[1],
+            datacenter_network("link"),
         )
 
         write_event = Event(
@@ -126,8 +128,7 @@ class TestMultiLeaderWrite:
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -151,7 +152,8 @@ class TestMultiLeaderWrite:
         for i in range(3):
             for j in range(i + 1, 3):
                 network.add_bidirectional_link(
-                    leaders[i], leaders[j],
+                    leaders[i],
+                    leaders[j],
                     datacenter_network(f"link-{i}-{j}"),
                 )
 
@@ -163,8 +165,7 @@ class TestMultiLeaderWrite:
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -217,7 +218,9 @@ class TestConflictResolution:
         network = Network(name="net")
         leaders = _make_leaders(2, network, conflict_resolver=LastWriterWins())
         network.add_bidirectional_link(
-            leaders[0], leaders[1], datacenter_network("link"),
+            leaders[0],
+            leaders[1],
+            datacenter_network("link"),
         )
 
         # Write different values to the same key on each leader at different times
@@ -235,8 +238,7 @@ class TestConflictResolution:
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -261,12 +263,15 @@ class TestConflictResolution:
             return versions[-1]  # Pick last
 
         from happysimulator.components.replication.conflict_resolver import CustomResolver
+
         resolver = CustomResolver(track_resolver)
 
         network = Network(name="net")
         leaders = _make_leaders(2, network, conflict_resolver=resolver)
         network.add_bidirectional_link(
-            leaders[0], leaders[1], datacenter_network("link"),
+            leaders[0],
+            leaders[1],
+            datacenter_network("link"),
         )
 
         # Concurrent writes (same time = concurrent vector clocks)
@@ -284,8 +289,7 @@ class TestConflictResolution:
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,
@@ -309,13 +313,17 @@ class TestAntiEntropy:
         network = Network(name="net")
         leaders = _make_leaders(2, network, anti_entropy_interval=1.0)
         network.add_bidirectional_link(
-            leaders[0], leaders[1], datacenter_network("link"),
+            leaders[0],
+            leaders[1],
+            datacenter_network("link"),
         )
 
         # Directly insert into leader-0 (bypassing replication to simulate divergence)
         leaders[0].store.put_sync("divergent", "value-from-0")
         leaders[0]._versions["divergent"] = VersionedValue(
-            value="value-from-0", timestamp=1.0, writer_id="leader-0",
+            value="value-from-0",
+            timestamp=1.0,
+            writer_id="leader-0",
             vector_clock={"leader-0": 1, "leader-1": 0},
         )
         leaders[0]._merkle.update("divergent", "value-from-0")
@@ -329,8 +337,7 @@ class TestAntiEntropy:
         )
 
         all_entities = [*leaders, network]
-        for l in leaders:
-            all_entities.append(l.store)
+        all_entities.extend(l.store for l in leaders)
 
         sim = Simulation(
             start_time=Instant.Epoch,

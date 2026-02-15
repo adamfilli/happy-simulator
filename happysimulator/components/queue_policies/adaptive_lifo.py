@@ -15,7 +15,7 @@ Example:
 
 from collections import deque
 from dataclasses import dataclass
-from typing import TypeVar, Optional
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
 
@@ -132,7 +132,7 @@ class AdaptiveLIFO(QueuePolicy[T]):
         self._enqueued += 1
         return True
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         """Remove and return the next item.
 
         Uses FIFO when below congestion threshold, LIFO when above.
@@ -161,7 +161,7 @@ class AdaptiveLIFO(QueuePolicy[T]):
 
         return item
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         """Return the next item without removing it.
 
         Returns item based on current mode (FIFO or LIFO).
@@ -172,9 +172,8 @@ class AdaptiveLIFO(QueuePolicy[T]):
         if self.is_congested:
             # LIFO: peek at right
             return self._queue[-1]
-        else:
-            # FIFO: peek at left
-            return self._queue[0]
+        # FIFO: peek at left
+        return self._queue[0]
 
     def is_empty(self) -> bool:
         """Return True if no items in queue."""

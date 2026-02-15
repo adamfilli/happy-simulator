@@ -16,19 +16,19 @@ The **CRDTStore** entity wraps CRDTs in a key-value store with
 gossip-based replication for use in simulations.
 """
 
-from happysimulator.components.crdt.protocol import CRDT
+from happysimulator.components.crdt.crdt_store import CRDTStore, CRDTStoreStats
 from happysimulator.components.crdt.g_counter import GCounter
-from happysimulator.components.crdt.pn_counter import PNCounter
 from happysimulator.components.crdt.lww_register import LWWRegister
 from happysimulator.components.crdt.or_set import ORSet
-from happysimulator.components.crdt.crdt_store import CRDTStore, CRDTStoreStats
+from happysimulator.components.crdt.pn_counter import PNCounter
+from happysimulator.components.crdt.protocol import CRDT
 
 __all__ = [
     "CRDT",
-    "GCounter",
-    "PNCounter",
-    "LWWRegister",
-    "ORSet",
     "CRDTStore",
     "CRDTStoreStats",
+    "GCounter",
+    "LWWRegister",
+    "ORSet",
+    "PNCounter",
 ]

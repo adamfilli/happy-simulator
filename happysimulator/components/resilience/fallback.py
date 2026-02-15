@@ -18,8 +18,8 @@ Example:
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -240,7 +240,9 @@ class Fallback(Entity):
 
         return events
 
-    def _forward_to_fallback(self, request_id: int, original_event: Event) -> list[Event] | Event | None:
+    def _forward_to_fallback(
+        self, request_id: int, original_event: Event
+    ) -> list[Event] | Event | None:
         """Forward a request to the fallback service."""
         self._fallback_invocations += 1
 
@@ -381,12 +383,12 @@ class Fallback(Entity):
                 self.name,
                 request_id,
             )
-            return None
+            return
 
         request_info = self._in_flight[request_id]
 
         if request_info["state"] != "fallback":
-            return None
+            return
 
         request_info["state"] = "completed"
         del self._in_flight[request_id]
@@ -398,4 +400,4 @@ class Fallback(Entity):
             request_id,
         )
 
-        return None
+        return

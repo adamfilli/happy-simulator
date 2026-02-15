@@ -1,18 +1,21 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.core.entity import Entity
 from happysimulator.components.queue import Queue
 from happysimulator.components.queue_driver import QueueDriver
 from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
-from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
 from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
 
-import logging
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 
 def test_queue_driver_single_event_trace_flow(caplog):
     """Single-event trace: Queue notifies driver, driver polls, server processes, driver polls again."""
@@ -61,17 +64,17 @@ def test_queue_driver_single_event_trace_flow(caplog):
     assert not any("Time travel detected" in rec.message for rec in caplog.records)
 
     scheduled = [
-        s for s in trace.spans
-        if s["kind"] == "simulation.schedule" and s.get("event_type") in {"QUEUE_NOTIFY", "QUEUE_POLL"}
+        s
+        for s in trace.spans
+        if s["kind"] == "simulation.schedule"
+        and s.get("event_type") in {"QUEUE_NOTIFY", "QUEUE_POLL"}
     ]
     scheduled_types = {s.get("event_type") for s in scheduled}
     assert "QUEUE_NOTIFY" in scheduled_types
     assert "QUEUE_POLL" in scheduled_types
 
     poll_times = [
-        s["data"]["scheduled_time"]
-        for s in scheduled
-        if s.get("event_type") == "QUEUE_POLL"
+        s["data"]["scheduled_time"] for s in scheduled if s.get("event_type") == "QUEUE_POLL"
     ]
     assert Instant.Epoch in poll_times
     assert Instant.from_seconds(1.0) in poll_times
@@ -130,7 +133,8 @@ def test_queue_driver_overload_serializes_requests(caplog):
     assert not any("Time travel detected" in rec.message for rec in caplog.records)
 
     scheduled_polls = [
-        s for s in trace.spans
+        s
+        for s in trace.spans
         if s["kind"] == "simulation.schedule" and s.get("event_type") == "QUEUE_POLL"
     ]
 

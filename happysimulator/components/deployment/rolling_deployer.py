@@ -17,8 +17,8 @@ Example:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -116,8 +116,11 @@ class RollingDeployer(Entity):
         logger.debug(
             "[%s] RollingDeployer initialized: batch_size=%d, "
             "health_interval=%.1fs, healthy_threshold=%d, max_failures=%d",
-            name, batch_size, health_check_interval,
-            healthy_threshold, max_failures,
+            name,
+            batch_size,
+            health_check_interval,
+            healthy_threshold,
+            max_failures,
         )
 
     @property
@@ -180,26 +183,31 @@ class RollingDeployer(Entity):
 
         logger.info(
             "[%s] Starting rolling deployment: %d instances to replace",
-            self.name, len(self._old_backends),
+            self.name,
+            len(self._old_backends),
         )
 
-        return [Event(
-            time=self.now,
-            event_type="_rolling_replace_batch",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="_rolling_replace_batch",
+                target=self,
+                context={},
+            )
+        ]
 
     def _replace_batch(self) -> list[Event]:
         """Create new instances for the current batch."""
         if not self._old_backends:
             # All batches done
-            return [Event(
-                time=self.now,
-                event_type="_rolling_complete",
-                target=self,
-                context={},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="_rolling_complete",
+                    target=self,
+                    context={},
+                )
+            ]
 
         self.state.current_batch += 1
         batch_count = min(self._batch_size, len(self._old_backends))
@@ -209,7 +217,7 @@ class RollingDeployer(Entity):
         self._current_batch_new = []
 
         events = []
-        for old_backend in self._current_batch_old:
+        for _old_backend in self._current_batch_old:
             self._next_instance_id += 1
             new_name = f"{self.name}_v2_{self._next_instance_id}"
             new_server = self._server_factory(new_name)
@@ -224,16 +232,20 @@ class RollingDeployer(Entity):
             self._health_pass_count[new_name] = 0
 
         # Start health checking the new instances
-        events.append(Event(
-            time=self.now + Duration.from_seconds(self._health_check_interval),
-            event_type="_rolling_health_check",
-            target=self,
-            context={},
-        ))
+        events.append(
+            Event(
+                time=self.now + Duration.from_seconds(self._health_check_interval),
+                event_type="_rolling_health_check",
+                target=self,
+                context={},
+            )
+        )
 
         logger.debug(
             "[%s] Batch %d: created %d new instances",
-            self.name, self.state.current_batch, batch_count,
+            self.name,
+            self.state.current_batch,
+            batch_count,
         )
 
         return events
@@ -261,6 +273,7 @@ class RollingDeployer(Entity):
             )
 
             server_name = new_server.name
+
             def on_complete(finish_time: Instant, _name=server_name) -> Event:
                 return Event(
                     time=finish_time,
@@ -273,12 +286,14 @@ class RollingDeployer(Entity):
             events.append(probe)
 
             # Timeout
-            events.append(Event(
-                time=self.now + Duration.from_seconds(self._health_check_interval),
-                event_type="_rolling_health_timeout",
-                target=self,
-                context={"metadata": {"server_name": server_name}},
-            ))
+            events.append(
+                Event(
+                    time=self.now + Duration.from_seconds(self._health_check_interval),
+                    event_type="_rolling_health_timeout",
+                    target=self,
+                    context={"metadata": {"server_name": server_name}},
+                )
+            )
 
         return events
 
@@ -293,7 +308,8 @@ class RollingDeployer(Entity):
 
         logger.debug(
             "[%s] Health pass for %s (%d/%d)",
-            self.name, server_name,
+            self.name,
+            server_name,
             self._health_pass_count[server_name],
             self._healthy_threshold,
         )
@@ -313,24 +329,30 @@ class RollingDeployer(Entity):
 
             logger.info(
                 "[%s] Batch %d complete: %d instances replaced",
-                self.name, self.state.current_batch, len(self._current_batch_old),
+                self.name,
+                self.state.current_batch,
+                len(self._current_batch_old),
             )
 
             # Move to next batch
-            return [Event(
-                time=self.now,
-                event_type="_rolling_replace_batch",
-                target=self,
-                context={},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="_rolling_replace_batch",
+                    target=self,
+                    context={},
+                )
+            ]
 
         # Schedule next health check
-        return [Event(
-            time=self.now + Duration.from_seconds(self._health_check_interval),
-            event_type="_rolling_health_check",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now + Duration.from_seconds(self._health_check_interval),
+                event_type="_rolling_health_check",
+                target=self,
+                context={},
+            )
+        ]
 
     def _handle_health_timeout(self, event: Event) -> list[Event]:
         """Handle a health check timeout (failure)."""
@@ -349,16 +371,21 @@ class RollingDeployer(Entity):
 
         logger.warning(
             "[%s] Health check failed for %s (total failures=%d/%d)",
-            self.name, server_name, self._health_fail_count, self._max_failures,
+            self.name,
+            server_name,
+            self._health_fail_count,
+            self._max_failures,
         )
 
         if self._health_fail_count > self._max_failures:
-            return [Event(
-                time=self.now,
-                event_type="_rolling_rollback",
-                target=self,
-                context={},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="_rolling_rollback",
+                    target=self,
+                    context={},
+                )
+            ]
 
         return []
 
@@ -373,9 +400,7 @@ class RollingDeployer(Entity):
 
         # Re-add old instances that were removed
         for old_backend in self._current_batch_old:
-            if old_backend.name not in {
-                b.name for b in self._load_balancer.all_backends
-            }:
+            if old_backend.name not in {b.name for b in self._load_balancer.all_backends}:
                 self._load_balancer.add_backend(old_backend)
 
         logger.info("[%s] Deployment rolled back", self.name)
@@ -387,6 +412,7 @@ class RollingDeployer(Entity):
         self._deployments_completed += 1
         logger.info(
             "[%s] Deployment completed: %d instances replaced",
-            self.name, self.state.replaced,
+            self.name,
+            self.state.replaced,
         )
         return []

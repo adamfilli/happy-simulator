@@ -25,10 +25,10 @@ def test_basic_constant_simulation():
 
     # We expect events at t=1, 2, ... 60 → 60 events handled by the counter.
     # source._nmb_generated includes the Source's self-scheduling events.
-    assert source._nmb_generated == 61, \
+    assert source._nmb_generated == 61, (
         f"Expected 61 generated, but source generated {source._nmb_generated}"
+    )
 
-    assert counter.total == 60, \
-        f"Expected 60 events counted, but there were {counter.total}"
+    assert counter.total == 60, f"Expected 60 events counted, but there were {counter.total}"
 
     assert counter.by_type == {"Ping": 60}

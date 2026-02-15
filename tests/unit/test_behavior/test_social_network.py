@@ -34,7 +34,7 @@ class TestSocialGraph:
 
     def test_add_bidirectional_edge(self):
         g = SocialGraph()
-        r1, r2 = g.add_bidirectional_edge("alice", "bob")
+        _r1, _r2 = g.add_bidirectional_edge("alice", "bob")
         assert "bob" in g.neighbors("alice")
         assert "alice" in g.neighbors("bob")
 

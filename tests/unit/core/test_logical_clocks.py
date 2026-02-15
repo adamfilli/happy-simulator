@@ -13,7 +13,6 @@ from happysimulator.core.logical_clocks import (
 from happysimulator.core.node_clock import NodeClock
 from happysimulator.core.temporal import Instant
 
-
 # =============================================================================
 # LamportClock
 # =============================================================================
@@ -85,11 +84,11 @@ class TestLamportClock:
 
         # A sends to B
         ts = a.send()  # A=3
-        b.receive(ts)   # B = max(0, 3) + 1 = 4
+        b.receive(ts)  # B = max(0, 3) + 1 = 4
 
         # B sends to C
         ts2 = b.send()  # B=5
-        c.receive(ts2)   # C = max(0, 5) + 1 = 6
+        c.receive(ts2)  # C = max(0, 5) + 1 = 6
 
         assert c.time == 6
         assert c.time > b.time - 1  # C received after B sent
@@ -132,7 +131,7 @@ class TestVectorClock:
         b = VectorClock("B", ["A", "B"])
 
         ts = a.send()  # A={A:1, B:0}
-        b.receive(ts)   # B={A:1, B:1}
+        b.receive(ts)  # B={A:1, B:1}
 
         # a happened before b (a's state at send time was {A:1, B:0})
         assert a.happened_before(b)
@@ -213,10 +212,10 @@ class TestVectorClock:
         b = VectorClock("B", ["A", "B", "C"])
         c = VectorClock("C", ["A", "B", "C"])
 
-        ts_ab = a.send()   # A={A:1, B:0, C:0}
-        b.receive(ts_ab)    # B={A:1, B:1, C:0}
-        ts_bc = b.send()    # B={A:1, B:2, C:0}
-        c.receive(ts_bc)     # C={A:1, B:2, C:1}
+        ts_ab = a.send()  # A={A:1, B:0, C:0}
+        b.receive(ts_ab)  # B={A:1, B:1, C:0}
+        ts_bc = b.send()  # B={A:1, B:2, C:0}
+        c.receive(ts_bc)  # C={A:1, B:2, C:1}
 
         assert a.happened_before(c)
         assert b.happened_before(c)
@@ -260,7 +259,7 @@ class TestHLCTimestamp:
         a = HLCTimestamp(physical_ns=100, logical=5, node_id="X")
         b = HLCTimestamp(physical_ns=100, logical=5, node_id="X")
         assert a == b
-        assert not (a != b)
+        assert a == b
 
     def test_inequality(self):
         a = HLCTimestamp(physical_ns=100, logical=5, node_id="X")
@@ -467,7 +466,7 @@ class TestHybridLogicalClock:
 
         # A sends to B
         ts_a1 = a.send()  # (100, 0, A)
-        b.receive(ts_a1)   # B reads pt=150, last=this receive result
+        b.receive(ts_a1)  # B reads pt=150, last=this receive result
 
         # B sends to A
         ts_b1 = b.send()

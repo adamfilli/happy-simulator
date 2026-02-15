@@ -15,10 +15,9 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
@@ -34,6 +33,8 @@ from happysimulator import (
 )
 from happysimulator.analysis import analyze, detect_phases
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Simple spike profile for analysis demonstration
@@ -48,10 +49,11 @@ class SpikeLoadProfile(Profile):
     Base rate of 3 req/s = 30% utilization.
     Spike rate of 20 req/s = 200% utilization (guaranteed queue buildup).
     """
-    base_rate: float = 3.0    # 30% of 10 req/s capacity
+
+    base_rate: float = 3.0  # 30% of 10 req/s capacity
     spike_rate: float = 20.0  # 200% of capacity
     spike_start: float = 60.0
-    spike_end: float = 75.0   # 15s sustained overload
+    spike_end: float = 75.0  # 15s sustained overload
 
     def get_rate(self, time: Instant) -> float:
         t = time.to_seconds()
@@ -91,12 +93,14 @@ class SimpleProvider(EventProvider):
         self._target = target
 
     def get_events(self, time: Instant) -> list[Event]:
-        return [Event(
-            time=time,
-            event_type="Request",
-            target=self._target,
-            context={"created_at": time},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="Request",
+                target=self._target,
+                context={"created_at": time},
+            )
+        ]
 
 
 # =============================================================================
@@ -140,8 +144,10 @@ def main() -> None:
     print("=" * 60)
     phases = detect_phases(sink.data, window_s=5.0)
     for p in phases:
-        print(f"  [{p.label:>10}] {p.start_s:.0f}s - {p.end_s:.0f}s  "
-              f"mean={p.mean:.4f}s  std={p.std:.4f}s")
+        print(
+            f"  [{p.label:>10}] {p.start_s:.0f}s - {p.end_s:.0f}s  "
+            f"mean={p.mean:.4f}s  std={p.std:.4f}s"
+        )
 
     # 3. Run full analysis pipeline
     print("\n" + "=" * 60)
@@ -183,6 +189,7 @@ def main() -> None:
     print("JSON OUTPUT (for programmatic consumption)")
     print("=" * 60)
     import json
+
     d = analysis.to_dict()
     # Truncate for display
     print(json.dumps(d, indent=2, default=str)[:2000])

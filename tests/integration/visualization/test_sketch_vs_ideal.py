@@ -7,21 +7,19 @@ counters, then compare the results to verify sketch accuracy.
 from collections import Counter
 from pathlib import Path
 
-import pytest
-
 from happysimulator import (
+    ConstantArrivalTimeProvider,
+    ConstantRateProfile,
+    DistributedFieldProvider,
     Entity,
     Event,
     Instant,
     Simulation,
     Source,
-    ConstantArrivalTimeProvider,
-    ConstantRateProfile,
-    DistributedFieldProvider,
     ZipfDistribution,
 )
-from happysimulator.sketching import TopK, CountMinSketch, TDigest, HyperLogLog
-from happysimulator.components.sketching import TopKCollector, QuantileEstimator
+from happysimulator.components.sketching import TopKCollector
+from happysimulator.sketching import CountMinSketch, HyperLogLog, TDigest, TopK
 
 
 class IdealStatsSink(Entity):
@@ -119,10 +117,8 @@ class TestTopKAccuracy:
         sim.run()
 
         # Compare results
-        true_top_k = set(
-            item for item, _ in ideal_sink.counts.most_common(k)
-        )
-        sketch_top_k = set(item.item for item in topk_collector.top(k))
+        true_top_k = {item for item, _ in ideal_sink.counts.most_common(k)}
+        sketch_top_k = {item.item for item in topk_collector.top(k)}
 
         # Calculate precision and recall
         true_positives = len(sketch_top_k & true_top_k)
@@ -138,11 +134,12 @@ class TestTopKAccuracy:
         # Visualize if matplotlib available
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
             # Plot true counts vs estimated counts for top items
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+            _fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
             # True counts (log scale)
             true_counts = [ideal_sink.counts[i] for i in range(min(50, population_size))]
@@ -207,9 +204,7 @@ class TestCountMinSketchAccuracy:
 
         for item, true_count in exact.items():
             estimate = cms.estimate(item)
-            assert estimate >= true_count, (
-                f"Item {item}: estimate {estimate} < true {true_count}"
-            )
+            assert estimate >= true_count, f"Item {item}: estimate {estimate} < true {true_count}"
 
     def test_cms_error_within_bounds(self, test_output_dir: Path):
         """CMS error is within epsilon * N with high probability."""
@@ -242,10 +237,11 @@ class TestCountMinSketchAccuracy:
         # Visualize error distribution
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
-            fig, ax = plt.subplots(figsize=(8, 5))
+            _fig, ax = plt.subplots(figsize=(8, 5))
             ax.hist(errors, bins=50, edgecolor="black", alpha=0.7)
             ax.axvline(error_bound, color="red", linestyle="--", label=f"ε×N = {error_bound:.0f}")
             ax.set_xlabel("Estimation error (estimate - true)")
@@ -276,11 +272,13 @@ class TestHyperLogLogAccuracy:
             estimate = hll.cardinality()
             relative_error = abs(estimate - true_cardinality) / true_cardinality
 
-            results.append({
-                "true": true_cardinality,
-                "estimate": estimate,
-                "error": relative_error,
-            })
+            results.append(
+                {
+                    "true": true_cardinality,
+                    "estimate": estimate,
+                    "error": relative_error,
+                }
+            )
 
             # Should be within 3x standard error
             expected_error = hll.standard_error()
@@ -292,20 +290,25 @@ class TestHyperLogLogAccuracy:
         # Visualize
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
-            fig, ax = plt.subplots(figsize=(8, 5))
+            _fig, ax = plt.subplots(figsize=(8, 5))
 
-            true_cards = [r["true"] for r in results]
-            estimates = [r["estimate"] for r in results]
+            [r["true"] for r in results]
+            [r["estimate"] for r in results]
             errors = [r["error"] * 100 for r in results]
 
             ax.bar(range(len(results)), errors)
             ax.set_xticks(range(len(results)))
             ax.set_xticklabels([f"n={r['true']}" for r in results])
-            ax.axhline(1.04 / (2**7) * 100, color="red", linestyle="--",
-                      label=f"Expected error (~{1.04/128:.1%})")
+            ax.axhline(
+                1.04 / (2**7) * 100,
+                color="red",
+                linestyle="--",
+                label=f"Expected error (~{1.04 / 128:.1%})",
+            )
             ax.set_ylabel("Relative error (%)")
             ax.set_title("HyperLogLog Accuracy vs Cardinality (precision=14)")
             ax.legend()
@@ -349,12 +352,14 @@ class TestTDigestAccuracy:
             exact = values[min(idx, n_samples - 1)]
             estimated = td.percentile(p)
             error = abs(estimated - exact) / exact if exact > 0 else 0
-            results.append({
-                "percentile": p,
-                "exact": exact,
-                "estimated": estimated,
-                "relative_error": error,
-            })
+            results.append(
+                {
+                    "percentile": p,
+                    "exact": exact,
+                    "estimated": estimated,
+                    "relative_error": error,
+                }
+            )
 
         # Check reasonable accuracy - this simplified T-Digest implementation
         # provides approximate estimates. For better accuracy, use higher compression.
@@ -368,10 +373,11 @@ class TestTDigestAccuracy:
         # Visualize
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+            _fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
             # Plot exact vs estimated
             ps = [r["percentile"] for r in results]
@@ -380,8 +386,8 @@ class TestTDigestAccuracy:
 
             x = range(len(ps))
             width = 0.35
-            ax1.bar([i - width/2 for i in x], exact_vals, width, label="Exact")
-            ax1.bar([i + width/2 for i in x], est_vals, width, label="Estimated")
+            ax1.bar([i - width / 2 for i in x], exact_vals, width, label="Exact")
+            ax1.bar([i + width / 2 for i in x], est_vals, width, label="Estimated")
             ax1.set_xticks(x)
             ax1.set_xticklabels([f"p{p}" for p in ps])
             ax1.set_ylabel("Latency (ms)")
@@ -414,7 +420,7 @@ class TestSketchMemoryVsAccuracy:
         # Sample once
         samples = [dist.sample() for _ in range(n_samples)]
         exact = Counter(samples)
-        true_top_50 = set(item for item, _ in exact.most_common(50))
+        true_top_50 = {item for item, _ in exact.most_common(50)}
 
         results = []
         for k in [20, 50, 100, 200]:
@@ -422,26 +428,29 @@ class TestSketchMemoryVsAccuracy:
             for item in samples:
                 topk.add(item)
 
-            sketch_top_50 = set(item.item for item in topk.top(50))
+            sketch_top_50 = {item.item for item in topk.top(50)}
             precision = len(sketch_top_50 & true_top_50) / 50
 
-            results.append({
-                "k": k,
-                "memory_bytes": topk.memory_bytes,
-                "precision": precision,
-            })
+            results.append(
+                {
+                    "k": k,
+                    "memory_bytes": topk.memory_bytes,
+                    "precision": precision,
+                }
+            )
 
         # More k should mean better precision
         for i in range(1, len(results)):
-            assert results[i]["precision"] >= results[i-1]["precision"] * 0.9
+            assert results[i]["precision"] >= results[i - 1]["precision"] * 0.9
 
         # Visualize
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
-            fig, ax1 = plt.subplots(figsize=(8, 5))
+            _fig, ax1 = plt.subplots(figsize=(8, 5))
 
             ks = [r["k"] for r in results]
             precisions = [r["precision"] * 100 for r in results]
@@ -454,7 +463,7 @@ class TestSketchMemoryVsAccuracy:
             ax1.set_ylim(0, 100)
 
             ax2 = ax1.twinx()
-            ax2.plot(range(len(ks)), memories, 'r-o', label="Memory")
+            ax2.plot(range(len(ks)), memories, "r-o", label="Memory")
             ax2.set_ylabel("Memory (KB)", color="red")
 
             ax1.set_title("TopK: Memory vs Accuracy Tradeoff")

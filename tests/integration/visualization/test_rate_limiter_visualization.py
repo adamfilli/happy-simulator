@@ -13,21 +13,22 @@ Output:
 from __future__ import annotations
 
 import random
-from typing import List, Generator, Any
-
-import pytest
+from typing import TYPE_CHECKING, Any
 
 from happysimulator.components.rate_limiter import (
-    RateLimitedEntity,
-    FixedWindowPolicy,
     AdaptivePolicy,
     DistributedRateLimiter,
+    FixedWindowPolicy,
     RateAdjustmentReason,
+    RateLimitedEntity,
 )
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class DummyServer(Entity):
@@ -56,7 +57,7 @@ class MockKVStore(Entity):
         yield 0.001  # 1ms latency
         return self._data.get(key)
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         yield 0.001  # 1ms latency
         self._data[key] = value
 
@@ -72,9 +73,9 @@ class TestFixedWindowVisualization:
         the intended rate limit.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
 
         window_size = 1.0
         requests_per_window = 10
@@ -91,7 +92,7 @@ class TestFixedWindowVisualization:
         )
 
         # Need a simulation for clock
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             duration=10.0,
             sources=[],
@@ -100,11 +101,8 @@ class TestFixedWindowVisualization:
 
         # Generate requests clustered at window boundary
         # 10 requests at t=0.9 (end of window 0) + 10 requests at t=1.1 (start of window 1)
-        request_times = []
-        for i in range(10):
-            request_times.append(0.9 + i * 0.01)  # 0.9, 0.91, ..., 0.99
-        for i in range(10):
-            request_times.append(1.0 + i * 0.01)  # 1.0, 1.01, ..., 1.09
+        request_times = [0.9 + i * 0.01 for i in range(10)]  # 0.9, 0.91, ..., 0.99
+        request_times.extend(1.0 + i * 0.01 for i in range(10))  # 1.0, 1.01, ..., 1.09
 
         forwarded = []
         queued = []
@@ -117,58 +115,68 @@ class TestFixedWindowVisualization:
             )
             result = limiter.handle_event(event)
             # Check if a forward event was produced (vs just poll events)
-            has_forward = any(
-                e.event_type.startswith("forward::") for e in result
-            )
+            has_forward = any(e.event_type.startswith("forward::") for e in result)
             if has_forward:
                 forwarded.append(t)
             else:
                 queued.append(t)
 
         # Create visualization
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+        _fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         # Request timeline
-        ax1.scatter(forwarded, [1] * len(forwarded), c='green', marker='o', s=100, label='Forwarded', alpha=0.7)
-        ax1.scatter(queued, [1] * len(queued), c='orange', marker='s', s=100, label='Queued', alpha=0.7)
+        ax1.scatter(
+            forwarded,
+            [1] * len(forwarded),
+            c="green",
+            marker="o",
+            s=100,
+            label="Forwarded",
+            alpha=0.7,
+        )
+        ax1.scatter(
+            queued, [1] * len(queued), c="orange", marker="s", s=100, label="Queued", alpha=0.7
+        )
 
         # Window boundaries
-        ax1.axvline(x=1.0, color='blue', linestyle='--', linewidth=2, label='Window boundary')
-        ax1.fill_betweenx([0.5, 1.5], 0, 1.0, alpha=0.1, color='blue', label='Window 0')
-        ax1.fill_betweenx([0.5, 1.5], 1.0, 2.0, alpha=0.1, color='orange', label='Window 1')
+        ax1.axvline(x=1.0, color="blue", linestyle="--", linewidth=2, label="Window boundary")
+        ax1.fill_betweenx([0.5, 1.5], 0, 1.0, alpha=0.1, color="blue", label="Window 0")
+        ax1.fill_betweenx([0.5, 1.5], 1.0, 2.0, alpha=0.1, color="orange", label="Window 1")
 
         ax1.set_xlim(0.8, 1.2)
         ax1.set_ylim(0.5, 1.5)
-        ax1.set_xlabel('Time (s)')
+        ax1.set_xlabel("Time (s)")
         ax1.set_yticks([])
-        ax1.set_title(f'Fixed Window Boundary Burst (limit={requests_per_window}/window)')
-        ax1.legend(loc='upper right')
+        ax1.set_title(f"Fixed Window Boundary Burst (limit={requests_per_window}/window)")
+        ax1.legend(loc="upper right")
 
         # Cumulative request count
         all_times = sorted(forwarded)
         counts = list(range(1, len(all_times) + 1))
 
-        ax2.step(all_times, counts, where='post', linewidth=2, color='green')
-        ax2.axvline(x=1.0, color='blue', linestyle='--', linewidth=2, label='Window boundary')
-        ax2.axhline(y=requests_per_window, color='red', linestyle='--', label='Per-window limit')
+        ax2.step(all_times, counts, where="post", linewidth=2, color="green")
+        ax2.axvline(x=1.0, color="blue", linestyle="--", linewidth=2, label="Window boundary")
+        ax2.axhline(y=requests_per_window, color="red", linestyle="--", label="Per-window limit")
 
         # Highlight the burst
         burst_count = len([t for t in forwarded if 0.9 <= t <= 1.1])
-        ax2.annotate(f'{burst_count} requests in 0.2s window\n(2x limit allows burst)',
-                    xy=(1.0, burst_count / 2),
-                    xytext=(1.15, burst_count / 2),
-                    fontsize=10,
-                    arrowprops=dict(arrowstyle='->', color='red'),
-                    bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.5))
+        ax2.annotate(
+            f"{burst_count} requests in 0.2s window\n(2x limit allows burst)",
+            xy=(1.0, burst_count / 2),
+            xytext=(1.15, burst_count / 2),
+            fontsize=10,
+            arrowprops={"arrowstyle": "->", "color": "red"},
+            bbox={"boxstyle": "round", "facecolor": "yellow", "alpha": 0.5},
+        )
 
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Cumulative Forwarded Requests')
-        ax2.set_title('Boundary Burst: Requests Passed Near Window Edge')
+        ax2.set_xlabel("Time (s)")
+        ax2.set_ylabel("Cumulative Forwarded Requests")
+        ax2.set_title("Boundary Burst: Requests Passed Near Window Edge")
         ax2.legend()
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'fixed_window_boundary_burst.png', dpi=150)
+        plt.savefig(test_output_dir / "fixed_window_boundary_burst.png", dpi=150)
         plt.close()
 
         # Verify the boundary burst effect — all 20 forwarded immediately
@@ -185,9 +193,9 @@ class TestAdaptiveVisualization:
         Shows how AIMD algorithm adjusts rate based on success/failure feedback.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
 
         # Simulate a server with capacity of ~50 req/s
         server_capacity = 50.0
@@ -207,7 +215,7 @@ class TestAdaptiveVisualization:
             queue_capacity=10000,
         )
 
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             duration=20.0,
             sources=[],
@@ -222,7 +230,7 @@ class TestAdaptiveVisualization:
         current_time = 0.0
         random.seed(42)
 
-        for i in range(200):
+        for _i in range(200):
             # Send a request
             event = Event(
                 time=Instant.from_seconds(current_time),
@@ -231,73 +239,86 @@ class TestAdaptiveVisualization:
             )
             result = limiter.handle_event(event)
 
-            has_forward = any(
-                e.event_type.startswith("forward::") for e in result
-            )
+            has_forward = any(e.event_type.startswith("forward::") for e in result)
 
             if has_forward:
                 # Request was forwarded - simulate success/failure based on load
-                failure_probability = max(0, (policy.current_rate - server_capacity) / server_capacity)
+                failure_probability = max(
+                    0, (policy.current_rate - server_capacity) / server_capacity
+                )
                 if random.random() < failure_probability:
                     policy.record_failure(Instant.from_seconds(current_time))
-                    outcomes.append('failure')
+                    outcomes.append("failure")
                 else:
                     policy.record_success(Instant.from_seconds(current_time))
-                    outcomes.append('success')
+                    outcomes.append("success")
             else:
-                outcomes.append('queued')
+                outcomes.append("queued")
 
             times.append(current_time)
             rates.append(policy.current_rate)
             current_time += 0.05  # 20 req/s incoming
 
         # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        _fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
         # Rate over time
         ax1 = axes[0, 0]
-        ax1.plot(times, rates, 'b-', linewidth=2)
-        ax1.axhline(y=server_capacity, color='red', linestyle='--', linewidth=2, label=f'Server capacity ({server_capacity}/s)')
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Rate Limit (req/s)')
-        ax1.set_title('Adaptive Rate Limiter: Rate Convergence')
+        ax1.plot(times, rates, "b-", linewidth=2)
+        ax1.axhline(
+            y=server_capacity,
+            color="red",
+            linestyle="--",
+            linewidth=2,
+            label=f"Server capacity ({server_capacity}/s)",
+        )
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Rate Limit (req/s)")
+        ax1.set_title("Adaptive Rate Limiter: Rate Convergence")
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
         # Rate history with annotations
         ax2 = axes[0, 1]
         for snapshot in policy.rate_history[:50]:  # First 50 changes
-            color = 'green' if snapshot.reason == RateAdjustmentReason.SUCCESS else 'red'
-            marker = '^' if snapshot.reason == RateAdjustmentReason.SUCCESS else 'v'
-            ax2.scatter(snapshot.time.to_seconds(), snapshot.rate, c=color, marker=marker, s=50, alpha=0.6)
+            color = "green" if snapshot.reason == RateAdjustmentReason.SUCCESS else "red"
+            marker = "^" if snapshot.reason == RateAdjustmentReason.SUCCESS else "v"
+            ax2.scatter(
+                snapshot.time.to_seconds(), snapshot.rate, c=color, marker=marker, s=50, alpha=0.6
+            )
 
-        ax2.axhline(y=server_capacity, color='red', linestyle='--', alpha=0.5)
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Rate')
-        ax2.set_title('Rate Adjustments (^ increase, v decrease)')
+        ax2.axhline(y=server_capacity, color="red", linestyle="--", alpha=0.5)
+        ax2.set_xlabel("Time (s)")
+        ax2.set_ylabel("Rate")
+        ax2.set_title("Rate Adjustments (^ increase, v decrease)")
         ax2.grid(True, alpha=0.3)
 
         # Outcome distribution
         ax3 = axes[1, 0]
         outcome_counts = {
-            'success': outcomes.count('success'),
-            'failure': outcomes.count('failure'),
-            'queued': outcomes.count('queued'),
+            "success": outcomes.count("success"),
+            "failure": outcomes.count("failure"),
+            "queued": outcomes.count("queued"),
         }
-        colors = {'success': 'green', 'failure': 'red', 'queued': 'orange'}
-        bars = ax3.bar(outcome_counts.keys(), outcome_counts.values(),
-                      color=[colors[k] for k in outcome_counts.keys()], alpha=0.7)
-        ax3.set_ylabel('Count')
-        ax3.set_title('Request Outcomes')
-        ax3.grid(True, alpha=0.3, axis='y')
+        colors = {"success": "green", "failure": "red", "queued": "orange"}
+        bars = ax3.bar(
+            outcome_counts.keys(),
+            outcome_counts.values(),
+            color=[colors[k] for k in outcome_counts],
+            alpha=0.7,
+        )
+        ax3.set_ylabel("Count")
+        ax3.set_title("Request Outcomes")
+        ax3.grid(True, alpha=0.3, axis="y")
 
-        for bar, count in zip(bars, outcome_counts.values()):
-            ax3.annotate(str(count), xy=(bar.get_x() + bar.get_width() / 2, count),
-                        ha='center', va='bottom')
+        for bar, count in zip(bars, outcome_counts.values(), strict=False):
+            ax3.annotate(
+                str(count), xy=(bar.get_x() + bar.get_width() / 2, count), ha="center", va="bottom"
+            )
 
         # AIMD explanation
         ax4 = axes[1, 1]
-        ax4.axis('off')
+        ax4.axis("off")
         explanation = f"""
 AIMD (Additive Increase, Multiplicative Decrease)
 
@@ -316,17 +337,24 @@ Behavior:
 Results:
   - Final rate: {rates[-1]:.1f} req/s
   - Server capacity: {server_capacity} req/s
-  - Successes: {outcome_counts['success']}
-  - Failures: {outcome_counts['failure']}
-  - Queued: {outcome_counts['queued']}
+  - Successes: {outcome_counts["success"]}
+  - Failures: {outcome_counts["failure"]}
+  - Queued: {outcome_counts["queued"]}
 """
-        ax4.text(0.1, 0.9, explanation, transform=ax4.transAxes,
-                fontsize=10, verticalalignment='top', fontfamily='monospace',
-                bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax4.text(
+            0.1,
+            0.9,
+            explanation,
+            transform=ax4.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        plt.suptitle('Adaptive Rate Limiter with AIMD', fontsize=14, fontweight='bold')
+        plt.suptitle("Adaptive Rate Limiter with AIMD", fontsize=14, fontweight="bold")
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(test_output_dir / 'adaptive_rate_convergence.png', dpi=150)
+        plt.savefig(test_output_dir / "adaptive_rate_convergence.png", dpi=150)
         plt.close()
 
         # Verify rate adapted reasonably
@@ -343,6 +371,7 @@ class TestDistributedVisualization:
         Shows how multiple limiters share a global limit via backing store.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
@@ -365,7 +394,7 @@ class TestDistributedVisualization:
         ]
 
         # Simulate requests across instances
-        request_log = {i: {'forwarded': [], 'dropped': []} for i in range(3)}
+        request_log = {i: {"forwarded": [], "dropped": []} for i in range(3)}
         random.seed(42)
 
         for t_ms in range(500):  # 500ms of simulation
@@ -387,48 +416,58 @@ class TestDistributedVisualization:
                 result = e.value
 
             if result:
-                request_log[instance]['forwarded'].append(t)
+                request_log[instance]["forwarded"].append(t)
             else:
-                request_log[instance]['dropped'].append(t)
+                request_log[instance]["dropped"].append(t)
 
         # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        _fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-        colors = ['#e74c3c', '#3498db', '#2ecc71']
+        colors = ["#e74c3c", "#3498db", "#2ecc71"]
 
         # Request timeline by instance
         ax1 = axes[0, 0]
         for i in range(3):
             y_base = i
-            forwarded = request_log[i]['forwarded']
-            dropped = request_log[i]['dropped']
+            forwarded = request_log[i]["forwarded"]
+            dropped = request_log[i]["dropped"]
 
-            ax1.scatter(forwarded, [y_base + 0.2] * len(forwarded),
-                       c=colors[i], marker='o', s=30, alpha=0.6, label=f'Instance {i} forwarded')
-            ax1.scatter(dropped, [y_base - 0.2] * len(dropped),
-                       c='gray', marker='x', s=20, alpha=0.4)
+            ax1.scatter(
+                forwarded,
+                [y_base + 0.2] * len(forwarded),
+                c=colors[i],
+                marker="o",
+                s=30,
+                alpha=0.6,
+                label=f"Instance {i} forwarded",
+            )
+            ax1.scatter(
+                dropped, [y_base - 0.2] * len(dropped), c="gray", marker="x", s=20, alpha=0.4
+            )
 
         ax1.set_yticks(range(3))
-        ax1.set_yticklabels([f'Instance {i}' for i in range(3)])
-        ax1.set_xlabel('Time (s)')
-        ax1.set_title('Request Distribution Across Instances')
-        ax1.grid(True, alpha=0.3, axis='x')
+        ax1.set_yticklabels([f"Instance {i}" for i in range(3)])
+        ax1.set_xlabel("Time (s)")
+        ax1.set_title("Request Distribution Across Instances")
+        ax1.grid(True, alpha=0.3, axis="x")
 
         # Cumulative forwarded requests
         ax2 = axes[0, 1]
         all_forwarded = []
         for i in range(3):
-            all_forwarded.extend([(t, i) for t in request_log[i]['forwarded']])
+            all_forwarded.extend([(t, i) for t in request_log[i]["forwarded"]])
         all_forwarded.sort()
 
         times = [t for t, _ in all_forwarded]
         cumulative = list(range(1, len(times) + 1))
 
-        ax2.step(times, cumulative, where='post', linewidth=2, color='blue')
-        ax2.axhline(y=global_limit, color='red', linestyle='--', label=f'Global limit ({global_limit})')
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Cumulative Forwarded')
-        ax2.set_title('Global Request Count (Shared Limit)')
+        ax2.step(times, cumulative, where="post", linewidth=2, color="blue")
+        ax2.axhline(
+            y=global_limit, color="red", linestyle="--", label=f"Global limit ({global_limit})"
+        )
+        ax2.set_xlabel("Time (s)")
+        ax2.set_ylabel("Cumulative Forwarded")
+        ax2.set_title("Global Request Count (Shared Limit)")
         ax2.legend()
         ax2.grid(True, alpha=0.3)
 
@@ -436,29 +475,41 @@ class TestDistributedVisualization:
         ax3 = axes[1, 0]
         instance_stats = []
         for i in range(3):
-            forwarded = len(request_log[i]['forwarded'])
-            dropped = len(request_log[i]['dropped'])
-            instance_stats.append({'forwarded': forwarded, 'dropped': dropped})
+            forwarded = len(request_log[i]["forwarded"])
+            dropped = len(request_log[i]["dropped"])
+            instance_stats.append({"forwarded": forwarded, "dropped": dropped})
 
         x = np.arange(3)
         width = 0.35
-        ax3.bar(x - width/2, [s['forwarded'] for s in instance_stats], width,
-               label='Forwarded', color='green', alpha=0.7)
-        ax3.bar(x + width/2, [s['dropped'] for s in instance_stats], width,
-               label='Dropped', color='red', alpha=0.7)
+        ax3.bar(
+            x - width / 2,
+            [s["forwarded"] for s in instance_stats],
+            width,
+            label="Forwarded",
+            color="green",
+            alpha=0.7,
+        )
+        ax3.bar(
+            x + width / 2,
+            [s["dropped"] for s in instance_stats],
+            width,
+            label="Dropped",
+            color="red",
+            alpha=0.7,
+        )
         ax3.set_xticks(x)
-        ax3.set_xticklabels([f'Instance {i}' for i in range(3)])
-        ax3.set_ylabel('Request Count')
-        ax3.set_title('Per-Instance Statistics')
+        ax3.set_xticklabels([f"Instance {i}" for i in range(3)])
+        ax3.set_ylabel("Request Count")
+        ax3.set_title("Per-Instance Statistics")
         ax3.legend()
-        ax3.grid(True, alpha=0.3, axis='y')
+        ax3.grid(True, alpha=0.3, axis="y")
 
         # Summary statistics
         ax4 = axes[1, 1]
-        ax4.axis('off')
+        ax4.axis("off")
 
-        total_forwarded = sum(len(request_log[i]['forwarded']) for i in range(3))
-        total_dropped = sum(len(request_log[i]['dropped']) for i in range(3))
+        total_forwarded = sum(len(request_log[i]["forwarded"]) for i in range(3))
+        total_dropped = sum(len(request_log[i]["dropped"]) for i in range(3))
         total_requests = total_forwarded + total_dropped
 
         summary = f"""
@@ -480,19 +531,26 @@ Per-Instance Breakdown:
         for i in range(3):
             summary += f"  Instance {i}: {instance_stats[i]['forwarded']} forwarded, {instance_stats[i]['dropped']} dropped\n"
 
-        ax4.text(0.1, 0.9, summary, transform=ax4.transAxes,
-                fontsize=10, verticalalignment='top', fontfamily='monospace',
-                bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.5))
+        ax4.text(
+            0.1,
+            0.9,
+            summary,
+            transform=ax4.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightblue", "alpha": 0.5},
+        )
 
-        plt.suptitle('Distributed Rate Limiting Across Multiple Instances', fontsize=14, fontweight='bold')
+        plt.suptitle(
+            "Distributed Rate Limiting Across Multiple Instances", fontsize=14, fontweight="bold"
+        )
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(test_output_dir / 'distributed_coordination.png', dpi=150)
+        plt.savefig(test_output_dir / "distributed_coordination.png", dpi=150)
         plt.close()
 
         # Verify global limit was approximately respected per window
-        first_window_forwarded = sum(
-            1 for t in all_forwarded if t[0] < 1.0
-        )
+        first_window_forwarded = sum(1 for t in all_forwarded if t[0] < 1.0)
         assert first_window_forwarded <= global_limit
 
 
@@ -506,6 +564,7 @@ class TestRateLimiterComparison:
         Shows different characteristics of each algorithm.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
@@ -531,10 +590,13 @@ class TestRateLimiterComparison:
         server1 = DummyServer()
         fw_policy = FixedWindowPolicy(requests_per_window=50, window_size=1.0)
         fw_limiter = RateLimitedEntity(
-            name="fixed", downstream=server1, policy=fw_policy, queue_capacity=10000,
+            name="fixed",
+            downstream=server1,
+            policy=fw_policy,
+            queue_capacity=10000,
         )
 
-        sim1 = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             duration=20.0,
             sources=[],
@@ -551,18 +613,23 @@ class TestRateLimiterComparison:
                 fw_forwarded.append(t)
             else:
                 fw_queued.append(t)
-        results['Fixed Window'] = {'forwarded': fw_forwarded, 'queued': fw_queued}
+        results["Fixed Window"] = {"forwarded": fw_forwarded, "queued": fw_queued}
 
         # Adaptive (simulating good conditions)
         server2 = DummyServer()
         adp_policy = AdaptivePolicy(
-            initial_rate=50.0, min_rate=10.0, max_rate=100.0,
+            initial_rate=50.0,
+            min_rate=10.0,
+            max_rate=100.0,
         )
         adaptive_limiter = RateLimitedEntity(
-            name="adaptive", downstream=server2, policy=adp_policy, queue_capacity=10000,
+            name="adaptive",
+            downstream=server2,
+            policy=adp_policy,
+            queue_capacity=10000,
         )
 
-        sim2 = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             duration=20.0,
             sources=[],
@@ -580,21 +647,21 @@ class TestRateLimiterComparison:
                 adp_policy.record_success(Instant.from_seconds(t))
             else:
                 adp_queued.append(t)
-        results['Adaptive'] = {'forwarded': adp_forwarded, 'queued': adp_queued}
+        results["Adaptive"] = {"forwarded": adp_forwarded, "queued": adp_queued}
 
         # Create visualization
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        _fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
         # Forwarded over time comparison
         ax1 = axes[0, 0]
         for name, data in results.items():
-            times = sorted(data['forwarded'])
+            times = sorted(data["forwarded"])
             cumulative = list(range(1, len(times) + 1))
-            ax1.step(times, cumulative, where='post', linewidth=2, label=name)
+            ax1.step(times, cumulative, where="post", linewidth=2, label=name)
 
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Cumulative Forwarded')
-        ax1.set_title('Forwarded Requests Over Time')
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Cumulative Forwarded")
+        ax1.set_title("Forwarded Requests Over Time")
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
@@ -602,34 +669,34 @@ class TestRateLimiterComparison:
         ax2 = axes[0, 1]
         names = list(results.keys())
         total_per_algo = [
-            len(results[name]['forwarded']) + len(results[name]['queued'])
-            for name in names
+            len(results[name]["forwarded"]) + len(results[name]["queued"]) for name in names
         ]
         queue_rates = [
-            len(results[name]['queued']) / total * 100 if total > 0 else 0
-            for name, total in zip(names, total_per_algo)
+            len(results[name]["queued"]) / total * 100 if total > 0 else 0
+            for name, total in zip(names, total_per_algo, strict=False)
         ]
-        colors = ['#3498db', '#e74c3c']
+        colors = ["#3498db", "#e74c3c"]
         bars = ax2.bar(names, queue_rates, color=colors, alpha=0.7)
-        ax2.set_ylabel('Queue Rate (%)')
-        ax2.set_title('Request Queue Rate by Algorithm')
-        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.set_ylabel("Queue Rate (%)")
+        ax2.set_title("Request Queue Rate by Algorithm")
+        ax2.grid(True, alpha=0.3, axis="y")
 
-        for bar, rate in zip(bars, queue_rates):
-            ax2.annotate(f'{rate:.1f}%', xy=(bar.get_x() + bar.get_width() / 2, rate + 1),
-                        ha='center')
+        for bar, rate in zip(bars, queue_rates, strict=False):
+            ax2.annotate(
+                f"{rate:.1f}%", xy=(bar.get_x() + bar.get_width() / 2, rate + 1), ha="center"
+            )
 
         # Traffic pattern
         ax3 = axes[1, 0]
-        ax3.hist(request_times, bins=50, color='steelblue', alpha=0.7, edgecolor='black')
-        ax3.set_xlabel('Time (s)')
-        ax3.set_ylabel('Request Count')
-        ax3.set_title('Input Traffic Pattern (Bursty)')
+        ax3.hist(request_times, bins=50, color="steelblue", alpha=0.7, edgecolor="black")
+        ax3.set_xlabel("Time (s)")
+        ax3.set_ylabel("Request Count")
+        ax3.set_title("Input Traffic Pattern (Bursty)")
         ax3.grid(True, alpha=0.3)
 
         # Algorithm characteristics
         ax4 = axes[1, 1]
-        ax4.axis('off')
+        ax4.axis("off")
         characteristics = """
 Rate Limiter Algorithm Comparison
 
@@ -657,13 +724,20 @@ Token Bucket (not shown):
   - Good for bursty traffic
   - Best for: APIs with burst allowance
 """
-        ax4.text(0.05, 0.95, characteristics, transform=ax4.transAxes,
-                fontsize=10, verticalalignment='top', fontfamily='monospace',
-                bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8))
+        ax4.text(
+            0.05,
+            0.95,
+            characteristics,
+            transform=ax4.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox={"boxstyle": "round", "facecolor": "lightyellow", "alpha": 0.8},
+        )
 
-        plt.suptitle('Rate Limiter Algorithm Comparison', fontsize=14, fontweight='bold')
+        plt.suptitle("Rate Limiter Algorithm Comparison", fontsize=14, fontweight="bold")
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        plt.savefig(test_output_dir / 'algorithm_comparison.png', dpi=150)
+        plt.savefig(test_output_dir / "algorithm_comparison.png", dpi=150)
         plt.close()
 
         assert len(results) == 2

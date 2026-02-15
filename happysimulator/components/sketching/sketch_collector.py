@@ -6,17 +6,21 @@ through the collector, values are extracted, and the sketch is updated.
 
 from __future__ import annotations
 
-from typing import Callable, Generic, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.sketching.base import Sketch
 
-S = TypeVar('S', bound=Sketch)
-T = TypeVar('T')
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.core.event import Event
+
+S = TypeVar("S", bound=Sketch)
+T = TypeVar("T")
 
 
-class SketchCollector(Entity, Generic[S, T]):
+class SketchCollector[S: Sketch, T](Entity):
     """Generic entity wrapper for any sketch algorithm.
 
     Extracts values from events and updates the underlying sketch.

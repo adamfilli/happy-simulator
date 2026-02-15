@@ -3,32 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 from happysimulator.components.load_balancer.health_check import (
     HealthChecker,
-    HealthCheckStats,
-    BackendHealthState,
 )
-from happysimulator.components.load_balancer.strategies import RoundRobin
+from happysimulator.components.load_balancer.load_balancer import LoadBalancer
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 
 @dataclass
 class HealthyServer(Entity):
     """Server that always responds to health checks."""
+
     name: str
     response_time: float = 0.010
 
     health_checks_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         if event.event_type == "health_check":
             self.health_checks_received += 1
         yield self.response_time
@@ -37,12 +39,13 @@ class HealthyServer(Entity):
 @dataclass
 class SlowServer(Entity):
     """Server that responds slowly (may timeout)."""
+
     name: str
     response_time: float = 10.0  # Very slow
 
     health_checks_received: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         if event.event_type == "health_check":
             self.health_checks_received += 1
         yield self.response_time
@@ -51,6 +54,7 @@ class SlowServer(Entity):
 @dataclass
 class IntermittentServer(Entity):
     """Server that alternates between fast and slow responses."""
+
     name: str
     fast_response: float = 0.010
     slow_response: float = 10.0
@@ -58,7 +62,7 @@ class IntermittentServer(Entity):
 
     requests: int = field(default=0, init=False)
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests += 1
         idx = (self.requests - 1) % len(self.fail_pattern)
         if self.fail_pattern[idx]:
@@ -329,7 +333,7 @@ class TestHealthCheckerMultipleBackends:
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
-            entities=servers + [lb, hc],
+            entities=[*servers, lb, hc],
         )
 
         start_event = hc.start()

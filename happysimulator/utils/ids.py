@@ -7,7 +7,6 @@ a process.
 
 import threading
 
-
 _counter = 0
 _counter_lock = threading.Lock()
 _ID_LENGTH = 12
@@ -27,4 +26,4 @@ def get_id() -> str:
         value = _counter
         _counter += 1
 
-    return format(value, f'0{_ID_LENGTH}X')
+    return format(value, f"0{_ID_LENGTH}X")

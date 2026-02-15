@@ -5,18 +5,17 @@ Type-aware registry with safe fallback for custom entities.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
+if TYPE_CHECKING:
+    from happysimulator.core.event import Event
 
 
 def serialize_entity(entity: object) -> dict[str, Any]:
     """Serialize an entity's observable state to a JSON-safe dict."""
-    from happysimulator.load.source import Source
-    from happysimulator.components.common import Sink, Counter
+    from happysimulator.components.common import Counter, Sink
     from happysimulator.components.queued_resource import QueuedResource
+    from happysimulator.load.source import Source
 
     try:
         from happysimulator.components.rate_limiter.rate_limited_entity import RateLimitedEntity
@@ -122,11 +121,12 @@ def _fallback_serialize(entity: object) -> dict[str, Any]:
     for key, val in getattr(entity, "__dict__", {}).items():
         if key.startswith("_"):
             continue
-        if isinstance(val, (int, float, str, bool)):
+        if isinstance(val, (int, float, str, bool)) or (
+            isinstance(val, dict)
+            and all(isinstance(k, str) for k in val)
+            and all(isinstance(v, (int, float, str, bool)) for v in val.values())
+        ):
             result[key] = val
-        elif isinstance(val, dict) and all(isinstance(k, str) for k in val):
-            if all(isinstance(v, (int, float, str, bool)) for v in val.values()):
-                result[key] = val
     return result
 
 
@@ -142,20 +142,20 @@ def serialize_event(event: Event) -> dict[str, Any]:
     }
 
 
-_INTERNAL_EVENT_TYPES = frozenset({
-    "source_event",
-    "SourceEvent",
-    "QUEUE_POLL",
-    "QUEUE_NOTIFY",
-    "QUEUE_DELIVER",
-    "probe_event",
-})
+_INTERNAL_EVENT_TYPES = frozenset(
+    {
+        "source_event",
+        "SourceEvent",
+        "QUEUE_POLL",
+        "QUEUE_NOTIFY",
+        "QUEUE_DELIVER",
+        "probe_event",
+    }
+)
 
 
 def is_internal_event(event_type: str) -> bool:
     """Check if an event type is an internal simulation mechanism."""
     if event_type in _INTERNAL_EVENT_TYPES:
         return True
-    if event_type.startswith("inductor_poll::") or event_type.startswith("rate_limit_poll::"):
-        return True
-    return False
+    return bool(event_type.startswith(("inductor_poll::", "rate_limit_poll::")))

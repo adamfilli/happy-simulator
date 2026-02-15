@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.faults.fault import FaultContext
+
+if TYPE_CHECKING:
+    from happysimulator.faults.fault import FaultContext
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +45,7 @@ class CrashNode:
 
         def crash(e: Event) -> None:
             entity._crashed = True  # type: ignore[attr-defined]
-            logger.info(
-                "[FaultInjection] Crashed '%s' at %s", entity_name, e.time
-            )
+            logger.info("[FaultInjection] Crashed '%s' at %s", entity_name, e.time)
 
         events.append(
             Event.once(
@@ -101,15 +102,11 @@ class PauseNode:
 
         def pause(e: Event) -> None:
             entity._crashed = True  # type: ignore[attr-defined]
-            logger.info(
-                "[FaultInjection] Paused '%s' at %s", entity_name, e.time
-            )
+            logger.info("[FaultInjection] Paused '%s' at %s", entity_name, e.time)
 
         def resume(e: Event) -> None:
             entity._crashed = False  # type: ignore[attr-defined]
-            logger.info(
-                "[FaultInjection] Resumed '%s' at %s", entity_name, e.time
-            )
+            logger.info("[FaultInjection] Resumed '%s' at %s", entity_name, e.time)
 
         events.append(
             Event.once(

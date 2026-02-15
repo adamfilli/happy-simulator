@@ -30,7 +30,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Data,
@@ -44,13 +44,15 @@ from happysimulator import (
     Source,
 )
 from happysimulator.components.infrastructure import (
+    AIMD,
+    BBR,
+    Cubic,
     TCPConnection,
     TCPStats,
-    AIMD,
-    Cubic,
-    BBR,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity
@@ -159,21 +161,29 @@ def run_simulation(
     aimd = _run_algorithm(
         "AIMD",
         TCPConnection("TCP_AIMD", congestion_control=AIMD(), loss_rate=loss_rate),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     cubic = _run_algorithm(
         "Cubic",
         TCPConnection("TCP_Cubic", congestion_control=Cubic(), loss_rate=loss_rate),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     bbr = _run_algorithm(
         "BBR",
         TCPConnection("TCP_BBR", congestion_control=BBR(), loss_rate=loss_rate),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
 
     return SimulationResult(
-        aimd=aimd, cubic=cubic, bbr=bbr,
+        aimd=aimd,
+        cubic=cubic,
+        bbr=bbr,
         duration_s=duration_s,
     )
 
@@ -195,12 +205,19 @@ def print_summary(result: SimulationResult) -> None:
 
     print(f"{'Segments sent':<30} " + " ".join(f"{r.stats.segments_sent:>15,}" for r in results))
     print(f"{'Segments ACKed':<30} " + " ".join(f"{r.stats.segments_acked:>15,}" for r in results))
-    print(f"{'Retransmissions':<30} " + " ".join(f"{r.stats.retransmissions:>15,}" for r in results))
+    print(
+        f"{'Retransmissions':<30} " + " ".join(f"{r.stats.retransmissions:>15,}" for r in results)
+    )
     print(f"{'Final cwnd':<30} " + " ".join(f"{r.stats.cwnd:>15.1f}" for r in results))
     print(f"{'Final ssthresh':<30} " + " ".join(f"{r.stats.ssthresh:>15.1f}" for r in results))
-    print(f"{'RTT (ms)':<30} " + " ".join(f"{r.stats.rtt_s*1000:>15.2f}" for r in results))
-    print(f"{'Throughput (seg/s)':<30} " + " ".join(f"{r.stats.throughput_segments_per_s:>15.1f}" for r in results))
-    print(f"{'Total bytes sent':<30} " + " ".join(f"{r.stats.total_bytes_sent:>15,}" for r in results))
+    print(f"{'RTT (ms)':<30} " + " ".join(f"{r.stats.rtt_s * 1000:>15.2f}" for r in results))
+    print(
+        f"{'Throughput (seg/s)':<30} "
+        + " ".join(f"{r.stats.throughput_segments_per_s:>15.1f}" for r in results)
+    )
+    print(
+        f"{'Total bytes sent':<30} " + " ".join(f"{r.stats.total_bytes_sent:>15,}" for r in results)
+    )
 
     print("\n" + "=" * 72)
     print("INTERPRETATION:")
@@ -223,6 +240,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
     except ImportError:
@@ -249,12 +267,14 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax = axes[1]
     algos = ["AIMD", "Cubic", "BBR"]
     retrans = [r.stats.retransmissions for r in [result.aimd, result.cubic, result.bbr]]
-    throughputs = [r.stats.throughput_segments_per_s for r in [result.aimd, result.cubic, result.bbr]]
+    throughputs = [
+        r.stats.throughput_segments_per_s for r in [result.aimd, result.cubic, result.bbr]
+    ]
 
     x = range(len(algos))
     ax2 = ax.twinx()
-    bars = ax.bar(list(x), retrans, 0.4, label="Retransmissions", color="#DD8452", alpha=0.8)
-    line = ax2.plot(list(x), throughputs, "bo-", linewidth=2, label="Throughput")
+    ax.bar(list(x), retrans, 0.4, label="Retransmissions", color="#DD8452", alpha=0.8)
+    ax2.plot(list(x), throughputs, "bo-", linewidth=2, label="Throughput")
     ax.set_xticks(list(x))
     ax.set_xticklabels(algos)
     ax.set_ylabel("Retransmissions")
@@ -290,7 +310,9 @@ if __name__ == "__main__":
     seed = None if args.seed == -1 else args.seed
     print("Running TCP congestion control comparison...")
     result = run_simulation(
-        duration_s=args.duration, loss_rate=args.loss_rate, seed=seed,
+        duration_s=args.duration,
+        loss_rate=args.loss_rate,
+        seed=seed,
     )
     print_summary(result)
 

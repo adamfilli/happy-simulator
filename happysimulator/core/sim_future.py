@@ -13,12 +13,20 @@ Example::
         def handle_event(self, event):
             future = SimFuture()
             # Send request with the future so the server can resolve it
-            yield 0.0, [Event(
-                time=self.now, event_type="Request", target=self.server,
-                context={"reply_future": future},
-            )]
+            yield (
+                0.0,
+                [
+                    Event(
+                        time=self.now,
+                        event_type="Request",
+                        target=self.server,
+                        context={"reply_future": future},
+                    )
+                ],
+            )
             response = yield future  # Park until server resolves
             # response is the value passed to future.resolve(value)
+
 
     class Server(Entity):
         def handle_event(self, event):
@@ -30,9 +38,11 @@ from __future__ import annotations
 
 import contextvars
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from happysimulator.core.clock import Clock
     from happysimulator.core.event import ProcessContinuation
     from happysimulator.core.event_heap import EventHeap
@@ -84,10 +94,15 @@ class SimFuture:
     """
 
     __slots__ = (
-        "_resolved", "_value",
-        "_parked_process", "_parked_event_type", "_parked_daemon",
-        "_parked_target", "_parked_on_complete", "_parked_context",
+        "_parked_context",
+        "_parked_daemon",
+        "_parked_event_type",
+        "_parked_on_complete",
+        "_parked_process",
+        "_parked_target",
+        "_resolved",
         "_settle_callbacks",
+        "_value",
     )
 
     def __init__(self) -> None:
@@ -219,10 +234,9 @@ class SimFuture:
     def __repr__(self) -> str:
         if self._resolved:
             return f"SimFuture(resolved={self._value!r})"
-        elif self._parked_process is not None:
+        if self._parked_process is not None:
             return "SimFuture(parked)"
-        else:
-            return "SimFuture(pending)"
+        return "SimFuture(pending)"
 
 
 def any_of(*futures: SimFuture) -> SimFuture:
@@ -236,13 +250,30 @@ def any_of(*futures: SimFuture) -> SimFuture:
 
         timeout = SimFuture()
         # Schedule a timeout event that resolves timeout future
-        yield 0.0, [Event.once(time=self.now + 5.0, event_type="Timeout",
-                               fn=lambda e: timeout.resolve("timeout"))]
+        yield (
+            0.0,
+            [
+                Event.once(
+                    time=self.now + 5.0,
+                    event_type="Timeout",
+                    fn=lambda e: timeout.resolve("timeout"),
+                )
+            ],
+        )
 
         response = SimFuture()
         # Send request with response future
-        yield 0.0, [Event(time=self.now, event_type="Request", target=server,
-                          context={"reply_future": response})]
+        yield (
+            0.0,
+            [
+                Event(
+                    time=self.now,
+                    event_type="Request",
+                    target=server,
+                    context={"reply_future": response},
+                )
+            ],
+        )
 
         idx, value = yield any_of(timeout, response)
         if idx == 0:
@@ -262,9 +293,7 @@ def any_of(*futures: SimFuture) -> SimFuture:
     composite = SimFuture()
 
     for i, f in enumerate(futures):
-        f._add_settle_callback(
-            lambda sf, idx=i: composite.resolve((idx, sf._value))
-        )
+        f._add_settle_callback(lambda sf, idx=i: composite.resolve((idx, sf._value)))
 
     return composite
 
@@ -279,14 +308,14 @@ def all_of(*futures: SimFuture) -> SimFuture:
 
         ack1, ack2, ack3 = SimFuture(), SimFuture(), SimFuture()
         # Send requests to three replicas
-        yield 0.0, [
-            Event(time=self.now, event_type="Write", target=replica1,
-                  context={"ack": ack1}),
-            Event(time=self.now, event_type="Write", target=replica2,
-                  context={"ack": ack2}),
-            Event(time=self.now, event_type="Write", target=replica3,
-                  context={"ack": ack3}),
-        ]
+        yield (
+            0.0,
+            [
+                Event(time=self.now, event_type="Write", target=replica1, context={"ack": ack1}),
+                Event(time=self.now, event_type="Write", target=replica2, context={"ack": ack2}),
+                Event(time=self.now, event_type="Write", target=replica3, context={"ack": ack3}),
+            ],
+        )
         results = yield all_of(ack1, ack2, ack3)
         # results = [value1, value2, value3]
 

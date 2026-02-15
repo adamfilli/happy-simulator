@@ -2,15 +2,15 @@
 
 import pytest
 
+from happysimulator.components.storage.lsm_tree import LSMTree
 from happysimulator.components.storage.wal import (
-    WriteAheadLog,
+    SyncEveryWrite,
+    SyncOnBatch,
+    SyncPeriodic,
     WALEntry,
     WALStats,
-    SyncEveryWrite,
-    SyncPeriodic,
-    SyncOnBatch,
+    WriteAheadLog,
 )
-from happysimulator.components.storage.lsm_tree import LSMTree
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
@@ -53,7 +53,7 @@ class TestWriteAheadLog:
         return wal, sim
 
     def test_append_sync(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         seq1 = wal.append_sync("key1", "value1")
         seq2 = wal.append_sync("key2", "value2")
         assert seq1 == 1
@@ -61,7 +61,7 @@ class TestWriteAheadLog:
         assert wal.size == 2
 
     def test_recover(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         wal.append_sync("key1", "value1")
         wal.append_sync("key2", "value2")
         wal.append_sync("key3", "value3")
@@ -74,7 +74,7 @@ class TestWriteAheadLog:
         assert all(isinstance(e, WALEntry) for e in entries)
 
     def test_truncate(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         wal.append_sync("key1", "value1")
         wal.append_sync("key2", "value2")
         wal.append_sync("key3", "value3")
@@ -85,13 +85,13 @@ class TestWriteAheadLog:
         assert entries[0].key == "key3"
 
     def test_truncate_all(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         wal.append_sync("key1", "value1")
         wal.truncate(up_to_sequence=1)
         assert wal.size == 0
 
     def test_stats(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         wal.append_sync("key1", "value1")
         wal.append_sync("key2", "value2")
         stats = wal.stats
@@ -100,18 +100,19 @@ class TestWriteAheadLog:
         assert stats.bytes_written > 0
 
     def test_recover_updates_stats(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         wal.append_sync("k", "v")
         wal.recover()
         assert wal.stats.entries_recovered == 1
 
     def test_repr(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         assert "test_wal" in repr(wal)
 
     def test_handle_event_is_noop(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",
@@ -121,17 +122,17 @@ class TestWriteAheadLog:
         assert result is None
 
     def test_synced_up_to_starts_at_zero(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         assert wal.synced_up_to == 0
 
     def test_crash_no_entries(self):
-        wal, sim = self._make_wal()
+        wal, _sim = self._make_wal()
         lost = wal.crash()
         assert lost == 0
         assert wal.size == 0
 
     def test_crash_discards_unsynced_entries(self):
-        wal, sim = self._make_wal(sync_policy=SyncOnBatch(batch_size=100))
+        wal, _sim = self._make_wal(sync_policy=SyncOnBatch(batch_size=100))
         # append_sync doesn't trigger sync — all entries are unsynced
         for i in range(10):
             wal.append_sync(f"key_{i}", f"val_{i}")
@@ -143,7 +144,7 @@ class TestWriteAheadLog:
         assert wal.size == 0
 
     def test_crash_preserves_synced_entries(self):
-        wal, sim = self._make_wal(sync_policy=SyncEveryWrite())
+        wal, _sim = self._make_wal(sync_policy=SyncEveryWrite())
         # SyncEveryWrite syncs on every append(), but append_sync
         # bypasses the sync path. Use append_sync to manually
         # set up the scenario.
@@ -176,9 +177,9 @@ class TestLSMTreeCrashRecovery:
 
     def test_sstables_survive_crash(self):
         """Data flushed to SSTables is durable across crashes."""
-        from happysimulator.components.storage.lsm_tree import LSMTree
-        lsm, wal, sim = self._make_lsm(
-            SyncEveryWrite(), memtable_size=5,
+        lsm, _wal, _sim = self._make_lsm(
+            SyncEveryWrite(),
+            memtable_size=5,
         )
         # Write enough to trigger a flush (5 entries → SSTable)
         for i in range(6):
@@ -194,9 +195,9 @@ class TestLSMTreeCrashRecovery:
 
     def test_sync_every_write_no_data_loss(self):
         """With SyncEveryWrite, WAL entries survive crash."""
-        from happysimulator.components.storage.lsm_tree import LSMTree
-        lsm, wal, sim = self._make_lsm(
-            SyncEveryWrite(), memtable_size=1000,
+        lsm, wal, _sim = self._make_lsm(
+            SyncEveryWrite(),
+            memtable_size=1000,
         )
         # Manually set synced_up_to to simulate sync-every-write behavior
         # (append_sync bypasses the sync path, so we set it manually)
@@ -216,9 +217,9 @@ class TestLSMTreeCrashRecovery:
 
     def test_async_sync_loses_unsynced_writes(self):
         """With SyncOnBatch, unsynced WAL entries are lost on crash."""
-        from happysimulator.components.storage.lsm_tree import LSMTree
-        lsm, wal, sim = self._make_lsm(
-            SyncOnBatch(batch_size=50), memtable_size=1000,
+        lsm, wal, _sim = self._make_lsm(
+            SyncOnBatch(batch_size=50),
+            memtable_size=1000,
         )
         for i in range(20):
             lsm.put_sync(f"key_{i}", f"val_{i}")
@@ -238,9 +239,9 @@ class TestLSMTreeCrashRecovery:
 
     def test_partial_batch_loss(self):
         """Only the tail of writes after the last sync is lost."""
-        from happysimulator.components.storage.lsm_tree import LSMTree
-        lsm, wal, sim = self._make_lsm(
-            SyncOnBatch(batch_size=10), memtable_size=1000,
+        lsm, wal, _sim = self._make_lsm(
+            SyncOnBatch(batch_size=10),
+            memtable_size=1000,
         )
         for i in range(25):
             lsm.put_sync(f"key_{i:03d}", f"val_{i}")

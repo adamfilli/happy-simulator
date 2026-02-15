@@ -1,20 +1,15 @@
 """Tests for CRDTStore entity."""
 
-import pytest
-
 from happysimulator import (
     Event,
     Instant,
     Network,
-    Simulation,
     SimFuture,
+    Simulation,
     datacenter_network,
 )
 from happysimulator.components.crdt.crdt_store import CRDTStore, CRDTStoreStats
 from happysimulator.components.crdt.g_counter import GCounter
-from happysimulator.components.crdt.pn_counter import PNCounter
-from happysimulator.components.crdt.lww_register import LWWRegister
-from happysimulator.core.logical_clocks import HLCTimestamp
 
 
 class TestCRDTStoreCreation:
@@ -51,7 +46,7 @@ class TestCRDTStoreCreation:
     def test_get_gossip_event_returns_none_without_peers(self):
         network = Network(name="net")
         store = CRDTStore("node-a", network=network)
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
@@ -64,7 +59,7 @@ class TestCRDTStoreCreation:
         a = CRDTStore("node-a", network=network, gossip_interval=0)
         b = CRDTStore("node-b", network=network)
         a.add_peers([b])
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],
@@ -80,7 +75,8 @@ class TestCRDTStoreReadWrite:
         """Write to a key creates a CRDT and applies the operation."""
         network = Network(name="net")
         store = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
         )
 
@@ -88,11 +84,13 @@ class TestCRDTStoreReadWrite:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store,
-            context={"metadata": {
-                "key": "hits",
-                "operation": "increment",
-                "value": 5,
-            }},
+            context={
+                "metadata": {
+                    "key": "hits",
+                    "operation": "increment",
+                    "value": 5,
+                }
+            },
         )
 
         sim = Simulation(
@@ -112,7 +110,8 @@ class TestCRDTStoreReadWrite:
         """Read returns the current CRDT value."""
         network = Network(name="net")
         store = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
         )
 
@@ -121,11 +120,13 @@ class TestCRDTStoreReadWrite:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store,
-            context={"metadata": {
-                "key": "hits",
-                "operation": "increment",
-                "value": 3,
-            }},
+            context={
+                "metadata": {
+                    "key": "hits",
+                    "operation": "increment",
+                    "value": 3,
+                }
+            },
         )
 
         reply = SimFuture()
@@ -178,7 +179,8 @@ class TestCRDTStoreReadWrite:
         """Write resolves reply future with result."""
         network = Network(name="net")
         store = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
         )
 
@@ -187,12 +189,14 @@ class TestCRDTStoreReadWrite:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store,
-            context={"metadata": {
-                "key": "counter",
-                "operation": "increment",
-                "value": 1,
-                "reply_future": reply,
-            }},
+            context={
+                "metadata": {
+                    "key": "counter",
+                    "operation": "increment",
+                    "value": 1,
+                    "reply_future": reply,
+                }
+            },
         )
 
         sim = Simulation(
@@ -215,19 +219,23 @@ class TestCRDTStoreGossip:
         """Two nodes with different writes converge after gossip."""
         network = Network(name="net")
         store_a = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_b = CRDTStore(
-            "node-b", network=network,
+            "node-b",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_a.add_peers([store_b])
         store_b.add_peers([store_a])
         network.add_bidirectional_link(
-            store_a, store_b, datacenter_network("link"),
+            store_a,
+            store_b,
+            datacenter_network("link"),
         )
 
         # Write to node-a
@@ -235,22 +243,26 @@ class TestCRDTStoreGossip:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_a,
-            context={"metadata": {
-                "key": "hits",
-                "operation": "increment",
-                "value": 5,
-            }},
+            context={
+                "metadata": {
+                    "key": "hits",
+                    "operation": "increment",
+                    "value": 5,
+                }
+            },
         )
         # Write to node-b
         write_b = Event(
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_b,
-            context={"metadata": {
-                "key": "hits",
-                "operation": "increment",
-                "value": 3,
-            }},
+            context={
+                "metadata": {
+                    "key": "hits",
+                    "operation": "increment",
+                    "value": 3,
+                }
+            },
         )
 
         sim = Simulation(
@@ -282,19 +294,23 @@ class TestCRDTStoreGossip:
         """Gossip propagates keys that only exist on one node."""
         network = Network(name="net")
         store_a = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_b = CRDTStore(
-            "node-b", network=network,
+            "node-b",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_a.add_peers([store_b])
         store_b.add_peers([store_a])
         network.add_bidirectional_link(
-            store_a, store_b, datacenter_network("link"),
+            store_a,
+            store_b,
+            datacenter_network("link"),
         )
 
         # Write different keys to each node
@@ -302,21 +318,25 @@ class TestCRDTStoreGossip:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_a,
-            context={"metadata": {
-                "key": "key-a",
-                "operation": "increment",
-                "value": 1,
-            }},
+            context={
+                "metadata": {
+                    "key": "key-a",
+                    "operation": "increment",
+                    "value": 1,
+                }
+            },
         )
         write_b = Event(
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_b,
-            context={"metadata": {
-                "key": "key-b",
-                "operation": "increment",
-                "value": 1,
-            }},
+            context={
+                "metadata": {
+                    "key": "key-b",
+                    "operation": "increment",
+                    "value": 1,
+                }
+            },
         )
 
         sim = Simulation(
@@ -351,43 +371,51 @@ class TestCRDTStorePartition:
         """Both nodes accept writes independently during partition."""
         network = Network(name="net")
         store_a = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_b = CRDTStore(
-            "node-b", network=network,
+            "node-b",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_a.add_peers([store_b])
         store_b.add_peers([store_a])
         network.add_bidirectional_link(
-            store_a, store_b, datacenter_network("link"),
+            store_a,
+            store_b,
+            datacenter_network("link"),
         )
 
         # Create partition
-        partition = network.partition([store_a], [store_b])
+        network.partition([store_a], [store_b])
 
         write_a = Event(
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_a,
-            context={"metadata": {
-                "key": "counter",
-                "operation": "increment",
-                "value": 10,
-            }},
+            context={
+                "metadata": {
+                    "key": "counter",
+                    "operation": "increment",
+                    "value": 10,
+                }
+            },
         )
         write_b = Event(
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_b,
-            context={"metadata": {
-                "key": "counter",
-                "operation": "increment",
-                "value": 7,
-            }},
+            context={
+                "metadata": {
+                    "key": "counter",
+                    "operation": "increment",
+                    "value": 7,
+                }
+            },
         )
 
         # Gossip during partition (will be dropped by network)
@@ -415,19 +443,23 @@ class TestCRDTStorePartition:
         """Nodes converge after partition heals and gossip resumes."""
         network = Network(name="net")
         store_a = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_b = CRDTStore(
-            "node-b", network=network,
+            "node-b",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
             gossip_interval=1.0,
         )
         store_a.add_peers([store_b])
         store_b.add_peers([store_a])
         network.add_bidirectional_link(
-            store_a, store_b, datacenter_network("link"),
+            store_a,
+            store_b,
+            datacenter_network("link"),
         )
 
         # Write during partition
@@ -437,21 +469,25 @@ class TestCRDTStorePartition:
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_a,
-            context={"metadata": {
-                "key": "counter",
-                "operation": "increment",
-                "value": 10,
-            }},
+            context={
+                "metadata": {
+                    "key": "counter",
+                    "operation": "increment",
+                    "value": 10,
+                }
+            },
         )
         write_b = Event(
             time=Instant.from_seconds(0.1),
             event_type="Write",
             target=store_b,
-            context={"metadata": {
-                "key": "counter",
-                "operation": "increment",
-                "value": 7,
-            }},
+            context={
+                "metadata": {
+                    "key": "counter",
+                    "operation": "increment",
+                    "value": 7,
+                }
+            },
         )
 
         sim = Simulation(
@@ -486,11 +522,12 @@ class TestCRDTStorePartition:
         """get_or_create creates CRDT on first access."""
         network = Network(name="net")
         store = CRDTStore(
-            "node-a", network=network,
+            "node-a",
+            network=network,
             crdt_factory=lambda nid: GCounter(nid),
         )
 
-        sim = Simulation(
+        Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(1.0),
             sources=[],

@@ -15,12 +15,12 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from happysimulator.components.consensus.log import Log, LogEntry
+from happysimulator.components.consensus.paxos import Ballot
+from happysimulator.components.consensus.raft_state_machine import KVStateMachine, StateMachine
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.consensus.log import Log, LogEntry
-from happysimulator.components.consensus.paxos import Ballot
-from happysimulator.components.consensus.raft_state_machine import StateMachine, KVStateMachine
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ class FlexiblePaxosStats:
         phase1_quorum: Phase 1 quorum size.
         phase2_quorum: Phase 2 quorum size.
     """
+
     is_leader: bool = False
     current_ballot: int = 0
     log_length: int = 0
@@ -206,15 +207,18 @@ class FlexiblePaxosNode(Entity):
             return []
 
         if self._current_ballot > ballot:
-            return [self._network.send(
-                source=self, destination=sender,
-                event_type="FlexPaxosNack",
-                payload={
-                    "ballot_number": self._current_ballot.number,
-                    "ballot_node": self._current_ballot.node_id,
-                },
-                daemon=True,
-            )]
+            return [
+                self._network.send(
+                    source=self,
+                    destination=sender,
+                    event_type="FlexPaxosNack",
+                    payload={
+                        "ballot_number": self._current_ballot.number,
+                        "ballot_node": self._current_ballot.node_id,
+                    },
+                    daemon=True,
+                )
+            ]
 
         self._current_ballot = ballot
         self._is_leader = False
@@ -223,18 +227,21 @@ class FlexiblePaxosNode(Entity):
             {"index": e.index, "term": e.term, "command": e.command}
             for e in self._log.entries_after(0)
         ]
-        return [self._network.send(
-            source=self, destination=sender,
-            event_type="FlexPaxosPromise",
-            payload={
-                "ballot_number": ballot.number,
-                "ballot_node": ballot.node_id,
-                "from": self.name,
-                "log_entries": entries,
-                "commit_index": self._log.commit_index,
-            },
-            daemon=True,
-        )]
+        return [
+            self._network.send(
+                source=self,
+                destination=sender,
+                event_type="FlexPaxosPromise",
+                payload={
+                    "ballot_number": ballot.number,
+                    "ballot_node": ballot.node_id,
+                    "from": self.name,
+                    "log_entries": entries,
+                    "commit_index": self._log.commit_index,
+                },
+                daemon=True,
+            )
+        ]
 
     def _handle_promise(self, event: Event) -> list[Event]:
         metadata = event.context.get("metadata", {})
@@ -243,10 +250,12 @@ class FlexiblePaxosNode(Entity):
         if ballot_number not in self._phase1_responses:
             return []
 
-        self._phase1_responses[ballot_number].append({
-            "from": metadata.get("from"),
-            "log_entries": metadata.get("log_entries", []),
-        })
+        self._phase1_responses[ballot_number].append(
+            {
+                "from": metadata.get("from"),
+                "log_entries": metadata.get("log_entries", []),
+            }
+        )
 
         if len(self._phase1_responses[ballot_number]) >= self._phase1_quorum:
             return self._become_leader()
@@ -255,8 +264,13 @@ class FlexiblePaxosNode(Entity):
     def _become_leader(self) -> list[Event]:
         self._is_leader = True
         self._leader = self.name
-        logger.debug("[%s] Became FlexPaxos leader (ballot=%s, Q1=%d, Q2=%d)",
-                     self.name, self._current_ballot, self._phase1_quorum, self._phase2_quorum)
+        logger.debug(
+            "[%s] Became FlexPaxos leader (ballot=%s, Q1=%d, Q2=%d)",
+            self.name,
+            self._current_ballot,
+            self._phase1_quorum,
+            self._phase2_quorum,
+        )
 
         events: list[Event] = []
         for command, future in self._pending_commands:
@@ -279,15 +293,18 @@ class FlexiblePaxosNode(Entity):
             return []
 
         if ballot < self._current_ballot:
-            return [self._network.send(
-                source=self, destination=sender,
-                event_type="FlexPaxosNack",
-                payload={
-                    "ballot_number": self._current_ballot.number,
-                    "ballot_node": self._current_ballot.node_id,
-                },
-                daemon=True,
-            )]
+            return [
+                self._network.send(
+                    source=self,
+                    destination=sender,
+                    event_type="FlexPaxosNack",
+                    payload={
+                        "ballot_number": self._current_ballot.number,
+                        "ballot_node": self._current_ballot.node_id,
+                    },
+                    daemon=True,
+                )
+            ]
 
         self._current_ballot = ballot
         self._leader = ballot.node_id
@@ -303,16 +320,19 @@ class FlexiblePaxosNode(Entity):
             newly_committed = self._log.advance_commit(leader_commit)
             self._apply_committed(newly_committed)
 
-        return [self._network.send(
-            source=self, destination=sender,
-            event_type="FlexPaxosAccepted",
-            payload={
-                "ballot_number": ballot.number,
-                "slot": slot,
-                "from": self.name,
-            },
-            daemon=True,
-        )]
+        return [
+            self._network.send(
+                source=self,
+                destination=sender,
+                event_type="FlexPaxosAccepted",
+                payload={
+                    "ballot_number": ballot.number,
+                    "slot": slot,
+                    "from": self.name,
+                },
+                daemon=True,
+            )
+        ]
 
     def _handle_accepted(self, event: Event) -> list[Event]:
         metadata = event.context.get("metadata", {})
@@ -322,10 +342,9 @@ class FlexiblePaxosNode(Entity):
             self._slot_acks[slot] = 0
         self._slot_acks[slot] += 1
 
-        if self._slot_acks[slot] >= self._phase2_quorum:
-            if slot > self._log.commit_index:
-                newly_committed = self._log.advance_commit(slot)
-                self._apply_committed(newly_committed)
+        if self._slot_acks[slot] >= self._phase2_quorum and slot > self._log.commit_index:
+            newly_committed = self._log.advance_commit(slot)
+            self._apply_committed(newly_committed)
         return []
 
     def _handle_heartbeat(self, event: Event) -> list[Event] | None:
@@ -366,7 +385,8 @@ class FlexiblePaxosNode(Entity):
         events: list[Event] = []
         for peer in self._peers:
             msg = self._network.send(
-                source=self, destination=peer,
+                source=self,
+                destination=peer,
                 event_type="FlexPaxosAccept",
                 payload={
                     "ballot_number": self._current_ballot.number,
@@ -384,7 +404,8 @@ class FlexiblePaxosNode(Entity):
         events: list[Event] = []
         for peer in self._peers:
             msg = self._network.send(
-                source=self, destination=peer,
+                source=self,
+                destination=peer,
                 event_type="FlexPaxosHeartbeat",
                 payload={
                     "ballot_number": self._current_ballot.number,
@@ -400,12 +421,14 @@ class FlexiblePaxosNode(Entity):
             event_type="FlexPaxosHeartbeat",
             target=self,
             daemon=True,
-            context={"metadata": {
-                "ballot_number": self._current_ballot.number,
-                "ballot_node": self._current_ballot.node_id,
-                "commit_index": self._log.commit_index,
-                "self_heartbeat": True,
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": self._current_ballot.number,
+                    "ballot_node": self._current_ballot.node_id,
+                    "commit_index": self._log.commit_index,
+                    "self_heartbeat": True,
+                }
+            },
         )
         if self._heartbeat_event:
             self._heartbeat_event.cancel()

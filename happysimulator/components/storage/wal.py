@@ -15,10 +15,14 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -277,8 +281,7 @@ class WriteAheadLog(Entity):
         """
         before = len(self._entries)
         self._entries = [
-            e for e in self._entries
-            if e.sequence_number <= self._synced_up_to_sequence
+            e for e in self._entries if e.sequence_number <= self._synced_up_to_sequence
         ]
         lost = before - len(self._entries)
         self._writes_since_sync = 0
@@ -286,7 +289,6 @@ class WriteAheadLog(Entity):
 
     def handle_event(self, event: Event) -> None:
         """WAL does not process events directly."""
-        pass
 
     def __repr__(self) -> str:
         return f"WriteAheadLog('{self.name}', entries={len(self._entries)}, writes={self._total_writes})"

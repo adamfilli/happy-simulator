@@ -27,8 +27,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -46,6 +45,8 @@ from happysimulator.components.infrastructure import (
     PriorityPreemptive,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity
@@ -152,12 +153,16 @@ def run_simulation(
     fair = _run_policy(
         "FairShare",
         CPUScheduler("CPU_Fair", policy=FairShare(quantum_s=0.005)),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     priority = _run_policy(
         "PriorityPreemptive",
         CPUScheduler("CPU_Priority", policy=PriorityPreemptive(quantum_s=0.005)),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
 
     return SimulationResult(
@@ -184,7 +189,9 @@ def print_summary(result: SimulationResult) -> None:
     print(f"{'Tasks completed':<35} {f.tasks_completed:>15,} {p.tasks_completed:>15,}")
     print(f"{'Context switches':<35} {f.context_switches:>15,} {p.context_switches:>15,}")
     print(f"{'Total CPU time (s)':<35} {f.total_cpu_time_s:>15.4f} {p.total_cpu_time_s:>15.4f}")
-    print(f"{'Context switch overhead (s)':<35} {f.total_context_switch_overhead_s:>15.6f} {p.total_context_switch_overhead_s:>15.6f}")
+    print(
+        f"{'Context switch overhead (s)':<35} {f.total_context_switch_overhead_s:>15.6f} {p.total_context_switch_overhead_s:>15.6f}"
+    )
     print(f"{'Overhead fraction':<35} {f.overhead_fraction:>15.4%} {p.overhead_fraction:>15.4%}")
     print(f"{'Total wait time (s)':<35} {f.total_wait_time_s:>15.4f} {p.total_wait_time_s:>15.4f}")
     print(f"{'Peak queue depth':<35} {f.peak_queue_depth:>15} {p.peak_queue_depth:>15}")

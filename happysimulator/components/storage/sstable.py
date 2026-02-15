@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import bisect
 import logging
-import sys
 from dataclasses import dataclass
 from typing import Any
 
@@ -177,7 +176,9 @@ class SSTable:
             return self._values[idx]
         return None
 
-    def scan(self, start_key: str | None = None, end_key: str | None = None) -> list[tuple[str, Any]]:
+    def scan(
+        self, start_key: str | None = None, end_key: str | None = None
+    ) -> list[tuple[str, Any]]:
         """Return all key-value pairs in [start_key, end_key) range.
 
         Args:

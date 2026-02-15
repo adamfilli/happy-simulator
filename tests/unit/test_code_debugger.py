@@ -1,15 +1,14 @@
 """Unit tests for the code debugger module."""
 
+import contextlib
 import threading
 import time
 
-import pytest
-
+from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.components.queue_policy import FIFOQueue
 from happysimulator.visual.code_debugger import (
     CodeBreakpoint,
     CodeDebugger,
@@ -20,8 +19,8 @@ from happysimulator.visual.code_debugger import (
     _safe_serialize_value,
 )
 
-
 # --- Test entities ---
+
 
 class SimpleServer(Entity):
     def __init__(self):
@@ -30,7 +29,7 @@ class SimpleServer(Entity):
     def handle_event(self, event):
         x = 1
         yield 0.1
-        y = x + 1
+        y = x + 1  # noqa: F841 - intentional: test inspects source code
         return []
 
 
@@ -41,7 +40,7 @@ class SimpleQueuedServer(QueuedResource):
     def handle_queued_event(self, event):
         result = "processing"
         yield 0.05
-        result = "done"
+        result = "done"  # noqa: F841 - intentional: test inspects source code
         return []
 
 
@@ -54,6 +53,7 @@ class NonGeneratorEntity(Entity):
 
 
 # --- Source retrieval ---
+
 
 class TestSourceRetrieval:
     def test_get_source_for_entity(self):
@@ -111,6 +111,7 @@ class TestCodeLocation:
 
 # --- Entity activation ---
 
+
 class TestEntityActivation:
     def test_activate_deactivate(self):
         debugger = CodeDebugger()
@@ -134,6 +135,7 @@ class TestEntityActivation:
 
 # --- Breakpoints ---
 
+
 class TestBreakpoints:
     def test_add_remove(self):
         debugger = CodeDebugger()
@@ -155,6 +157,7 @@ class TestBreakpoints:
 
 
 # --- Serialization ---
+
 
 class TestSerialization:
     def test_safe_serialize_primitives(self):
@@ -187,6 +190,7 @@ class TestSerialization:
 
 # --- Trace recording ---
 
+
 class TestTraceRecording:
     def test_install_and_remove_trace(self):
         debugger = CodeDebugger()
@@ -205,10 +209,8 @@ class TestTraceRecording:
         debugger.install_trace(gen, "SimpleServer")
 
         # Advance the generator
-        try:
+        with contextlib.suppress(StopIteration):
             gen.send(None)
-        except StopIteration:
-            pass
 
         debugger.remove_trace(gen)
 
@@ -232,6 +234,7 @@ class TestTraceRecording:
 
 # --- Line record ---
 
+
 class TestLineRecord:
     def test_to_dict_no_locals(self):
         lr = LineRecord(line_number=42)
@@ -247,6 +250,7 @@ class TestLineRecord:
 
 # --- Execution trace ---
 
+
 class TestExecutionTrace:
     def test_to_dict(self):
         trace = ExecutionTrace(
@@ -261,6 +265,7 @@ class TestExecutionTrace:
 
 
 # --- Code debug state ---
+
 
 class TestCodeDebugState:
     def test_get_state(self):
@@ -285,6 +290,7 @@ class TestCodeDebugState:
 
 
 # --- Blocking / pause ---
+
 
 class TestCodePause:
     def test_continue_unblocks(self):
@@ -341,7 +347,6 @@ class TestCodePause:
                 target=server,
             )
             gen = server.handle_event(event)
-            frame = gen.gi_frame
 
             # Set a breakpoint on the first code line
             location = debugger._source_cache["SimpleServer"]
@@ -352,9 +357,7 @@ class TestCodePause:
                     bp_line = location.start_line + i
                     break
 
-            debugger.add_breakpoint(
-                CodeBreakpoint(entity_name="SimpleServer", line_number=bp_line)
-            )
+            debugger.add_breakpoint(CodeBreakpoint(entity_name="SimpleServer", line_number=bp_line))
 
             # Run gen.send() in a thread — it should block briefly then timeout
             result_holder = []

@@ -24,15 +24,28 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Entity, Event, Instant, LatencyTracker, QueuedResource,
-    FIFOQueue, Simulation, SimulationSummary, Source,
+    Entity,
+    Event,
+    FIFOQueue,
+    Instant,
+    LatencyTracker,
+    QueuedResource,
+    Simulation,
+    SimulationSummary,
+    Source,
 )
 from happysimulator.components.industrial import (
-    ConveyorBelt, InspectionStation, BatchProcessor, BreakdownScheduler,
+    BatchProcessor,
+    BreakdownScheduler,
+    ConveyorBelt,
+    InspectionStation,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @dataclass(frozen=True)
@@ -47,7 +60,7 @@ class ManufacturingConfig:
     defect_rate: float = 0.05
     batch_size: int = 12
     mttf: float = 300.0  # mean time to failure for cut station
-    mttr: float = 30.0   # mean time to repair
+    mttr: float = 30.0  # mean time to repair
     seed: int = 42
 
 
@@ -67,9 +80,7 @@ class WorkStation(QueuedResource):
     def handle_queued_event(self, event: Event) -> Generator[float, None, list[Event]]:
         yield self.service_time_s
         self.parts_processed += 1
-        return [
-            self.forward(event, self.downstream)
-        ]
+        return [self.forward(event, self.downstream)]
 
 
 @dataclass
@@ -92,7 +103,8 @@ def run_manufacturing_simulation(config: ManufacturingConfig | None = None) -> M
 
     # Build pipeline from end to start
     packager = BatchProcessor(
-        "Package", downstream=sink,
+        "Package",
+        downstream=sink,
         batch_size=config.batch_size,
         process_time=config.package_time,
         timeout_s=30.0,
@@ -123,20 +135,33 @@ def run_manufacturing_simulation(config: ManufacturingConfig | None = None) -> M
 
     # Breakdown scheduler for cut station
     breakdown = BreakdownScheduler(
-        "CutBreakdowns", target=cut_station,
+        "CutBreakdowns",
+        target=cut_station,
         mean_time_to_failure=config.mttf,
         mean_repair_time=config.mttr,
     )
 
     source = Source.poisson(
-        rate=config.arrival_rate, target=cut_station,
-        event_type="Part", name="PartSource",
+        rate=config.arrival_rate,
+        target=cut_station,
+        event_type="Part",
+        name="PartSource",
         stop_after=config.duration_s,
     )
 
-    entities = [cut_station, belt_to_assemble, assemble, belt_to_inspect,
-                inspector, belt_to_pack, packager, rework_belt, sink,
-                rework_sink, breakdown]
+    entities = [
+        cut_station,
+        belt_to_assemble,
+        assemble,
+        belt_to_inspect,
+        inspector,
+        belt_to_pack,
+        packager,
+        rework_belt,
+        sink,
+        rework_sink,
+        breakdown,
+    ]
 
     sim = Simulation(
         start_time=Instant.Epoch,
@@ -150,9 +175,13 @@ def run_manufacturing_simulation(config: ManufacturingConfig | None = None) -> M
     stations = {"Cut": cut_station, "Assemble": assemble}
 
     return ManufacturingResult(
-        sink=sink, stations=stations, inspector=inspector,
-        packager=packager, breakdown=breakdown,
-        config=config, summary=summary,
+        sink=sink,
+        stations=stations,
+        inspector=inspector,
+        packager=packager,
+        breakdown=breakdown,
+        config=config,
+        summary=summary,
     )
 
 
@@ -162,33 +191,33 @@ def print_summary(result: ManufacturingResult) -> None:
     print("=" * 60)
 
     c = result.config
-    print(f"\nConfiguration:")
-    print(f"  Duration: {c.duration_s/60:.0f} minutes")
+    print("\nConfiguration:")
+    print(f"  Duration: {c.duration_s / 60:.0f} minutes")
     print(f"  Arrival rate: {c.arrival_rate:.2f} parts/s")
-    print(f"  Defect rate: {c.defect_rate*100:.1f}%")
+    print(f"  Defect rate: {c.defect_rate * 100:.1f}%")
     print(f"  Batch size: {c.batch_size}")
 
-    print(f"\nStation Performance:")
+    print("\nStation Performance:")
     for name, station in result.stations.items():
         print(f"  {name}: {station.parts_processed} parts")
 
     insp = result.inspector.stats
-    print(f"\nInspection:")
+    print("\nInspection:")
     print(f"  Inspected: {insp.inspected}")
-    print(f"  Passed: {insp.passed} ({insp.passed/max(insp.inspected,1)*100:.1f}%)")
+    print(f"  Passed: {insp.passed} ({insp.passed / max(insp.inspected, 1) * 100:.1f}%)")
     print(f"  Failed (rework): {insp.failed}")
 
     pkg = result.packager.stats
-    print(f"\nPackaging:")
+    print("\nPackaging:")
     print(f"  Batches: {pkg.batches_processed}")
     print(f"  Items packaged: {pkg.items_processed}")
 
     bd = result.breakdown.stats
-    print(f"\nBreakdowns:")
+    print("\nBreakdowns:")
     print(f"  Count: {bd.breakdown_count}")
-    print(f"  Availability: {bd.availability*100:.1f}%")
+    print(f"  Availability: {bd.availability * 100:.1f}%")
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Finished goods: {result.sink.count}")
     if result.sink.count > 0:
         print(f"  Avg cycle time: {result.sink.mean_latency():.1f}s")

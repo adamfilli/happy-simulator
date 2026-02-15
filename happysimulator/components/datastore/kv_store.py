@@ -20,8 +20,9 @@ Example:
         yield from store.put("user:123", {"name": "Alice"})
 """
 
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Generator, Optional
+from typing import Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -129,7 +130,7 @@ class KVStore(Entity):
         """Current number of stored keys."""
         return len(self._data)
 
-    def get(self, key: str) -> Generator[float, None, Optional[Any]]:
+    def get(self, key: str) -> Generator[float, None, Any | None]:
         """Get a value by key.
 
         Args:
@@ -152,7 +153,7 @@ class KVStore(Entity):
             self._misses += 1
             return None
 
-    def get_sync(self, key: str) -> Optional[Any]:
+    def get_sync(self, key: str) -> Any | None:
         """Get a value synchronously (no latency, for internal use).
 
         Args:
@@ -163,7 +164,7 @@ class KVStore(Entity):
         """
         return self._data.get(key)
 
-    def put(self, key: str, value: Any) -> Generator[float, None, None]:
+    def put(self, key: str, value: Any) -> Generator[float]:
         """Store a value.
 
         Args:
@@ -272,4 +273,3 @@ class KVStore(Entity):
 
     def handle_event(self, event: Event) -> None:
         """KVStore can handle events for get/put operations."""
-        pass

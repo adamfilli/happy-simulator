@@ -12,8 +12,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Instant
 from happysimulator.faults.fault import (
     Fault,
     FaultContext,
@@ -23,7 +21,9 @@ from happysimulator.faults.fault import (
 )
 
 if TYPE_CHECKING:
+    from happysimulator.core.event import Event
     from happysimulator.core.simulation import Simulation
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class FaultSchedule(Entity):
         ctx = self._build_context(start_time, sim)
         all_events: list[Event] = []
 
-        for fault, handle in zip(self._faults, self._handles):
+        for fault, handle in zip(self._faults, self._handles, strict=False):
             fault_events = fault.generate_events(ctx)
             handle._events = fault_events
             all_events.extend(fault_events)
@@ -103,18 +103,13 @@ class FaultSchedule(Entity):
     def stats(self) -> FaultStats:
         """Frozen snapshot of fault injection statistics."""
         # Update cancelled count from handles
-        self._stats.faults_cancelled = sum(
-            1 for h in self._handles if h.cancelled
-        )
+        self._stats.faults_cancelled = sum(1 for h in self._handles if h.cancelled)
         return self._stats.freeze()
 
     def handle_event(self, event: Event) -> None:
         """FaultSchedule does not process events itself."""
-        pass
 
-    def _build_context(
-        self, start_time: Instant, sim: Simulation
-    ) -> FaultContext:
+    def _build_context(self, start_time: Instant, sim: Simulation) -> FaultContext:
         """Build a FaultContext from the simulation's registered components."""
         from happysimulator.components.network.network import Network
         from happysimulator.components.resource import Resource

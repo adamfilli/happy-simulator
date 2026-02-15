@@ -213,20 +213,15 @@ class Advertiser(Entity):
         time_s = self.now.to_seconds()
 
         prev_count = len(self.active_tiers)
-        self.active_tiers = [
-            t for t in self.tiers if t.is_profitable(self._sentiment, self.margin)
-        ]
+        self.active_tiers = [t for t in self.tiers if t.is_profitable(self._sentiment, self.margin)]
         new_count = len(self.active_tiers)
 
         if new_count < prev_count:
             self._tier_shutoff_events += prev_count - new_count
 
-        monthly_profit = sum(
-            t.tier_profit(self._sentiment, self.margin) for t in self.active_tiers
-        )
+        monthly_profit = sum(t.tier_profit(self._sentiment, self.margin) for t in self.active_tiers)
         monthly_platform_rev = sum(
-            t.tier_platform_revenue(self._sentiment, self.margin)
-            for t in self.active_tiers
+            t.tier_platform_revenue(self._sentiment, self.margin) for t in self.active_tiers
         )
 
         self._periods_evaluated += 1

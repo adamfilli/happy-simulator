@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
-
-from happysimulator.components.industrial.conditional_router import ConditionalRouter
 from happysimulator.components.common import Sink
+from happysimulator.components.industrial.conditional_router import ConditionalRouter
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
 
 class TestConditionalRouterBasics:
-
     def test_creates_with_parameters(self):
         sink = Sink()
         router = ConditionalRouter(
@@ -87,12 +84,13 @@ class TestConditionalRouterBasics:
 
 
 class TestConditionalRouterByContextField:
-
     def test_routes_by_field_value(self):
         sink_a = Sink("a")
         sink_b = Sink("b")
         router = ConditionalRouter.by_context_field(
-            "router", "color", {"red": sink_a, "blue": sink_b},
+            "router",
+            "color",
+            {"red": sink_a, "blue": sink_b},
         )
 
         sim = Simulation(
@@ -100,9 +98,15 @@ class TestConditionalRouterByContextField:
             end_time=Instant.from_seconds(1.0),
             entities=[router, sink_a, sink_b],
         )
-        sim.schedule(Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "red"}))
-        sim.schedule(Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "blue"}))
-        sim.schedule(Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "blue"}))
+        sim.schedule(
+            Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "red"})
+        )
+        sim.schedule(
+            Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "blue"})
+        )
+        sim.schedule(
+            Event(time=Instant.Epoch, event_type="T", target=router, context={"color": "blue"})
+        )
         sim.run()
 
         assert sink_a.events_received == 1
@@ -111,7 +115,8 @@ class TestConditionalRouterByContextField:
     def test_stats_snapshot(self):
         sink = Sink()
         router = ConditionalRouter(
-            "router", routes=[(lambda e: True, sink)],
+            "router",
+            routes=[(lambda e: True, sink)],
         )
 
         sim = Simulation(
@@ -119,7 +124,7 @@ class TestConditionalRouterByContextField:
             end_time=Instant.from_seconds(1.0),
             entities=[router, sink],
         )
-        for i in range(3):
+        for _i in range(3):
             sim.schedule(Event(time=Instant.Epoch, event_type="T", target=router))
         sim.run()
 
@@ -131,7 +136,9 @@ class TestConditionalRouterByContextField:
         sink_a = Sink("a")
         sink_b = Sink("b")
         router = ConditionalRouter.by_context_field(
-            "router", "t", {"x": sink_a, "y": sink_b},
+            "router",
+            "t",
+            {"x": sink_a, "y": sink_b},
         )
 
         sim = Simulation(

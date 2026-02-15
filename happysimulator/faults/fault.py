@@ -8,15 +8,14 @@ for manual cancellation, and ``FaultStats`` for observability.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable, TYPE_CHECKING
-
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from happysimulator.components.network.network import Network
     from happysimulator.components.resource import Resource
+    from happysimulator.core.entity import Entity
+    from happysimulator.core.event import Event
     from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)

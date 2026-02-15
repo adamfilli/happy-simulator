@@ -14,6 +14,7 @@ from typing import Any
 @dataclass
 class QueueStats:
     """Queue-specific statistics for QueuedResource entities."""
+
     peak_depth: int
     total_accepted: int
     total_dropped: int
@@ -22,6 +23,7 @@ class QueueStats:
 @dataclass
 class EntitySummary:
     """Per-entity statistics from a simulation run."""
+
     name: str
     entity_type: str
     events_handled: int
@@ -48,6 +50,7 @@ class SimulationSummary:
 
     Returned by Simulation.run() and also accessible via Simulation.summary.
     """
+
     duration_s: float
     total_events_processed: int
     events_cancelled: int = 0
@@ -80,7 +83,5 @@ class SimulationSummary:
             "events_cancelled": self.events_cancelled,
             "events_per_second": self.events_per_second,
             "wall_clock_seconds": self.wall_clock_seconds,
-            "entities": {
-                name: es.to_dict() for name, es in self.entities.items()
-            },
+            "entities": {name: es.to_dict() for name, es in self.entities.items()},
         }

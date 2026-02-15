@@ -17,21 +17,21 @@ Example:
             return mutex.release()
 """
 
-from happysimulator.components.sync.mutex import Mutex, MutexStats
-from happysimulator.components.sync.semaphore import Semaphore, SemaphoreStats
-from happysimulator.components.sync.rwlock import RWLock, RWLockStats
-from happysimulator.components.sync.condition import Condition, ConditionStats
 from happysimulator.components.sync.barrier import Barrier, BarrierStats
+from happysimulator.components.sync.condition import Condition, ConditionStats
+from happysimulator.components.sync.mutex import Mutex, MutexStats
+from happysimulator.components.sync.rwlock import RWLock, RWLockStats
+from happysimulator.components.sync.semaphore import Semaphore, SemaphoreStats
 
 __all__ = [
-    "Mutex",
-    "MutexStats",
-    "Semaphore",
-    "SemaphoreStats",
-    "RWLock",
-    "RWLockStats",
-    "Condition",
-    "ConditionStats",
     "Barrier",
     "BarrierStats",
+    "Condition",
+    "ConditionStats",
+    "Mutex",
+    "MutexStats",
+    "RWLock",
+    "RWLockStats",
+    "Semaphore",
+    "SemaphoreStats",
 ]

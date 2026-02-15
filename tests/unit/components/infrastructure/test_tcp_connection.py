@@ -1,15 +1,15 @@
 """Unit tests for TCPConnection."""
 
-import pytest
 import random
 
+import pytest
+
 from happysimulator.components.infrastructure.tcp_connection import (
+    AIMD,
+    BBR,
+    Cubic,
     TCPConnection,
     TCPStats,
-    CongestionControl,
-    AIMD,
-    Cubic,
-    BBR,
 )
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -85,7 +85,7 @@ class TestTCPConnection:
         assert tcp.cwnd == 10.0
 
     def test_stats_initial(self):
-        tcp, sim = self._make_tcp()
+        tcp, _sim = self._make_tcp()
         stats = tcp.stats
         assert isinstance(stats, TCPStats)
         assert stats.segments_sent == 0
@@ -94,16 +94,16 @@ class TestTCPConnection:
         assert stats.algorithm == "AIMD"
 
     def test_rtt_positive(self):
-        tcp, sim = self._make_tcp(base_rtt_s=0.05)
+        tcp, _sim = self._make_tcp(base_rtt_s=0.05)
         assert tcp.rtt_s >= 0.05
 
     def test_throughput(self):
-        tcp, sim = self._make_tcp()
+        tcp, _sim = self._make_tcp()
         assert tcp.throughput_segments_per_s > 0
 
     def test_send_small_data(self):
         random.seed(42)
-        tcp, sim = self._make_tcp(loss_rate=0.0)
+        tcp, _sim = self._make_tcp(loss_rate=0.0)
         gen = tcp.send(1460)  # 1 segment
 
         values = []
@@ -119,7 +119,7 @@ class TestTCPConnection:
 
     def test_send_multi_segment(self):
         random.seed(42)
-        tcp, sim = self._make_tcp(loss_rate=0.0)
+        tcp, _sim = self._make_tcp(loss_rate=0.0)
         gen = tcp.send(14600)  # 10 segments
 
         values = []
@@ -133,7 +133,7 @@ class TestTCPConnection:
 
     def test_cwnd_grows_without_loss(self):
         random.seed(42)
-        tcp, sim = self._make_tcp(loss_rate=0.0)
+        tcp, _sim = self._make_tcp(loss_rate=0.0)
         initial_cwnd = tcp.cwnd
 
         gen = tcp.send(146000)  # many segments
@@ -147,7 +147,7 @@ class TestTCPConnection:
 
     def test_loss_causes_retransmissions(self):
         random.seed(42)
-        tcp, sim = self._make_tcp(loss_rate=0.1)  # 10% loss
+        tcp, _sim = self._make_tcp(loss_rate=0.1)  # 10% loss
 
         gen = tcp.send(146000)
         try:
@@ -159,16 +159,17 @@ class TestTCPConnection:
         assert tcp.stats.retransmissions > 0
 
     def test_cubic_algorithm(self):
-        tcp, sim = self._make_tcp(congestion_control=Cubic())
+        tcp, _sim = self._make_tcp(congestion_control=Cubic())
         assert tcp.stats.algorithm == "Cubic"
 
     def test_bbr_algorithm(self):
-        tcp, sim = self._make_tcp(congestion_control=BBR())
+        tcp, _sim = self._make_tcp(congestion_control=BBR())
         assert tcp.stats.algorithm == "BBR"
 
     def test_handle_event_is_noop(self):
-        tcp, sim = self._make_tcp()
+        tcp, _sim = self._make_tcp()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",
@@ -178,6 +179,6 @@ class TestTCPConnection:
         assert result is None
 
     def test_repr(self):
-        tcp, sim = self._make_tcp()
+        tcp, _sim = self._make_tcp()
         assert "test_tcp" in repr(tcp)
         assert "AIMD" in repr(tcp)

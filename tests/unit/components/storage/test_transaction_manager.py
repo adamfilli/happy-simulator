@@ -1,15 +1,13 @@
 """Unit tests for TransactionManager."""
 
-import pytest
-
-from happysimulator.components.storage.transaction_manager import (
-    TransactionManager,
-    StorageTransaction,
-    TransactionStats,
-    IsolationLevel,
-)
-from happysimulator.components.storage.lsm_tree import LSMTree
 from happysimulator.components.storage.btree import BTree
+from happysimulator.components.storage.lsm_tree import LSMTree
+from happysimulator.components.storage.transaction_manager import (
+    IsolationLevel,
+    StorageTransaction,
+    TransactionManager,
+    TransactionStats,
+)
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 
@@ -27,7 +25,7 @@ class TestTransactionManager:
         return tm, sim
 
     def test_begin_sync(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         tx = tm.begin_sync()
         assert isinstance(tx, StorageTransaction)
         assert tx.is_active
@@ -36,7 +34,7 @@ class TestTransactionManager:
     def test_read_write_commit_sync(self):
         store = LSMTree("store")
         store.put_sync("existing", "value")
-        tm, sim = self._make_tm(store=store)
+        tm, _sim = self._make_tm(store=store)
 
         tx = tm.begin_sync()
         # Read existing key
@@ -51,7 +49,7 @@ class TestTransactionManager:
         assert "new_key" in tx._write_set
 
     def test_abort(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         tx = tm.begin_sync()
         tx._write_set["key"] = "value"
         tx.abort()
@@ -60,7 +58,7 @@ class TestTransactionManager:
         assert tm.stats.transactions_aborted == 1
 
     def test_abort_idempotent(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         tx = tm.begin_sync()
         tx.abort()
         tx.abort()  # should be no-op
@@ -69,7 +67,7 @@ class TestTransactionManager:
     def test_snapshot_isolation_no_conflict(self):
         """Two transactions writing different keys should both commit."""
         store = LSMTree("store")
-        tm, sim = self._make_tm(
+        tm, _sim = self._make_tm(
             store=store,
             isolation=IsolationLevel.SNAPSHOT_ISOLATION,
         )
@@ -86,13 +84,16 @@ class TestTransactionManager:
 
         # Record tx1 commit
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
         tm._version += 1
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(["key_a"]),
-            keys_read=frozenset(),
-        ))
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(["key_a"]),
+                keys_read=frozenset(),
+            )
+        )
 
         # Check tx2 — different keys, no conflict
         has_conflict = tm._check_conflict(tx2)
@@ -101,7 +102,7 @@ class TestTransactionManager:
     def test_snapshot_isolation_write_write_conflict(self):
         """Two transactions writing the same key — second should conflict."""
         store = LSMTree("store")
-        tm, sim = self._make_tm(
+        tm, _sim = self._make_tm(
             store=store,
             isolation=IsolationLevel.SNAPSHOT_ISOLATION,
         )
@@ -115,13 +116,16 @@ class TestTransactionManager:
         # Commit tx1
         assert not tm._check_conflict(tx1)
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
         tm._version += 1
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(["key"]),
-            keys_read=frozenset(),
-        ))
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(["key"]),
+                keys_read=frozenset(),
+            )
+        )
 
         # tx2 should have write-write conflict
         assert tm._check_conflict(tx2)
@@ -129,7 +133,7 @@ class TestTransactionManager:
     def test_serializable_read_write_conflict(self):
         """Serializable: tx1 reads key, tx2 writes same key — tx2 conflicts."""
         store = LSMTree("store")
-        tm, sim = self._make_tm(
+        tm, _sim = self._make_tm(
             store=store,
             isolation=IsolationLevel.SERIALIZABLE,
         )
@@ -142,13 +146,16 @@ class TestTransactionManager:
 
         # Commit tx1 (reads key)
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
         tm._version += 1
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(),
-            keys_read=frozenset(["key"]),
-        ))
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(),
+                keys_read=frozenset(["key"]),
+            )
+        )
 
         # tx2 writes key that tx1 read — conflict under serializable
         assert tm._check_conflict(tx2)
@@ -156,7 +163,7 @@ class TestTransactionManager:
     def test_read_committed_no_conflicts(self):
         """READ_COMMITTED never detects conflicts."""
         store = LSMTree("store")
-        tm, sim = self._make_tm(
+        tm, _sim = self._make_tm(
             store=store,
             isolation=IsolationLevel.READ_COMMITTED,
         )
@@ -169,19 +176,22 @@ class TestTransactionManager:
 
         # Commit tx1
         from happysimulator.components.storage.transaction_manager import _CommitLogEntry
+
         tm._version += 1
-        tm._commit_log.append(_CommitLogEntry(
-            tx_id=tx1.tx_id,
-            version=tm._version,
-            keys_written=frozenset(["key"]),
-            keys_read=frozenset(),
-        ))
+        tm._commit_log.append(
+            _CommitLogEntry(
+                tx_id=tx1.tx_id,
+                version=tm._version,
+                keys_written=frozenset(["key"]),
+                keys_read=frozenset(),
+            )
+        )
 
         # tx2 should NOT conflict under READ_COMMITTED
         assert not tm._check_conflict(tx2)
 
     def test_stats(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         tx = tm.begin_sync()
         tx.abort()
 
@@ -194,17 +204,18 @@ class TestTransactionManager:
     def test_with_btree_store(self):
         """TransactionManager works with BTree as well."""
         store = BTree("btree_store")
-        tm, sim = self._make_tm(store=store)
+        tm, _sim = self._make_tm(store=store)
         tx = tm.begin_sync()
         assert tx.is_active
 
     def test_repr(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         assert "test_tm" in repr(tm)
 
     def test_handle_event_is_noop(self):
-        tm, sim = self._make_tm()
+        tm, _sim = self._make_tm()
         from happysimulator.core.event import Event
+
         event = Event(
             time=Instant.from_seconds(1),
             event_type="Test",
@@ -216,7 +227,7 @@ class TestTransactionManager:
     def test_multiple_transactions_sequential(self):
         """Multiple transactions committed sequentially."""
         store = LSMTree("store")
-        tm, sim = self._make_tm(store=store)
+        tm, _sim = self._make_tm(store=store)
 
         for i in range(5):
             tx = tm.begin_sync()
@@ -225,12 +236,15 @@ class TestTransactionManager:
             store.put_sync(f"key_{i}", f"val_{i}")
             tm._version += 1
             from happysimulator.components.storage.transaction_manager import _CommitLogEntry
-            tm._commit_log.append(_CommitLogEntry(
-                tx_id=tx.tx_id,
-                version=tm._version,
-                keys_written=frozenset([f"key_{i}"]),
-                keys_read=frozenset(),
-            ))
+
+            tm._commit_log.append(
+                _CommitLogEntry(
+                    tx_id=tx.tx_id,
+                    version=tm._version,
+                    keys_written=frozenset([f"key_{i}"]),
+                    keys_read=frozenset(),
+                )
+            )
             tx._committed = True
             tm._total_committed += 1
             tm._active_txns.pop(tx.tx_id, None)

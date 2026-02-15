@@ -28,12 +28,12 @@ Example:
     )
 """
 
+from happysimulator.components.sketching.quantile_estimator import QuantileEstimator
 from happysimulator.components.sketching.sketch_collector import SketchCollector
 from happysimulator.components.sketching.topk_collector import TopKCollector
-from happysimulator.components.sketching.quantile_estimator import QuantileEstimator
 
 __all__ = [
+    "QuantileEstimator",
     "SketchCollector",
     "TopKCollector",
-    "QuantileEstimator",
 ]

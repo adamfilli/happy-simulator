@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -134,7 +133,9 @@ class InventoryBuffer(Entity):
             self._stockouts += 1
             logger.debug(
                 "[%s] Stockout: requested %d, have %d",
-                self.name, amount, self._stock,
+                self.name,
+                amount,
+                self._stock,
             )
             if self.stockout_target is not None:
                 results.append(
@@ -161,7 +162,9 @@ class InventoryBuffer(Entity):
             )
             logger.debug(
                 "[%s] Reorder #%d placed: Q=%d, arriving at t=%.2f",
-                self.name, self._reorders, self.order_quantity,
+                self.name,
+                self._reorders,
+                self.order_quantity,
                 now_s + self.lead_time,
             )
 
@@ -174,6 +177,8 @@ class InventoryBuffer(Entity):
         self._order_pending = False
         logger.debug(
             "[%s] Replenished %d units, stock now %d",
-            self.name, quantity, self._stock,
+            self.name,
+            quantity,
+            self._stock,
         )
         return []

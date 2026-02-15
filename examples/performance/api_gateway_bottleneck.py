@@ -23,9 +23,9 @@ and rejection rates across routes.
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -40,6 +40,8 @@ from happysimulator import (
 )
 from happysimulator.components.microservice import APIGateway, RouteConfig
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Components
@@ -54,7 +56,7 @@ class BackendService(Entity):
         self.latency = latency
         self.requests_received = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         self.requests_received += 1
         yield self.latency
 
@@ -77,12 +79,14 @@ class MixedTrafficProvider(EventProvider):
         if self._stop_after and time > self._stop_after:
             return []
         route = random.choices(self._routes, weights=self._weights, k=1)[0]
-        return [Event(
-            time=time,
-            event_type="request",
-            target=self._target,
-            context={"metadata": {"route": route}},
-        )]
+        return [
+            Event(
+                time=time,
+                event_type="request",
+                target=self._target,
+                context={"metadata": {"route": route}},
+            )
+        ]
 
 
 # =============================================================================
@@ -114,9 +118,9 @@ def run_gateway_simulation(
 
     if route_weights is None:
         route_weights = {
-            "/api/search": 0.6,   # Hot route: 60% of traffic
-            "/api/users": 0.3,    # Moderate: 30%
-            "/api/health": 0.1,   # Light: 10%
+            "/api/search": 0.6,  # Hot route: 60% of traffic
+            "/api/users": 0.3,  # Moderate: 30%
+            "/api/health": 0.1,  # Light: 10%
         }
 
     # Create backends
@@ -137,7 +141,8 @@ def run_gateway_simulation(
                 name="search",
                 backends=search_backends,
                 rate_limit_policy=TokenBucketPolicy(
-                    capacity=search_rate_limit, refill_rate=search_rate_limit,
+                    capacity=search_rate_limit,
+                    refill_rate=search_rate_limit,
                 ),
                 auth_required=False,
             ),
@@ -145,7 +150,8 @@ def run_gateway_simulation(
                 name="users",
                 backends=user_backends,
                 rate_limit_policy=TokenBucketPolicy(
-                    capacity=users_rate_limit, refill_rate=users_rate_limit,
+                    capacity=users_rate_limit,
+                    refill_rate=users_rate_limit,
                 ),
                 auth_required=False,
             ),
@@ -195,14 +201,16 @@ def print_summary(result: SimulationResult) -> None:
     print("API GATEWAY BOTTLENECK — RESULTS")
     print("=" * 70)
 
-    print(f"\nOverall:")
+    print("\nOverall:")
     print(f"  Total requests:        {s.total_requests}")
     print(f"  Routed:                {s.requests_routed}")
     print(f"  Rate limited:          {s.requests_rejected_rate_limit}")
     print(f"  No route:              {s.requests_no_route}")
 
-    print(f"\nPer-Route Breakdown:")
-    print(f"  {'Route':>15s}  {'Received':>9s}  {'Routed':>7s}  {'Limited':>8s}  {'Backend Reqs':>13s}")
+    print("\nPer-Route Breakdown:")
+    print(
+        f"  {'Route':>15s}  {'Received':>9s}  {'Routed':>7s}  {'Limited':>8s}  {'Backend Reqs':>13s}"
+    )
     print("  " + "-" * 60)
 
     for route in result.routes:
@@ -219,8 +227,8 @@ def print_summary(result: SimulationResult) -> None:
         overall_rate_limited = s.requests_rejected_rate_limit / s.total_requests * 100
         print(f"\nOverall rate limited: {overall_rate_limited:.1f}%")
 
-    print(f"\nBackend Load Distribution:")
-    for route, backends in result.backends.items():
+    print("\nBackend Load Distribution:")
+    for backends in result.backends.values():
         for b in backends:
             print(f"  {b.name:>15s}: {b.requests_received} requests")
 
@@ -230,6 +238,7 @@ def print_summary(result: SimulationResult) -> None:
 def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     """Generate gateway visualization."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -258,9 +267,9 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 
     # Rate limited breakdown
     ax = axes[1]
-    limited = [r - rt for r, rt in zip(received, routed)]
+    limited = [r - rt for r, rt in zip(received, routed, strict=False)]
     colors = ["#e74c3c", "#f39c12", "#2ecc71"]
-    ax.bar(short_names, limited, color=colors[:len(routes)], edgecolor="black", alpha=0.8)
+    ax.bar(short_names, limited, color=colors[: len(routes)], edgecolor="black", alpha=0.8)
     ax.set_ylabel("Requests Rate Limited")
     ax.set_title("Rate Limited Requests per Route")
     ax.grid(True, alpha=0.3, axis="y")

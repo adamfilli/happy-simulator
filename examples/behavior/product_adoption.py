@@ -10,19 +10,17 @@ Usage:
 
 import random
 
-from happysimulator import Simulation, Instant, Event, Source
-from happysimulator.components.behavior.agent import Agent
-from happysimulator.components.behavior.traits import NormalTraitDistribution
-from happysimulator.components.behavior.decision import Choice, UtilityModel
+from happysimulator import Event, Instant, Simulation
+from happysimulator.components.behavior.decision import UtilityModel
 from happysimulator.components.behavior.environment import Environment
 from happysimulator.components.behavior.population import DemographicSegment, Population
-from happysimulator.components.behavior.stimulus import broadcast_stimulus, price_change
-from happysimulator.load import ConstantArrivalTimeProvider, EventProvider
-
+from happysimulator.components.behavior.stimulus import price_change
+from happysimulator.components.behavior.traits import NormalTraitDistribution
 
 # ---------------------------------------------------------------------------
 # Decision models
 # ---------------------------------------------------------------------------
+
 
 def innovator_utility(choice, ctx):
     """Innovators value novelty — high openness boosts buy utility."""
@@ -48,23 +46,36 @@ def majority_utility(choice, ctx):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     random.seed(42)
 
     # Define population segments
     innovator_traits = NormalTraitDistribution(
-        means={"openness": 0.85, "conscientiousness": 0.5,
-               "extraversion": 0.7, "agreeableness": 0.5,
-               "neuroticism": 0.3},
-        stds={"openness": 0.1, "conscientiousness": 0.15,
-              "extraversion": 0.15, "agreeableness": 0.15,
-              "neuroticism": 0.15},
+        means={
+            "openness": 0.85,
+            "conscientiousness": 0.5,
+            "extraversion": 0.7,
+            "agreeableness": 0.5,
+            "neuroticism": 0.3,
+        },
+        stds={
+            "openness": 0.1,
+            "conscientiousness": 0.15,
+            "extraversion": 0.15,
+            "agreeableness": 0.15,
+            "neuroticism": 0.15,
+        },
     )
 
     majority_traits = NormalTraitDistribution(
-        means={"openness": 0.4, "conscientiousness": 0.55,
-               "extraversion": 0.5, "agreeableness": 0.6,
-               "neuroticism": 0.45},
+        means={
+            "openness": 0.4,
+            "conscientiousness": 0.55,
+            "extraversion": 0.5,
+            "agreeableness": 0.6,
+            "neuroticism": 0.45,
+        },
     )
 
     segments = [
@@ -95,10 +106,12 @@ def main():
     adoption_log: list[tuple[float, str, str]] = []
 
     for agent in pop.agents:
+
         def make_handler(ag_name):
             def handler(ag, choice, event):
                 adoption_log.append((ag.now.to_seconds(), ag_name, choice.action))
-                return None
+                return
+
             return handler
 
         agent.on_action("buy", make_handler(agent.name))
@@ -117,7 +130,7 @@ def main():
     sim = Simulation(
         start_time=Instant.Epoch,
         end_time=end_time,
-        entities=[env] + pop.agents,
+        entities=[env, *pop.agents],
     )
 
     # Schedule stimuli: periodic price drops and influence rounds
@@ -125,12 +138,14 @@ def main():
         sim.schedule(price_change(t, env, "GadgetX", 100.0, 100.0 - t * 2))
 
     for t in range(1, 20):
-        sim.schedule(Event(
-            time=Instant.from_seconds(float(t)),
-            event_type="InfluencePropagation",
-            target=env,
-            context={"metadata": {"topic": "product_sentiment"}},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(float(t)),
+                event_type="InfluencePropagation",
+                target=env,
+                context={"metadata": {"topic": "product_sentiment"}},
+            )
+        )
 
     # Run
     summary = sim.run()
@@ -147,16 +162,18 @@ def main():
     # Adoption stats
     innovator_count = int(0.15 * 100)
     innovator_buys = sum(
-        pop.agents[i].stats.actions_by_type.get("buy", 0)
-        for i in range(innovator_count)
+        pop.agents[i].stats.actions_by_type.get("buy", 0) for i in range(innovator_count)
     )
     majority_buys = sum(
-        pop.agents[i].stats.actions_by_type.get("buy", 0)
-        for i in range(innovator_count, 100)
+        pop.agents[i].stats.actions_by_type.get("buy", 0) for i in range(innovator_count, 100)
     )
 
-    print(f"Innovator buys: {innovator_buys} ({innovator_buys / max(1, innovator_count):.1f} per capita)")
-    print(f"Majority buys:  {majority_buys} ({majority_buys / max(1, 100 - innovator_count):.1f} per capita)")
+    print(
+        f"Innovator buys: {innovator_buys} ({innovator_buys / max(1, innovator_count):.1f} per capita)"
+    )
+    print(
+        f"Majority buys:  {majority_buys} ({majority_buys / max(1, 100 - innovator_count):.1f} per capita)"
+    )
     print()
 
     # Timeline

@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import random
 
-from happysimulator.components.industrial.conveyor import ConveyorBelt
-from happysimulator.components.industrial.inspection import InspectionStation
+from happysimulator.components.common import Sink
 from happysimulator.components.industrial.batch_processor import BatchProcessor
 from happysimulator.components.industrial.breakdown import BreakdownScheduler
-from happysimulator.components.common import Sink
-from happysimulator.core.event import Event
+from happysimulator.components.industrial.conveyor import ConveyorBelt
+from happysimulator.components.industrial.inspection import InspectionStation
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
@@ -29,8 +28,11 @@ class TestProductionLineWithInspection:
         fail_sink = Sink("fail")
 
         station = InspectionStation(
-            "inspect", pass_sink, fail_sink,
-            pass_rate=0.8, inspection_time=0.01,
+            "inspect",
+            pass_sink,
+            fail_sink,
+            pass_rate=0.8,
+            inspection_time=0.01,
         )
         belt = ConveyorBelt("belt", downstream=station, transit_time=0.1)
 
@@ -56,8 +58,11 @@ class TestProductionLineWithInspection:
         fail_sink = Sink("fail")
 
         station = InspectionStation(
-            "inspect", pass_sink, fail_sink,
-            pass_rate=1.0, inspection_time=0.01,
+            "inspect",
+            pass_sink,
+            fail_sink,
+            pass_rate=1.0,
+            inspection_time=0.01,
         )
         belt = ConveyorBelt("belt", downstream=station, transit_time=0.05)
 
@@ -84,12 +89,17 @@ class TestMultiStageWithBatchProcessing:
         fail_sink = Sink("reject")
 
         batch = BatchProcessor(
-            "batch", downstream=sink,
-            batch_size=5, process_time=0.05,
+            "batch",
+            downstream=sink,
+            batch_size=5,
+            process_time=0.05,
         )
         station = InspectionStation(
-            "inspect", batch, fail_sink,
-            pass_rate=1.0, inspection_time=0.01,
+            "inspect",
+            batch,
+            fail_sink,
+            pass_rate=1.0,
+            inspection_time=0.01,
         )
         belt = ConveyorBelt("belt", downstream=station, transit_time=0.05)
 
@@ -113,12 +123,18 @@ class TestMultiStageWithBatchProcessing:
         fail_sink = Sink("reject")
 
         batch = BatchProcessor(
-            "batch", downstream=sink,
-            batch_size=100, process_time=0.01, timeout_s=1.0,
+            "batch",
+            downstream=sink,
+            batch_size=100,
+            process_time=0.01,
+            timeout_s=1.0,
         )
         station = InspectionStation(
-            "inspect", batch, fail_sink,
-            pass_rate=1.0, inspection_time=0.01,
+            "inspect",
+            batch,
+            fail_sink,
+            pass_rate=1.0,
+            inspection_time=0.01,
         )
         belt = ConveyorBelt("belt", downstream=station, transit_time=0.05)
 
@@ -150,11 +166,15 @@ class TestProductionLineWithBreakdowns:
         fail_sink = Sink("fail")
 
         station = InspectionStation(
-            "inspect", pass_sink, fail_sink,
-            pass_rate=1.0, inspection_time=0.01,
+            "inspect",
+            pass_sink,
+            fail_sink,
+            pass_rate=1.0,
+            inspection_time=0.01,
         )
         breakdown = BreakdownScheduler(
-            "bd", target=station,
+            "bd",
+            target=station,
             mean_time_to_failure=5.0,
             mean_repair_time=2.0,
         )

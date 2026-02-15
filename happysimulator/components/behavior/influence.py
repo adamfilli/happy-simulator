@@ -8,10 +8,12 @@ and Voter Model (random adoption).
 from __future__ import annotations
 
 import logging
-import random
 
 logger = logging.getLogger(__name__)
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    import random
 
 
 @runtime_checkable
@@ -68,7 +70,7 @@ class DeGrootModel:
 
         # Normalize influencer weights to sum to (1 - self_weight)
         other_weight = 1.0 - self.self_weight
-        weighted_sum = sum(o * w for o, w in zip(influencer_opinions, weights))
+        weighted_sum = sum(o * w for o, w in zip(influencer_opinions, weights, strict=False))
         neighbor_avg = weighted_sum / total_w
 
         return self.self_weight * current + other_weight * neighbor_avg
@@ -102,7 +104,7 @@ class BoundedConfidenceModel:
         # Filter to opinions within epsilon
         close_opinions: list[float] = []
         close_weights: list[float] = []
-        for opinion, w in zip(influencer_opinions, weights):
+        for opinion, w in zip(influencer_opinions, weights, strict=False):
             if abs(opinion - current) <= self.epsilon:
                 close_opinions.append(opinion)
                 close_weights.append(w)
@@ -115,7 +117,7 @@ class BoundedConfidenceModel:
             return current
 
         other_weight = 1.0 - self.self_weight
-        weighted_sum = sum(o * w for o, w in zip(close_opinions, close_weights))
+        weighted_sum = sum(o * w for o, w in zip(close_opinions, close_weights, strict=False))
         neighbor_avg = weighted_sum / total_w
 
         return self.self_weight * current + other_weight * neighbor_avg

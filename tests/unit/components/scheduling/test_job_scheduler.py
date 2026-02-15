@@ -2,17 +2,14 @@
 
 import pytest
 
-from happysimulator.core.clock import Clock
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
-
 from happysimulator.components.scheduling.job_scheduler import (
     JobDefinition,
     JobScheduler,
-    JobSchedulerStats,
-    JobState,
 )
+from happysimulator.core.clock import Clock
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 
 
 class DummyTarget(Entity):
@@ -24,7 +21,7 @@ class DummyTarget(Entity):
 
     def handle_event(self, event):
         self.received.append(event)
-        return None
+        return
 
 
 def make_scheduler(tick_interval: float = 1.0, time: float = 0.0) -> tuple[JobScheduler, Clock]:
@@ -112,15 +109,22 @@ class TestTickExecution:
         scheduler, clock = make_scheduler()
         target = DummyTarget()
         target.set_clock(clock)
-        scheduler.add_job(JobDefinition(
-            name="j1", target=target, event_type="Run", interval=5.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="j1",
+                target=target,
+                event_type="Run",
+                interval=5.0,
+            )
+        )
         scheduler._is_running = True
 
         # First tick: job never run, should fire
         tick_event = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick_event)
 
@@ -134,8 +138,10 @@ class TestTickExecution:
     def test_tick_not_running_returns_empty(self):
         scheduler, _ = make_scheduler()
         tick_event = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick_event)
         assert result == []
@@ -149,8 +155,10 @@ class TestTickExecution:
         scheduler._is_running = True
 
         tick_event = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick_event)
 
@@ -161,15 +169,22 @@ class TestTickExecution:
         scheduler, clock = make_scheduler()
         target = DummyTarget()
         target.set_clock(clock)
-        scheduler.add_job(JobDefinition(
-            name="j1", target=target, event_type="Run", interval=5.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="j1",
+                target=target,
+                event_type="Run",
+                interval=5.0,
+            )
+        )
         scheduler._is_running = True
 
         # First tick triggers the job
         tick1 = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         scheduler.handle_event(tick1)
         assert scheduler.stats.jobs_triggered == 1
@@ -187,8 +202,10 @@ class TestTickExecution:
         # Second tick at t=1s: job interval is 5s, not yet due
         clock._current_time = Instant.from_seconds(1.0)
         tick2 = Event(
-            time=Instant.from_seconds(1.0), event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.from_seconds(1.0),
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick2)
         job_events = [e for e in result if e.event_type == "Run"]
@@ -200,23 +217,32 @@ class TestTickExecution:
         scheduler, clock = make_scheduler()
         target = DummyTarget()
         target.set_clock(clock)
-        scheduler.add_job(JobDefinition(
-            name="j1", target=target, event_type="Run", interval=5.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="j1",
+                target=target,
+                event_type="Run",
+                interval=5.0,
+            )
+        )
         scheduler._is_running = True
 
         # Trigger the job at t=0
         tick1 = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         scheduler.handle_event(tick1)
 
         # At t=6s the job is due again but still running (no completion)
         clock._current_time = Instant.from_seconds(6.0)
         tick2 = Event(
-            time=Instant.from_seconds(6.0), event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.from_seconds(6.0),
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick2)
         job_events = [e for e in result if e.event_type == "Run"]
@@ -232,17 +258,31 @@ class TestPriorityOrdering:
         t1.set_clock(clock)
         t2.set_clock(clock)
 
-        scheduler.add_job(JobDefinition(
-            name="low", target=t1, event_type="RunLow", interval=5.0, priority=1,
-        ))
-        scheduler.add_job(JobDefinition(
-            name="high", target=t2, event_type="RunHigh", interval=5.0, priority=10,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="low",
+                target=t1,
+                event_type="RunLow",
+                interval=5.0,
+                priority=1,
+            )
+        )
+        scheduler.add_job(
+            JobDefinition(
+                name="high",
+                target=t2,
+                event_type="RunHigh",
+                interval=5.0,
+                priority=10,
+            )
+        )
         scheduler._is_running = True
 
         tick_event = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick_event)
         job_events = [e for e in result if e.event_type in ("RunLow", "RunHigh")]
@@ -261,19 +301,31 @@ class TestDAGDependencies:
         t1.set_clock(clock)
         t2.set_clock(clock)
 
-        scheduler.add_job(JobDefinition(
-            name="extract", target=t1, event_type="Extract", interval=10.0,
-        ))
-        scheduler.add_job(JobDefinition(
-            name="transform", target=t2, event_type="Transform",
-            interval=10.0, depends_on=["extract"],
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="extract",
+                target=t1,
+                event_type="Extract",
+                interval=10.0,
+            )
+        )
+        scheduler.add_job(
+            JobDefinition(
+                name="transform",
+                target=t2,
+                event_type="Transform",
+                interval=10.0,
+                depends_on=["extract"],
+            )
+        )
         scheduler._is_running = True
 
         # Tick: extract fires, transform blocked (extract hasn't completed)
         tick1 = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick1)
         job_types = [e.event_type for e in result if e.event_type in ("Extract", "Transform")]
@@ -288,19 +340,31 @@ class TestDAGDependencies:
         t1.set_clock(clock)
         t2.set_clock(clock)
 
-        scheduler.add_job(JobDefinition(
-            name="extract", target=t1, event_type="Extract", interval=10.0,
-        ))
-        scheduler.add_job(JobDefinition(
-            name="transform", target=t2, event_type="Transform",
-            interval=10.0, depends_on=["extract"],
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="extract",
+                target=t1,
+                event_type="Extract",
+                interval=10.0,
+            )
+        )
+        scheduler.add_job(
+            JobDefinition(
+                name="transform",
+                target=t2,
+                event_type="Transform",
+                interval=10.0,
+                depends_on=["extract"],
+            )
+        )
         scheduler._is_running = True
 
         # First tick: trigger extract (transform blocked by deps)
         tick1 = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         scheduler.handle_event(tick1)
 
@@ -318,8 +382,10 @@ class TestDAGDependencies:
         # and extract completed after transform's last_run_time (None) → deps satisfied
         clock._current_time = Instant.from_seconds(2.0)
         tick2 = Event(
-            time=Instant.from_seconds(2.0), event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.from_seconds(2.0),
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick2)
         job_types = [e.event_type for e in result if e.event_type in ("Extract", "Transform")]
@@ -332,15 +398,22 @@ class TestCompletionHooks:
         scheduler, clock = make_scheduler()
         target = DummyTarget()
         target.set_clock(clock)
-        scheduler.add_job(JobDefinition(
-            name="j1", target=target, event_type="Run", interval=5.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="j1",
+                target=target,
+                event_type="Run",
+                interval=5.0,
+            )
+        )
         scheduler._is_running = True
 
         # Trigger job
         tick = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         scheduler.handle_event(tick)
         state = scheduler.get_job_state("j1")
@@ -364,14 +437,21 @@ class TestCompletionHooks:
         scheduler, clock = make_scheduler()
         target = DummyTarget()
         target.set_clock(clock)
-        scheduler.add_job(JobDefinition(
-            name="j1", target=target, event_type="Run", interval=5.0,
-        ))
+        scheduler.add_job(
+            JobDefinition(
+                name="j1",
+                target=target,
+                event_type="Run",
+                interval=5.0,
+            )
+        )
         scheduler._is_running = True
 
         tick = Event(
-            time=Instant.Epoch, event_type="_scheduler_tick",
-            target=scheduler, context={},
+            time=Instant.Epoch,
+            event_type="_scheduler_tick",
+            target=scheduler,
+            context={},
         )
         result = scheduler.handle_event(tick)
         job_events = [e for e in result if e.event_type == "Run"]

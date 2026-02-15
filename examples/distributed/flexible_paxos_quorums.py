@@ -37,19 +37,16 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
-from happysimulator.core.event import Event
-from happysimulator.components.network.network import Network
-from happysimulator.components.network.conditions import datacenter_network
 from happysimulator.components.consensus.flexible_paxos import (
     FlexiblePaxosNode,
-    FlexiblePaxosStats,
 )
 from happysimulator.components.consensus.raft_state_machine import KVStateMachine
-
+from happysimulator.components.network.conditions import datacenter_network
+from happysimulator.components.network.network import Network
+from happysimulator.core.event import Event
+from happysimulator.core.simulation import Simulation
+from happysimulator.core.temporal import Instant
 
 # =============================================================================
 # Simulation Result
@@ -59,6 +56,7 @@ from happysimulator.components.consensus.raft_state_machine import KVStateMachin
 @dataclass
 class ClusterResult:
     """Result for a single Flexible Paxos cluster."""
+
     label: str
     nodes: list[FlexiblePaxosNode]
     state_machines: dict[str, KVStateMachine]
@@ -71,6 +69,7 @@ class ClusterResult:
 @dataclass
 class SimulationResult:
     """Results from the Flexible Paxos quorum comparison."""
+
     standard: ClusterResult
     fast_writes: ClusterResult
     duration_s: float
@@ -128,10 +127,8 @@ def _run_cluster(
         node.set_peers(nodes)
 
     for i, a in enumerate(nodes):
-        for b in nodes[i + 1:]:
-            network.add_bidirectional_link(
-                a, b, datacenter_network(f"link-{a.name}-{b.name}")
-            )
+        for b in nodes[i + 1 :]:
+            network.add_bidirectional_link(a, b, datacenter_network(f"link-{a.name}-{b.name}"))
 
     # Start node-1 as the initial leader candidate
     def start_leader(event: Event):
@@ -169,6 +166,7 @@ def _run_cluster(
                     # Trigger replication of the newly assigned slot
                     slot = ld.log.last_index
                     return ld._replicate_slot(slot)
+
                 return fn
 
             evt = Event.once(
@@ -188,7 +186,7 @@ def _run_cluster(
     sim = Simulation(
         start_time=Instant.Epoch,
         duration=duration_s,
-        entities=[network] + nodes,
+        entities=[network, *nodes],
     )
     sim.schedule(start_evt)
     sim.schedule(submit_trigger)
@@ -263,19 +261,22 @@ def _print_cluster_summary(cluster: ClusterResult) -> None:
     """Print summary for a single cluster configuration."""
     print(f"\n  Configuration: {cluster.label}")
     print(f"  Quorums: Q1={cluster.phase1_quorum}, Q2={cluster.phase2_quorum} (N=5)")
-    print(f"  Constraint: {cluster.phase1_quorum} + {cluster.phase2_quorum} = "
-          f"{cluster.phase1_quorum + cluster.phase2_quorum} > 5")
+    print(
+        f"  Constraint: {cluster.phase1_quorum} + {cluster.phase2_quorum} = "
+        f"{cluster.phase1_quorum + cluster.phase2_quorum} > 5"
+    )
     print(f"  Commands submitted: {cluster.commands_submitted}")
 
-    print(f"\n  {'Node':<20} {'Leader':<8} {'Ballot':<8} {'Log Len':<9} "
-          f"{'Committed':<11}")
+    print(f"\n  {'Node':<20} {'Leader':<8} {'Ballot':<8} {'Log Len':<9} {'Committed':<11}")
     print(f"  {'-' * 56}")
 
     for node in cluster.nodes:
         s = node.stats
         leader_str = "YES" if s.is_leader else "no"
-        print(f"  {node.name:<20} {leader_str:<8} {s.current_ballot:<8} "
-              f"{s.log_length:<9} {s.commands_committed:<11}")
+        print(
+            f"  {node.name:<20} {leader_str:<8} {s.current_ballot:<8} "
+            f"{s.log_length:<9} {s.commands_committed:<11}"
+        )
 
     total_committed = sum(n.stats.commands_committed for n in cluster.nodes)
     print(f"\n  Total committed (all nodes): {total_committed}")
@@ -300,17 +301,23 @@ def print_summary(result: SimulationResult) -> None:
     print(f"\n  {'Comparison':-^56}")
     print(f"  {'Metric':<30} {'Standard':<14} {'Fast-Write':<14}")
     print(f"  {'-' * 56}")
-    print(f"  {'Phase 1 Quorum (Q1)':<30} {result.standard.phase1_quorum:<14} "
-          f"{result.fast_writes.phase1_quorum:<14}")
-    print(f"  {'Phase 2 Quorum (Q2)':<30} {result.standard.phase2_quorum:<14} "
-          f"{result.fast_writes.phase2_quorum:<14}")
+    print(
+        f"  {'Phase 1 Quorum (Q1)':<30} {result.standard.phase1_quorum:<14} "
+        f"{result.fast_writes.phase1_quorum:<14}"
+    )
+    print(
+        f"  {'Phase 2 Quorum (Q2)':<30} {result.standard.phase2_quorum:<14} "
+        f"{result.fast_writes.phase2_quorum:<14}"
+    )
     print(f"  {'Total commits (all nodes)':<30} {std_committed:<14} {fw_committed:<14}")
-    print(f"  {'Network messages':<30} {result.standard.network.events_routed:<14} "
-          f"{result.fast_writes.network.events_routed:<14}")
+    print(
+        f"  {'Network messages':<30} {result.standard.network.events_routed:<14} "
+        f"{result.fast_writes.network.events_routed:<14}"
+    )
 
-    print(f"\n  Key insight: Fast-write configuration (Q2=2) can commit with")
-    print(f"  fewer Phase 2 acks, potentially reducing write latency. The trade-off")
-    print(f"  is that leader election (Phase 1) requires more responses (Q1=4).")
+    print("\n  Key insight: Fast-write configuration (Q2=2) can commit with")
+    print("  fewer Phase 2 acks, potentially reducing write latency. The trade-off")
+    print("  is that leader election (Phase 1) requires more responses (Q1=4).")
 
     print("\n" + "=" * 70)
 
@@ -338,10 +345,8 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     q1_sizes = [c.phase1_quorum for c in configs]
     q2_sizes = [c.phase2_quorum for c in configs]
     width = 0.35
-    ax.bar([i - width / 2 for i in x], q1_sizes, width,
-           label="Q1 (Prepare)", color="steelblue")
-    ax.bar([i + width / 2 for i in x], q2_sizes, width,
-           label="Q2 (Accept)", color="seagreen")
+    ax.bar([i - width / 2 for i in x], q1_sizes, width, label="Q1 (Prepare)", color="steelblue")
+    ax.bar([i + width / 2 for i in x], q2_sizes, width, label="Q2 (Accept)", color="seagreen")
     ax.axhline(y=5, color="red", linestyle="--", alpha=0.5, label="N (cluster size)")
     ax.set_xlabel("Configuration")
     ax.set_ylabel("Quorum Size")
@@ -358,9 +363,15 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax.set_xlabel("Configuration")
     ax.set_ylabel("Total Commits (all nodes)")
     ax.set_title("Commands Committed")
-    for bar, val in zip(bars, total_commits):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                str(val), ha="center", va="bottom", fontweight="bold")
+    for bar, val in zip(bars, total_commits, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            str(val),
+            ha="center",
+            va="bottom",
+            fontweight="bold",
+        )
     ax.grid(True, alpha=0.3, axis="y")
 
     # Chart 3: Network messages
@@ -370,13 +381,18 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
     ax.set_xlabel("Configuration")
     ax.set_ylabel("Network Messages")
     ax.set_title("Total Network Messages")
-    for bar, val in zip(bars, messages):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                str(val), ha="center", va="bottom", fontweight="bold")
+    for bar, val in zip(bars, messages, strict=False):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 0.5,
+            str(val),
+            ha="center",
+            va="bottom",
+            fontweight="bold",
+        )
     ax.grid(True, alpha=0.3, axis="y")
 
-    fig.suptitle("Flexible Paxos: Standard vs. Fast-Write Quorums",
-                 fontsize=14, fontweight="bold")
+    fig.suptitle("Flexible Paxos: Standard vs. Fast-Write Quorums", fontsize=14, fontweight="bold")
     fig.tight_layout()
     fig.savefig(output_dir / "flexible_paxos_quorums.png", dpi=150)
     plt.close(fig)
@@ -391,17 +407,13 @@ def visualize_results(result: SimulationResult, output_dir: Path) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Flexible Paxos quorum comparison simulation"
+    parser = argparse.ArgumentParser(description="Flexible Paxos quorum comparison simulation")
+    parser.add_argument("--duration", type=float, default=10.0, help="Simulation duration (s)")
+    parser.add_argument("--commands", type=int, default=10, help="Number of commands to submit")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed (-1 for random)")
+    parser.add_argument(
+        "--output", type=str, default="output/flexible_paxos", help="Output directory"
     )
-    parser.add_argument("--duration", type=float, default=10.0,
-                        help="Simulation duration (s)")
-    parser.add_argument("--commands", type=int, default=10,
-                        help="Number of commands to submit")
-    parser.add_argument("--seed", type=int, default=42,
-                        help="Random seed (-1 for random)")
-    parser.add_argument("--output", type=str, default="output/flexible_paxos",
-                        help="Output directory")
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization")
     args = parser.parse_args()
 
@@ -419,6 +431,7 @@ if __name__ == "__main__":
     if not args.no_viz:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             output_dir = Path(args.output)
             visualize_results(result, output_dir)

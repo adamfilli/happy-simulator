@@ -1,20 +1,15 @@
 """Unit tests for CanaryDeployer."""
 
-import pytest
-
-from happysimulator.core.clock import Clock
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
-
 from happysimulator.components.deployment.canary_deployer import (
     CanaryDeployer,
-    CanaryDeployerStats,
     CanaryStage,
-    CanaryState,
     ErrorRateEvaluator,
     LatencyEvaluator,
 )
+from happysimulator.core.clock import Clock
+from happysimulator.core.entity import Entity
+from happysimulator.core.event import Event
+from happysimulator.core.temporal import Instant
 
 
 class FakeBackend(Entity):
@@ -85,12 +80,14 @@ class _FakeWeightedStrategy:
 
 class AlwaysHealthy:
     """Evaluator that always reports healthy."""
+
     def is_healthy(self, canary, baseline_backends):
         return True
 
 
 class AlwaysUnhealthy:
     """Evaluator that always reports unhealthy."""
+
     def is_healthy(self, canary, baseline_backends):
         return False
 
@@ -136,10 +133,12 @@ class TestCanaryDeployerCreation:
 
 class TestDeploymentStart:
     def test_start_creates_canary(self):
-        deployer, lb, clock = make_deployer()
+        deployer, lb, _clock = make_deployer()
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
@@ -156,7 +155,7 @@ class TestProgressiveTrafficShift:
             CanaryStage(traffic_percentage=0.05, evaluation_period=5.0),
             CanaryStage(traffic_percentage=1.0, evaluation_period=5.0),
         ]
-        deployer, lb, clock = make_deployer(
+        deployer, _lb, clock = make_deployer(
             stages=stages,
             metric_evaluator=AlwaysHealthy(),
             evaluation_interval=2.0,
@@ -164,15 +163,19 @@ class TestProgressiveTrafficShift:
 
         # Start deployment
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         # Stage 1: start
         stage_event = Event(
-            time=Instant.Epoch, event_type="_canary_stage_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_stage_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(stage_event)
         assert deployer.state.canary_traffic_pct == 0.01
@@ -180,8 +183,10 @@ class TestProgressiveTrafficShift:
         # Advance time past evaluation period
         clock._current_time = Instant.from_seconds(6.0)
         eval_event = Event(
-            time=Instant.from_seconds(6.0), event_type="_canary_evaluate",
-            target=deployer, context={},
+            time=Instant.from_seconds(6.0),
+            event_type="_canary_evaluate",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(eval_event)
 
@@ -191,18 +196,22 @@ class TestProgressiveTrafficShift:
 
     def test_traffic_weights_set(self):
         stages = [CanaryStage(traffic_percentage=0.05, evaluation_period=5.0)]
-        deployer, lb, clock = make_deployer(stages=stages, metric_evaluator=AlwaysHealthy())
+        deployer, lb, _clock = make_deployer(stages=stages, metric_evaluator=AlwaysHealthy())
 
         # Start and begin stage
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         stage = Event(
-            time=Instant.Epoch, event_type="_canary_stage_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_stage_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(stage)
 
@@ -215,45 +224,56 @@ class TestProgressiveTrafficShift:
 class TestRollback:
     def test_rollback_on_unhealthy(self):
         stages = [CanaryStage(traffic_percentage=0.05, evaluation_period=10.0)]
-        deployer, lb, clock = make_deployer(
-            stages=stages, metric_evaluator=AlwaysUnhealthy(),
+        deployer, _lb, clock = make_deployer(
+            stages=stages,
+            metric_evaluator=AlwaysUnhealthy(),
         )
 
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         stage = Event(
-            time=Instant.Epoch, event_type="_canary_stage_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_stage_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(stage)
 
         # Evaluate - should fail and trigger rollback
         clock._current_time = Instant.from_seconds(3.0)
         eval_event = Event(
-            time=Instant.from_seconds(3.0), event_type="_canary_evaluate",
-            target=deployer, context={},
+            time=Instant.from_seconds(3.0),
+            event_type="_canary_evaluate",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(eval_event)
         assert any(e.event_type == "_canary_rollback" for e in result)
 
     def test_rollback_removes_canary(self):
         stages = [CanaryStage(traffic_percentage=0.05, evaluation_period=10.0)]
-        deployer, lb, clock = make_deployer(stages=stages, metric_evaluator=AlwaysUnhealthy())
+        deployer, lb, _clock = make_deployer(stages=stages, metric_evaluator=AlwaysUnhealthy())
 
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
         canary_name = deployer.canary.name
 
         rollback = Event(
-            time=Instant.Epoch, event_type="_canary_rollback",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_rollback",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(rollback)
 
@@ -266,28 +286,36 @@ class TestFullPromotion:
     def test_promotion_removes_old_backends(self):
         stages = [CanaryStage(traffic_percentage=1.0, evaluation_period=5.0)]
         deployer, lb, clock = make_deployer(
-            num_backends=3, stages=stages, metric_evaluator=AlwaysHealthy(),
+            num_backends=3,
+            stages=stages,
+            metric_evaluator=AlwaysHealthy(),
         )
 
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
         old_names = [b.name for b in deployer._baseline_backends]
 
         # Start stage
         stage = Event(
-            time=Instant.Epoch, event_type="_canary_stage_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_stage_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(stage)
 
         # Advance past evaluation
         clock._current_time = Instant.from_seconds(6.0)
         eval_event = Event(
-            time=Instant.from_seconds(6.0), event_type="_canary_evaluate",
-            target=deployer, context={},
+            time=Instant.from_seconds(6.0),
+            event_type="_canary_evaluate",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(eval_event)
 
@@ -305,8 +333,10 @@ class TestFullPromotion:
 
         # Complete
         complete = Event(
-            time=Instant.from_seconds(6.0), event_type="_canary_complete",
-            target=deployer, context={},
+            time=Instant.from_seconds(6.0),
+            event_type="_canary_complete",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(complete)
         assert deployer.state.status == "completed"
@@ -350,28 +380,34 @@ class TestCustomEvaluators:
                 return canary.average_service_time < self._threshold
 
         stages = [CanaryStage(traffic_percentage=0.1, evaluation_period=5.0)]
-        deployer, lb, clock = make_deployer(
+        deployer, _lb, clock = make_deployer(
             stages=stages,
             metric_evaluator=ThresholdEvaluator(threshold=0.2),
         )
 
         start = Event(
-            time=Instant.Epoch, event_type="_canary_deploy_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_deploy_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(start)
 
         stage = Event(
-            time=Instant.Epoch, event_type="_canary_stage_start",
-            target=deployer, context={},
+            time=Instant.Epoch,
+            event_type="_canary_stage_start",
+            target=deployer,
+            context={},
         )
         deployer.handle_event(stage)
 
         # Evaluate - canary has 0.05 latency < 0.2 threshold
         clock._current_time = Instant.from_seconds(1.0)
         eval_event = Event(
-            time=Instant.from_seconds(1.0), event_type="_canary_evaluate",
-            target=deployer, context={},
+            time=Instant.from_seconds(1.0),
+            event_type="_canary_evaluate",
+            target=deployer,
+            context={},
         )
         result = deployer.handle_event(eval_event)
         # Should continue evaluating (not rollback)

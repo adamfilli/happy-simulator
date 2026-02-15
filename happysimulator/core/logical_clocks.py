@@ -16,30 +16,32 @@ Usage::
 
     # Lamport: simple monotonic counter
     clock = LamportClock()
-    clock.tick()           # Local event
-    ts = clock.send()      # Returns timestamp to embed in message
-    clock.receive(ts)      # max(local, remote) + 1
+    clock.tick()  # Local event
+    ts = clock.send()  # Returns timestamp to embed in message
+    clock.receive(ts)  # max(local, remote) + 1
 
     # Vector clock: per-node counters for causal ordering
     vc = VectorClock("node-1", ["node-1", "node-2", "node-3"])
     vc.tick()
-    snapshot = vc.send()   # dict[str, int] to embed in message
-    vc.receive(snapshot)   # Element-wise max + increment own
+    snapshot = vc.send()  # dict[str, int] to embed in message
+    vc.receive(snapshot)  # Element-wise max + increment own
 
     # HLC: physical + logical (CockroachDB/Spanner-style)
     hlc = HybridLogicalClock("node-1", physical_clock=node_clock)
-    ts = hlc.now()         # HLCTimestamp(physical_ns, logical, node_id)
+    ts = hlc.now()  # HLCTimestamp(physical_ns, logical, node_id)
     hlc.receive(remote_ts)
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import TYPE_CHECKING
 
-from happysimulator.core.node_clock import NodeClock
-from happysimulator.core.temporal import Instant
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
+    from happysimulator.core.node_clock import NodeClock
+    from happysimulator.core.temporal import Instant
 
 # =============================================================================
 # Lamport Clock
@@ -109,7 +111,7 @@ class VectorClock:
 
     def __init__(self, node_id: str, node_ids: list[str]):
         self._node_id = node_id
-        self._vector: dict[str, int] = {nid: 0 for nid in node_ids}
+        self._vector: dict[str, int] = dict.fromkeys(node_ids, 0)
         if node_id not in self._vector:
             self._vector[node_id] = 0
 
@@ -318,7 +320,7 @@ class HybridLogicalClock:
         ValueError: If both or neither time source is provided.
     """
 
-    __slots__ = ("_node_id", "_get_physical_ns", "_last")
+    __slots__ = ("_get_physical_ns", "_last", "_node_id")
 
     def __init__(
         self,
@@ -327,20 +329,14 @@ class HybridLogicalClock:
         wall_time: Callable[[], Instant] | None = None,
     ):
         if physical_clock is not None and wall_time is not None:
-            raise ValueError(
-                "Provide either physical_clock or wall_time, not both."
-            )
+            raise ValueError("Provide either physical_clock or wall_time, not both.")
         if physical_clock is None and wall_time is None:
-            raise ValueError(
-                "Provide either physical_clock or wall_time."
-            )
+            raise ValueError("Provide either physical_clock or wall_time.")
 
         self._node_id = node_id
 
         if physical_clock is not None:
-            self._get_physical_ns: Callable[[], int] = (
-                lambda: physical_clock.now.nanoseconds
-            )
+            self._get_physical_ns: Callable[[], int] = lambda: physical_clock.now.nanoseconds
         else:
             assert wall_time is not None
             self._get_physical_ns = lambda: wall_time().nanoseconds
@@ -360,9 +356,7 @@ class HybridLogicalClock:
         """
         pt = self._get_physical_ns()
         if pt > self._last.physical_ns:
-            self._last = HLCTimestamp(
-                physical_ns=pt, logical=0, node_id=self._node_id
-            )
+            self._last = HLCTimestamp(physical_ns=pt, logical=0, node_id=self._node_id)
         else:
             self._last = HLCTimestamp(
                 physical_ns=self._last.physical_ns,
@@ -405,6 +399,4 @@ class HybridLogicalClock:
             # Physical time advanced past both — reset logical
             logical = 0
 
-        self._last = HLCTimestamp(
-            physical_ns=max_pt, logical=logical, node_id=self._node_id
-        )
+        self._last = HLCTimestamp(physical_ns=max_pt, logical=logical, node_id=self._node_id)

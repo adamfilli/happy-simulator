@@ -2,16 +2,15 @@
 
 import pytest
 
-from happysimulator.core.clock import Clock
-from happysimulator.core.event import Event
-from happysimulator.core.sim_future import SimFuture
-from happysimulator.core.temporal import Instant
 from happysimulator.components.consensus.flexible_paxos import (
     FlexiblePaxosNode,
     FlexiblePaxosStats,
 )
-from happysimulator.components.consensus.paxos import Ballot
 from happysimulator.components.network import Network
+from happysimulator.core.clock import Clock
+from happysimulator.core.event import Event
+from happysimulator.core.sim_future import SimFuture
+from happysimulator.core.temporal import Instant
 
 
 def make_clock(t=0.0):
@@ -184,11 +183,13 @@ class TestFlexiblePaxosPrepareHandler:
             time=Instant.from_seconds(1.0),
             event_type="FlexPaxosPrepare",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(prepare_event)
@@ -210,14 +211,16 @@ class TestFlexiblePaxosAcceptHandler:
             time=Instant.from_seconds(1.0),
             event_type="FlexPaxosAccept",
             target=follower,
-            context={"metadata": {
-                "ballot_number": 1,
-                "ballot_node": "node-0",
-                "slot": 1,
-                "command": {"op": "set", "key": "k", "value": "v"},
-                "commit_index": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 1,
+                    "ballot_node": "node-0",
+                    "slot": 1,
+                    "command": {"op": "set", "key": "k", "value": "v"},
+                    "commit_index": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = follower.handle_event(accept_event)
@@ -240,10 +243,12 @@ class TestFlexiblePaxosNackHandler:
             time=Instant.from_seconds(1.0),
             event_type="FlexPaxosNack",
             target=node,
-            context={"metadata": {
-                "ballot_number": 99,
-                "ballot_node": "node-2",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 99,
+                    "ballot_node": "node-2",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         node.handle_event(nack_event)

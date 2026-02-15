@@ -7,19 +7,26 @@ Server extends QueuedResource to provide a complete server abstraction with:
 - Statistics tracking for analysis
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.server.concurrency import (
     ConcurrencyModel,
     FixedConcurrency,
 )
-from happysimulator.core.event import Event
 from happysimulator.distributions.constant import ConstantLatency
-from happysimulator.distributions.latency_distribution import LatencyDistribution
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.entity import Entity
+    from happysimulator.core.event import Event
+    from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +68,7 @@ class Server(QueuedResource):
         service_time: LatencyDistribution | None = None,
         queue_policy: QueuePolicy | None = None,
         queue_capacity: int | None = None,
-        downstream: 'Entity | None' = None,
+        downstream: Entity | None = None,
     ):
         """Initialize the server.
 
@@ -115,12 +122,12 @@ class Server(QueuedResource):
         )
 
     @property
-    def downstream(self) -> 'Entity | None':
+    def downstream(self) -> Entity | None:
         """Optional downstream entity for event forwarding."""
         return self._downstream
 
     @downstream.setter
-    def downstream(self, target: 'Entity | None') -> None:
+    def downstream(self, target: Entity | None) -> None:
         self._downstream = target
 
     @property

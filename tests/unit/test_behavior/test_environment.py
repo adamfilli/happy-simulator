@@ -1,13 +1,11 @@
 """Unit tests for behavior environment module."""
 
-from happysimulator import Simulation, Instant, Event
+from happysimulator import Event, Instant, Simulation
 from happysimulator.components.behavior.agent import Agent
-from happysimulator.components.behavior.traits import PersonalityTraits
-from happysimulator.components.behavior.state import AgentState
 from happysimulator.components.behavior.decision import Choice, UtilityModel
 from happysimulator.components.behavior.environment import Environment
-from happysimulator.components.behavior.social_network import SocialGraph
 from happysimulator.components.behavior.influence import DeGrootModel
+from happysimulator.components.behavior.social_network import SocialGraph
 
 
 def _make_utility():
@@ -16,30 +14,31 @@ def _make_utility():
 
 class TestEnvironment:
     def test_broadcast_reaches_all_agents(self):
-        agents = [
-            Agent(name=f"a{i}", decision_model=_make_utility(), seed=i)
-            for i in range(5)
-        ]
+        agents = [Agent(name=f"a{i}", decision_model=_make_utility(), seed=i) for i in range(5)]
         for a in agents:
             a.on_action("buy", lambda ag, c, e: None)
 
         env = Environment(name="env", agents=agents, seed=42)
 
-        all_entities = [env] + agents
+        all_entities = [env, *agents]
         sim = Simulation(
             start_time=Instant.Epoch,
             end_time=Instant.from_seconds(2.0),
             entities=all_entities,
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="BroadcastStimulus",
-            target=env,
-            context={"metadata": {
-                "stimulus_type": "Promo",
-                "choices": [Choice(action="buy"), Choice(action="wait")],
-            }},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="BroadcastStimulus",
+                target=env,
+                context={
+                    "metadata": {
+                        "stimulus_type": "Promo",
+                        "choices": [Choice(action="buy"), Choice(action="wait")],
+                    }
+                },
+            )
+        )
         sim.run()
 
         for a in agents:
@@ -59,16 +58,20 @@ class TestEnvironment:
             end_time=Instant.from_seconds(2.0),
             entities=[env, a1, a2, a3],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="TargetedStimulus",
-            target=env,
-            context={"metadata": {
-                "stimulus_type": "Offer",
-                "targets": ["target1", "target2"],
-                "choices": [Choice(action="buy")],
-            }},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="TargetedStimulus",
+                target=env,
+                context={
+                    "metadata": {
+                        "stimulus_type": "Offer",
+                        "targets": ["target1", "target2"],
+                        "choices": [Choice(action="buy")],
+                    }
+                },
+            )
+        )
         sim.run()
 
         assert a1.stats.events_received >= 1
@@ -98,12 +101,14 @@ class TestEnvironment:
             end_time=Instant.from_seconds(2.0),
             entities=[env, a1, a2],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="InfluencePropagation",
-            target=env,
-            context={"metadata": {"topic": "topic"}},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="InfluencePropagation",
+                target=env,
+                context={"metadata": {"topic": "topic"}},
+            )
+        )
         sim.run()
 
         # Follower should have moved toward leader's opinion
@@ -117,12 +122,14 @@ class TestEnvironment:
             end_time=Instant.from_seconds(2.0),
             entities=[env],
         )
-        sim.schedule(Event(
-            time=Instant.from_seconds(1.0),
-            event_type="StateChange",
-            target=env,
-            context={"metadata": {"key": "price", "value": 9.99}},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(1.0),
+                event_type="StateChange",
+                target=env,
+                context={"metadata": {"key": "price", "value": 9.99}},
+            )
+        )
         sim.run()
 
         assert env.shared_state["price"] == 9.99

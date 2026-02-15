@@ -24,7 +24,7 @@ class CollectorEntity(Entity):
 
     def handle_event(self, event: Event):
         self.received.append(event)
-        return None
+        return
 
 
 class TestNetworkLinkBasics:
@@ -369,9 +369,7 @@ class TestNetworkLinkEventContext:
             entities=[link, collector],
         )
 
-        sim.schedule(
-            Event(time=Instant.Epoch, event_type="SpecificType", target=link)
-        )
+        sim.schedule(Event(time=Instant.Epoch, event_type="SpecificType", target=link))
         sim.run()
 
         assert len(collector.received) == 1

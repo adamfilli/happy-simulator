@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import List
 
 import pytest
 
-from happysimulator.components.server.thread_pool import ThreadPool, ThreadPoolStats
-from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue
+from happysimulator.components.queue_policy import LIFOQueue
+from happysimulator.components.server.thread_pool import ThreadPool
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
@@ -22,6 +21,7 @@ from happysimulator.load.source import Source
 @dataclass(frozen=True)
 class ConstantRateProfile(Profile):
     """Constant request rate profile."""
+
     rate_per_s: float
 
     def get_rate(self, time: Instant) -> float:
@@ -42,7 +42,7 @@ class TaskProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 
@@ -70,7 +70,7 @@ class VariableTaskProvider(EventProvider):
         self.stop_after = stop_after
         self.generated = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self.stop_after and time > self.stop_after:
             return []
 

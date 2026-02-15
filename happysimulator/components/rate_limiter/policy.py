@@ -260,10 +260,7 @@ class FixedWindowPolicy:
 
     def _maybe_reset(self, now: Instant) -> None:
         ws = self._get_window_start(now)
-        if self._current_window_start is None:
-            self._current_window_start = ws
-            self._current_window_count = 0
-        elif ws > self._current_window_start:
+        if self._current_window_start is None or ws > self._current_window_start:
             self._current_window_start = ws
             self._current_window_count = 0
 
@@ -343,7 +340,9 @@ class AdaptivePolicy:
         if max_rate < min_rate:
             raise ValueError(f"max_rate must be >= min_rate, got {max_rate} < {min_rate}")
         if initial_rate < min_rate or initial_rate > max_rate:
-            raise ValueError(f"initial_rate must be in [{min_rate}, {max_rate}], got {initial_rate}")
+            raise ValueError(
+                f"initial_rate must be in [{min_rate}, {max_rate}], got {initial_rate}"
+            )
         if decrease_factor <= 0 or decrease_factor >= 1:
             raise ValueError(f"decrease_factor must be in (0, 1), got {decrease_factor}")
         if window_size <= 0:
@@ -439,6 +438,4 @@ class AdaptivePolicy:
         self._current_rate = max(self._min_rate, self._current_rate * self._decrease_factor)
         if self._current_rate < old_rate:
             self.rate_decreases += 1
-            self.rate_history.append(
-                RateSnapshot(time=now, rate=self._current_rate, reason=reason)
-            )
+            self.rate_history.append(RateSnapshot(time=now, rate=self._current_rate, reason=reason))

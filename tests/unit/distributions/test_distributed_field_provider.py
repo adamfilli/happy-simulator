@@ -1,11 +1,9 @@
 """Tests for DistributedFieldProvider."""
 
-import pytest
-
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.distributions import ZipfDistribution, UniformDistribution
+from happysimulator.distributions import UniformDistribution, ZipfDistribution
 from happysimulator.load import DistributedFieldProvider
 
 

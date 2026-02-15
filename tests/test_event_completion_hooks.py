@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.callback_entity import NullEntity
 from happysimulator.core.event import Event, ProcessContinuation
 from happysimulator.core.temporal import Instant
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 _null = NullEntity()
 
@@ -30,7 +33,7 @@ def test_completion_hooks_run_for_regular_event() -> None:
 def test_completion_hooks_run_when_process_finishes() -> None:
     hook_times: list[Instant] = []
 
-    def process() -> Generator[float, None, None]:
+    def process() -> Generator[float]:
         yield 0.1
 
     def hook(finish_time: Instant) -> Event:

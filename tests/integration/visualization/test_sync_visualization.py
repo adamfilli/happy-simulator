@@ -13,18 +13,7 @@ Output:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Generator, List
-
-import pytest
-
-from happysimulator.components.sync import Mutex, Semaphore, RWLock, Condition, Barrier
-from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.core.simulation import Simulation
-from happysimulator.load.event_provider import EventProvider
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
-from happysimulator.load.source import Source
+from happysimulator.components.sync import Barrier, Mutex, Semaphore
 
 
 class TestMutexVisualization:
@@ -38,12 +27,13 @@ class TestMutexVisualization:
         wait times.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
 
         # Simulate mutex contention manually
-        mutex = Mutex(name="resource")
+        Mutex(name="resource")
 
         # Track lock hold periods
         events = []
@@ -54,35 +44,43 @@ class TestMutexVisualization:
         hold_times = [0.10, 0.15, 0.08, 0.12, 0.20]
         arrival_times = [0.0, 0.02, 0.05, 0.08, 0.15]
 
-        for i, (thread, hold_time, arrival) in enumerate(zip(threads, hold_times, arrival_times)):
+        for _i, (thread, hold_time, arrival) in enumerate(
+            zip(threads, hold_times, arrival_times, strict=False)
+        ):
             # Record arrival
             wait_start = max(current_time, arrival)
-            events.append({
-                "thread": thread,
-                "event": "arrive",
-                "time": arrival,
-            })
+            events.append(
+                {
+                    "thread": thread,
+                    "event": "arrive",
+                    "time": arrival,
+                }
+            )
 
             # Acquire (immediately if first, or after current holder releases)
             acquire_time = wait_start
-            events.append({
-                "thread": thread,
-                "event": "acquire",
-                "time": acquire_time,
-            })
+            events.append(
+                {
+                    "thread": thread,
+                    "event": "acquire",
+                    "time": acquire_time,
+                }
+            )
 
             # Hold the lock
             release_time = acquire_time + hold_time
-            events.append({
-                "thread": thread,
-                "event": "release",
-                "time": release_time,
-            })
+            events.append(
+                {
+                    "thread": thread,
+                    "event": "release",
+                    "time": release_time,
+                }
+            )
 
             current_time = release_time
 
         # Create visualization
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8))
+        _fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 8))
 
         # Timeline view
         colors = plt.cm.tab10(np.linspace(0, 1, len(threads)))
@@ -98,30 +96,45 @@ class TestMutexVisualization:
 
             # Wait period (if any)
             if acquire > arrive:
-                ax1.barh(y, acquire - arrive, left=arrive, height=0.4,
-                        color='lightgray', edgecolor='gray', label='Wait' if i == 0 else '')
+                ax1.barh(
+                    y,
+                    acquire - arrive,
+                    left=arrive,
+                    height=0.4,
+                    color="lightgray",
+                    edgecolor="gray",
+                    label="Wait" if i == 0 else "",
+                )
 
             # Hold period
-            ax1.barh(y, release - acquire, left=acquire, height=0.4,
-                    color=colors[i], edgecolor='black', label=f'{thread}' if i == 0 else '')
+            ax1.barh(
+                y,
+                release - acquire,
+                left=acquire,
+                height=0.4,
+                color=colors[i],
+                edgecolor="black",
+                label=f"{thread}" if i == 0 else "",
+            )
 
             # Mark arrival
-            ax1.plot(arrive, y, 'v', color=colors[i], markersize=10)
+            ax1.plot(arrive, y, "v", color=colors[i], markersize=10)
 
         ax1.set_yticks(range(len(threads)))
         ax1.set_yticklabels(threads)
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Thread')
-        ax1.set_title('Mutex Contention Timeline')
-        ax1.grid(True, alpha=0.3, axis='x')
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Thread")
+        ax1.set_title("Mutex Contention Timeline")
+        ax1.grid(True, alpha=0.3, axis="x")
 
         # Add legend for wait vs hold
         from matplotlib.patches import Patch
+
         legend_elements = [
-            Patch(facecolor='lightgray', edgecolor='gray', label='Waiting'),
-            Patch(facecolor='steelblue', edgecolor='black', label='Holding Lock'),
+            Patch(facecolor="lightgray", edgecolor="gray", label="Waiting"),
+            Patch(facecolor="steelblue", edgecolor="black", label="Holding Lock"),
         ]
-        ax1.legend(handles=legend_elements, loc='upper right')
+        ax1.legend(handles=legend_elements, loc="upper right")
 
         # Cumulative wait time
         wait_times = []
@@ -132,13 +145,13 @@ class TestMutexVisualization:
             wait_times.append(acquire - arrive)
 
         ax2.bar(threads, wait_times, color=colors)
-        ax2.set_xlabel('Thread')
-        ax2.set_ylabel('Wait Time (s)')
-        ax2.set_title('Wait Time by Thread')
-        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.set_xlabel("Thread")
+        ax2.set_ylabel("Wait Time (s)")
+        ax2.set_title("Wait Time by Thread")
+        ax2.grid(True, alpha=0.3, axis="y")
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'mutex_contention_timeline.png', dpi=150)
+        plt.savefig(test_output_dir / "mutex_contention_timeline.png", dpi=150)
         plt.close()
 
         # Verify some contention occurred
@@ -155,16 +168,15 @@ class TestSemaphoreVisualization:
         Shows how a semaphore limits concurrent resource usage.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
 
         # Simulate a connection pool with max 3 connections
         max_connections = 3
-        sem = Semaphore(name="pool", initial_count=max_connections)
+        Semaphore(name="pool", initial_count=max_connections)
 
         # Track resource usage over time
-        events = []
         active = 0
 
         # 10 requests, each holds a connection for some time
@@ -190,7 +202,9 @@ class TestSemaphoreVisualization:
             while pending_releases and pending_releases[0][0] <= t:
                 release_time, _ = pending_releases.pop(0)
                 active -= 1
-                timeline.append({"time": release_time, "active": active, "available": max_connections - active})
+                timeline.append(
+                    {"time": release_time, "active": active, "available": max_connections - active}
+                )
 
             # Try to acquire
             if active < max_connections:
@@ -198,7 +212,9 @@ class TestSemaphoreVisualization:
                 release_time = t + req["hold"]
                 pending_releases.append((release_time, req["id"]))
                 pending_releases.sort()
-                timeline.append({"time": t, "active": active, "available": max_connections - active})
+                timeline.append(
+                    {"time": t, "active": active, "available": max_connections - active}
+                )
             else:
                 # Would need to wait - for simplicity, skip in this visualization
                 pass
@@ -207,37 +223,39 @@ class TestSemaphoreVisualization:
         while pending_releases:
             release_time, _ = pending_releases.pop(0)
             active -= 1
-            timeline.append({"time": release_time, "active": active, "available": max_connections - active})
+            timeline.append(
+                {"time": release_time, "active": active, "available": max_connections - active}
+            )
 
         # Create visualization
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+        _fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         times = [e["time"] for e in timeline]
         active_counts = [e["active"] for e in timeline]
         available_counts = [e["available"] for e in timeline]
 
         # Active connections over time (step plot)
-        ax1.step(times, active_counts, where='post', linewidth=2, color='blue', label='Active')
-        ax1.axhline(y=max_connections, color='red', linestyle='--', label='Capacity')
-        ax1.fill_between(times, active_counts, step='post', alpha=0.3)
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Active Connections')
-        ax1.set_title(f'Semaphore Resource Pool (Capacity={max_connections})')
+        ax1.step(times, active_counts, where="post", linewidth=2, color="blue", label="Active")
+        ax1.axhline(y=max_connections, color="red", linestyle="--", label="Capacity")
+        ax1.fill_between(times, active_counts, step="post", alpha=0.3)
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Active Connections")
+        ax1.set_title(f"Semaphore Resource Pool (Capacity={max_connections})")
         ax1.set_ylim(0, max_connections + 1)
         ax1.legend()
         ax1.grid(True, alpha=0.3)
 
         # Available permits over time
-        ax2.step(times, available_counts, where='post', linewidth=2, color='green')
-        ax2.fill_between(times, available_counts, step='post', alpha=0.3, color='green')
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Available Permits')
-        ax2.set_title('Available Semaphore Permits')
+        ax2.step(times, available_counts, where="post", linewidth=2, color="green")
+        ax2.fill_between(times, available_counts, step="post", alpha=0.3, color="green")
+        ax2.set_xlabel("Time (s)")
+        ax2.set_ylabel("Available Permits")
+        ax2.set_title("Available Semaphore Permits")
         ax2.set_ylim(0, max_connections + 1)
         ax2.grid(True, alpha=0.3)
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'semaphore_resource_pool.png', dpi=150)
+        plt.savefig(test_output_dir / "semaphore_resource_pool.png", dpi=150)
         plt.close()
 
         # Verify pool was utilized
@@ -254,9 +272,9 @@ class TestRWLockVisualization:
         Shows multiple readers accessing simultaneously vs exclusive writers.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        import numpy as np
 
         # Simulate a mix of read and write operations
         operations = [
@@ -275,17 +293,13 @@ class TestRWLockVisualization:
         timeline = []
         active_readers = 0
         write_locked = False
-        write_queue = []
-        read_queue = []
         pending_releases = []
-
-        current_time = 0.0
 
         # Simple simulation
         events_to_process = [(op["arrive"], "arrive", op) for op in operations]
         events_to_process.sort()
 
-        for t, event_type, op in events_to_process:
+        for t, _event_type, op in events_to_process:
             # Process any releases before this
             while pending_releases and pending_releases[0][0] <= t:
                 release_t, release_type = pending_releases.pop(0)
@@ -293,11 +307,13 @@ class TestRWLockVisualization:
                     active_readers -= 1
                 else:
                     write_locked = False
-                timeline.append({
-                    "time": release_t,
-                    "readers": active_readers,
-                    "writer": 1 if write_locked else 0,
-                })
+                timeline.append(
+                    {
+                        "time": release_t,
+                        "readers": active_readers,
+                        "writer": 1 if write_locked else 0,
+                    }
+                )
 
             # Handle arrival
             if op["type"] == "read":
@@ -311,11 +327,13 @@ class TestRWLockVisualization:
                     pending_releases.append((t + op["duration"], "write"))
                     pending_releases.sort()
 
-            timeline.append({
-                "time": t,
-                "readers": active_readers,
-                "writer": 1 if write_locked else 0,
-            })
+            timeline.append(
+                {
+                    "time": t,
+                    "readers": active_readers,
+                    "writer": 1 if write_locked else 0,
+                }
+            )
 
         # Process remaining
         while pending_releases:
@@ -324,39 +342,48 @@ class TestRWLockVisualization:
                 active_readers -= 1
             else:
                 write_locked = False
-            timeline.append({
-                "time": release_t,
-                "readers": active_readers,
-                "writer": 1 if write_locked else 0,
-            })
+            timeline.append(
+                {
+                    "time": release_t,
+                    "readers": active_readers,
+                    "writer": 1 if write_locked else 0,
+                }
+            )
 
         # Create visualization
-        fig, ax = plt.subplots(figsize=(14, 6))
+        _fig, ax = plt.subplots(figsize=(14, 6))
 
         times = [e["time"] for e in timeline]
         readers = [e["readers"] for e in timeline]
         writers = [e["writer"] for e in timeline]
 
-        ax.step(times, readers, where='post', linewidth=2, color='blue', label='Active Readers')
-        ax.step(times, [-w * 0.5 for w in writers], where='post', linewidth=2, color='red', label='Writer Active')
+        ax.step(times, readers, where="post", linewidth=2, color="blue", label="Active Readers")
+        ax.step(
+            times,
+            [-w * 0.5 for w in writers],
+            where="post",
+            linewidth=2,
+            color="red",
+            label="Writer Active",
+        )
 
         # Fill areas
-        ax.fill_between(times, readers, step='post', alpha=0.3, color='blue')
-        ax.fill_between(times, [-w * 0.5 for w in writers], step='post', alpha=0.3, color='red')
+        ax.fill_between(times, readers, step="post", alpha=0.3, color="blue")
+        ax.fill_between(times, [-w * 0.5 for w in writers], step="post", alpha=0.3, color="red")
 
-        ax.axhline(y=0, color='black', linewidth=0.5)
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Concurrent Access')
-        ax.set_title('RWLock: Concurrent Readers vs Exclusive Writers')
+        ax.axhline(y=0, color="black", linewidth=0.5)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Concurrent Access")
+        ax.set_title("RWLock: Concurrent Readers vs Exclusive Writers")
         ax.legend()
         ax.grid(True, alpha=0.3)
 
         # Custom y-axis labels
         ax.set_yticks([-0.5, 0, 1, 2, 3])
-        ax.set_yticklabels(['Writer', '0', '1 Reader', '2 Readers', '3 Readers'])
+        ax.set_yticklabels(["Writer", "0", "1 Reader", "2 Readers", "3 Readers"])
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'rwlock_concurrent_readers.png', dpi=150)
+        plt.savefig(test_output_dir / "rwlock_concurrent_readers.png", dpi=150)
         plt.close()
 
         # Verify concurrent readers occurred
@@ -373,15 +400,14 @@ class TestConditionVisualization:
         Shows producers adding items and consumers waiting/waking.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
         # Simulate a bounded buffer producer-consumer
         buffer_size = 5
-        buffer = []
 
         events = []
-        time = 0.0
 
         # Simulation: producers add items, consumers take them
         # Format: (time, type, count_change)
@@ -407,48 +433,70 @@ class TestConditionVisualization:
         producer_waits = 0
         consumer_waits = 0
 
-        for t, op_type, delta in operations:
+        for t, op_type, _delta in operations:
             if op_type == "produce":
                 if buffer_level < buffer_size:
                     buffer_level += 1
-                    events.append({"time": t, "type": "produce", "level": buffer_level, "wait": False})
+                    events.append(
+                        {"time": t, "type": "produce", "level": buffer_level, "wait": False}
+                    )
                 else:
                     producer_waits += 1
-                    events.append({"time": t, "type": "produce_wait", "level": buffer_level, "wait": True})
+                    events.append(
+                        {"time": t, "type": "produce_wait", "level": buffer_level, "wait": True}
+                    )
             else:  # consume
                 if buffer_level > 0:
                     buffer_level -= 1
-                    events.append({"time": t, "type": "consume", "level": buffer_level, "wait": False})
+                    events.append(
+                        {"time": t, "type": "consume", "level": buffer_level, "wait": False}
+                    )
                 else:
                     consumer_waits += 1
-                    events.append({"time": t, "type": "consume_wait", "level": buffer_level, "wait": True})
+                    events.append(
+                        {"time": t, "type": "consume_wait", "level": buffer_level, "wait": True}
+                    )
 
         # Create visualization
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+        _fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         times = [e["time"] for e in events]
         levels = [e["level"] for e in events]
 
         # Buffer level over time
-        ax1.step(times, levels, where='post', linewidth=2, color='blue')
-        ax1.fill_between(times, levels, step='post', alpha=0.3)
-        ax1.axhline(y=buffer_size, color='red', linestyle='--', label='Buffer Capacity')
-        ax1.axhline(y=0, color='gray', linestyle='--')
+        ax1.step(times, levels, where="post", linewidth=2, color="blue")
+        ax1.fill_between(times, levels, step="post", alpha=0.3)
+        ax1.axhline(y=buffer_size, color="red", linestyle="--", label="Buffer Capacity")
+        ax1.axhline(y=0, color="gray", linestyle="--")
 
         # Mark waits
         produce_waits = [(e["time"], e["level"]) for e in events if e["type"] == "produce_wait"]
         consume_waits = [(e["time"], e["level"]) for e in events if e["type"] == "consume_wait"]
 
         if produce_waits:
-            ax1.scatter([w[0] for w in produce_waits], [w[1] for w in produce_waits],
-                       color='red', s=100, marker='x', label='Producer Wait', zorder=5)
+            ax1.scatter(
+                [w[0] for w in produce_waits],
+                [w[1] for w in produce_waits],
+                color="red",
+                s=100,
+                marker="x",
+                label="Producer Wait",
+                zorder=5,
+            )
         if consume_waits:
-            ax1.scatter([w[0] for w in consume_waits], [w[1] for w in consume_waits],
-                       color='orange', s=100, marker='x', label='Consumer Wait', zorder=5)
+            ax1.scatter(
+                [w[0] for w in consume_waits],
+                [w[1] for w in consume_waits],
+                color="orange",
+                s=100,
+                marker="x",
+                label="Consumer Wait",
+                zorder=5,
+            )
 
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Buffer Level')
-        ax1.set_title('Producer-Consumer: Buffer Level Over Time')
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Buffer Level")
+        ax1.set_title("Producer-Consumer: Buffer Level Over Time")
         ax1.set_ylim(-0.5, buffer_size + 1)
         ax1.legend()
         ax1.grid(True, alpha=0.3)
@@ -457,20 +505,20 @@ class TestConditionVisualization:
         produces = len([e for e in events if e["type"] == "produce"])
         consumes = len([e for e in events if e["type"] == "consume"])
 
-        categories = ['Produces', 'Consumes', 'Producer\nWaits', 'Consumer\nWaits']
+        categories = ["Produces", "Consumes", "Producer\nWaits", "Consumer\nWaits"]
         counts = [produces, consumes, producer_waits, consumer_waits]
-        colors = ['green', 'blue', 'lightcoral', 'lightsalmon']
+        colors = ["green", "blue", "lightcoral", "lightsalmon"]
 
         ax2.bar(categories, counts, color=colors)
-        ax2.set_ylabel('Count')
-        ax2.set_title('Operation Summary')
-        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.set_ylabel("Count")
+        ax2.set_title("Operation Summary")
+        ax2.grid(True, alpha=0.3, axis="y")
 
-        for i, (cat, count) in enumerate(zip(categories, counts)):
-            ax2.annotate(str(count), xy=(i, count), ha='center', va='bottom')
+        for i, (_cat, count) in enumerate(zip(categories, counts, strict=False)):
+            ax2.annotate(str(count), xy=(i, count), ha="center", va="bottom")
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'condition_producer_consumer.png', dpi=150)
+        plt.savefig(test_output_dir / "condition_producer_consumer.png", dpi=150)
         plt.close()
 
         # Verify operations occurred
@@ -487,12 +535,18 @@ class TestSyncComparison:
         Shows how different locking strategies affect concurrency.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
 
         # Simulated throughput under different strategies
-        strategies = ['No Lock\n(Unsafe)', 'Mutex\n(Exclusive)', 'RWLock\n(80% Reads)', 'Semaphore(3)\n(Limited)']
+        strategies = [
+            "No Lock\n(Unsafe)",
+            "Mutex\n(Exclusive)",
+            "RWLock\n(80% Reads)",
+            "Semaphore(3)\n(Limited)",
+        ]
 
         # Simulated throughput values (ops/sec)
         # No lock = maximum possible (but unsafe)
@@ -506,38 +560,39 @@ class TestSyncComparison:
         p95_latencies = [2, 20, 8, 10]
         p99_latencies = [5, 50, 15, 25]
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        _fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
         # Throughput comparison
         x = np.arange(len(strategies))
-        colors = ['red', 'blue', 'green', 'orange']
+        colors = ["red", "blue", "green", "orange"]
 
-        bars = ax1.bar(x, throughputs, color=colors, alpha=0.7, edgecolor='black')
+        bars = ax1.bar(x, throughputs, color=colors, alpha=0.7, edgecolor="black")
         ax1.set_xticks(x)
         ax1.set_xticklabels(strategies)
-        ax1.set_ylabel('Throughput (ops/sec)')
-        ax1.set_title('Throughput by Synchronization Strategy')
-        ax1.grid(True, alpha=0.3, axis='y')
+        ax1.set_ylabel("Throughput (ops/sec)")
+        ax1.set_title("Throughput by Synchronization Strategy")
+        ax1.grid(True, alpha=0.3, axis="y")
 
-        for bar, val in zip(bars, throughputs):
-            ax1.annotate(str(val), xy=(bar.get_x() + bar.get_width() / 2, val),
-                        ha='center', va='bottom')
+        for bar, val in zip(bars, throughputs, strict=False):
+            ax1.annotate(
+                str(val), xy=(bar.get_x() + bar.get_width() / 2, val), ha="center", va="bottom"
+            )
 
         # Latency comparison
         width = 0.25
-        ax2.bar(x - width, p50_latencies, width, label='p50', color='lightblue', edgecolor='black')
-        ax2.bar(x, p95_latencies, width, label='p95', color='steelblue', edgecolor='black')
-        ax2.bar(x + width, p99_latencies, width, label='p99', color='navy', edgecolor='black')
+        ax2.bar(x - width, p50_latencies, width, label="p50", color="lightblue", edgecolor="black")
+        ax2.bar(x, p95_latencies, width, label="p95", color="steelblue", edgecolor="black")
+        ax2.bar(x + width, p99_latencies, width, label="p99", color="navy", edgecolor="black")
 
         ax2.set_xticks(x)
         ax2.set_xticklabels(strategies)
-        ax2.set_ylabel('Latency (ms)')
-        ax2.set_title('Latency Percentiles by Strategy')
+        ax2.set_ylabel("Latency (ms)")
+        ax2.set_title("Latency Percentiles by Strategy")
         ax2.legend()
-        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.grid(True, alpha=0.3, axis="y")
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'sync_strategy_comparison.png', dpi=150)
+        plt.savefig(test_output_dir / "sync_strategy_comparison.png", dpi=150)
         plt.close()
 
         # Just verify the test completed
@@ -555,6 +610,7 @@ class TestBarrierVisualization:
         with faster workers waiting for slower ones.
         """
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
@@ -562,7 +618,7 @@ class TestBarrierVisualization:
         # Simulate 4 workers with 3 phases
         num_workers = 4
         num_phases = 3
-        barrier = Barrier(name="phase_sync", parties=num_workers)
+        Barrier(name="phase_sync", parties=num_workers)
 
         # Each worker has different processing times per phase
         # (simulates heterogeneous workers)
@@ -588,22 +644,30 @@ class TestBarrierVisualization:
                 else:
                     # Start after previous barrier
                     start = events[-1]["time"] if events else 0.0
-                    start = max(e["time"] for e in events if e["event"] == "barrier_break" and e["phase"] == phase - 1)
+                    start = max(
+                        e["time"]
+                        for e in events
+                        if e["event"] == "barrier_break" and e["phase"] == phase - 1
+                    )
 
                 finish = start + work_time
                 worker_completions.append((finish, worker))
-                events.append({
-                    "worker": worker,
-                    "phase": phase,
-                    "event": "work_start",
-                    "time": start,
-                })
-                events.append({
-                    "worker": worker,
-                    "phase": phase,
-                    "event": "work_done",
-                    "time": finish,
-                })
+                events.append(
+                    {
+                        "worker": worker,
+                        "phase": phase,
+                        "event": "work_start",
+                        "time": start,
+                    }
+                )
+                events.append(
+                    {
+                        "worker": worker,
+                        "phase": phase,
+                        "event": "work_done",
+                        "time": finish,
+                    }
+                )
 
             # Barrier breaks when last worker finishes
             worker_completions.sort()
@@ -611,23 +675,27 @@ class TestBarrierVisualization:
 
             for finish, worker in worker_completions:
                 wait_time = barrier_time - finish
-                events.append({
-                    "worker": worker,
-                    "phase": phase,
-                    "event": "waiting",
-                    "time": finish,
-                    "wait_duration": wait_time,
-                })
+                events.append(
+                    {
+                        "worker": worker,
+                        "phase": phase,
+                        "event": "waiting",
+                        "time": finish,
+                        "wait_duration": wait_time,
+                    }
+                )
 
-            events.append({
-                "worker": "all",
-                "phase": phase,
-                "event": "barrier_break",
-                "time": barrier_time,
-            })
+            events.append(
+                {
+                    "worker": "all",
+                    "phase": phase,
+                    "event": "barrier_break",
+                    "time": barrier_time,
+                }
+            )
 
         # Create visualization
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+        _fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
 
         workers = list(worker_times.keys())
         colors = plt.cm.Set2(np.linspace(0, 1, num_workers))
@@ -640,40 +708,59 @@ class TestBarrierVisualization:
 
             for phase in range(num_phases):
                 phase_events = [e for e in worker_events if e.get("phase") == phase]
-                work_start = next((e["time"] for e in phase_events if e["event"] == "work_start"), None)
-                work_done = next((e["time"] for e in phase_events if e["event"] == "work_done"), None)
+                work_start = next(
+                    (e["time"] for e in phase_events if e["event"] == "work_start"), None
+                )
+                work_done = next(
+                    (e["time"] for e in phase_events if e["event"] == "work_done"), None
+                )
                 waiting_event = next((e for e in phase_events if e["event"] == "waiting"), None)
 
                 if work_start is not None and work_done is not None:
                     # Work period
-                    ax1.barh(y, work_done - work_start, left=work_start, height=0.6,
-                            color=colors[y_positions[worker]], edgecolor='black', alpha=0.8)
+                    ax1.barh(
+                        y,
+                        work_done - work_start,
+                        left=work_start,
+                        height=0.6,
+                        color=colors[y_positions[worker]],
+                        edgecolor="black",
+                        alpha=0.8,
+                    )
 
                     # Wait period (if any)
                     if waiting_event and waiting_event["wait_duration"] > 0.001:
-                        ax1.barh(y, waiting_event["wait_duration"], left=work_done, height=0.6,
-                                color='lightgray', edgecolor='gray', hatch='//')
+                        ax1.barh(
+                            y,
+                            waiting_event["wait_duration"],
+                            left=work_done,
+                            height=0.6,
+                            color="lightgray",
+                            edgecolor="gray",
+                            hatch="//",
+                        )
 
         # Draw barrier lines
         barrier_times = [e["time"] for e in events if e["event"] == "barrier_break"]
         for bt in barrier_times:
-            ax1.axvline(x=bt, color='red', linestyle='--', linewidth=2, alpha=0.7)
+            ax1.axvline(x=bt, color="red", linestyle="--", linewidth=2, alpha=0.7)
 
         ax1.set_yticks(range(len(workers)))
         ax1.set_yticklabels(workers)
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Worker')
-        ax1.set_title('Barrier Synchronization: Phased Computation')
-        ax1.grid(True, alpha=0.3, axis='x')
+        ax1.set_xlabel("Time (s)")
+        ax1.set_ylabel("Worker")
+        ax1.set_title("Barrier Synchronization: Phased Computation")
+        ax1.grid(True, alpha=0.3, axis="x")
 
         # Add legend
         from matplotlib.patches import Patch
+
         legend_elements = [
-            Patch(facecolor='steelblue', edgecolor='black', label='Working'),
-            Patch(facecolor='lightgray', edgecolor='gray', hatch='//', label='Waiting at Barrier'),
-            Patch(facecolor='red', alpha=0.7, label='Barrier Break'),
+            Patch(facecolor="steelblue", edgecolor="black", label="Working"),
+            Patch(facecolor="lightgray", edgecolor="gray", hatch="//", label="Waiting at Barrier"),
+            Patch(facecolor="red", alpha=0.7, label="Barrier Break"),
         ]
-        ax1.legend(handles=legend_elements, loc='upper right')
+        ax1.legend(handles=legend_elements, loc="upper right")
 
         # Wait time analysis
         wait_times_by_worker = {w: [] for w in workers}
@@ -687,27 +774,44 @@ class TestBarrierVisualization:
         x = np.arange(len(workers))
         width = 0.35
 
-        ax2.bar(x - width/2, [wt * 1000 for wt in work_times], width, label='Work Time', color='steelblue')
-        ax2.bar(x + width/2, [wt * 1000 for wt in total_waits], width, label='Wait Time', color='lightcoral')
+        ax2.bar(
+            x - width / 2,
+            [wt * 1000 for wt in work_times],
+            width,
+            label="Work Time",
+            color="steelblue",
+        )
+        ax2.bar(
+            x + width / 2,
+            [wt * 1000 for wt in total_waits],
+            width,
+            label="Wait Time",
+            color="lightcoral",
+        )
 
         ax2.set_xticks(x)
         ax2.set_xticklabels(workers)
-        ax2.set_ylabel('Time (ms)')
-        ax2.set_title('Work vs Wait Time by Worker')
+        ax2.set_ylabel("Time (ms)")
+        ax2.set_title("Work vs Wait Time by Worker")
         ax2.legend()
-        ax2.grid(True, alpha=0.3, axis='y')
+        ax2.grid(True, alpha=0.3, axis="y")
 
         # Efficiency annotation
         total_work = sum(work_times)
         total_wait = sum(total_waits)
         efficiency = total_work / (total_work + total_wait) * 100
-        ax2.annotate(f'Parallel Efficiency: {efficiency:.1f}%',
-                    xy=(0.95, 0.95), xycoords='axes fraction',
-                    ha='right', va='top', fontsize=12,
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        ax2.annotate(
+            f"Parallel Efficiency: {efficiency:.1f}%",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=12,
+            bbox={"boxstyle": "round", "facecolor": "wheat", "alpha": 0.5},
+        )
 
         plt.tight_layout()
-        plt.savefig(test_output_dir / 'barrier_phased_computation.png', dpi=150)
+        plt.savefig(test_output_dir / "barrier_phased_computation.png", dpi=150)
         plt.close()
 
         # Verify barrier synchronization occurred

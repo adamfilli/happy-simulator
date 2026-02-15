@@ -24,11 +24,14 @@ from __future__ import annotations
 
 import random
 import sys
-from typing import Generic, TypeVar, Iterator
+from typing import TYPE_CHECKING, TypeVar
 
 from happysimulator.sketching.base import SamplingSketch
 
-T = TypeVar('T')
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+T = TypeVar("T")
 
 
 class ReservoirSampler(SamplingSketch[T]):
@@ -134,7 +137,7 @@ class ReservoirSampler(SamplingSketch[T]):
         """Whether the reservoir is at capacity."""
         return len(self._reservoir) >= self._size
 
-    def merge(self, other: "ReservoirSampler[T]") -> None:
+    def merge(self, other: ReservoirSampler[T]) -> None:
         """Merge another reservoir into this one.
 
         Maintains uniform sampling over the combined streams.
@@ -150,9 +153,7 @@ class ReservoirSampler(SamplingSketch[T]):
         if not isinstance(other, ReservoirSampler):
             raise TypeError(f"Can only merge with ReservoirSampler, got {type(other).__name__}")
         if other._size != self._size:
-            raise ValueError(
-                f"Cannot merge: capacity differs ({self._size} vs {other._size})"
-            )
+            raise ValueError(f"Cannot merge: capacity differs ({self._size} vs {other._size})")
 
         # Merge using weighted selection
         # Each item in self has probability self._total_count / combined_total
@@ -165,7 +166,7 @@ class ReservoirSampler(SamplingSketch[T]):
         # Create new reservoir by weighted sampling
         new_reservoir: list[T] = []
 
-        for i in range(min(self._size, combined_total)):
+        for _i in range(min(self._size, combined_total)):
             # Decide which reservoir to sample from
             if self._rng.random() < self._total_count / combined_total:
                 # Sample from self
@@ -178,7 +179,7 @@ class ReservoirSampler(SamplingSketch[T]):
                     idx = self._rng.randint(0, len(other._reservoir) - 1)
                     new_reservoir.append(other._reservoir[idx])
 
-        self._reservoir = new_reservoir[:self._size]
+        self._reservoir = new_reservoir[: self._size]
         self._total_count = combined_total
 
     @property

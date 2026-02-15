@@ -1,17 +1,15 @@
 """Tests for LeaderElection entity."""
 
-import pytest
-
+from happysimulator.components.consensus.election_strategies import BullyStrategy
+from happysimulator.components.consensus.leader_election import (
+    ElectionStats,
+    LeaderElection,
+)
+from happysimulator.components.network import Network
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.leader_election import (
-    LeaderElection,
-    ElectionStats,
-)
-from happysimulator.components.consensus.election_strategies import BullyStrategy
-from happysimulator.components.network import Network
 
 
 def make_clock(t=0.0):
@@ -70,7 +68,7 @@ class TestLeaderElectionVictory:
 
     def test_victory_sets_leader(self):
         """Handling an ElectionVictory message sets the leader."""
-        le, network, clock = make_election()
+        le, _network, clock = make_election()
 
         victory_event = Event(
             time=Instant.from_seconds(1.0),
@@ -85,7 +83,7 @@ class TestLeaderElectionVictory:
 
     def test_heartbeat_updates_leader(self):
         """Handling a LeaderHeartbeat updates the known leader."""
-        le, network, clock = make_election()
+        le, _network, clock = make_election()
 
         hb_event = Event(
             time=Instant.from_seconds(1.0),
@@ -101,7 +99,7 @@ class TestLeaderElectionVictory:
 
     def test_heartbeat_resets_timeout(self):
         """A heartbeat updates the last heartbeat time."""
-        le, network, clock = make_election()
+        le, _network, clock = make_election()
 
         hb_event = Event(
             time=Instant.from_seconds(5.0),
@@ -120,7 +118,7 @@ class TestLeaderElectionElection:
 
     def test_election_increments_term(self):
         """Starting an election increments the term."""
-        le, network, clock = make_election()
+        le, _network, clock = make_election()
         peer = DummyEntity(name="peer-1")
         peer.set_clock(clock)
         le.add_member(peer)
@@ -198,7 +196,7 @@ class TestLeaderElectionBully:
         peer.set_clock(clock)
         le.add_member(peer)
 
-        events = le._start_election()
+        le._start_election()
 
         # Should become leader since no higher nodes
         assert le.current_leader == "node-z"

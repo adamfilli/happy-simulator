@@ -7,15 +7,17 @@ views of event processing.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from happysimulator.core.temporal import Instant, Duration
-from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
+if TYPE_CHECKING:
+    from happysimulator.core.temporal import Duration, Instant
+    from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
 
 
 @dataclass
 class EventLifecycle:
     """Reconstructed lifecycle of a single event through the simulation."""
+
     event_id: str
     event_type: str | None = None
     scheduled_at: Instant | None = None
@@ -96,7 +98,10 @@ def trace_event_lifecycle(
     # Find schedule spans where this event's dequeue time matches
     if lifecycle.dequeued_at is not None:
         for span in recorder.spans:
-            if span.get("kind") == "simulation.schedule" and span.get("time") == lifecycle.dequeued_at:
+            if (
+                span.get("kind") == "simulation.schedule"
+                and span.get("time") == lifecycle.dequeued_at
+            ):
                 child_id = span.get("event_id")
                 if child_id and child_id != event_id:
                     lifecycle.child_event_ids.append(child_id)

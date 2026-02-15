@@ -19,10 +19,10 @@ Example:
 import math
 from collections import deque
 from dataclasses import dataclass
-from typing import TypeVar, Optional, Generic
+from typing import TypeVar
 
 from happysimulator.components.queue_policy import QueuePolicy
-from happysimulator.core.temporal import Instant, Duration
+from happysimulator.core.temporal import Duration, Instant
 
 T = TypeVar("T")
 
@@ -39,7 +39,7 @@ class CoDelStats:
 
 
 @dataclass
-class _QueuedItem(Generic[T]):
+class _QueuedItem[T]:
     """Item wrapper that tracks enqueue time."""
 
     item: T
@@ -71,7 +71,7 @@ class CoDelQueue(QueuePolicy[T]):
         target_delay: float = 0.005,
         interval: float = 0.100,
         capacity: int | None = None,
-        clock_func: callable = None,
+        clock_func: callable | None = None,
     ):
         """Initialize the CoDel queue.
 
@@ -173,7 +173,7 @@ class CoDelQueue(QueuePolicy[T]):
         self._enqueued += 1
         return True
 
-    def pop(self) -> Optional[T]:
+    def pop(self) -> T | None:
         """Remove and return the next item, applying CoDel algorithm.
 
         May drop items if delay exceeds target for too long.
@@ -221,7 +221,9 @@ class CoDelQueue(QueuePolicy[T]):
 
             # If we were recently dropping, start faster
             delta = self._count - self._last_count
-            self._count = 1 if delta < 1 or (now - self._drop_next).to_seconds() < self._interval else delta
+            self._count = (
+                1 if delta < 1 or (now - self._drop_next).to_seconds() < self._interval else delta
+            )
             self._last_count = self._count
             self._drop_next = self._control_law(now)
 
@@ -252,7 +254,7 @@ class CoDelQueue(QueuePolicy[T]):
             self._queue.popleft()
             self._dropped += 1
 
-    def peek(self) -> Optional[T]:
+    def peek(self) -> T | None:
         """Return the next item without removing it."""
         if not self._queue:
             return None

@@ -9,14 +9,14 @@ attributes and callable properties.
 """
 
 import logging
-from typing import List
+
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.data import Data
-from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.profile import Profile
+from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source
 
 logger = logging.getLogger(__name__)
@@ -59,20 +59,14 @@ class _ProbeEventProvider(EventProvider):
                 else:
                     val = raw_val
             else:
-                logger.warning(
-                    "Probe target '%s' has no attribute '%s'",
-                    target.name, metric
-                )
+                logger.warning("Probe target '%s' has no attribute '%s'", target.name, metric)
             data_sink.add_stat(val, event.time)
-            logger.debug(
-                "Probe sampled %s.%s = %s at %r",
-                target.name, metric, val, event.time
-            )
+            logger.debug("Probe sampled %s.%s = %s at %r", target.name, metric, val, event.time)
             return []
 
         return measure_callback
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         callback = self._create_measurement_callback()
         return [
             Event.once(
@@ -102,7 +96,14 @@ class Probe(Source):
         start_time: When to begin probing. Defaults to Instant.Epoch.
     """
 
-    def __init__(self, target: Entity, metric: str, data: Data, interval: float = 1.0, start_time: Instant | None = None):
+    def __init__(
+        self,
+        target: Entity,
+        metric: str,
+        data: Data,
+        interval: float = 1.0,
+        start_time: Instant | None = None,
+    ):
         self.target = target
         self.metric = metric
         self.data_sink = data
@@ -117,11 +118,10 @@ class Probe(Source):
         super().__init__(
             name=f"Probe_{target.name}_{metric}",
             event_provider=provider,
-            arrival_time_provider=arrival_time_provider
+            arrival_time_provider=arrival_time_provider,
         )
         logger.info(
-            "Probe created: target=%s metric=%s interval=%.3fs",
-            target.name, metric, interval
+            "Probe created: target=%s metric=%s interval=%.3fs", target.name, metric, interval
         )
 
     @classmethod

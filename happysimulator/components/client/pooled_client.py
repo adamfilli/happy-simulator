@@ -26,10 +26,11 @@ Example:
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Any, Callable, Generator
+from typing import Any
 
-from happysimulator.components.client.connection_pool import Connection, ConnectionPool
+from happysimulator.components.client.connection_pool import ConnectionPool
 from happysimulator.components.client.retry import NoRetry, RetryPolicy
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
@@ -236,9 +237,7 @@ class PooledClient(Entity):
         # New outgoing request
         return self._send_request(event)
 
-    def _send_request(
-        self, event: Event
-    ) -> Generator[float, None, list[Event] | None]:
+    def _send_request(self, event: Event) -> Generator[float, None, list[Event] | None]:
         """Send a request using a pooled connection."""
         metadata = event.context.get("metadata", {})
         request_id = metadata.get("request_id")

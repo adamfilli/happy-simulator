@@ -29,25 +29,21 @@ from __future__ import annotations
 import argparse
 import random
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
-    Data,
     Entity,
     Event,
     EventProvider,
-    FIFOQueue,
     Instant,
     LatencyTracker,
-    Probe,
-    QueuedResource,
-    Resource,
     Simulation,
     SimulationSummary,
     Source,
 )
-from happysimulator.components.common import Counter
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -58,14 +54,14 @@ from happysimulator.components.common import Counter
 class ElevatorConfig:
     """Configuration for the elevator system simulation."""
 
-    duration_s: float = 7200.0        # 2 hours
+    duration_s: float = 7200.0  # 2 hours
     num_floors: int = 10
     num_elevators: int = 3
     elevator_capacity: int = 8
-    floor_travel_time: float = 3.0    # seconds per floor
-    door_time: float = 5.0            # door open/close
-    lobby_rate_per_min: float = 2.0   # ground floor
-    upper_rate_per_min: float = 0.3   # per upper floor
+    floor_travel_time: float = 3.0  # seconds per floor
+    door_time: float = 5.0  # door open/close
+    lobby_rate_per_min: float = 2.0  # ground floor
+    upper_rate_per_min: float = 0.3  # per upper floor
     seed: int = 42
 
 
@@ -77,8 +73,9 @@ class ElevatorConfig:
 class FloorProvider(EventProvider):
     """Generates passenger events from a specific floor."""
 
-    def __init__(self, target: Entity, floor: int, num_floors: int,
-                 stop_after: Instant | None = None):
+    def __init__(
+        self, target: Entity, floor: int, num_floors: int, stop_after: Instant | None = None
+    ):
         self._target = target
         self._floor = floor
         self._num_floors = num_floors
@@ -118,8 +115,14 @@ class FloorProvider(EventProvider):
 class ElevatorCar(Entity):
     """Single elevator car that transports passengers."""
 
-    def __init__(self, name: str, capacity: int, floor_travel_time: float,
-                 door_time: float, downstream: Entity):
+    def __init__(
+        self,
+        name: str,
+        capacity: int,
+        floor_travel_time: float,
+        door_time: float,
+        downstream: Entity,
+    ):
         super().__init__(name)
         self._capacity = capacity
         self.floor_travel_time = floor_travel_time
@@ -163,9 +166,7 @@ class ElevatorCar(Entity):
         self._trips += 1
         self._passengers_carried += 1
 
-        return [
-            self.forward(event, self.downstream, event_type="Arrived")
-        ]
+        return [self.forward(event, self.downstream, event_type="Arrived")]
 
 
 class ElevatorDispatcher(Entity):
@@ -182,9 +183,7 @@ class ElevatorDispatcher(Entity):
         self._next_elevator = (self._next_elevator + 1) % len(self.elevators)
         self._dispatched += 1
 
-        return [
-            self.forward(event, elevator, event_type="Passenger")
-        ]
+        return [self.forward(event, elevator, event_type="Passenger")]
 
 
 # =============================================================================
@@ -220,8 +219,11 @@ def run_elevator_simulation(config: ElevatorConfig | None = None) -> ElevatorRes
 
     elevators = [
         ElevatorCar(
-            f"Elevator_{i}", config.elevator_capacity,
-            config.floor_travel_time, config.door_time, sink,
+            f"Elevator_{i}",
+            config.elevator_capacity,
+            config.floor_travel_time,
+            config.door_time,
+            sink,
         )
         for i in range(config.num_elevators)
     ]
@@ -230,8 +232,8 @@ def run_elevator_simulation(config: ElevatorConfig | None = None) -> ElevatorRes
 
     stop_after = Instant.from_seconds(config.duration_s)
 
-    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
     from happysimulator.load.profile import ConstantRateProfile
+    from happysimulator.load.providers.poisson_arrival import PoissonArrivalTimeProvider
 
     sources: list[Source] = []
     floor_providers: list[FloorProvider] = []
@@ -289,7 +291,7 @@ def print_summary(result: ElevatorResult) -> None:
     print("ELEVATOR SYSTEM SIMULATION RESULTS")
     print("=" * 65)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Duration:            {config.duration_s / 60:.0f} minutes")
     print(f"  Floors:              {config.num_floors}")
     print(f"  Elevators:           {config.num_elevators}")
@@ -298,19 +300,19 @@ def print_summary(result: ElevatorResult) -> None:
     print(f"  Upper floor rate:    {config.upper_rate_per_min:.1f}/min each")
 
     total = sum(p.generated for p in result.floor_providers)
-    print(f"\nPassenger Flow:")
+    print("\nPassenger Flow:")
     print(f"  Total passengers:    {total}")
     print(f"  Dispatched:          {result.dispatcher._dispatched}")
     print(f"  From lobby:          {result.floor_providers[0].generated}")
     print(f"  From upper floors:   {sum(p.generated for p in result.floor_providers[1:])}")
 
-    print(f"\nElevator Stats:")
+    print("\nElevator Stats:")
     for elev in result.elevators:
         print(f"  {elev.name}: trips={elev.trips}, passengers={elev.passengers_carried}")
 
     completed = result.sink.count
     if completed > 0:
-        print(f"\nWait + Travel Latency:")
+        print("\nWait + Travel Latency:")
         print(f"  Completed:           {completed}")
         print(f"  Mean:    {result.sink.mean_latency():.1f}s")
         print(f"  p50:     {result.sink.p50():.1f}s")

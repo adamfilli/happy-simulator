@@ -19,8 +19,9 @@ Example:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -81,10 +82,7 @@ class TargetUtilization:
             return min_instances
 
         # Calculate average utilization
-        utilizations = []
-        for b in backends:
-            if hasattr(b, 'utilization'):
-                utilizations.append(b.utilization)
+        utilizations = [b.utilization for b in backends if hasattr(b, "utilization")]
 
         if not utilizations:
             return current_count
@@ -126,10 +124,7 @@ class StepScaling:
         if not backends:
             return current_count
 
-        utilizations = []
-        for b in backends:
-            if hasattr(b, 'utilization'):
-                utilizations.append(b.utilization)
+        utilizations = [b.utilization for b in backends if hasattr(b, "utilization")]
 
         if not utilizations:
             return current_count
@@ -160,7 +155,7 @@ class QueueDepthScaling:
     ) -> int:
         total_depth = 0
         for b in backends:
-            if hasattr(b, 'depth'):
+            if hasattr(b, "depth"):
                 total_depth += b.depth
 
         if total_depth >= self._scale_out_threshold:
@@ -261,7 +256,10 @@ class AutoScaler(Entity):
 
         logger.debug(
             "[%s] AutoScaler initialized: min=%d, max=%d, interval=%.1fs",
-            name, min_instances, max_instances, evaluation_interval,
+            name,
+            min_instances,
+            max_instances,
+            evaluation_interval,
         )
 
     @property
@@ -331,8 +329,10 @@ class AutoScaler(Entity):
         current_count = len(backends)
 
         desired = self._policy.evaluate(
-            backends, current_count,
-            self._min_instances, self._max_instances,
+            backends,
+            current_count,
+            self._min_instances,
+            self._max_instances,
         )
 
         if desired > current_count:
@@ -341,13 +341,15 @@ class AutoScaler(Entity):
             self._try_scale_in(current_count - desired)
 
         # Schedule next evaluation
-        return [Event(
-            time=self.now + Duration.from_seconds(self._evaluation_interval),
-            event_type="_autoscaler_evaluate",
-            target=self,
-            daemon=True,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now + Duration.from_seconds(self._evaluation_interval),
+                event_type="_autoscaler_evaluate",
+                target=self,
+                daemon=True,
+                context={},
+            )
+        ]
 
     def _in_cooldown(self, action: str) -> bool:
         """Check if we're in a cooldown period for the given action."""
@@ -390,15 +392,20 @@ class AutoScaler(Entity):
         self._instances_added += to_add
 
         event = ScalingEvent(
-            time=self.now, action="scale_out",
-            from_count=current, to_count=new_count,
+            time=self.now,
+            action="scale_out",
+            from_count=current,
+            to_count=new_count,
             reason=f"Added {to_add} instances",
         )
         self.scaling_history.append(event)
 
         logger.info(
             "[%s] Scale out: %d -> %d (added %d)",
-            self.name, current, new_count, to_add,
+            self.name,
+            current,
+            new_count,
+            to_add,
         )
 
     def _try_scale_in(self, count: int) -> None:
@@ -426,13 +433,18 @@ class AutoScaler(Entity):
         self._instances_removed += to_remove
 
         event = ScalingEvent(
-            time=self.now, action="scale_in",
-            from_count=current, to_count=new_count,
+            time=self.now,
+            action="scale_in",
+            from_count=current,
+            to_count=new_count,
             reason=f"Removed {to_remove} instances",
         )
         self.scaling_history.append(event)
 
         logger.info(
             "[%s] Scale in: %d -> %d (removed %d)",
-            self.name, current, new_count, to_remove,
+            self.name,
+            current,
+            new_count,
+            to_remove,
         )

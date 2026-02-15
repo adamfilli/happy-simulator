@@ -1,7 +1,5 @@
 """Tests for PhiAccrualDetector."""
 
-import pytest
-
 from happysimulator.components.consensus import PhiAccrualDetector
 
 

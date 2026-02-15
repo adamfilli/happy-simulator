@@ -83,7 +83,9 @@ class TestREDQueueBehavior:
         # Once avg >= max_threshold (10), drop probability = 100%
         # So we should see either probabilistic or forced drops
         total_drops = queue.stats.dropped_probabilistic + queue.stats.dropped_forced
-        assert total_drops > 0, f"Expected some drops but got none. Enqueued={queue.stats.enqueued}, len={len(queue)}"
+        assert total_drops > 0, (
+            f"Expected some drops but got none. Enqueued={queue.stats.enqueued}, len={len(queue)}"
+        )
 
     def test_fifo_dequeue(self):
         """REDQueue dequeues in FIFO order."""
@@ -130,7 +132,7 @@ class TestREDQueueBehavior:
         for i in range(10):
             queue.push(i)
 
-        for i in range(5):
+        for _i in range(5):
             queue.pop()
 
         assert queue.stats.enqueued == 10

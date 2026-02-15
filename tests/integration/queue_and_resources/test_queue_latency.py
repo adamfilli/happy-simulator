@@ -1,30 +1,33 @@
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from dataclasses import dataclass, field
-import math
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from happysimulator.components.common import Sink
-from happysimulator.instrumentation.data import Data
-from happysimulator.instrumentation.probe import Probe
 from happysimulator.components.queue import Queue
 from happysimulator.components.queue_driver import QueueDriver
 from happysimulator.components.queue_policy import FIFOQueue, LIFOQueue, QueuePolicy
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
-from happysimulator.load.profile import Profile
-from happysimulator.load.source import Source
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
+from happysimulator.instrumentation.probe import Probe
+from happysimulator.load.profile import Profile
+from happysimulator.load.source import Source
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
+
+    from happysimulator.core.event import Event
+    from happysimulator.instrumentation.data import Data
 
 
 @dataclass(frozen=True)
 class LinearRampProfile(Profile):
-
     """Linear ramp from start_rate to end_rate over t_end_s seconds."""
 
     t_end_s: float
@@ -41,7 +44,6 @@ class LinearRampProfile(Profile):
 
 @dataclass
 class ConcurrencyLimitedServer(Entity):
-
     """A server with configurable concurrency and fixed service time."""
 
     name: str = "Server"
@@ -72,7 +74,7 @@ class ConcurrencyLimitedServer(Entity):
 def _write_csv(path: Path, header: list[str], rows: list[list[object]]) -> None:
     import csv
 
-    with open(path, "w", newline="", encoding="utf-8") as f:
+    with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(rows)
@@ -138,8 +140,11 @@ def run_queue_latency_scenario(
     queue_depth_probe, queue_depth_data = Probe.on(queue, "depth", interval=probe_interval_s)
 
     source = Source.with_profile(
-        profile=profile, target=queue,
-        poisson=False, name="RequestSource", stop_after=duration_s,
+        profile=profile,
+        target=queue,
+        poisson=False,
+        name="RequestSource",
+        stop_after=duration_s,
     )
 
     sim = Simulation(
@@ -155,7 +160,7 @@ def run_queue_latency_scenario(
 
     buckets: dict[int, list[float]] = defaultdict(list)
     for t_s, latency_s in zip(times_s, latencies_s, strict=False):
-        bucket = int(math.floor(t_s / bucket_size_s))
+        bucket = math.floor(t_s / bucket_size_s)
         buckets[bucket].append(latency_s)
 
     bucket_times_s: list[float] = []
@@ -217,7 +222,12 @@ def run_queue_latency_scenario(
         _write_csv(
             test_output_dir / "queue_depth_timeseries.csv",
             header=["index", "time_s", "queue_depth"],
-            rows=[[i, t, d] for i, (t, d) in enumerate(zip(queue_depth_times_s, queue_depth_values, strict=False))],
+            rows=[
+                [i, t, d]
+                for i, (t, d) in enumerate(
+                    zip(queue_depth_times_s, queue_depth_values, strict=False)
+                )
+            ],
         )
 
         matplotlib = pytest.importorskip("matplotlib")
@@ -258,7 +268,6 @@ def run_queue_latency_scenario(
 
 
 def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
-
     """Ramp load above capacity should increase average end-to-end latency."""
 
     duration_s = 30.0
@@ -292,7 +301,6 @@ def test_queue_latency_with_ramp_source(test_output_dir: Path) -> None:
 
 
 def test_queue_latency_with_ramp_source_lifo(test_output_dir: Path) -> None:
-
     """Same scenario as FIFO test, but with a LIFO queue policy."""
 
     duration_s = 30.0
@@ -324,7 +332,6 @@ def test_queue_latency_with_ramp_source_lifo(test_output_dir: Path) -> None:
 
 
 def test_queue_latency_fifo_and_lifo_have_same_average_when_drained() -> None:
-
     """FIFO vs LIFO averages only differ under censoring; draining removes bias."""
 
     duration_s = 30.0

@@ -20,9 +20,9 @@ Example:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -179,7 +179,8 @@ class Saga(Entity):
     def active_instances(self) -> int:
         """Number of currently active saga instances."""
         return sum(
-            1 for inst in self._instances.values()
+            1
+            for inst in self._instances.values()
             if inst.state in (SagaState.RUNNING, SagaState.COMPENSATING)
         )
 

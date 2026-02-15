@@ -1,14 +1,12 @@
 """Tests for MultiPaxosNode (multi-decree Paxos with stable leader)."""
 
-import pytest
-
+from happysimulator.components.consensus.multi_paxos import MultiPaxosNode, MultiPaxosStats
+from happysimulator.components.consensus.paxos import Ballot
+from happysimulator.components.network import Network
 from happysimulator.core.clock import Clock
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
 from happysimulator.core.temporal import Instant
-from happysimulator.components.consensus.multi_paxos import MultiPaxosNode, MultiPaxosStats
-from happysimulator.components.consensus.paxos import Ballot
-from happysimulator.components.network import Network
 
 
 def make_clock(t=0.0):
@@ -99,7 +97,7 @@ class TestMultiPaxosPhase1:
 
     def test_begin_phase1_sends_prepare(self):
         """_begin_phase1 sends Prepare to all peers."""
-        nodes, _, clock = make_multi_paxos_cluster(3)
+        nodes, _, _clock = make_multi_paxos_cluster(3)
         node = nodes[0]
 
         events = node._begin_phase1()
@@ -121,12 +119,14 @@ class TestMultiPaxosPrepareHandler:
             time=Instant.from_seconds(1.0),
             event_type="MultiPaxosPrepare",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "log_length": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "log_length": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(prepare_event)
@@ -147,12 +147,14 @@ class TestMultiPaxosPrepareHandler:
             time=Instant.from_seconds(1.0),
             event_type="MultiPaxosPrepare",
             target=node,
-            context={"metadata": {
-                "ballot_number": 5,
-                "ballot_node": "node-0",
-                "log_length": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 5,
+                    "ballot_node": "node-0",
+                    "log_length": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = node.handle_event(prepare_event)
@@ -167,7 +169,7 @@ class TestMultiPaxosBecomeLeader:
 
     def test_become_leader_processes_pending(self):
         """When becoming leader, pending commands are assigned to slots."""
-        nodes, _, clock = make_multi_paxos_cluster(3)
+        nodes, _, _clock = make_multi_paxos_cluster(3)
         node = nodes[0]
 
         # Queue a pending command
@@ -194,14 +196,16 @@ class TestMultiPaxosAcceptHandler:
             time=Instant.from_seconds(1.0),
             event_type="MultiPaxosAccept",
             target=follower,
-            context={"metadata": {
-                "ballot_number": 1,
-                "ballot_node": "node-0",
-                "slot": 1,
-                "command": {"op": "set", "key": "k", "value": "v"},
-                "commit_index": 0,
-                "source": "node-0",
-            }},
+            context={
+                "metadata": {
+                    "ballot_number": 1,
+                    "ballot_node": "node-0",
+                    "slot": 1,
+                    "command": {"op": "set", "key": "k", "value": "v"},
+                    "commit_index": 0,
+                    "source": "node-0",
+                }
+            },
         )
         clock.update(Instant.from_seconds(1.0))
         result = follower.handle_event(accept_event)
@@ -217,7 +221,7 @@ class TestMultiPaxosCommit:
 
     def test_commit_applies_to_state_machine(self):
         """Committed entries are applied to the state machine."""
-        nodes, _, clock = make_multi_paxos_cluster(3)
+        nodes, _, _clock = make_multi_paxos_cluster(3)
         node = nodes[0]
 
         # Manually become leader and add an entry

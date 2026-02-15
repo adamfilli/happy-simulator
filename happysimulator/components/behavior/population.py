@@ -11,19 +11,22 @@ import logging
 import random
 
 logger = logging.getLogger(__name__)
-from dataclasses import dataclass, field
-from typing import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.components.behavior.agent import Agent
+from happysimulator.components.behavior.social_network import SocialGraph
+from happysimulator.components.behavior.state import AgentState
+from happysimulator.components.behavior.stats import PopulationStats
 from happysimulator.components.behavior.traits import (
-    PersonalityTraits,
     TraitDistribution,
     UniformTraitDistribution,
 )
-from happysimulator.components.behavior.state import AgentState
-from happysimulator.components.behavior.decision import DecisionModel
-from happysimulator.components.behavior.social_network import SocialGraph
-from happysimulator.components.behavior.stats import PopulationStats
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from happysimulator.components.behavior.decision import DecisionModel
 
 
 @dataclass
@@ -108,19 +111,26 @@ class Population:
             name_prefix: Prefix for auto-generated agent names.
         """
         rng = random.Random(seed)
-        big_five_names = ["openness", "conscientiousness", "extraversion",
-                          "agreeableness", "neuroticism"]
+        big_five_names = [
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+        ]
         dist = UniformTraitDistribution(big_five_names)
 
         agents: list[Agent] = []
         for i in range(size):
             traits = dist.sample(rng)
-            agents.append(Agent(
-                name=f"{name_prefix}_{i}",
-                traits=traits,
-                decision_model=decision_model,
-                seed=rng.randint(0, 2**31),
-            ))
+            agents.append(
+                Agent(
+                    name=f"{name_prefix}_{i}",
+                    traits=traits,
+                    decision_model=decision_model,
+                    seed=rng.randint(0, 2**31),
+                )
+            )
 
         names = [a.name for a in agents]
         graph = _build_graph(names, graph_type, rng)
@@ -149,13 +159,16 @@ class Population:
         """
         rng = random.Random(seed)
         agents: list[Agent] = []
-        big_five_names = ["openness", "conscientiousness", "extraversion",
-                          "agreeableness", "neuroticism"]
+        big_five_names = [
+            "openness",
+            "conscientiousness",
+            "extraversion",
+            "agreeableness",
+            "neuroticism",
+        ]
 
         # Calculate segment sizes
-        sizes: list[int] = []
-        for seg in segments:
-            sizes.append(int(seg.fraction * total_size))
+        sizes: list[int] = [int(seg.fraction * total_size) for seg in segments]
 
         # Distribute remainder to largest segment
         remainder = total_size - sum(sizes)
@@ -164,7 +177,7 @@ class Population:
             sizes[max_idx] += remainder
 
         agent_idx = 0
-        for seg, seg_size in zip(segments, sizes):
+        for seg, seg_size in zip(segments, sizes, strict=False):
             seg_rng = random.Random(seg.seed if seg.seed is not None else rng.randint(0, 2**31))
             dist = seg.trait_distribution or UniformTraitDistribution(big_five_names)
 
@@ -173,13 +186,15 @@ class Population:
                 state = seg.initial_state_factory() if seg.initial_state_factory else AgentState()
                 model = seg.decision_model_factory() if seg.decision_model_factory else None
 
-                agents.append(Agent(
-                    name=f"{name_prefix}_{agent_idx}",
-                    traits=traits,
-                    decision_model=model,
-                    state=state,
-                    seed=seg_rng.randint(0, 2**31),
-                ))
+                agents.append(
+                    Agent(
+                        name=f"{name_prefix}_{agent_idx}",
+                        traits=traits,
+                        decision_model=model,
+                        state=state,
+                        seed=seg_rng.randint(0, 2**31),
+                    )
+                )
                 agent_idx += 1
 
         names = [a.name for a in agents]
@@ -187,16 +202,14 @@ class Population:
         return cls(agents, graph)
 
 
-def _build_graph(
-    names: list[str], graph_type: str, rng: random.Random
-) -> SocialGraph:
+def _build_graph(names: list[str], graph_type: str, rng: random.Random) -> SocialGraph:
     """Build a social graph of the specified type."""
     if graph_type == "complete":
         return SocialGraph.complete(names, rng=rng)
-    elif graph_type == "random":
+    if graph_type == "random":
         return SocialGraph.random_erdos_renyi(names, p=0.1, rng=rng)
-    else:  # "small_world" default
-        k = min(4, len(names) - 1) if len(names) > 1 else 0
-        if k < 2:
-            return SocialGraph.complete(names, rng=rng)
-        return SocialGraph.small_world(names, k=k, p_rewire=0.1, rng=rng)
+    # "small_world" default
+    k = min(4, len(names) - 1) if len(names) > 1 else 0
+    if k < 2:
+        return SocialGraph.complete(names, rng=rng)
+    return SocialGraph.small_world(names, k=k, p_rewire=0.1, rng=rng)

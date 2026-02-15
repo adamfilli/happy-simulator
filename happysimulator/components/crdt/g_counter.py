@@ -34,7 +34,7 @@ class GCounter:
         node_id: Identifier for this replica.
     """
 
-    __slots__ = ("_node_id", "_counts")
+    __slots__ = ("_counts", "_node_id")
 
     def __init__(self, node_id: str):
         self._node_id = node_id

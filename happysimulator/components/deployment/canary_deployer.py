@@ -22,8 +22,9 @@ Example:
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -99,10 +100,10 @@ class ErrorRateEvaluator:
         return canary_info <= self._max_error_rate
 
     def _get_error_rate(self, backend: Entity) -> float:
-        if hasattr(backend, 'stats'):
+        if hasattr(backend, "stats"):
             stats = backend.stats
-            total = getattr(stats, 'requests_completed', 0) + getattr(stats, 'requests_rejected', 0)
-            failures = getattr(stats, 'requests_rejected', 0) + getattr(stats, 'total_failures', 0)
+            total = getattr(stats, "requests_completed", 0) + getattr(stats, "requests_rejected", 0)
+            failures = getattr(stats, "requests_rejected", 0) + getattr(stats, "total_failures", 0)
             if total > 0:
                 return failures / total
         return 0.0
@@ -128,14 +129,16 @@ class LatencyEvaluator:
             return canary_latency <= self._max_latency
 
         baseline_latencies = [self._get_avg_latency(b) for b in baseline_backends]
-        avg_baseline = sum(baseline_latencies) / len(baseline_latencies) if baseline_latencies else 0
+        avg_baseline = (
+            sum(baseline_latencies) / len(baseline_latencies) if baseline_latencies else 0
+        )
 
         if avg_baseline > 0:
             return canary_latency <= avg_baseline * self._threshold_multiplier
         return canary_latency <= self._max_latency
 
     def _get_avg_latency(self, backend: Entity) -> float:
-        if hasattr(backend, 'average_service_time'):
+        if hasattr(backend, "average_service_time"):
             return backend.average_service_time
         return 0.0
 
@@ -217,7 +220,8 @@ class CanaryDeployer(Entity):
 
         logger.debug(
             "[%s] CanaryDeployer initialized: stages=%d",
-            name, len(self._stages),
+            name,
+            len(self._stages),
         )
 
     @property
@@ -289,23 +293,27 @@ class CanaryDeployer(Entity):
 
         logger.info("[%s] Canary deployment started", self.name)
 
-        return [Event(
-            time=self.now,
-            event_type="_canary_stage_start",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="_canary_stage_start",
+                target=self,
+                context={},
+            )
+        ]
 
     def _start_stage(self) -> list[Event]:
         """Configure traffic splitting for the current stage."""
         stage_idx = self.state.current_stage
         if stage_idx >= len(self._stages):
-            return [Event(
-                time=self.now,
-                event_type="_canary_promote",
-                target=self,
-                context={},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="_canary_promote",
+                    target=self,
+                    context={},
+                )
+            ]
 
         stage = self._stages[stage_idx]
         self.state.canary_traffic_pct = stage.traffic_percentage
@@ -316,16 +324,20 @@ class CanaryDeployer(Entity):
 
         logger.info(
             "[%s] Stage %d: %.0f%% traffic to canary",
-            self.name, stage_idx + 1, stage.traffic_percentage * 100,
+            self.name,
+            stage_idx + 1,
+            stage.traffic_percentage * 100,
         )
 
         # Schedule periodic evaluation
-        return [Event(
-            time=self.now + Duration.from_seconds(self._evaluation_interval),
-            event_type="_canary_evaluate",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now + Duration.from_seconds(self._evaluation_interval),
+                event_type="_canary_evaluate",
+                target=self,
+                context={},
+            )
+        ]
 
     def _evaluate(self) -> list[Event]:
         """Evaluate canary health at current stage."""
@@ -335,18 +347,21 @@ class CanaryDeployer(Entity):
         self._evaluations_performed += 1
 
         is_healthy = self._metric_evaluator.is_healthy(
-            self._canary, self._baseline_backends,
+            self._canary,
+            self._baseline_backends,
         )
 
         if not is_healthy:
             self._evaluations_failed += 1
             logger.warning("[%s] Canary evaluation failed", self.name)
-            return [Event(
-                time=self.now,
-                event_type="_canary_rollback",
-                target=self,
-                context={},
-            )]
+            return [
+                Event(
+                    time=self.now,
+                    event_type="_canary_rollback",
+                    target=self,
+                    context={},
+                )
+            ]
 
         self._evaluations_passed += 1
 
@@ -360,27 +375,33 @@ class CanaryDeployer(Entity):
             self.state.current_stage += 1
 
             if self.state.current_stage >= len(self._stages):
-                return [Event(
+                return [
+                    Event(
+                        time=self.now,
+                        event_type="_canary_promote",
+                        target=self,
+                        context={},
+                    )
+                ]
+
+            return [
+                Event(
                     time=self.now,
-                    event_type="_canary_promote",
+                    event_type="_canary_stage_start",
                     target=self,
                     context={},
-                )]
-
-            return [Event(
-                time=self.now,
-                event_type="_canary_stage_start",
-                target=self,
-                context={},
-            )]
+                )
+            ]
 
         # Continue evaluating
-        return [Event(
-            time=self.now + Duration.from_seconds(self._evaluation_interval),
-            event_type="_canary_evaluate",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now + Duration.from_seconds(self._evaluation_interval),
+                event_type="_canary_evaluate",
+                target=self,
+                context={},
+            )
+        ]
 
     def _promote(self) -> list[Event]:
         """Promote canary to production: remove old backends."""
@@ -392,12 +413,14 @@ class CanaryDeployer(Entity):
         # Reset weights
         self._reset_weights()
 
-        return [Event(
-            time=self.now,
-            event_type="_canary_complete",
-            target=self,
-            context={},
-        )]
+        return [
+            Event(
+                time=self.now,
+                event_type="_canary_complete",
+                target=self,
+                context={},
+            )
+        ]
 
     def _do_rollback(self) -> list[Event]:
         """Roll back: remove canary, restore weights."""
@@ -425,9 +448,11 @@ class CanaryDeployer(Entity):
 
         Uses WeightedRoundRobin strategy on the load balancer.
         """
-        strategy = self._load_balancer.strategy if hasattr(self._load_balancer, 'strategy') else None
+        strategy = (
+            self._load_balancer.strategy if hasattr(self._load_balancer, "strategy") else None
+        )
 
-        if strategy is not None and hasattr(strategy, 'set_weight'):
+        if strategy is not None and hasattr(strategy, "set_weight"):
             # Calculate weights: if canary gets pct, each baseline gets
             # (1-pct) / num_baseline of traffic
             num_baseline = len(self._baseline_backends)
@@ -454,7 +479,9 @@ class CanaryDeployer(Entity):
 
     def _reset_weights(self) -> None:
         """Reset all backend weights to 1."""
-        strategy = self._load_balancer.strategy if hasattr(self._load_balancer, 'strategy') else None
-        if strategy is not None and hasattr(strategy, 'set_weight'):
+        strategy = (
+            self._load_balancer.strategy if hasattr(self._load_balancer, "strategy") else None
+        )
+        if strategy is not None and hasattr(strategy, "set_weight"):
             for b in self._load_balancer.all_backends:
                 strategy.set_weight(b, 1)

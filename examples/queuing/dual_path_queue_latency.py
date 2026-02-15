@@ -88,7 +88,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator, List
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
@@ -105,6 +105,8 @@ from happysimulator import (
     Source,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Profile: Stepwise load function
@@ -153,7 +155,7 @@ class RequestProvider(EventProvider):
         self._stop_after = stop_after
         self.generated_requests: int = 0
 
-    def get_events(self, time: Instant) -> List[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self._stop_after is not None and time > self._stop_after:
             return []
 
@@ -294,7 +296,7 @@ def bucket_latencies(
     """Bucket latencies by time and compute statistics."""
     buckets: dict[int, list[float]] = defaultdict(list)
     for t_s, latency_s in zip(times_s, latencies_s, strict=False):
-        bucket = int(math.floor(t_s / bucket_size_s))
+        bucket = math.floor(t_s / bucket_size_s)
         buckets[bucket].append(latency_s)
 
     result = {
@@ -328,6 +330,7 @@ def bucket_latencies(
 @dataclass
 class SimulationResult:
     """Results from the dual-path queue simulation."""
+
     sink: LatencyTrackingSink
     entity1: Server
     entity2: Server
@@ -344,12 +347,12 @@ def run_dual_path_simulation(
     duration_s: float = 60.0,
     drain_s: float = 10.0,
     step_time_s: float = 30.0,
-    rate_before: float = 4.0,        # events/sec (below capacity)
-    rate_after_source1: float = 12.0, # events/sec (above capacity for path 1)
-    rate_source2: float = 4.0,        # events/sec (constant, below capacity)
+    rate_before: float = 4.0,  # events/sec (below capacity)
+    rate_after_source1: float = 12.0,  # events/sec (above capacity for path 1)
+    rate_source2: float = 4.0,  # events/sec (constant, below capacity)
     entity1_service_time_s: float = 0.1,  # fast entity
     entity2_service_time_s: float = 0.2,  # slow entity (2x latency)
-    entity3_service_time_s: float = 0.05, # final entity
+    entity3_service_time_s: float = 0.05,  # final entity
     probe_interval_s: float = 0.1,
     output_dir: Path | None = None,
 ) -> SimulationResult:
@@ -466,10 +469,22 @@ def visualize_results(result: SimulationResult, output_dir: Path, step_time_s: f
     # Figure 1: Latency time series with percentiles
     fig, ax = plt.subplots(figsize=(12, 5))
     ax.plot(latency_buckets["time_s"], latency_buckets["avg"], label="avg", linewidth=2)
-    ax.plot(latency_buckets["time_s"], latency_buckets["p0"], label="p0 (min)", linestyle="--", alpha=0.7)
+    ax.plot(
+        latency_buckets["time_s"],
+        latency_buckets["p0"],
+        label="p0 (min)",
+        linestyle="--",
+        alpha=0.7,
+    )
     ax.plot(latency_buckets["time_s"], latency_buckets["p50"], label="p50", linewidth=2)
     ax.plot(latency_buckets["time_s"], latency_buckets["p99"], label="p99", linewidth=2)
-    ax.plot(latency_buckets["time_s"], latency_buckets["p100"], label="p100 (max)", linestyle="--", alpha=0.7)
+    ax.plot(
+        latency_buckets["time_s"],
+        latency_buckets["p100"],
+        label="p100 (max)",
+        linestyle="--",
+        alpha=0.7,
+    )
     ax.axvline(x=step_time_s, color="red", linestyle=":", label=f"Load step at {step_time_s}s")
     ax.set_title("End-to-End Latency Over Time (1s buckets)")
     ax.set_xlabel("Time (s)")
@@ -483,17 +498,31 @@ def visualize_results(result: SimulationResult, output_dir: Path, step_time_s: f
 
     # Figure 1b: Latency time series for first half only (before load step)
     pre_step_times = [t for t in times_s if t < step_time_s]
-    pre_step_latencies = [lat for t, lat in zip(times_s, latencies_s, strict=False) if t < step_time_s]
+    pre_step_latencies = [
+        lat for t, lat in zip(times_s, latencies_s, strict=False) if t < step_time_s
+    ]
 
     if pre_step_times:
         pre_step_buckets = bucket_latencies(pre_step_times, pre_step_latencies, bucket_size_s=1.0)
 
         fig, ax = plt.subplots(figsize=(12, 5))
         ax.plot(pre_step_buckets["time_s"], pre_step_buckets["avg"], label="avg", linewidth=2)
-        ax.plot(pre_step_buckets["time_s"], pre_step_buckets["p0"], label="p0 (min)", linestyle="--", alpha=0.7)
+        ax.plot(
+            pre_step_buckets["time_s"],
+            pre_step_buckets["p0"],
+            label="p0 (min)",
+            linestyle="--",
+            alpha=0.7,
+        )
         ax.plot(pre_step_buckets["time_s"], pre_step_buckets["p50"], label="p50", linewidth=2)
         ax.plot(pre_step_buckets["time_s"], pre_step_buckets["p99"], label="p99", linewidth=2)
-        ax.plot(pre_step_buckets["time_s"], pre_step_buckets["p100"], label="p100 (max)", linestyle="--", alpha=0.7)
+        ax.plot(
+            pre_step_buckets["time_s"],
+            pre_step_buckets["p100"],
+            label="p100 (max)",
+            linestyle="--",
+            alpha=0.7,
+        )
         ax.set_title(f"End-to-End Latency - First Half (before load step at {step_time_s}s)")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Latency (s)")
@@ -557,7 +586,7 @@ def visualize_results(result: SimulationResult, output_dir: Path, step_time_s: f
     # Figure 4: Throughput over time (requests completed per second)
     completion_buckets: dict[int, int] = defaultdict(int)
     for t in times_s:
-        bucket = int(math.floor(t))
+        bucket = math.floor(t)
         completion_buckets[bucket] += 1
 
     throughput_times = sorted(completion_buckets.keys())
@@ -583,15 +612,15 @@ def print_summary(result: SimulationResult, step_time_s: float) -> None:
     print("SIMULATION RESULTS SUMMARY")
     print("=" * 60)
 
-    print(f"\nLoad Configuration:")
+    print("\nLoad Configuration:")
     print(f"  Step time: {step_time_s}s (Source1 rate increases)")
 
-    print(f"\nRequests Generated:")
+    print("\nRequests Generated:")
     print(f"  Source1: {result.source1_generated}")
     print(f"  Source2: {result.source2_generated}")
     print(f"  Total:   {result.source1_generated + result.source2_generated}")
 
-    print(f"\nRequests Processed:")
+    print("\nRequests Processed:")
     print(f"  Entity1 (fast, 0.1s): {result.entity1.stats_processed}")
     print(f"  Entity2 (slow, 0.2s): {result.entity2.stats_processed}")
     print(f"  Entity3 (final):      {result.entity3.stats_processed}")
@@ -599,13 +628,15 @@ def print_summary(result: SimulationResult, step_time_s: float) -> None:
 
     # Verify Entity3 sees combined volume
     combined_e1_e2 = result.entity1.stats_processed + result.entity2.stats_processed
-    print(f"\n  Entity3 received {result.entity3.stats_processed} (Entity1 + Entity2 = {combined_e1_e2})")
+    print(
+        f"\n  Entity3 received {result.entity3.stats_processed} (Entity1 + Entity2 = {combined_e1_e2})"
+    )
 
     # Latency statistics
     latencies = result.sink.latencies_s
     if latencies:
         sorted_latencies = sorted(latencies)
-        print(f"\nOverall Latency Statistics:")
+        print("\nOverall Latency Statistics:")
         print(f"  Average: {sum(latencies) / len(latencies):.4f}s")
         print(f"  p0 (min): {percentile_sorted(sorted_latencies, 0.0):.4f}s")
         print(f"  p50:      {percentile_sorted(sorted_latencies, 0.5):.4f}s")
@@ -614,7 +645,7 @@ def print_summary(result: SimulationResult, step_time_s: float) -> None:
 
     # Latency by source
     latencies_by_source = result.sink.latencies_by_source()
-    print(f"\nLatency by Source:")
+    print("\nLatency by Source:")
     for source_id in sorted(latencies_by_source.keys()):
         source_latencies = sorted(latencies_by_source[source_id])
         if source_latencies:
@@ -638,8 +669,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Dual-path queue latency simulation")
     parser.add_argument("--duration", type=float, default=60.0, help="Simulation duration (s)")
     parser.add_argument("--drain", type=float, default=10.0, help="Drain time after load stops (s)")
-    parser.add_argument("--step-time", type=float, default=30.0, help="Time when Source1 load increases (s)")
-    parser.add_argument("--output", type=str, default="output/dual_path_queue", help="Output directory")
+    parser.add_argument(
+        "--step-time", type=float, default=30.0, help="Time when Source1 load increases (s)"
+    )
+    parser.add_argument(
+        "--output", type=str, default="output/dual_path_queue", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 
@@ -651,11 +686,11 @@ if __name__ == "__main__":
         duration_s=args.duration,
         drain_s=args.drain,
         step_time_s=args.step_time,
-        rate_before=4.0,           # 4 req/s (below Entity1 capacity of 10 req/s)
-        rate_after_source1=12.0,   # 12 req/s (above Entity1 capacity)
-        rate_source2=4.0,          # 4 req/s constant (below Entity2 capacity of 5 req/s)
-        entity1_service_time_s=0.1,   # 10 req/s capacity
-        entity2_service_time_s=0.2,   # 5 req/s capacity (2x latency)
+        rate_before=4.0,  # 4 req/s (below Entity1 capacity of 10 req/s)
+        rate_after_source1=12.0,  # 12 req/s (above Entity1 capacity)
+        rate_source2=4.0,  # 4 req/s constant (below Entity2 capacity of 5 req/s)
+        entity1_service_time_s=0.1,  # 10 req/s capacity
+        entity2_service_time_s=0.2,  # 5 req/s capacity (2x latency)
         entity3_service_time_s=0.05,  # 20 req/s capacity
     )
 

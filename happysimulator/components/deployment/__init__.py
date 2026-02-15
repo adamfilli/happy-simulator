@@ -9,11 +9,6 @@ from happysimulator.components.deployment.auto_scaler import (
     StepScaling,
     TargetUtilization,
 )
-from happysimulator.components.deployment.rolling_deployer import (
-    DeploymentState,
-    RollingDeployer,
-    RollingDeployerStats,
-)
 from happysimulator.components.deployment.canary_deployer import (
     CanaryDeployer,
     CanaryDeployerStats,
@@ -23,26 +18,31 @@ from happysimulator.components.deployment.canary_deployer import (
     LatencyEvaluator,
     MetricEvaluator,
 )
+from happysimulator.components.deployment.rolling_deployer import (
+    DeploymentState,
+    RollingDeployer,
+    RollingDeployerStats,
+)
 
 __all__ = [
     # Auto Scaler
     "AutoScaler",
     "AutoScalerStats",
-    "ScalingPolicy",
-    "TargetUtilization",
-    "StepScaling",
-    "QueueDepthScaling",
-    "ScalingEvent",
-    # Rolling Deployer
-    "RollingDeployer",
-    "RollingDeployerStats",
-    "DeploymentState",
     # Canary Deployer
     "CanaryDeployer",
     "CanaryDeployerStats",
     "CanaryStage",
     "CanaryState",
-    "MetricEvaluator",
+    "DeploymentState",
     "ErrorRateEvaluator",
     "LatencyEvaluator",
+    "MetricEvaluator",
+    "QueueDepthScaling",
+    # Rolling Deployer
+    "RollingDeployer",
+    "RollingDeployerStats",
+    "ScalingEvent",
+    "ScalingPolicy",
+    "StepScaling",
+    "TargetUtilization",
 ]

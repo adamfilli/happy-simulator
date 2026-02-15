@@ -29,23 +29,25 @@ Source (100 req/s, constant rate)
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     ConstantArrivalTimeProvider,
     ConstantRateProfile,
+    DistributedFieldProvider,
     Entity,
     Event,
     Instant,
     Simulation,
     Source,
     ZipfDistribution,
-    DistributedFieldProvider,
 )
 from happysimulator.components.datastore import KVStore, SoftTTLCache
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Configuration
@@ -83,7 +85,7 @@ class CacheClient(Entity):
         self.misses: dict[int, int] = defaultdict(int)
         self.total_requests: int = 0
 
-    def handle_event(self, event: Event) -> Generator[float, None, None]:
+    def handle_event(self, event: Event) -> Generator[float]:
         customer_id = event.context["customer_id"]
         self.total_requests += 1
 
@@ -160,17 +162,19 @@ def analyze_cohorts(
         actual_reqs = hits + misses
         actual_share = actual_reqs / total_requests if total_requests > 0 else 0.0
 
-        results.append(CohortResult(
-            name=name,
-            start_rank=start_rank,
-            end_rank=end_rank,
-            num_customers=n,
-            expected_traffic_share=expected_share,
-            actual_requests=actual_reqs,
-            actual_traffic_share=actual_share,
-            hits=hits,
-            misses=misses,
-        ))
+        results.append(
+            CohortResult(
+                name=name,
+                start_rank=start_rank,
+                end_rank=end_rank,
+                num_customers=n,
+                expected_traffic_share=expected_share,
+                actual_requests=actual_reqs,
+                actual_traffic_share=actual_share,
+                hits=hits,
+                misses=misses,
+            )
+        )
 
     return results
 
@@ -191,8 +195,10 @@ class SimulationResult:
     cohorts: list[CohortResult]
 
 
-def run_simulation(config: CohortConfig = CohortConfig()) -> SimulationResult:
+def run_simulation(config: CohortConfig | None = None) -> SimulationResult:
     """Wire up components and run the simulation."""
+    if config is None:
+        config = CohortConfig()
     # Backing store pre-populated with customer records
     db = KVStore(name="db", read_latency=config.db_read_latency)
     for i in range(config.num_customers):
@@ -271,7 +277,7 @@ def print_summary(result: SimulationResult) -> None:
     print("ZIPF CACHE COHORT ANALYSIS")
     print("=" * 72)
 
-    print(f"\nConfiguration:")
+    print("\nConfiguration:")
     print(f"  Customers:       {cfg.num_customers}")
     print(f"  Zipf exponent:   s={cfg.zipf_s}")
     print(f"  Arrival rate:    {cfg.arrival_rate} req/s")
@@ -279,7 +285,7 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Cache capacity:  {cfg.cache_capacity}")
     print(f"  Seed:            {cfg.seed}")
 
-    print(f"\nCache Stats:")
+    print("\nCache Stats:")
     print(f"  Total reads:     {cache.stats.reads}")
     print(f"  Fresh hits:      {cache.stats.fresh_hits}")
     print(f"  Stale hits:      {cache.stats.stale_hits}")
@@ -287,14 +293,18 @@ def print_summary(result: SimulationResult) -> None:
     print(f"  Evictions:       {cache.stats.evictions}")
     print(f"  Hit rate:        {cache.stats.total_hit_rate:.1%}")
 
-    print(f"\n{'Cohort':<16} {'Customers':>10} {'Requests':>10} {'Traffic':>10} "
-          f"{'Expected':>10} {'Hits':>8} {'Misses':>8} {'Hit Rate':>10}")
+    print(
+        f"\n{'Cohort':<16} {'Customers':>10} {'Requests':>10} {'Traffic':>10} "
+        f"{'Expected':>10} {'Hits':>8} {'Misses':>8} {'Hit Rate':>10}"
+    )
     print("-" * 92)
 
     for c in result.cohorts:
-        print(f"{c.name:<16} {c.num_customers:>10} {c.actual_requests:>10} "
-              f"{c.actual_traffic_share:>9.1%} {c.expected_traffic_share:>9.1%} "
-              f"{c.hits:>8} {c.misses:>8} {c.hit_rate:>9.1%}")
+        print(
+            f"{c.name:<16} {c.num_customers:>10} {c.actual_requests:>10} "
+            f"{c.actual_traffic_share:>9.1%} {c.expected_traffic_share:>9.1%} "
+            f"{c.hits:>8} {c.misses:>8} {c.hit_rate:>9.1%}"
+        )
 
     print("=" * 72)
 
@@ -305,6 +315,7 @@ def visualize_results(
 ) -> None:
     """Generate a 3-subplot figure with cohort analysis."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -323,9 +334,15 @@ def visualize_results(
     ax1.set_title("Cache Hit Rate by Customer Cohort")
     ax1.set_ylim(0, 105)
     ax1.grid(axis="y", alpha=0.3)
-    for bar, rate in zip(bars, hit_rates):
-        ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1.5,
-                 f"{rate:.1f}%", ha="center", va="bottom", fontsize=9)
+    for bar, rate in zip(bars, hit_rates, strict=False):
+        ax1.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1.5,
+            f"{rate:.1f}%",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+        )
 
     # --- Subplot 2: Expected vs actual traffic share ---
     ax2 = axes[1]
@@ -333,8 +350,24 @@ def visualize_results(
     width = 0.35
     expected = [c.expected_traffic_share * 100 for c in cohorts]
     actual = [c.actual_traffic_share * 100 for c in cohorts]
-    ax2.bar([i - width / 2 for i in x], expected, width, label="Expected (Zipf)", color="lightcoral", edgecolor="black", linewidth=0.5)
-    ax2.bar([i + width / 2 for i in x], actual, width, label="Actual", color="steelblue", edgecolor="black", linewidth=0.5)
+    ax2.bar(
+        [i - width / 2 for i in x],
+        expected,
+        width,
+        label="Expected (Zipf)",
+        color="lightcoral",
+        edgecolor="black",
+        linewidth=0.5,
+    )
+    ax2.bar(
+        [i + width / 2 for i in x],
+        actual,
+        width,
+        label="Actual",
+        color="steelblue",
+        edgecolor="black",
+        linewidth=0.5,
+    )
     ax2.set_ylabel("Traffic Share (%)")
     ax2.set_title("Expected vs Actual Traffic Share by Cohort")
     ax2.set_xticks(list(x))
@@ -363,7 +396,9 @@ def visualize_results(
     # Mark the cache capacity boundary
     cap = result.config.cache_capacity
     if cap < top_n:
-        ax3.axvline(x=cap, color="red", linestyle="--", linewidth=1.5, label=f"Cache capacity ({cap})")
+        ax3.axvline(
+            x=cap, color="red", linestyle="--", linewidth=1.5, label=f"Cache capacity ({cap})"
+        )
         ax3.legend()
 
     fig.tight_layout()
@@ -383,13 +418,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Zipf-distributed traffic and cache hit rates by customer cohort",
     )
-    parser.add_argument("--customers", type=int, default=1000, help="Number of customers (default: 1000)")
+    parser.add_argument(
+        "--customers", type=int, default=1000, help="Number of customers (default: 1000)"
+    )
     parser.add_argument("--zipf-s", type=float, default=1.0, help="Zipf exponent (default: 1.0)")
-    parser.add_argument("--rate", type=float, default=100.0, help="Arrival rate in req/s (default: 100)")
-    parser.add_argument("--duration", type=float, default=60.0, help="Simulation duration in seconds (default: 60)")
+    parser.add_argument(
+        "--rate", type=float, default=100.0, help="Arrival rate in req/s (default: 100)"
+    )
+    parser.add_argument(
+        "--duration", type=float, default=60.0, help="Simulation duration in seconds (default: 60)"
+    )
     parser.add_argument("--cache-size", type=int, default=200, help="Cache capacity (default: 200)")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed (default: 42, use -1 for random)")
-    parser.add_argument("--output", type=str, default="output/zipf_cache_cohorts", help="Output directory")
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Random seed (default: 42, use -1 for random)"
+    )
+    parser.add_argument(
+        "--output", type=str, default="output/zipf_cache_cohorts", help="Output directory"
+    )
     parser.add_argument("--no-viz", action="store_true", help="Skip visualization generation")
     args = parser.parse_args()
 

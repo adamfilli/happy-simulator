@@ -10,12 +10,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.clock import Clock
-from happysimulator.components.network.link import NetworkLink
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.components.network.link import NetworkLink
+    from happysimulator.core.clock import Clock
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +64,7 @@ class Partition:
         """True if any of this partition's pairs are still active."""
         if self.pairs & self._network._partitioned_pairs:
             return True
-        if self.directed_pairs & self._network._directed_partitions:
-            return True
-        return False
+        return bool(self.directed_pairs & self._network._directed_partitions)
 
     def heal(self) -> None:
         """Remove only this partition's pairs, leaving others intact."""
@@ -96,17 +98,13 @@ class Network(Entity):
     default_link: NetworkLink | None = None
 
     # Routing table: (source_name, dest_name) -> NetworkLink
-    _routes: dict[tuple[str, str], NetworkLink] = field(
-        default_factory=dict, init=False
-    )
+    _routes: dict[tuple[str, str], NetworkLink] = field(default_factory=dict, init=False)
 
     # Partition state: set of frozenset pairs (bidirectional)
     _partitioned_pairs: set[frozenset[str]] = field(default_factory=set, init=False)
 
     # Directed partition state: set of (source, dest) tuples (asymmetric)
-    _directed_partitions: set[tuple[str, str]] = field(
-        default_factory=set, init=False
-    )
+    _directed_partitions: set[tuple[str, str]] = field(default_factory=set, init=False)
 
     # Track all known entities for partition validation
     _known_entities: dict[str, Entity] = field(default_factory=dict, init=False)
@@ -128,9 +126,7 @@ class Network(Entity):
         for link in self._routes.values():
             link.set_clock(clock)
 
-    def add_link(
-        self, source: Entity, dest: Entity, link: NetworkLink
-    ) -> None:
+    def add_link(self, source: Entity, dest: Entity, link: NetworkLink) -> None:
         """Configure a unidirectional link between two entities.
 
         Args:
@@ -153,9 +149,7 @@ class Network(Entity):
             link.name,
         )
 
-    def add_bidirectional_link(
-        self, a: Entity, b: Entity, link: NetworkLink
-    ) -> None:
+    def add_bidirectional_link(self, a: Entity, b: Entity, link: NetworkLink) -> None:
         """Configure a bidirectional link between two entities.
 
         Creates two routes (a->b and b->a) using the same link characteristics.
@@ -228,9 +222,7 @@ class Network(Entity):
                 self._known_entities[entity_b.name] = entity_b
                 if asymmetric:
                     directed_pairs.add((entity_a.name, entity_b.name))
-                    self._directed_partitions.add(
-                        (entity_a.name, entity_b.name)
-                    )
+                    self._directed_partitions.add((entity_a.name, entity_b.name))
                 else:
                     pair = frozenset([entity_a.name, entity_b.name])
                     bidirectional_pairs.add(pair)
@@ -285,9 +277,7 @@ class Network(Entity):
         pair = frozenset([source_name, dest_name])
         if pair in self._partitioned_pairs:
             return True
-        if (source_name, dest_name) in self._directed_partitions:
-            return True
-        return False
+        return (source_name, dest_name) in self._directed_partitions
 
     def get_link(self, source_name: str, dest_name: str) -> NetworkLink | None:
         """Get the link for a source-destination pair.
@@ -323,9 +313,7 @@ class Network(Entity):
             )
         return result
 
-    def handle_event(
-        self, event: Event
-    ) -> Generator[float, None, list[Event] | Event | None]:
+    def handle_event(self, event: Event) -> Generator[float, None, list[Event] | Event | None]:
         """Route an event through the appropriate network link.
 
         The event must have 'source' and 'destination' in its context metadata

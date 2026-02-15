@@ -13,13 +13,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from happysimulator.components.queue_policy import FIFOQueue
-from happysimulator.components.rate_limiter.policy import RateLimiterPolicy
-from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
+
+if TYPE_CHECKING:
+    from happysimulator.components.rate_limiter.policy import RateLimiterPolicy
+    from happysimulator.core.clock import Clock
+    from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +121,9 @@ class RateLimitedEntity(Entity):
             self._queued += 1
             logger.debug(
                 "[%.3f][%s] Queued request; queue_depth=%d",
-                now.to_seconds(), self.name, len(self._queue),
+                now.to_seconds(),
+                self.name,
+                len(self._queue),
             )
             return self._ensure_poll_scheduled(now)
 
@@ -127,7 +132,9 @@ class RateLimitedEntity(Entity):
         self.dropped_times.append(now)
         logger.debug(
             "[%.3f][%s] Dropped request; queue full (%d)",
-            now.to_seconds(), self.name, len(self._queue),
+            now.to_seconds(),
+            self.name,
+            len(self._queue),
         )
         return []
 
@@ -155,7 +162,8 @@ class RateLimitedEntity(Entity):
         self.forwarded_times.append(now)
         logger.debug(
             "[%.3f][%s] Forwarded request",
-            now.to_seconds(), self.name,
+            now.to_seconds(),
+            self.name,
         )
         forward_event = Event(
             time=now,

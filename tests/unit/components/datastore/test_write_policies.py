@@ -3,9 +3,9 @@
 import pytest
 
 from happysimulator.components.datastore import (
-    WriteThrough,
-    WriteBack,
     WriteAround,
+    WriteBack,
+    WriteThrough,
 )
 
 

@@ -32,7 +32,6 @@ class Profile(ABC):
         Returns:
             The rate value (interpretation depends on usage context).
         """
-        pass
 
 
 @dataclass(frozen=True)

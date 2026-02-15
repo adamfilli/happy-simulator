@@ -3,7 +3,7 @@
 import pytest
 
 from happysimulator.components.queue_policies import DeadlineQueue
-from happysimulator.core.temporal import Instant, Duration
+from happysimulator.core.temporal import Instant
 
 
 class TestDeadlineQueueCreation:

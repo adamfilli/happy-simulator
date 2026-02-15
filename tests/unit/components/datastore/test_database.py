@@ -4,7 +4,6 @@ import pytest
 
 from happysimulator.components.datastore import (
     Database,
-    DatabaseStats,
     Transaction,
     TransactionState,
 )
@@ -108,6 +107,7 @@ class TestDatabaseQuery:
 
     def test_callable_query_latency(self):
         """Uses callable for query-dependent latency."""
+
         def get_latency(query: str) -> float:
             if "SELECT" in query.upper():
                 return 0.001

@@ -2,12 +2,12 @@
 
 import pytest
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.decorators import simulatable
+from happysimulator.core.event import Event
 from happysimulator.core.protocols import Simulatable
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
-from happysimulator.core.clock import Clock
 
 
 class TestSimulatableDecorator:
@@ -15,6 +15,7 @@ class TestSimulatableDecorator:
 
     def test_decorator_adds_set_clock(self):
         """Decorated class gets set_clock method."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -29,6 +30,7 @@ class TestSimulatableDecorator:
 
     def test_decorator_adds_now_property(self):
         """Decorated class gets now property."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -42,6 +44,7 @@ class TestSimulatableDecorator:
 
     def test_now_raises_before_clock_injection(self):
         """Accessing now before simulation raises RuntimeError."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -56,6 +59,7 @@ class TestSimulatableDecorator:
 
     def test_now_works_after_clock_injection(self):
         """Accessing now after set_clock works."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -72,6 +76,7 @@ class TestSimulatableDecorator:
 
     def test_satisfies_simulatable_protocol(self):
         """Decorated class is recognized as Simulatable."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -85,6 +90,7 @@ class TestSimulatableDecorator:
 
     def test_has_capacity_default(self):
         """Decorated class gets default has_capacity returning True."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -98,6 +104,7 @@ class TestSimulatableDecorator:
 
     def test_has_capacity_can_be_overridden(self):
         """User-defined has_capacity is preserved."""
+
         @simulatable
         class LimitedServer:
             def __init__(self, name: str):
@@ -121,6 +128,7 @@ class TestSimulatableInSimulation:
 
     def test_simple_counter_simulation(self):
         """A decorated counter can count events in a simulation."""
+
         @simulatable
         class Counter:
             def __init__(self, name: str):
@@ -129,7 +137,7 @@ class TestSimulatableInSimulation:
 
             def handle_event(self, event):
                 self.count += 1
-                return None
+                return
 
         counter = Counter("my-counter")
 
@@ -154,6 +162,7 @@ class TestSimulatableInSimulation:
 
     def test_decorated_class_can_access_now(self):
         """Decorated class can use self.now during event handling."""
+
         @simulatable
         class TimeRecorder:
             def __init__(self, name: str):
@@ -162,7 +171,7 @@ class TestSimulatableInSimulation:
 
             def handle_event(self, event):
                 self.recorded_times.append(self.now)
-                return None
+                return
 
         recorder = TimeRecorder("recorder")
 
@@ -188,6 +197,7 @@ class TestSimulatableInSimulation:
 
     def test_decorated_class_can_return_events(self):
         """Decorated class can schedule follow-up events."""
+
         @simulatable
         class PingPong:
             def __init__(self, name: str):
@@ -223,6 +233,7 @@ class TestSimulatableInSimulation:
 
     def test_decorated_class_with_generator(self):
         """Decorated class can use generator-style multi-step processing."""
+
         @simulatable
         class SlowProcessor:
             def __init__(self, name: str):

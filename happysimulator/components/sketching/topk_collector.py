@@ -6,14 +6,17 @@ convenient access to top-k queries and statistics.
 
 from __future__ import annotations
 
-from typing import Callable, TypeVar, Hashable
+from collections.abc import Callable, Hashable
+from typing import TYPE_CHECKING, TypeVar
 
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
 from happysimulator.sketching.topk import TopK
-from happysimulator.sketching.base import FrequencyEstimate
 
-T = TypeVar('T', bound=Hashable)
+if TYPE_CHECKING:
+    from happysimulator.core.event import Event
+    from happysimulator.sketching.base import FrequencyEstimate
+
+T = TypeVar("T", bound=Hashable)
 
 
 class TopKCollector(Entity):

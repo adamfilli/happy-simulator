@@ -78,13 +78,13 @@ class MerkleNode:
 
 def _hash_leaf(key: str, value: Any) -> str:
     """Hash a single key-value pair."""
-    data = f"{key}:{value!r}".encode("utf-8")
+    data = f"{key}:{value!r}".encode()
     return hashlib.sha256(data).hexdigest()
 
 
 def _hash_children(left_hash: str, right_hash: str) -> str:
     """Hash two child hashes together."""
-    data = f"{left_hash}|{right_hash}".encode("utf-8")
+    data = f"{left_hash}|{right_hash}".encode()
     return hashlib.sha256(data).hexdigest()
 
 

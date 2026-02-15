@@ -10,12 +10,16 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING
 
-from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.components.queue_policy import FIFOQueue, QueuePolicy
-from happysimulator.core.entity import Entity
+from happysimulator.components.queued_resource import QueuedResource
 from happysimulator.core.event import Event
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+    from happysimulator.core.entity import Entity
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +89,9 @@ class RenegingQueuedResource(QueuedResource):
             self._reneged += 1
             logger.debug(
                 "[%s] Item reneged (waited %.3fs > patience %.3fs)",
-                self.name, wait_time, patience_s,
+                self.name,
+                wait_time,
+                patience_s,
             )
             if self.reneged_target is not None:
                 return [

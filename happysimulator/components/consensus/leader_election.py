@@ -11,9 +11,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from happysimulator.components.consensus.election_strategies import BullyStrategy, ElectionStrategy
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.components.consensus.election_strategies import ElectionStrategy, BullyStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ class ElectionStats:
         elections_won: Elections won by this node.
         elections_participated: Elections this node participated in.
     """
+
     current_leader: str | None = None
     current_term: int = 0
     elections_started: int = 0
@@ -144,10 +145,11 @@ class LeaderElection(Entity):
                         daemon=True,
                     )
                     events.append(hb)
-        elif not self._election_in_progress:
-            # Check if leader timed out
-            if now_s - self._last_leader_heartbeat > self._election_timeout:
-                events.extend(self._start_election())
+        elif (
+            not self._election_in_progress
+            and now_s - self._last_leader_heartbeat > self._election_timeout
+        ):
+            events.extend(self._start_election())
 
         # Schedule next check
         interval = self._heartbeat_interval if self.is_leader else self._election_timeout
@@ -171,7 +173,7 @@ class LeaderElection(Entity):
             self._current_term = term
             self._last_leader_heartbeat = self.now.to_seconds()
             self._election_in_progress = False
-        return None
+        return
 
     def _handle_election_message(self, event: Event) -> list[Event]:
         metadata = event.context.get("metadata", {})
@@ -271,7 +273,5 @@ class LeaderElection(Entity):
 
     def __repr__(self) -> str:
         return (
-            f"LeaderElection({self.name}, "
-            f"leader={self._current_leader}, "
-            f"term={self._current_term})"
+            f"LeaderElection({self.name}, leader={self._current_leader}, term={self._current_term})"
         )

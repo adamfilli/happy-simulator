@@ -9,21 +9,22 @@ from __future__ import annotations
 
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Any
 
+from happysimulator.components.consensus.log import Log, LogEntry
+from happysimulator.components.consensus.raft_state_machine import KVStateMachine, StateMachine
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.sim_future import SimFuture
-from happysimulator.components.consensus.log import Log, LogEntry
-from happysimulator.components.consensus.raft_state_machine import StateMachine, KVStateMachine
 
 logger = logging.getLogger(__name__)
 
 
 class RaftState(Enum):
     """Raft node states."""
+
     FOLLOWER = auto()
     CANDIDATE = auto()
     LEADER = auto()
@@ -43,6 +44,7 @@ class RaftStats:
         elections_started: Total elections initiated.
         votes_received: Total votes received in current/past elections.
     """
+
     state: RaftState = RaftState.FOLLOWER
     current_term: int = 0
     current_leader: str | None = None
@@ -221,7 +223,8 @@ class RaftNode(Entity):
 
         logger.debug(
             "[%s] Starting election for term %d",
-            self.name, self._current_term,
+            self.name,
+            self._current_term,
         )
 
         events: list[Event] = []
@@ -263,15 +266,17 @@ class RaftNode(Entity):
             self._step_down(term)
 
         vote_granted = False
-        if term >= self._current_term:
-            if self._voted_for is None or self._voted_for == candidate:
-                # Check log is at least as up-to-date
-                if (last_log_term > self._log.last_term or
-                    (last_log_term == self._log.last_term and
-                     last_log_index >= self._log.last_index)):
-                    vote_granted = True
-                    self._voted_for = candidate
-                    self._current_term = term
+        if (
+            term >= self._current_term
+            and (self._voted_for is None or self._voted_for == candidate)
+            and (
+                last_log_term > self._log.last_term
+                or (last_log_term == self._log.last_term and last_log_index >= self._log.last_index)
+            )
+        ):
+            vote_granted = True
+            self._voted_for = candidate
+            self._current_term = term
 
         resp = self._network.send(
             source=self,
@@ -364,8 +369,7 @@ class RaftNode(Entity):
 
             entries = self._log.entries_after(prev_log_index)
             entry_dicts = [
-                {"index": e.index, "term": e.term, "command": e.command}
-                for e in entries
+                {"index": e.index, "term": e.term, "command": e.command} for e in entries
             ]
 
             msg = self._network.send(
@@ -495,41 +499,39 @@ class RaftNode(Entity):
             self._match_index[follower] = match_index
             # Try to advance commit index
             return self._try_advance_commit()
-        else:
-            # Decrement next_index and retry
-            current = self._next_index.get(follower, 1)
-            self._next_index[follower] = max(1, current - 1)
-            # Resend AppendEntries to this follower
-            peer = self._find_peer(follower)
-            if peer:
-                prev_log_index = self._next_index[follower] - 1
-                prev_log_term = 0
-                if prev_log_index > 0:
-                    prev_entry = self._log.get(prev_log_index)
-                    if prev_entry:
-                        prev_log_term = prev_entry.term
+        # Decrement next_index and retry
+        current = self._next_index.get(follower, 1)
+        self._next_index[follower] = max(1, current - 1)
+        # Resend AppendEntries to this follower
+        peer = self._find_peer(follower)
+        if peer:
+            prev_log_index = self._next_index[follower] - 1
+            prev_log_term = 0
+            if prev_log_index > 0:
+                prev_entry = self._log.get(prev_log_index)
+                if prev_entry:
+                    prev_log_term = prev_entry.term
 
-                entries = self._log.entries_after(prev_log_index)
-                entry_dicts = [
-                    {"index": e.index, "term": e.term, "command": e.command}
-                    for e in entries
-                ]
+            entries = self._log.entries_after(prev_log_index)
+            entry_dicts = [
+                {"index": e.index, "term": e.term, "command": e.command} for e in entries
+            ]
 
-                msg = self._network.send(
-                    source=self,
-                    destination=peer,
-                    event_type="RaftAppendEntries",
-                    payload={
-                        "term": self._current_term,
-                        "leader_id": self.name,
-                        "prev_log_index": prev_log_index,
-                        "prev_log_term": prev_log_term,
-                        "entries": entry_dicts,
-                        "leader_commit": self._log.commit_index,
-                    },
-                    daemon=True,
-                )
-                return [msg]
+            msg = self._network.send(
+                source=self,
+                destination=peer,
+                event_type="RaftAppendEntries",
+                payload={
+                    "term": self._current_term,
+                    "leader_id": self.name,
+                    "prev_log_index": prev_log_index,
+                    "prev_log_term": prev_log_term,
+                    "entries": entry_dicts,
+                    "leader_commit": self._log.commit_index,
+                },
+                daemon=True,
+            )
+            return [msg]
         return []
 
     def _try_advance_commit(self) -> list[Event]:
@@ -541,7 +543,7 @@ class RaftNode(Entity):
                 continue
 
             count = 1  # self
-            for peer_name, match_idx in self._match_index.items():
+            for match_idx in self._match_index.values():
                 if match_idx >= n:
                     count += 1
 

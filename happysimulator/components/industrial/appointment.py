@@ -80,16 +80,15 @@ class AppointmentScheduler(Entity):
             for e in scheduler.start_events():
                 sim.schedule(e)
         """
-        events: list[Event] = []
-        for t in self.appointments:
-            events.append(
-                Event(
-                    time=Instant.from_seconds(t),
-                    event_type=_APPOINTMENT_TICK,
-                    target=self,
-                    context={"appointment_time": t},
-                )
+        events: list[Event] = [
+            Event(
+                time=Instant.from_seconds(t),
+                event_type=_APPOINTMENT_TICK,
+                target=self,
+                context={"appointment_time": t},
             )
+            for t in self.appointments
+        ]
         return events
 
     def handle_event(self, event: Event) -> list[Event]:
@@ -98,9 +97,7 @@ class AppointmentScheduler(Entity):
 
         if random.random() < self.no_show_rate:
             self._no_shows += 1
-            logger.debug(
-                "[%s] No-show at t=%.2f", self.name, self.now.to_seconds()
-            )
+            logger.debug("[%s] No-show at t=%.2f", self.name, self.now.to_seconds())
             return []
 
         self._arrivals += 1

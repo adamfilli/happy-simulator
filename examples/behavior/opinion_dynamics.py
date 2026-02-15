@@ -7,11 +7,11 @@ Usage:
     python examples/opinion_dynamics.py
 """
 
-from happysimulator import Simulation, Instant, Event
+from happysimulator import Event, Instant, Simulation
 from happysimulator.components.behavior.agent import Agent
 from happysimulator.components.behavior.environment import Environment
+from happysimulator.components.behavior.influence import BoundedConfidenceModel, DeGrootModel
 from happysimulator.components.behavior.social_network import SocialGraph
-from happysimulator.components.behavior.influence import DeGrootModel, BoundedConfidenceModel
 
 
 def run_degroot_consensus():
@@ -44,17 +44,19 @@ def run_degroot_consensus():
     sim = Simulation(
         start_time=Instant.Epoch,
         duration=25.0,
-        entities=[env] + agents,
+        entities=[env, *agents],
     )
 
     # 20 rounds of influence
     for t in range(1, 21):
-        sim.schedule(Event(
-            time=Instant.from_seconds(float(t)),
-            event_type="InfluencePropagation",
-            target=env,
-            context={"metadata": {"topic": "policy"}},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(float(t)),
+                event_type="InfluencePropagation",
+                target=env,
+                context={"metadata": {"topic": "policy"}},
+            )
+        )
     sim.run()
 
     final = [a.state.beliefs["policy"] for a in agents]
@@ -104,16 +106,18 @@ def run_bounded_confidence():
     sim = Simulation(
         start_time=Instant.Epoch,
         duration=15.0,
-        entities=[env] + agents,
+        entities=[env, *agents],
     )
 
     for t in range(1, 11):
-        sim.schedule(Event(
-            time=Instant.from_seconds(float(t)),
-            event_type="InfluencePropagation",
-            target=env,
-            context={"metadata": {"topic": "tax_policy"}},
-        ))
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(float(t)),
+                event_type="InfluencePropagation",
+                target=env,
+                context={"metadata": {"topic": "tax_policy"}},
+            )
+        )
     sim.run()
 
     final = sorted(a.state.beliefs["tax_policy"] for a in agents)
@@ -133,7 +137,7 @@ def run_bounded_confidence():
 
     print(f"Number of clusters: {len(clusters)}")
     for i, cluster in enumerate(clusters):
-        print(f"  Cluster {i+1}: center={sum(cluster)/len(cluster):.3f}, size={len(cluster)}")
+        print(f"  Cluster {i + 1}: center={sum(cluster) / len(cluster):.3f}, size={len(cluster)}")
     print()
 
 

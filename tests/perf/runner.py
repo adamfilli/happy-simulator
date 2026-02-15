@@ -6,10 +6,9 @@ import json
 import os
 import platform
 import subprocess
-import sys
 import tracemalloc
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 BASELINE_PATH = Path(__file__).parent / "baseline.json"
@@ -109,7 +108,7 @@ def print_report(
     baseline: dict | None = None,
 ) -> None:
     """Print a formatted console report."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     py_version = platform.python_version()
 
     print()
@@ -122,9 +121,7 @@ def print_report(
         f"  {'Scenario':<22s}  {'Events/sec':>12s}  {'Peak Mem (MB)':>14s}"
         f"  {'Wall (s)':>9s}  {'vs Baseline':>12s}"
     )
-    print(
-        f"  {'-' * 22}  {'-' * 12}  {'-' * 14}  {'-' * 9}  {'-' * 12}"
-    )
+    print(f"  {'-' * 22}  {'-' * 12}  {'-' * 14}  {'-' * 9}  {'-' * 12}")
 
     for r in results:
         eps_str = f"{r.events_per_second:>12,.0f}" if r.events_per_second > 0 else f"{'—':>12s}"
@@ -170,7 +167,7 @@ def print_report(
 def save_baseline(results: list[BenchmarkResult]) -> None:
     """Save current results as the baseline."""
     payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "system": _collect_system_info(),
         "results": {r.name: asdict(r) for r in results},
     }
@@ -189,7 +186,7 @@ def load_baseline() -> dict[str, dict] | None:
 def results_to_json(results: list[BenchmarkResult]) -> str:
     """Serialize results list to JSON string."""
     payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "system": _collect_system_info(),
         "results": [asdict(r) for r in results],
     }
@@ -218,12 +215,12 @@ def save_checkpoint(results: list[BenchmarkResult]) -> Path:
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     git_hash = _git_short_hash()
     filename = f"{date_str}_{git_hash}.json"
 
     payload = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "git_hash": git_hash,
         "system": _collect_system_info(),
         "results": {r.name: asdict(r) for r in results},

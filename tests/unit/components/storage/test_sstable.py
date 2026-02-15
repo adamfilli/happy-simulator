@@ -134,8 +134,7 @@ class TestSSTablePageReads:
         sst = SSTable(data, bloom_fp_rate=0.001)
         # A key not in the set should usually be rejected by bloom
         # With very low FP rate, most should return 0
-        zero_count = sum(1 for i in range(100, 200)
-                        if sst.page_reads_for_get(f"key_{i:04d}") == 0)
+        zero_count = sum(1 for i in range(100, 200) if sst.page_reads_for_get(f"key_{i:04d}") == 0)
         assert zero_count > 90
 
     def test_page_reads_for_get_empty(self):

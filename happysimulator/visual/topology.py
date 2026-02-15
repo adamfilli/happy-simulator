@@ -39,7 +39,9 @@ class Topology:
         return {
             "nodes": [
                 {
-                    "id": n.id, "type": n.type, "category": n.category,
+                    "id": n.id,
+                    "type": n.type,
+                    "category": n.category,
                     **({"profile": n.profile} if n.profile else {}),
                 }
                 for n in self.nodes
@@ -58,15 +60,15 @@ class Topology:
 
 def classify(entity: object) -> str:
     """Classify an entity into a visual category."""
-    from happysimulator.load.source import Source
-    from happysimulator.components.common import Sink, Counter
+    from happysimulator.components.common import Counter, Sink
     from happysimulator.components.queued_resource import QueuedResource
     from happysimulator.components.random_router import RandomRouter
     from happysimulator.components.resource import Resource
+    from happysimulator.load.source import Source
 
     try:
-        from happysimulator.components.rate_limiter.rate_limited_entity import RateLimitedEntity
         from happysimulator.components.rate_limiter.inductor import Inductor
+        from happysimulator.components.rate_limiter.rate_limited_entity import RateLimitedEntity
     except ImportError:
         RateLimitedEntity = type(None)
         Inductor = type(None)
@@ -149,7 +151,7 @@ def _sample_profile(source: object, end_s: float, num_points: int = 200) -> dict
     return {"times": times, "values": values}
 
 
-def discover(sim: "Simulation") -> Topology:
+def discover(sim: Simulation) -> Topology:
     """Build the initial topology graph from a simulation's entities and sources."""
     from happysimulator.load.source import Source as SourceCls
 
@@ -172,23 +174,27 @@ def discover(sim: "Simulation") -> Topology:
         if isinstance(entity, SourceCls):
             profile = _sample_profile(entity, end_s)
 
-        topology.nodes.append(Node(
-            id=name,
-            type=type(entity).__name__,
-            category=classify(entity),
-            profile=profile,
-        ))
+        topology.nodes.append(
+            Node(
+                id=name,
+                type=type(entity).__name__,
+                category=classify(entity),
+                profile=profile,
+            )
+        )
 
         for downstream in _find_downstream(entity):
             ds_name = getattr(downstream, "name", type(downstream).__name__)
             # Ensure downstream node exists
             if ds_name not in seen_names:
                 seen_names.add(ds_name)
-                topology.nodes.append(Node(
-                    id=ds_name,
-                    type=type(downstream).__name__,
-                    category=classify(downstream),
-                ))
+                topology.nodes.append(
+                    Node(
+                        id=ds_name,
+                        type=type(downstream).__name__,
+                        category=classify(downstream),
+                    )
+                )
             topology.add_edge_if_new(name, ds_name)
 
     # Source -> target via _event_provider._target
@@ -199,11 +205,13 @@ def discover(sim: "Simulation") -> Topology:
             t_name = getattr(target, "name", type(target).__name__)
             if t_name not in seen_names:
                 seen_names.add(t_name)
-                topology.nodes.append(Node(
-                    id=t_name,
-                    type=type(target).__name__,
-                    category=classify(target),
-                ))
+                topology.nodes.append(
+                    Node(
+                        id=t_name,
+                        type=type(target).__name__,
+                        category=classify(target),
+                    )
+                )
             topology.add_edge_if_new(source.name, t_name)
 
     # Probe -> target (monitoring edges)

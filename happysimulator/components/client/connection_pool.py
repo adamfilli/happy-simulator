@@ -28,14 +28,14 @@ Example:
 
 import logging
 from collections import deque
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
-from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
-from happysimulator.distributions.latency_distribution import LatencyDistribution
 from happysimulator.distributions.constant import ConstantLatency
+from happysimulator.distributions.latency_distribution import LatencyDistribution
 
 logger = logging.getLogger(__name__)
 
@@ -130,9 +130,7 @@ class ConnectionPool(Entity):
                 f"min_connections ({min_connections})"
             )
         if connection_timeout <= 0:
-            raise ValueError(
-                f"connection_timeout must be > 0, got {connection_timeout}"
-            )
+            raise ValueError(f"connection_timeout must be > 0, got {connection_timeout}")
         if idle_timeout <= 0:
             raise ValueError(f"idle_timeout must be > 0, got {idle_timeout}")
 
@@ -166,10 +164,9 @@ class ConnectionPool(Entity):
         self._total_wait_time = 0.0
 
         logger.debug(
-            "[%s] ConnectionPool initialized: target=%s, min=%d, max=%d, "
-            "timeout=%.1fs, idle=%.1fs",
+            "[%s] ConnectionPool initialized: target=%s, min=%d, max=%d, timeout=%.1fs, idle=%.1fs",
             name,
-            target.name if hasattr(target, 'name') else str(target),
+            target.name if hasattr(target, "name") else str(target),
             min_connections,
             max_connections,
             connection_timeout,
@@ -348,8 +345,7 @@ class ConnectionPool(Entity):
         )
 
         raise TimeoutError(
-            f"Failed to acquire connection from {self.name} "
-            f"within {self._connection_timeout}s"
+            f"Failed to acquire connection from {self.name} within {self._connection_timeout}s"
         )
 
     def release(self, connection: Connection) -> list[Event]:
@@ -390,7 +386,7 @@ class ConnectionPool(Entity):
 
         # Check if there are waiters
         if self._waiters:
-            waiter_id, request_time, callback = self._waiters.popleft()
+            waiter_id, _request_time, callback = self._waiters.popleft()
 
             # Reactivate connection for waiter
             self._activate_connection(connection)
@@ -521,17 +517,19 @@ class ConnectionPool(Entity):
                         )
                     else:
                         # Reschedule the timeout check
-                        return [Event(
-                            time=self.now + Duration.from_seconds(self._idle_timeout),
-                            event_type="_pool_idle_timeout",
-                            target=self,
-                            context={
-                                "metadata": {
-                                    "connection_id": connection_id,
-                                    "expected_last_used": conn.last_used_at,
+                        return [
+                            Event(
+                                time=self.now + Duration.from_seconds(self._idle_timeout),
+                                event_type="_pool_idle_timeout",
+                                target=self,
+                                context={
+                                    "metadata": {
+                                        "connection_id": connection_id,
+                                        "expected_last_used": conn.last_used_at,
+                                    },
                                 },
-                            },
-                        )]
+                            )
+                        ]
                 break
 
         return None
@@ -612,7 +610,7 @@ class ConnectionPool(Entity):
         self._active_connections.clear()
 
         # Clear waiters
-        for waiter_id, request_time, callback in self._waiters:
+        for _waiter_id, _request_time, callback in self._waiters:
             callback(None)
         self._waiters.clear()
 

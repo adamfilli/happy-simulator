@@ -21,9 +21,9 @@ Example:
 """
 
 import logging
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity

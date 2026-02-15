@@ -28,8 +28,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Generator
+from typing import TYPE_CHECKING
 
 from happysimulator import (
     Entity,
@@ -45,6 +44,8 @@ from happysimulator.components.infrastructure import (
     PageCacheStats,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # =============================================================================
 # Custom Entity
@@ -168,17 +169,23 @@ def run_simulation(
     small = _run_config(
         "Small (100 pages)",
         PageCache("small_cache", capacity_pages=100),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     large = _run_config(
         "Large (1000 pages)",
         PageCache("large_cache", capacity_pages=1000),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
     readahead = _run_config(
         "Readahead (100 + ra=4)",
         PageCache("readahead_cache", capacity_pages=100, readahead_pages=4),
-        duration_s=duration_s, rate=rate, seed=seed,
+        duration_s=duration_s,
+        rate=rate,
+        seed=seed,
     )
 
     return SimulationResult(

@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def simulatable(cls: type[T]) -> type[T]:
+def simulatable[T](cls: type[T]) -> type[T]:
     """Class decorator that adds simulation clock infrastructure.
 
     Transforms a plain class into one that satisfies the Simulatable protocol
@@ -83,7 +83,7 @@ def simulatable(cls: type[T]) -> type[T]:
 
     cls.__init__ = new_init
 
-    def set_clock(self, clock: "Clock") -> None:
+    def set_clock(self, clock: Clock) -> None:
         """Receive the simulation clock. Called by Simulation during setup."""
         self._clock = clock
         logger.debug("[%s] Clock injected", getattr(self, "name", type(self).__name__))
@@ -91,7 +91,7 @@ def simulatable(cls: type[T]) -> type[T]:
     cls.set_clock = set_clock
 
     @property
-    def now(self) -> "Instant":
+    def now(self) -> Instant:
         """Current simulation time from the injected clock.
 
         Raises:

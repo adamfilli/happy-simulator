@@ -6,19 +6,19 @@ happy-simulator ships with [Claude Code](https://claude.ai/claude-code) skills t
 
 | Skill | Description |
 |-------|-------------|
-| `/scaffold` | Generate a complete simulation from a description |
-| `/diagnose` | Troubleshoot a broken or misbehaving simulation |
-| `/add-instrumentation` | Add probes, trackers, and charts to existing code |
-| `/explain-example` | Walk through any library example with explanation |
-| `/component-guide` | Interactive wizard to pick the right components |
-| `/analyze` | Run a simulation and interpret its results |
+| `/happy-sim-scaffold` | Generate a complete simulation from a description |
+| `/happy-sim-diagnose` | Troubleshoot a broken or misbehaving simulation |
+| `/happy-sim-add-instrumentation` | Add probes, trackers, and charts to existing code |
+| `/happy-sim-explain-example` | Walk through any library example with explanation |
+| `/happy-sim-component-guide` | Interactive wizard to pick the right components |
+| `/happy-sim-analyze` | Run a simulation and interpret its results |
 
-## `/scaffold` — Generate a Simulation
+## `/happy-sim-scaffold` — Generate a Simulation
 
 Describe what you want to simulate and get a complete, runnable Python file.
 
 ```
-/scaffold
+/happy-sim-scaffold
 > "A coffee shop with 2 baristas, customers arriving every 30 seconds,
 >  and drinks taking 1-3 minutes to prepare"
 ```
@@ -32,12 +32,12 @@ The generated file includes:
 
 This is the fastest way to go from idea to running simulation.
 
-## `/diagnose` — Fix a Broken Simulation
+## `/happy-sim-diagnose` — Fix a Broken Simulation
 
-When your simulation isn't behaving as expected — events aren't being processed, queues grow without bound, or you're getting errors — point `/diagnose` at your file.
+When your simulation isn't behaving as expected — events aren't being processed, queues grow without bound, or you're getting errors — point `/happy-sim-diagnose` at your file.
 
 ```
-/diagnose my_simulation.py
+/happy-sim-diagnose my_simulation.py
 ```
 
 It checks for the most common issues:
@@ -48,12 +48,12 @@ It checks for the most common issues:
 - **Arrival rate > service rate** — unbounded growth
 - **Generator yield mistakes** — yielding `Instant` instead of `float`, returning events mid-generator
 
-## `/add-instrumentation` — Add Observability
+## `/happy-sim-add-instrumentation` — Add Observability
 
 You've built a simulation that runs. Now you need to understand what's happening inside it.
 
 ```
-/add-instrumentation my_simulation.py
+/happy-sim-add-instrumentation my_simulation.py
 ```
 
 This reads your code, identifies entities worth monitoring, and adds:
@@ -64,12 +64,12 @@ This reads your code, identifies entities worth monitoring, and adds:
 - **`Chart`** definitions for the visual debugger (optional)
 - **matplotlib plots** as a fallback
 
-## `/explain-example` — Learn from Examples
+## `/happy-sim-explain-example` — Learn from Examples
 
 The library includes 78 examples across 10 categories. Pick one and get a guided walkthrough.
 
 ```
-/explain-example
+/happy-sim-explain-example
 > "Show me the Raft leader election example"
 ```
 
@@ -95,12 +95,12 @@ The explanation covers:
 | Load Balancing | 4 | Consistent hashing, virtual nodes |
 | Visual | 1 | Browser-based debugger demo |
 
-## `/component-guide` — Choose the Right Components
+## `/happy-sim-component-guide` — Choose the Right Components
 
 With 350+ components, finding the right ones can be overwhelming. Describe your scenario and get targeted recommendations.
 
 ```
-/component-guide
+/happy-sim-component-guide
 > "I need to model a web service with retry logic and circuit breaking"
 ```
 
@@ -115,12 +115,12 @@ The guide maps your description to components using a decision tree:
 
 Each recommendation includes a minimal wiring example and pointers to relevant example files.
 
-## `/analyze` — Interpret Results
+## `/happy-sim-analyze` — Interpret Results
 
 After running a simulation, get a plain-English interpretation of the results.
 
 ```
-/analyze my_simulation.py
+/happy-sim-analyze my_simulation.py
 ```
 
 The analysis covers:
@@ -139,9 +139,9 @@ It uses the library's built-in `analyze()` and `detect_phases()` functions under
 These skills are designed to cover the full simulation lifecycle:
 
 ```
-/component-guide  →  /scaffold  →  /diagnose  →  /add-instrumentation  →  /analyze
+/happy-sim-component-guide  →  /happy-sim-scaffold  →  /happy-sim-diagnose  →  /happy-sim-add-instrumentation  →  /happy-sim-analyze
    "What do I         "Build       "Why isn't      "Add metrics"         "What do the
     need?"              it"          it working?"                          results mean?"
 ```
 
-At any point, use `/explain-example` to learn from the 78 built-in examples.
+At any point, use `/happy-sim-explain-example` to learn from the 78 built-in examples.

@@ -1,5 +1,5 @@
 ---
-name: analyze
+name: happy-sim-analyze
 description: Analyze simulation results and provide insights
 ---
 
@@ -94,4 +94,4 @@ print(analysis.to_prompt_context(max_tokens=2000))
    - "Add a circuit breaker to prevent cascade failure"
    - "The queue stabilizes at ~12 items — safe but close to the tipping point at 80% utilization"
 
-6. If the simulation doesn't have enough instrumentation to analyze, suggest using `/add-instrumentation` first.
+6. If the simulation doesn't have enough instrumentation to analyze, suggest using `/happy-sim-add-instrumentation` first.

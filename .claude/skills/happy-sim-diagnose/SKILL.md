@@ -1,5 +1,5 @@
 ---
-name: diagnose
+name: happy-sim-diagnose
 description: Troubleshoot a broken or misbehaving simulation
 ---
 
@@ -56,4 +56,4 @@ Find and fix common issues in happysimulator code.
    - The fix, with a code snippet
    - Offer to apply the fix
 
-6. If no issues are found, say so and suggest adding instrumentation (`/add-instrumentation`) to investigate further.
+6. If no issues are found, say so and suggest adding instrumentation (`/happy-sim-add-instrumentation`) to investigate further.

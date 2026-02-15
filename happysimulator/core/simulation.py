@@ -15,6 +15,7 @@ from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.clock import Clock
 from happysimulator.core.temporal import Instant
 from happysimulator.core.sim_future import _set_active_context, _clear_active_context
+from happysimulator.core.event import _set_active_code_debugger, _clear_active_code_debugger
 from happysimulator.load.source import Source
 from happysimulator.faults.schedule import FaultSchedule
 from happysimulator.instrumentation.recorder import TraceRecorder, NullTraceRecorder
@@ -230,9 +231,13 @@ class Simulation:
         # Set active context so SimFuture.resolve()/fail() can schedule events
         _set_active_context(self._event_heap, self._clock)
 
+        # Set code debugger context if one has been injected by the visual bridge
+        _set_active_code_debugger(getattr(self, '_code_debugger', None))
+
         try:
             return self._run_loop()
         finally:
+            _clear_active_code_debugger()
             _clear_active_context()
 
     def _run_loop(self) -> SimulationSummary:

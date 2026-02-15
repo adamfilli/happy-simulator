@@ -1,5 +1,6 @@
-import { memo } from "react";
+import { memo, useContext } from "react";
 import { Handle, Position, type NodeProps, type Node } from "@xyflow/react";
+import { CodePanelCtx } from "./CodePanelContext";
 
 type EntityNodeData = {
   label: string;
@@ -14,6 +15,9 @@ type EntityNodeType = Node<EntityNodeData, "entity">;
 
 function EntityNode({ data }: NodeProps<EntityNodeType>) {
   const { label, entityType, color, metrics, selected } = data;
+  const ctx = useContext(CodePanelCtx);
+  const onOpenCodePanel = ctx?.onOpenCodePanel;
+  const hasCodePanel = ctx?.openPanels.has(label) ?? false;
 
   // Pick top 2 metrics to show on the node
   const metricEntries = Object.entries(metrics).slice(0, 2);
@@ -30,7 +34,25 @@ function EntityNode({ data }: NodeProps<EntityNodeType>) {
           boxShadow: selected ? `0 0 12px ${color}40` : "none",
         }}
       >
-        <div className="text-xs font-semibold text-white truncate">{label}</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-white truncate">{label}</div>
+          {onOpenCodePanel && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCodePanel(label);
+              }}
+              className={`ml-1 text-[10px] font-mono px-1 rounded transition-colors ${
+                hasCodePanel
+                  ? "text-amber-400 bg-amber-900/30"
+                  : "text-gray-500 hover:text-amber-400 hover:bg-amber-900/20"
+              }`}
+              title={hasCodePanel ? "Code panel open" : "Open code panel"}
+            >
+              &lt;/&gt;
+            </button>
+          )}
+        </div>
         <div className="text-[10px] mt-0.5" style={{ color: `${color}cc` }}>
           {entityType}
         </div>

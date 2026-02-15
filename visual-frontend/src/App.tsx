@@ -71,12 +71,8 @@ export default function App() {
     });
   }, [setTopology, setState, addDashboardPanel, setActiveView]);
 
-  const handleStep = async (count: number) => {
-    const res = await fetch(`/api/step?count=${count}`, { method: "POST" });
-    const data: StepResult = await res.json();
-    setState(data.state);
-    if (data.new_events?.length) addEvents(data.new_events);
-    if (data.new_logs?.length) addLogs(data.new_logs);
+  const handleStep = (count: number) => {
+    send("step", { count });
   };
 
   const handlePlay = (speed: number) => {

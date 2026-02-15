@@ -1,4 +1,8 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from "react";
+
+export interface TimeSeriesChartHandle {
+  getCanvas: () => HTMLCanvasElement | null;
+}
 
 interface Props {
   times: number[];
@@ -11,17 +15,24 @@ interface Props {
   yMax?: number | null;
 }
 
-export default function TimeSeriesChart({
-  times,
-  values,
-  label,
-  color = "#3b82f6",
-  yLabel,
-  xLabel,
-  yMin: fixedYMin,
-  yMax: fixedYMax,
-}: Props) {
+const TimeSeriesChart = forwardRef<TimeSeriesChartHandle, Props>(function TimeSeriesChart(
+  {
+    times,
+    values,
+    label,
+    color = "#3b82f6",
+    yLabel,
+    xLabel,
+    yMin: fixedYMin,
+    yMax: fixedYMax,
+  },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    getCanvas: () => canvasRef.current,
+  }));
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -170,4 +181,6 @@ export default function TimeSeriesChart({
       </div>
     </div>
   );
-}
+});
+
+export default TimeSeriesChart;

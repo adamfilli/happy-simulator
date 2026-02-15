@@ -15,6 +15,16 @@ Launch the browser-based simulation debugger at http://127.0.0.1:8765.
 3. Tell the user the server is running at http://127.0.0.1:8765
 4. Remind them to press Ctrl+C in the terminal to stop the server when done
 
+## Rebuild After Frontend Changes
+
+After modifying any file under `visual-frontend/src/`, always rebuild so the static assets served by the Python backend are up to date:
+
+```bash
+cd visual-frontend && npm run build
+```
+
+This runs `tsc -b && vite build`, outputting to `happysimulator/visual/static/`. The built assets (hashed `.js` and `.css` files) should be committed alongside the source changes.
+
 ## Clean Build & Reset
 
 If the debugger is showing stale UI that doesn't reflect recent frontend changes, do a full clean rebuild:

@@ -91,6 +91,18 @@ export interface DashboardPanelConfig {
   chartConfig?: ChartConfig;
 }
 
+export interface PinnedChart {
+  id: string;
+  x: number;
+  y: number;
+  kind: "entity_metric" | "probe";
+  entityName?: string;
+  metricKey?: string;
+  displayMode?: "total" | "rate" | "avg" | "p99";
+  probeName?: string;
+  label: string;
+}
+
 // --- Code Debug Types ---
 
 export interface CodeTraceRecord {

@@ -54,11 +54,16 @@ export interface SimState {
   end_time_s?: number | null;
 }
 
+export interface EdgeStats {
+  [key: string]: { source: string; target: string; count: number; rate: number };
+}
+
 export interface StepResult {
   state: SimState;
   new_events: RecordedEvent[];
   new_edges: TopologyEdge[];
   new_logs: RecordedLog[];
+  edge_stats?: EdgeStats;
 }
 
 export interface ChartConfig {
@@ -87,6 +92,6 @@ export interface DashboardPanelConfig {
 }
 
 export type WSMessage =
-  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[] }
+  | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[]; edge_stats?: EdgeStats }
   | { type: "simulation_complete" }
   | { type: "breakpoint_hit" };

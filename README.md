@@ -26,17 +26,13 @@
 
 > **Alpha** — Still in active development. APIs may change between releases.
 
-happy-simulator is a composable, generator-based discrete-event simulation engine built for modeling queuing systems, distributed systems, manufacturing lines, and human behavior. It ships with 70+ ready-to-run examples and a browser-based visual debugger.
+Happy Simulator is a discrete-event simulation engine. Simulate systems for education, research, design, or entertainment.
 
 ## Features
 
-- **Generator-driven entities** — model delays and async coordination with `yield`
+- **Intuitive modeling** — convert real-world components into simulated equivalents.
 - **Rich component library** — queues, load balancers, rate limiters, circuit breakers, consensus protocols, industrial components, and more
-- **Network simulation** — topology, latency models, partitions, and per-node clock skew/drift
-- **Behavioral modeling** — agents with personality traits, decision models, social graphs, and influence propagation
-- **Observability built in** — probes, latency/throughput trackers, bucketed time series
-- **Simulation control** — pause, step, breakpoints (time, event count, metric threshold, conditional)
-- **Visual debugger** — browser-based UI with entity graph, live dashboards, event log, and step-through debugging
+- **Visual debugger** — browser-based UI generated from simulation model.
 
 ## Quick Start
 

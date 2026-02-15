@@ -13,6 +13,8 @@ const MODE_LABELS: Record<MetricMode, string> = {
   p99: "p99",
 };
 
+const DRAG_MIME = "application/happysim-chart";
+
 interface TimeSeriesData {
   name: string;
   metric: string;
@@ -144,7 +146,22 @@ export default function InspectorPanel() {
                 sparklineValues = transformed.values;
               }
               return (
-                <div key={key}>
+                <div
+                  key={key}
+                  draggable={!!hasSparkline}
+                  onDragStart={hasSparkline ? (e) => {
+                    e.dataTransfer.setData(DRAG_MIME, JSON.stringify({
+                      kind: "entity_metric",
+                      entityName,
+                      metricKey: key,
+                      displayMode: mode,
+                      label: `${entityName}.${key}`,
+                    }));
+                    e.dataTransfer.effectAllowed = "copy";
+                  } : undefined}
+                  title={hasSparkline ? "Drag to graph to pin" : undefined}
+                  className={hasSparkline ? "cursor-grab active:cursor-grabbing" : undefined}
+                >
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400">
                       {key}
@@ -176,7 +193,19 @@ export default function InspectorPanel() {
 
           {/* Time series chart for probes */}
           {isProbe && tsData && tsData.times.length > 0 && (
-            <div className="border-t border-gray-800 pt-3">
+            <div
+              className="border-t border-gray-800 pt-3 cursor-grab active:cursor-grabbing"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData(DRAG_MIME, JSON.stringify({
+                  kind: "probe",
+                  probeName: entityName,
+                  label: `${tsData.target}.${tsData.metric}`,
+                }));
+                e.dataTransfer.effectAllowed = "copy";
+              }}
+              title="Drag to graph to pin"
+            >
               <TimeSeriesChart
                 times={tsData.times}
                 values={tsData.values}

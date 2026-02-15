@@ -87,10 +87,32 @@ select = [
     "UP",     # pyupgrade
     "B",      # flake8-bugbear
     "SIM",    # flake8-simplify
+    "N",      # pep8-naming
+    "C4",     # flake8-comprehensions
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+    "PIE",    # flake8-pie (misc. lints)
+    "T20",    # flake8-print (flag print statements in library code)
+    "RET",    # flake8-return
+    "TCH",    # flake8-type-checking (move imports behind TYPE_CHECKING)
+    "PGH",    # pygrep-hooks
+    "PERF",   # Perflint (performance anti-patterns)
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "RET504", # unnecessary assignment before return
+    "SIM108", # use ternary instead of if-else (readability preference)
+    "N806",   # variable in function should be lowercase (conflicts with math conventions)
+    "UP007",  # use X | Y for union types (keep Optional for readability in some cases)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/**" = ["T20"]   # allow print() in examples
+"tests/**" = ["T20"]      # allow print() in tests
 
 [tool.ruff.lint.isort]
 known-first-party = ["happysimulator"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true

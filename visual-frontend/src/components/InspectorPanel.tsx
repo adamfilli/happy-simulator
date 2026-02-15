@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
 import TimeSeriesChart from "./TimeSeriesChart";
+import MiniSparkline from "./MiniSparkline";
 
 interface TimeSeriesData {
   name: string;
@@ -8,6 +9,11 @@ interface TimeSeriesData {
   target: string;
   times: number[];
   values: number[];
+}
+
+interface EntityHistoryData {
+  entity: string;
+  metrics: Record<string, { times: number[]; values: number[] }>;
 }
 
 export default function InspectorPanel() {
@@ -18,7 +24,9 @@ export default function InspectorPanel() {
   const addDashboardPanel = useSimStore((s) => s.addDashboardPanel);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
+  const [historyData, setHistoryData] = useState<EntityHistoryData | null>(null);
   const lastFetchedRef = useRef<{ name: string; events: number } | null>(null);
+  const lastHistoryFetchRef = useRef<{ name: string; events: number } | null>(null);
 
   const entityName = selectedEntity;
   const entityData = entityName ? state?.entities[entityName] : null;
@@ -50,6 +58,28 @@ export default function InspectorPanel() {
       .then((data: TimeSeriesData) => setTsData(data));
   }, [isProbe, entityName, state?.events_processed, state]);
 
+  // Fetch entity history for sparklines on any selected entity
+  useEffect(() => {
+    if (!entityName || !state) {
+      setHistoryData(null);
+      lastHistoryFetchRef.current = null;
+      return;
+    }
+
+    const key = { name: entityName, events: state.events_processed };
+    if (
+      lastHistoryFetchRef.current &&
+      lastHistoryFetchRef.current.name === key.name &&
+      lastHistoryFetchRef.current.events === key.events
+    ) {
+      return;
+    }
+
+    lastHistoryFetchRef.current = key;
+    fetch(`/api/entity_history?entity=${encodeURIComponent(entityName)}`)
+      .then((r) => r.json())
+      .then((data: EntityHistoryData) => setHistoryData(data));
+  }, [entityName, state?.events_processed, state]);
 
   if (!state) return null;
 
@@ -70,14 +100,22 @@ export default function InspectorPanel() {
             )}
           </div>
           <div className="space-y-1">
-            {Object.entries(entityData).map(([key, value]) => (
-              <div key={key} className="flex justify-between text-xs">
-                <span className="text-gray-400">{key}</span>
-                <span className="text-white font-mono">
-                  {formatValue(value)}
-                </span>
-              </div>
-            ))}
+            {Object.entries(entityData).map(([key, value]) => {
+              const history = historyData?.metrics[key];
+              return (
+                <div key={key}>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400">{key}</span>
+                    <span className="text-white font-mono">
+                      {formatValue(value)}
+                    </span>
+                  </div>
+                  {typeof value === "number" && history && history.values.length >= 2 && (
+                    <MiniSparkline values={history.values} />
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Time series chart for probes */}

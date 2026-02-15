@@ -83,12 +83,7 @@ class SimpleServer(QueuedResource):
         yield service_time, None
         self._busy = False
         self.stats_processed += 1
-        return [Event(
-            time=self.now,
-            event_type="Completed",
-            target=self.downstream,
-            context=event.context,
-        )]
+        return [self.forward(event, self.downstream, event_type="Completed")]
 
 
 class SimpleProvider(EventProvider):
@@ -116,11 +111,7 @@ def main() -> None:
     sink = LatencyTracker("Sink")
     server = SimpleServer("Server", downstream=sink)
 
-    queue_data = Data()
-    queue_probe = Probe(
-        target=server, metric="depth", data=queue_data,
-        interval=0.1, start_time=Instant.Epoch,
-    )
+    queue_probe, queue_data = Probe.on(server, "depth", interval=0.1)
 
     profile = SpikeLoadProfile()
     provider = SimpleProvider(server)
@@ -129,7 +120,7 @@ def main() -> None:
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(145.0),
+        duration=145.0,
         sources=[source],
         entities=[server, sink],
         probes=[queue_probe],

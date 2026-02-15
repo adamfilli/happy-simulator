@@ -90,7 +90,7 @@ def test_multi_fault_scenario():
     source_b = Source.constant(rate=2, target=node_b, event_type="Request")
 
     sim = Simulation(
-        end_time=Instant.from_seconds(30.0),
+        duration=30.0,
         sources=[source_a, source_b],
         entities=[node_a, node_b, node_c, sink],
         fault_schedule=schedule,
@@ -119,7 +119,7 @@ def test_crash_node_with_counter():
     source = Source.constant(rate=10, target=counter, event_type="Tick")
 
     sim = Simulation(
-        end_time=Instant.from_seconds(15.0),
+        duration=15.0,
         sources=[source],
         entities=[counter],
         fault_schedule=schedule,
@@ -143,7 +143,7 @@ def test_reduce_capacity_with_resource():
     source = Source.constant(rate=1, target=counter, event_type="Tick")
 
     sim = Simulation(
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[resource, counter],
         fault_schedule=schedule,
@@ -170,7 +170,7 @@ def test_fault_stats_tracking():
     source = Source.constant(rate=1, target=counter, event_type="Tick")
 
     sim = Simulation(
-        end_time=Instant.from_seconds(25.0),
+        duration=25.0,
         sources=[source],
         entities=[counter],
         fault_schedule=schedule,
@@ -195,7 +195,7 @@ def test_network_partition_fault():
     schedule.add(NetworkPartition(["a"], ["b"], start=5.0, end=15.0))
 
     sim = Simulation(
-        end_time=Instant.from_seconds(20.0),
+        duration=20.0,
         sources=[],
         entities=[node_a, node_b, network],
         fault_schedule=schedule,
@@ -221,7 +221,7 @@ def test_inject_latency_fault():
     )
 
     sim = Simulation(
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[node_a, node_b, network],
         fault_schedule=schedule,

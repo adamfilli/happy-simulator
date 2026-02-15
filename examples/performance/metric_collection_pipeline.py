@@ -353,12 +353,7 @@ class MetricExecutor(QueuedResource):
         self.stats_processed += 1
 
         # Forward to downstream with preserved context
-        completed = Event(
-            time=self.now,
-            event_type=event.event_type,
-            target=self.downstream,
-            context=event.context,
-        )
+        completed = self.forward(event, self.downstream)
         return [completed]
 
 
@@ -567,43 +562,13 @@ def run_simulation(
         arrival_time_provider=arrival,
     )
 
-    # Create probes for queue depths
-    queue1_depth_data = Data()
-    queue1_probe = Probe(
-        target=executor1,
-        metric="depth",
-        data=queue1_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
-
-    queue2_depth_data = Data()
-    queue2_probe = Probe(
-        target=executor2,
-        metric="depth",
-        data=queue2_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
-
-    # Create probes for worker utilization (in_flight)
-    executor1_utilization_data = Data()
-    executor1_utilization_probe = Probe(
-        target=executor1,
-        metric="in_flight",
-        data=executor1_utilization_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
-
-    executor2_utilization_data = Data()
-    executor2_utilization_probe = Probe(
-        target=executor2,
-        metric="in_flight",
-        data=executor2_utilization_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+    # Create probes for queue depths and worker utilization
+    exec1_probes, exec1_data = Probe.on_many(executor1, ["depth", "in_flight"], interval=probe_interval_s)
+    exec2_probes, exec2_data = Probe.on_many(executor2, ["depth", "in_flight"], interval=probe_interval_s)
+    queue1_depth_data = exec1_data["depth"]
+    queue2_depth_data = exec2_data["depth"]
+    executor1_utilization_data = exec1_data["in_flight"]
+    executor2_utilization_data = exec2_data["in_flight"]
 
     # Collect entities — always include rate limiters (LeakyBucket
     # self-schedules leak events that need entity registration)
@@ -615,15 +580,10 @@ def run_simulation(
     drain_s = batch_interval_s  # Allow time for last batch to complete
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=entities,
-        probes=[
-            queue1_probe,
-            queue2_probe,
-            executor1_utilization_probe,
-            executor2_utilization_probe,
-        ],
+        probes=exec1_probes + exec2_probes,
     )
     sim.run()
 

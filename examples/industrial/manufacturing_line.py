@@ -68,8 +68,7 @@ class WorkStation(QueuedResource):
         yield self.service_time_s
         self.parts_processed += 1
         return [
-            Event(time=self.now, event_type=event.event_type,
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream)
         ]
 
 
@@ -141,7 +140,7 @@ def run_manufacturing_simulation(config: ManufacturingConfig | None = None) -> M
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 300),
+        duration=config.duration_s + 300,
         sources=[source],
         entities=entities,
     )

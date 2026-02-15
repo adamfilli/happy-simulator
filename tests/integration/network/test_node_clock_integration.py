@@ -231,7 +231,7 @@ def _run_lease_simulation(
     node_b = LeaseNode("NodeB", coordinator, clock_b, check_interval=check_interval)
 
     sim = Simulation(
-        end_time=Instant.from_seconds(duration),
+        duration=duration,
         entities=[coordinator, node_a, node_b],
     )
 

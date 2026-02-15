@@ -161,7 +161,7 @@ def run_mode(
     # Run
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=[source],
         entities=[writer, primary, *backups, network, primary_store, *backup_stores],
     )

@@ -157,12 +157,7 @@ class Station(QueuedResource):
         yield self.service_time
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type=event.event_type,
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream)
         ]
 
 

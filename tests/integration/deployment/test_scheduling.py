@@ -61,7 +61,7 @@ class TestJobSchedulerEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=[scheduler, extract_worker, transform_worker, load_worker],
         )
         sim.schedule(scheduler.start())
@@ -89,7 +89,7 @@ class TestJobSchedulerEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[scheduler, worker],
         )
         sim.schedule(scheduler.start())
@@ -137,7 +137,7 @@ class TestWorkStealingPoolEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[pool] + pool.workers + [sink],
         )
@@ -167,7 +167,7 @@ class TestWorkStealingPoolEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             sources=[source],
             entities=[pool] + pool.workers + [sink],
         )

@@ -92,7 +92,7 @@ class TryAcquireWorker(Entity):
 def _make_sim(*entities, end_time_s=60.0):
     """Create a Simulation with clock injection for the given entities."""
     return Simulation(
-        end_time=Instant.from_seconds(end_time_s),
+        duration=end_time_s,
         entities=list(entities),
     )
 
@@ -403,7 +403,7 @@ class TestResourceContentionVisualization:
         ]
 
         sim = Simulation(
-            end_time=Instant.from_seconds(DURATION),
+            duration=DURATION,
             entities=[resource, sampler, *workers],
         )
 

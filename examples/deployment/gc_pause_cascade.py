@@ -89,12 +89,7 @@ class GCAwareServer(Entity):
         # Normal service time
         yield self._service_time_s
 
-        return [Event(
-            time=self.now,
-            event_type="Response",
-            target=self._downstream,
-            context=event.context,
-        )]
+        return [self.forward(event, self._downstream, event_type="Response")]
 
 
 # =============================================================================
@@ -145,7 +140,7 @@ def _run_strategy(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[gc, server, sink],
     )

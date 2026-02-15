@@ -64,7 +64,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "user:1"))
@@ -82,7 +82,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "user:1"))   # cold miss
@@ -101,7 +101,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "user:1"))   # cold miss
@@ -122,7 +122,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(8.0),
+            duration=8.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "user:1"))    # cold miss
@@ -139,7 +139,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "nonexistent"))
@@ -156,7 +156,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             entities=[client, cache],
         )
         # First pass: all cold misses
@@ -181,7 +181,7 @@ class TestClientCacheDatastoreFlow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[client, cache],
         )
         sim.schedule(_request(client, 0.0, "k0"))  # miss, cache: [k0]

@@ -46,12 +46,7 @@ class SimpleRenegingServer(RenegingQueuedResource):
             self._active -= 1
         if self.downstream:
             return [
-                Event(
-                    time=self.now,
-                    event_type="Served",
-                    target=self.downstream,
-                    context=event.context,
-                )
+                self.forward(event, self.downstream, event_type="Served")
             ]
         return []
 
@@ -77,12 +72,7 @@ class FixedTimeServer(QueuedResource):
             self._active -= 1
         if self.downstream:
             return [
-                Event(
-                    time=self.now,
-                    event_type="Served",
-                    target=self.downstream,
-                    context=event.context,
-                )
+                self.forward(event, self.downstream, event_type="Served")
             ]
         return []
 
@@ -102,7 +92,7 @@ class TestServiceWithBalking:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[server, sink],
         )
@@ -134,7 +124,7 @@ class TestServiceWithReneging:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[source],
             entities=[server, served_sink, reneged_sink],
         )
@@ -168,7 +158,7 @@ class TestShiftBasedCapacity:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(25.0),
+            duration=25.0,
             sources=[source],
             entities=[server, sink],
         )
@@ -192,7 +182,7 @@ class TestCombinedBalkingRenegingComparison:
 
         balk_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[balk_source],
             entities=[balk_server, balk_sink],
         )
@@ -211,7 +201,7 @@ class TestCombinedBalkingRenegingComparison:
 
         renege_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[renege_source],
             entities=[renege_server, renege_served, renege_lost],
         )

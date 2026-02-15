@@ -148,7 +148,7 @@ def run_stream_processor(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 10.0),
+        duration=duration_s + 10.0,
         sources=[source],
         entities=[processor, result_sink, late_sink, emitter],
     )

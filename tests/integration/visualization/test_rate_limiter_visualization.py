@@ -93,7 +93,7 @@ class TestFixedWindowVisualization:
         # Need a simulation for clock
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[],
             entities=[limiter, server],
         )
@@ -209,7 +209,7 @@ class TestAdaptiveVisualization:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[],
             entities=[limiter, server],
         )
@@ -536,7 +536,7 @@ class TestRateLimiterComparison:
 
         sim1 = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[],
             entities=[fw_limiter, server1],
         )
@@ -564,7 +564,7 @@ class TestRateLimiterComparison:
 
         sim2 = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[],
             entities=[adaptive_limiter, server2],
         )

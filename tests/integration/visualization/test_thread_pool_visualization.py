@@ -352,7 +352,7 @@ def run_thread_pool_scenario(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),  # Extra time to drain
+        duration=duration_s + 5.0,  # Extra time to drain
         sources=[source],
         entities=[pool, metrics, tracker],
     )

@@ -274,7 +274,7 @@ def test_rate_limiter_basic_functionality():
     # Create a simulation to provide clock
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
@@ -307,7 +307,7 @@ def test_rate_limiter_empty_bucket():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
@@ -450,7 +450,7 @@ def test_leaky_bucket_basic_functionality():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
@@ -483,7 +483,7 @@ def test_leaky_bucket_full_queue():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
@@ -738,7 +738,7 @@ def test_sliding_window_basic_functionality():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
@@ -774,7 +774,7 @@ def test_sliding_window_empty():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )

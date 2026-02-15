@@ -48,7 +48,7 @@ def test_queue_drops_when_capacity_is_one_and_three_arrive() -> None:
 
 	sim = Simulation(
 		start_time=Instant.Epoch,
-		end_time=Instant.from_seconds(10.0),
+		duration=10.0,
 		sources=[],
 		entities=[queue, driver, server],
 		probes=[],

@@ -22,7 +22,6 @@ from happysimulator.components.sync import Mutex, Semaphore, RWLock, Condition, 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.simulation import Simulation
-from happysimulator.core.temporal import Instant
 from happysimulator.load.event_provider import EventProvider
 from happysimulator.load.providers.constant_arrival import ConstantArrivalTimeProvider
 from happysimulator.load.source import Source

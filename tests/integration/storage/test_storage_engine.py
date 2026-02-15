@@ -39,7 +39,7 @@ class TestLSMWriteReadRoundtrip:
         lsm = LSMTree("db", memtable_size=10)
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[lsm],
         )
 
@@ -56,7 +56,7 @@ class TestLSMWriteReadRoundtrip:
         lsm = LSMTree("db", memtable_size=5)
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[lsm],
         )
 
@@ -73,7 +73,7 @@ class TestWALRecovery:
         wal = WriteAheadLog("wal", sync_policy=SyncEveryWrite())
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[wal],
         )
 
@@ -91,7 +91,7 @@ class TestWALRecovery:
         wal = WriteAheadLog("wal")
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[wal],
         )
 
@@ -115,7 +115,7 @@ class TestCompactionReducesSSTables:
         )
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[lsm],
         )
 
@@ -135,7 +135,7 @@ class TestCompactionReducesSSTables:
         )
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[lsm],
         )
 
@@ -155,7 +155,7 @@ class TestBloomFilterReducesPageReads:
         lsm = LSMTree("db", memtable_size=50)
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[lsm],
         )
 
@@ -183,7 +183,7 @@ class TestBTreeVsLSMComparison:
         lsm = LSMTree("lsm", memtable_size=20)
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[btree, lsm],
         )
 
@@ -202,7 +202,7 @@ class TestBTreeVsLSMComparison:
         lsm = LSMTree("lsm", memtable_size=20)
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[btree, lsm],
         )
 
@@ -233,7 +233,7 @@ class TestSnapshotIsolationConflicts:
         )
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[store, tm],
         )
 
@@ -272,7 +272,7 @@ class TestSerializableConflicts:
         )
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(100),
+            duration=100,
             entities=[store, tm],
         )
 
@@ -335,7 +335,7 @@ class TestFullPipeline:
 
         sim = Simulation(
             start_time=Instant.from_seconds(0),
-            end_time=Instant.from_seconds(1),
+            duration=1,
             sources=[source],
             entities=[wal, lsm, worker, tracker],
         )

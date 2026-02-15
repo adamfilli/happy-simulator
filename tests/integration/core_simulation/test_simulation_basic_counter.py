@@ -17,7 +17,7 @@ def test_basic_constant_simulation():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(sim_duration),
+        duration=sim_duration,
         sources=[source],
         entities=[counter],
     )

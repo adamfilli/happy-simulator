@@ -17,7 +17,6 @@ from happysimulator.load.source import Source
 from happysimulator.load.profile import Profile
 from happysimulator.components.common import Sink
 from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
 from happysimulator.visual import serve, Chart
 
@@ -56,12 +55,7 @@ class Server(QueuedResource):
             yield self._service_time
         finally:
             self._in_flight -= 1
-        return [Event(
-            time=self.now,
-            event_type="Response",
-            target=self._downstream,
-            context=event.context,
-        )]
+        return [self.forward(event, self._downstream, event_type="Response")]
 
 
 sink = Sink("Sink")
@@ -76,14 +70,13 @@ source = Source.with_profile(
     poisson=False,
 )
 
-depth_data = Data()
-depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+depth_probe, depth_data = Probe.on(server, "depth", interval=0.1)
 
 sim = Simulation(
     sources=[source],
     entities=[server, sink],
     probes=[depth_probe],
-    end_time=Instant.from_seconds(60.0),
+    duration=60.0,
 )
 
 serve(sim, charts=[

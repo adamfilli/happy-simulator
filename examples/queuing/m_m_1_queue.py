@@ -245,12 +245,7 @@ class MM1Server(QueuedResource):
         if self.downstream is None:
             return []
 
-        completed = Event(
-            time=self.now,
-            event_type="Completed",
-            target=self.downstream,
-            context=event.context,
-        )
+        completed = self.forward(event, self.downstream, event_type="Completed")
         return [completed]
 
 
@@ -303,14 +298,8 @@ def run_metastable_simulation(
     )
 
     # Create queue depth probe
-    queue_depth_data = Data()
-    queue_probe = Probe(
-        target=server,
-        metric="depth",
-        data=queue_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+
+    queue_probe, queue_depth_data = Probe.on(server, "depth", interval=probe_interval_s)
 
     # Create load profile and source
     profile = MetastableLoadProfile()
@@ -323,7 +312,7 @@ def run_metastable_simulation(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source],
         entities=[server, sink],
         probes=[queue_probe],

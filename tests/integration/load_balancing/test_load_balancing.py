@@ -42,12 +42,7 @@ class SimpleServer(Entity):
         yield self.service_time
         self.active_connections -= 1
         if self.downstream:
-            return [Event(
-                time=self.now,
-                event_type="Response",
-                target=self.downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self.downstream, event_type="Response")]
         return []
 
 
@@ -88,12 +83,7 @@ class CachingServer(Entity):
 
         self.active_connections -= 1
         if self.downstream:
-            return [Event(
-                time=self.now,
-                event_type="Response",
-                target=self.downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self.downstream, event_type="Response")]
         return []
 
     @property
@@ -124,7 +114,7 @@ class TestConsistentHashVsRoundRobin:
 
         ch_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=ch_servers + [ch_lb, sink],
         )
 
@@ -155,7 +145,7 @@ class TestConsistentHashVsRoundRobin:
 
         rr_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=rr_servers + [rr_lb, rr_sink],
         )
 
@@ -195,7 +185,7 @@ class TestConsistentHashVsRoundRobin:
 
         ch_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=ch_servers + [ch_lb],
         )
 
@@ -238,7 +228,7 @@ class TestLeastConnectionsDistribution:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(8.0),
+            duration=8.0,
             sources=[source],
             entities=servers + [lb, sink],
         )
@@ -272,7 +262,7 @@ class TestPowerOfTwoChoicesLoadBalancing:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(8.0),
+            duration=8.0,
             sources=[source],
             entities=servers + [lb, sink],
         )
@@ -314,7 +304,7 @@ class TestBackendFailureHandling:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[healthy1, healthy2, failed, lb, sink],
         )

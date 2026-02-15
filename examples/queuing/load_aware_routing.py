@@ -458,29 +458,14 @@ def run_load_aware_routing_simulation(
     router = RandomRouter(name="Router", targets=clients)
 
     # Create probes for server metrics
-    server_depth_data = [Data() for _ in range(num_servers)]
-    server_load_data = [Data() for _ in range(num_servers)]
-
     probes = []
-    for i, server in enumerate(servers):
-        probes.append(
-            Probe(
-                target=server,
-                metric="depth",
-                data=server_depth_data[i],
-                interval=probe_interval_s,
-                start_time=Instant.Epoch,
-            )
-        )
-        probes.append(
-            Probe(
-                target=server,
-                metric="load",
-                data=server_load_data[i],
-                interval=probe_interval_s,
-                start_time=Instant.Epoch,
-            )
-        )
+    server_depth_data = []
+    server_load_data = []
+    for server in servers:
+        server_probes, data = Probe.on_many(server, ["depth", "load"], interval=probe_interval_s)
+        probes.extend(server_probes)
+        server_depth_data.append(data["depth"])
+        server_load_data.append(data["load"])
 
     # Create sources
     stop_after = Instant.from_seconds(duration_s)
@@ -516,7 +501,7 @@ def run_load_aware_routing_simulation(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[random_source, high_rate_source],
         entities=entities,
         probes=probes,

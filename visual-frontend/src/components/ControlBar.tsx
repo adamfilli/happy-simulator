@@ -16,9 +16,11 @@ interface Props {
   onReset: () => void;
   onRunTo: (time_s: number) => void;
   onRunToEvent: (n: number) => void;
+  onToggleBreakpoints?: () => void;
+  breakpointCount?: number;
 }
 
-export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent }: Props) {
+export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, onRunTo, onRunToEvent, onToggleBreakpoints, breakpointCount }: Props) {
   const state = useSimStore((s) => s.state);
   const isPlaying = useSimStore((s) => s.isPlaying);
   const setPlaying = useSimStore((s) => s.setPlaying);
@@ -142,6 +144,21 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
             </option>
           ))}
         </select>
+
+        {onToggleBreakpoints && (
+          <button
+            onClick={onToggleBreakpoints}
+            className="relative px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs font-medium"
+            title="Manage breakpoints"
+          >
+            BP
+            {(breakpointCount ?? 0) > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center bg-purple-600 text-[10px] font-bold rounded-full">
+                {breakpointCount}
+              </span>
+            )}
+          </button>
+        )}
 
         <span className="text-gray-700">|</span>
 

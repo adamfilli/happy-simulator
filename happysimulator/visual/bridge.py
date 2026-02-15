@@ -557,3 +557,96 @@ class SimulationBridge:
     def code_step_out(self) -> None:
         """Step out — continue until the current frame returns."""
         self._code_debugger.code_step_out()
+
+    # --- Simulation Breakpoint Management ---
+
+    def list_breakpoints_json(self) -> list[dict]:
+        """Return all simulation breakpoints as JSON-safe dicts."""
+        from happysimulator.core.control.breakpoints import (
+            ConditionBreakpoint,
+            EventCountBreakpoint,
+            EventTypeBreakpoint,
+            MetricBreakpoint,
+            TimeBreakpoint,
+        )
+
+        result: list[dict] = []
+        for bp_id, bp in self._sim.control.list_breakpoints():
+            info: dict[str, Any] = {"id": bp_id, "one_shot": bp.one_shot}
+            if isinstance(bp, TimeBreakpoint):
+                info["type"] = "time"
+                info["time_s"] = bp.time.to_seconds()
+                info["description"] = f"t >= {bp.time.to_seconds():.4f}s"
+            elif isinstance(bp, EventCountBreakpoint):
+                info["type"] = "event_count"
+                info["count"] = bp.count
+                info["description"] = f"events >= {bp.count}"
+            elif isinstance(bp, EventTypeBreakpoint):
+                info["type"] = "event_type"
+                info["event_type"] = bp.event_type
+                info["description"] = f'event_type == "{bp.event_type}"'
+            elif isinstance(bp, MetricBreakpoint):
+                info["type"] = "metric"
+                info["entity_name"] = bp.entity_name
+                info["attribute"] = bp.attribute
+                info["operator"] = bp.operator
+                info["threshold"] = bp.threshold
+                info["description"] = (
+                    f"{bp.entity_name}.{bp.attribute} {bp.operator} {bp.threshold}"
+                )
+            elif isinstance(bp, ConditionBreakpoint):
+                info["type"] = "custom"
+                info["description"] = bp.description
+            else:
+                info["type"] = "custom"
+                info["description"] = str(bp)
+            result.append(info)
+        return result
+
+    def add_breakpoint_from_json(self, body: dict) -> dict:
+        """Create a breakpoint from a JSON request body and register it.
+
+        Returns:
+            Dict with ``id`` and ``type`` of the created breakpoint.
+        """
+        from happysimulator.core.control.breakpoints import (
+            EventCountBreakpoint,
+            EventTypeBreakpoint,
+            MetricBreakpoint,
+            TimeBreakpoint,
+        )
+        from happysimulator.core.temporal import Instant
+
+        bp_type = body.get("type", "")
+        one_shot = body.get("one_shot", True)
+
+        if bp_type == "time":
+            bp = TimeBreakpoint(
+                time=Instant.from_seconds(float(body["time_s"])),
+                one_shot=one_shot,
+            )
+        elif bp_type == "event_count":
+            bp = EventCountBreakpoint(count=int(body["count"]), one_shot=one_shot)
+        elif bp_type == "event_type":
+            bp = EventTypeBreakpoint(event_type=body["event_type"], one_shot=one_shot)
+        elif bp_type == "metric":
+            bp = MetricBreakpoint(
+                entity_name=body["entity_name"],
+                attribute=body["attribute"],
+                operator=body["operator"],
+                threshold=float(body["threshold"]),
+                one_shot=one_shot,
+            )
+        else:
+            raise ValueError(f"Unknown breakpoint type: {bp_type!r}")
+
+        bp_id = self._sim.control.add_breakpoint(bp)
+        return {"id": bp_id, "type": bp_type}
+
+    def remove_sim_breakpoint(self, bp_id: str) -> None:
+        """Remove a simulation breakpoint by ID."""
+        self._sim.control.remove_breakpoint(bp_id)
+
+    def clear_sim_breakpoints(self) -> None:
+        """Remove all simulation breakpoints."""
+        self._sim.control.clear_breakpoints()

@@ -5,21 +5,29 @@ import { useWebSocket } from "./hooks/useWebSocket";
 import GraphView from "./components/GraphView";
 import DashboardView from "./components/DashboardView";
 import ControlBar from "./components/ControlBar";
+import BreakpointPanel from "./components/BreakpointPanel";
 import InspectorPanel from "./components/InspectorPanel";
 import EventLog from "./components/EventLog";
 import SimulationLog from "./components/SimulationLog";
 import Timeline from "./components/Timeline";
-import type { SimState, Topology, StepResult, ChartConfig } from "./types";
+import type { SimState, Topology, StepResult, ChartConfig, BreakpointInfo } from "./types";
 
 export default function App() {
   const { setTopology, setState, addEvents, addLogs, addDashboardPanel } = useSimStore();
   const state = useSimStore((s) => s.state);
+  const topology = useSimStore((s) => s.topology);
   const activeView = useSimStore((s) => s.activeView);
   const setActiveView = useSimStore((s) => s.setActiveView);
   const { send } = useWebSocket();
   const [activeTab, setActiveTab] = useState<"inspector" | "events" | "logs">("inspector");
   const [panelWidth, setPanelWidth] = useState(320);
   const dragging = useRef(false);
+  const [bpPanelOpen, setBpPanelOpen] = useState(false);
+  const [breakpoints, setBreakpoints] = useState<BreakpointInfo[]>([]);
+
+  const entityNames = (topology?.nodes ?? [])
+    .filter((n) => n.category !== "probe")
+    .map((n) => n.id);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -120,10 +128,19 @@ export default function App() {
         onReset={handleReset}
         onRunTo={handleRunTo}
         onRunToEvent={handleRunToEvent}
+        onToggleBreakpoints={() => setBpPanelOpen((v) => !v)}
+        breakpointCount={breakpoints.length}
+      />
+      <BreakpointPanel
+        open={bpPanelOpen}
+        onClose={() => setBpPanelOpen(false)}
+        entityNames={entityNames}
+        onBreakpointsChanged={setBreakpoints}
       />
       <Timeline
         currentTime={state?.time_s ?? 0}
         endTime={state?.end_time_s ?? null}
+        breakpoints={breakpoints}
         onSeekTo={handleRunTo}
       />
       <div className="flex-1 flex overflow-hidden">

@@ -6,6 +6,7 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const {
     setState, addEvents, addEdges, addLogs, setPlaying, setEdgeStats,
+    setBreakpointHitInfo,
     setCodeTrace, setCodePaused, clearCodePaused,
     openCodePanel, closeCodePanel,
     addCodeBreakpoint, removeCodeBreakpoint,
@@ -35,6 +36,7 @@ export function useWebSocket() {
         setPlaying(false);
       } else if (msg.type === "breakpoint_hit") {
         setPlaying(false);
+        setBreakpointHitInfo(msg.breakpoints ?? null);
       } else if (msg.type === "code_debug_activated") {
         if (msg.source) {
           openCodePanel(msg.entity_name, {
@@ -65,6 +67,7 @@ export function useWebSocket() {
     };
   }, [
     setState, addEvents, addEdges, addLogs, setPlaying, setEdgeStats,
+    setBreakpointHitInfo,
     setCodeTrace, setCodePaused, clearCodePaused,
     openCodePanel, closeCodePanel,
     addCodeBreakpoint, removeCodeBreakpoint,

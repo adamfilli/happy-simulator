@@ -142,10 +142,26 @@ export interface CodePanelConfig {
   source: EntitySource;
 }
 
+// --- Simulation Breakpoint Types ---
+
+export interface BreakpointInfo {
+  id: string;
+  type: "time" | "event_count" | "event_type" | "metric" | "custom";
+  one_shot: boolean;
+  time_s?: number;
+  count?: number;
+  event_type?: string;
+  entity_name?: string;
+  attribute?: string;
+  operator?: string;
+  threshold?: number;
+  description?: string;
+}
+
 export type WSMessage =
   | { type: "state_update"; state: SimState; new_events: RecordedEvent[]; new_edges: TopologyEdge[]; new_logs?: RecordedLog[]; edge_stats?: EdgeStats; code_traces?: CodeTrace[] }
   | { type: "simulation_complete" }
-  | { type: "breakpoint_hit" }
+  | { type: "breakpoint_hit"; breakpoints?: BreakpointInfo[] }
   | { type: "code_debug_activated"; entity_name: string; source: EntitySource | null; debug_state: Record<string, unknown> }
   | { type: "code_debug_deactivated"; entity_name: string; debug_state: Record<string, unknown> }
   | { type: "code_paused"; paused_state: CodePausedState }

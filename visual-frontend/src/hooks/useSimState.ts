@@ -12,6 +12,7 @@ import type {
   CodeTrace,
   CodePausedState,
   CodeBreakpointInfo,
+  BreakpointInfo,
 } from "../types";
 
 interface SimStore {
@@ -28,6 +29,9 @@ interface SimStore {
   dashboardTimeRange: { start: number | null; end: number | null };
   edgeStats: EdgeStats;
   pinnedCharts: PinnedChart[];
+
+  // Simulation breakpoint state
+  breakpointHitInfo: BreakpointInfo[] | null;
 
   // Code debug state
   codePanels: Map<string, CodePanelConfig>;
@@ -55,6 +59,9 @@ interface SimStore {
   removePinnedChart: (id: string) => void;
   updatePinnedChartPosition: (id: string, x: number, y: number) => void;
   updatePinnedChartMode: (id: string, mode: PinnedChart["displayMode"]) => void;
+
+  // Simulation breakpoint actions
+  setBreakpointHitInfo: (info: BreakpointInfo[] | null) => void;
 
   // Code debug actions
   openCodePanel: (entityName: string, config: CodePanelConfig) => void;
@@ -85,6 +92,9 @@ export const useSimStore = create<SimStore>((set) => ({
   dashboardTimeRange: { start: null, end: null },
   edgeStats: {},
   pinnedCharts: [],
+
+  // Simulation breakpoint state
+  breakpointHitInfo: null,
 
   // Code debug state
   codePanels: new Map(),
@@ -146,6 +156,9 @@ export const useSimStore = create<SimStore>((set) => ({
       pinnedCharts: prev.pinnedCharts.map((c) => (c.id === id ? { ...c, displayMode: mode } : c)),
     })),
 
+  // Simulation breakpoint actions
+  setBreakpointHitInfo: (info) => set({ breakpointHitInfo: info }),
+
   // Code debug actions
   openCodePanel: (entityName, config) =>
     set((prev) => {
@@ -180,6 +193,7 @@ export const useSimStore = create<SimStore>((set) => ({
     eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null,
     dashboardTimeRange: { start: null, end: null }, edgeStats: {},
     pinnedCharts: [],
+    breakpointHitInfo: null,
     codePanels: new Map(), codeTraces: new Map(),
     codePausedEntity: null, codePausedState: null, codeBreakpoints: [],
   }),

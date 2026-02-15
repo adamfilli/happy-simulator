@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -113,6 +113,34 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
     def get_code_debug_state() -> JSONResponse:
         return JSONResponse(bridge.get_code_debug_state())
 
+    # --- Simulation Breakpoint REST endpoints ---
+
+    @app.get("/api/breakpoints")
+    def get_breakpoints() -> JSONResponse:
+        return JSONResponse(bridge.list_breakpoints_json())
+
+    @app.post("/api/breakpoints")
+    async def post_breakpoint(request: Request) -> JSONResponse:
+        body = await request.json()
+        try:
+            result = bridge.add_breakpoint_from_json(body)
+            return JSONResponse(result, status_code=201)
+        except (ValueError, KeyError) as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+
+    @app.delete("/api/breakpoints/{bp_id}")
+    def delete_breakpoint(bp_id: str) -> JSONResponse:
+        try:
+            bridge.remove_sim_breakpoint(bp_id)
+            return JSONResponse({"removed": True})
+        except KeyError:
+            return JSONResponse({"error": "Breakpoint not found"}, status_code=404)
+
+    @app.delete("/api/breakpoints")
+    def delete_all_breakpoints() -> JSONResponse:
+        bridge.clear_sim_breakpoints()
+        return JSONResponse({"cleared": True})
+
     # --- WebSocket for play mode ---
 
     @app.websocket("/api/ws")
@@ -197,7 +225,8 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
                     break
 
                 if result["state"].get("is_paused"):
-                    await ws.send_json({"type": "breakpoint_hit"})
+                    breakpoints = bridge.list_breakpoints_json()
+                    await ws.send_json({"type": "breakpoint_hit", "breakpoints": breakpoints})
                     break
 
                 await asyncio.sleep(0.05 if speed != 0 else 0.01)

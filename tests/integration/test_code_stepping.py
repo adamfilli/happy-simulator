@@ -24,7 +24,9 @@ class TraceableServer(Entity):
         self.downstream = downstream
 
     def handle_event(self, event):
+        step_one = 0.05  # noqa: F841 - intentional: test inspects source code
         yield 0.05
+        step_two = 0.05  # noqa: F841 - intentional: test inspects source code
         yield 0.05
         return [Event(time=self.now, event_type="Done", target=self.downstream)]
 
@@ -35,6 +37,7 @@ class TraceableQueuedServer(QueuedResource):
         self.downstream = downstream
 
     def handle_queued_event(self, event):
+        phase = "processing"  # noqa: F841 - intentional: test inspects source code
         yield 0.1
         return [Event(time=self.now, event_type="Done", target=self.downstream)]
 

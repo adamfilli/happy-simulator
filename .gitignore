@@ -166,3 +166,12 @@ output
 
 # Performance benchmark baselines (machine-specific)
 tests/perf/baseline.json
+
+# Local IDE config
+.vscode/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Windows artifacts
+nul

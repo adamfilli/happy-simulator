@@ -183,7 +183,7 @@ class WindowState:
     emitted: bool = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class StreamProcessorStats:
     """Statistics tracked by StreamProcessor.
 
@@ -253,7 +253,24 @@ class StreamProcessor(Entity):
         self._min_event_time_seen: float = float('inf')
         self._watermark_scheduled: bool = False
 
-        self.stats = StreamProcessorStats()
+        self._events_processed = 0
+        self._windows_emitted = 0
+        self._late_events = 0
+        self._late_events_dropped = 0
+        self._late_events_updated = 0
+        self._late_events_side_output = 0
+
+    @property
+    def stats(self) -> StreamProcessorStats:
+        """Return a frozen snapshot of current statistics."""
+        return StreamProcessorStats(
+            events_processed=self._events_processed,
+            windows_emitted=self._windows_emitted,
+            late_events=self._late_events,
+            late_events_dropped=self._late_events_dropped,
+            late_events_updated=self._late_events_updated,
+            late_events_side_output=self._late_events_side_output,
+        )
 
     @property
     def watermark_s(self) -> float:
@@ -271,7 +288,7 @@ class StreamProcessor(Entity):
     @property
     def total_windows_emitted(self) -> int:
         """Total windows emitted."""
-        return self.stats.windows_emitted
+        return self._windows_emitted
 
     def _is_session_window(self) -> bool:
         """Check if using session windows."""
@@ -351,7 +368,7 @@ class StreamProcessor(Entity):
                 if self._window_type.should_close(window.end, self._watermark_s):
                     result = self._aggregate_fn(window.records)
                     window.emitted = True
-                    self.stats.windows_emitted += 1
+                    self._windows_emitted += 1
 
                     events.append(Event(
                         time=self.now,
@@ -388,7 +405,7 @@ class StreamProcessor(Entity):
                 else:
                     event_time_s = self.now.to_seconds()
 
-            self.stats.events_processed += 1
+            self._events_processed += 1
 
             # Track min event time for watermark advancement
             if event_time_s < self._min_event_time_seen:
@@ -396,15 +413,15 @@ class StreamProcessor(Entity):
 
             # Check for late event
             if self._is_late(event_time_s):
-                self.stats.late_events += 1
+                self._late_events += 1
 
                 if self._late_event_policy == LateEventPolicy.DROP:
-                    self.stats.late_events_dropped += 1
+                    self._late_events_dropped += 1
                     yield 0.0
                     return None
 
                 elif self._late_event_policy == LateEventPolicy.SIDE_OUTPUT:
-                    self.stats.late_events_side_output += 1
+                    self._late_events_side_output += 1
                     if self._side_output is not None:
                         yield 0.0
                         return [Event(
@@ -421,7 +438,7 @@ class StreamProcessor(Entity):
                     return None
 
                 elif self._late_event_policy == LateEventPolicy.UPDATE:
-                    self.stats.late_events_updated += 1
+                    self._late_events_updated += 1
                     # Fall through to add to windows
 
             # Assign to windows

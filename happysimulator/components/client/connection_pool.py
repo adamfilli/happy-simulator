@@ -28,7 +28,7 @@ Example:
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Generator
 
 from happysimulator.core.entity import Entity
@@ -57,9 +57,9 @@ class Connection:
     is_active: bool = False
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConnectionPoolStats:
-    """Statistics tracked by ConnectionPool."""
+    """Frozen snapshot of ConnectionPool statistics."""
 
     connections_created: int = 0
     connections_closed: int = 0
@@ -158,7 +158,12 @@ class ConnectionPool(Entity):
         self._next_waiter_id = 0
 
         # Statistics
-        self.stats = ConnectionPoolStats()
+        self._connections_created = 0
+        self._connections_closed = 0
+        self._acquisitions = 0
+        self._releases = 0
+        self._timeouts = 0
+        self._total_wait_time = 0.0
 
         logger.debug(
             "[%s] ConnectionPool initialized: target=%s, min=%d, max=%d, "
@@ -217,11 +222,23 @@ class ConnectionPool(Entity):
         return len(self._waiters)
 
     @property
+    def stats(self) -> ConnectionPoolStats:
+        """Frozen snapshot of connection pool statistics."""
+        return ConnectionPoolStats(
+            connections_created=self._connections_created,
+            connections_closed=self._connections_closed,
+            acquisitions=self._acquisitions,
+            releases=self._releases,
+            timeouts=self._timeouts,
+            total_wait_time=self._total_wait_time,
+        )
+
+    @property
     def average_wait_time(self) -> float:
         """Average time spent waiting for a connection."""
-        if self.stats.acquisitions == 0:
+        if self._acquisitions == 0:
             return 0.0
-        return self.stats.total_wait_time / self.stats.acquisitions
+        return self._total_wait_time / self._acquisitions
 
     def acquire(self) -> Generator[float, None, Connection]:
         """Acquire a connection from the pool.
@@ -240,7 +257,7 @@ class ConnectionPool(Entity):
             TimeoutError: If no connection becomes available within timeout.
         """
         start_time = self.now
-        self.stats.acquisitions += 1
+        self._acquisitions += 1
 
         logger.debug(
             "[%s] Acquire requested: idle=%d, active=%d, total=%d, max=%d",
@@ -305,7 +322,7 @@ class ConnectionPool(Entity):
                 connection = result[0]
                 if connection is not None:
                     wait_time = (self.now - start_time).to_seconds()
-                    self.stats.total_wait_time += wait_time
+                    self._total_wait_time += wait_time
                     logger.debug(
                         "[%s] Acquired connection after wait: id=%d, wait=%.3fs",
                         self.name,
@@ -319,7 +336,7 @@ class ConnectionPool(Entity):
 
         # Timeout - remove ourselves from waiters
         self._remove_waiter(waiter_id)
-        self.stats.timeouts += 1
+        self._timeouts += 1
 
         if self._on_timeout is not None:
             self._on_timeout()
@@ -360,7 +377,7 @@ class ConnectionPool(Entity):
         connection.is_active = False
         connection.last_used_at = self.now
 
-        self.stats.releases += 1
+        self._releases += 1
 
         logger.debug(
             "[%s] Released connection: id=%d",
@@ -541,7 +558,7 @@ class ConnectionPool(Entity):
             is_active=False,
         )
         self._total_connections += 1
-        self.stats.connections_created += 1
+        self._connections_created += 1
 
         logger.debug(
             "[%s] Created connection: id=%d, total=%d",
@@ -564,7 +581,7 @@ class ConnectionPool(Entity):
     def _close_connection(self, connection: Connection) -> None:
         """Close a connection."""
         self._total_connections -= 1
-        self.stats.connections_closed += 1
+        self._connections_closed += 1
 
         logger.debug(
             "[%s] Closed connection: id=%d, total=%d",
@@ -602,6 +619,6 @@ class ConnectionPool(Entity):
         logger.info(
             "[%s] Pool closed: created=%d, closed=%d",
             self.name,
-            self.stats.connections_created,
-            self.stats.connections_closed,
+            self._connections_created,
+            self._connections_closed,
         )

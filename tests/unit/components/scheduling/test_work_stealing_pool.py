@@ -201,6 +201,9 @@ class TestAllTasksComplete:
     def test_pool_tracks_completions(self):
         pool, _ = make_pool()
         assert pool.stats.tasks_completed == 0
-        # Manually increment to verify tracking
-        pool.stats.tasks_completed = 5
-        assert pool.stats.tasks_completed == 5
+        # Verify stats are frozen snapshots
+        stats = pool.stats
+        assert stats.tasks_submitted == 0
+        assert stats.tasks_completed == 0
+        assert stats.total_steals == 0
+        assert stats.total_steal_attempts == 0

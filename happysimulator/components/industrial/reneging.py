@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 class RenegingStats:
     """Snapshot of reneging statistics."""
 
-    served: int
-    reneged: int
+    served: int = 0
+    reneged: int = 0
 
 
 class RenegingQueuedResource(QueuedResource):

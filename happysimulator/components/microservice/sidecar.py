@@ -19,7 +19,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Generator
 
@@ -39,7 +39,7 @@ class _CircuitState(Enum):
     HALF_OPEN = "half_open"
 
 
-@dataclass
+@dataclass(frozen=True)
 class SidecarStats:
     """Statistics tracked by Sidecar."""
 
@@ -134,7 +134,13 @@ class Sidecar(Entity):
         self._in_flight: dict[int, dict] = {}
         self._next_request_id = 0
 
-        self.stats = SidecarStats()
+        self._total_requests = 0
+        self._successful_requests = 0
+        self._failed_requests = 0
+        self._retries = 0
+        self._rate_limited = 0
+        self._circuit_broken = 0
+        self._timed_out = 0
 
         logger.debug(
             "[%s] Sidecar initialized: target=%s, timeout=%.1fs, max_retries=%d",
@@ -142,6 +148,19 @@ class Sidecar(Entity):
             target.name,
             request_timeout,
             max_retries,
+        )
+
+    @property
+    def stats(self) -> SidecarStats:
+        """Return a frozen snapshot of current statistics."""
+        return SidecarStats(
+            total_requests=self._total_requests,
+            successful_requests=self._successful_requests,
+            failed_requests=self._failed_requests,
+            retries=self._retries,
+            rate_limited=self._rate_limited,
+            circuit_broken=self._circuit_broken,
+            timed_out=self._timed_out,
         )
 
     @property
@@ -186,7 +205,7 @@ class Sidecar(Entity):
 
     def _handle_request(self, event: Event) -> list[Event] | None:
         """Apply rate limiting and circuit breaking, then forward."""
-        self.stats.total_requests += 1
+        self._total_requests += 1
 
         # Check if this is a retry (carries attempt number in metadata)
         attempt = event.context.get("metadata", {}).get("_sc_retry_attempt", 0)
@@ -194,14 +213,14 @@ class Sidecar(Entity):
         # 1. Rate limit check
         if self._rate_limit_policy is not None:
             if not self._rate_limit_policy.try_acquire(self.now):
-                self.stats.rate_limited += 1
+                self._rate_limited += 1
                 logger.debug("[%s] Request rate limited", self.name)
                 return None
 
         # 2. Circuit breaker check
         self._check_circuit_timeout()
         if self._circuit_state == _CircuitState.OPEN:
-            self.stats.circuit_broken += 1
+            self._circuit_broken += 1
             logger.debug("[%s] Request circuit broken", self.name)
             return None
 
@@ -276,7 +295,7 @@ class Sidecar(Entity):
         request_info["completed"] = True
         del self._in_flight[request_id]
 
-        self.stats.successful_requests += 1
+        self._successful_requests += 1
         self._record_circuit_success()
 
         return None
@@ -296,12 +315,12 @@ class Sidecar(Entity):
         request_info["completed"] = True
         del self._in_flight[request_id]
 
-        self.stats.timed_out += 1
+        self._timed_out += 1
         attempt = request_info["attempt"]
 
         # Retry if attempts remaining
         if attempt < self._max_retries:
-            self.stats.retries += 1
+            self._retries += 1
             delay = self._retry_base_delay * (2 ** attempt)
 
             # Schedule retry after backoff delay
@@ -316,7 +335,7 @@ class Sidecar(Entity):
             return [retry_event]
 
         # All retries exhausted
-        self.stats.failed_requests += 1
+        self._failed_requests += 1
         self._record_circuit_failure()
         return None
 

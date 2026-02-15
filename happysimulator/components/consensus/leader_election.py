@@ -29,11 +29,11 @@ class ElectionStats:
         elections_won: Elections won by this node.
         elections_participated: Elections this node participated in.
     """
-    current_leader: str | None
-    current_term: int
-    elections_started: int
-    elections_won: int
-    elections_participated: int
+    current_leader: str | None = None
+    current_term: int = 0
+    elections_started: int = 0
+    elections_won: int = 0
+    elections_participated: int = 0
 
 
 class LeaderElection(Entity):

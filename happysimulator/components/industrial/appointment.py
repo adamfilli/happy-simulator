@@ -24,9 +24,9 @@ _APPOINTMENT_TICK = "_AppointmentTick"
 class AppointmentStats:
     """Snapshot of appointment scheduler statistics."""
 
-    total_scheduled: int
-    arrivals: int
-    no_shows: int
+    total_scheduled: int = 0
+    arrivals: int = 0
+    no_shows: int = 0
 
 
 class AppointmentScheduler(Entity):
@@ -52,6 +52,8 @@ class AppointmentScheduler(Entity):
         no_show_rate: float = 0.0,
         event_type: str = "Appointment",
     ):
+        if not (0.0 <= no_show_rate <= 1.0):
+            raise ValueError(f"no_show_rate must be in [0.0, 1.0], got {no_show_rate}")
         super().__init__(name)
         self.target = target
         self.appointments = sorted(appointments)

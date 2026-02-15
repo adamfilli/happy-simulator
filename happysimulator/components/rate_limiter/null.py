@@ -5,6 +5,7 @@ rate limiting. Use it as a placeholder in pipelines where rate limiting
 may be optionally added, or as a baseline for comparison.
 """
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 
@@ -34,6 +35,11 @@ class NullRateLimiter(Entity):
     def downstream(self) -> Entity:
         """The downstream entity receiving forwarded events."""
         return self._downstream
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to downstream."""
+        super().set_clock(clock)
+        self._downstream.set_clock(clock)
 
     def handle_event(self, event: Event) -> list[Event]:
         """Forward the event to downstream immediately."""

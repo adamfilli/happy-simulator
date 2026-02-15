@@ -18,20 +18,20 @@ Example:
 
 import logging
 from collections import deque
-from dataclasses import dataclass, field
-from typing import Callable, Generator
+from dataclasses import dataclass
+from typing import Generator
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
-from happysimulator.core.temporal import Duration, Instant
+from happysimulator.core.temporal import Instant
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkerStats:
-    """Statistics tracked per worker."""
+    """Frozen snapshot of per-worker statistics."""
 
     tasks_completed: int = 0
     tasks_stolen: int = 0
@@ -39,9 +39,9 @@ class WorkerStats:
     idle_time: float = 0.0
 
 
-@dataclass
+@dataclass(frozen=True)
 class WorkStealingPoolStats:
-    """Aggregate statistics for the pool."""
+    """Frozen snapshot of aggregate pool statistics."""
 
     tasks_submitted: int = 0
     tasks_completed: int = 0
@@ -58,8 +58,23 @@ class _Worker(Entity):
         self._index = index
         self._queue: deque[Event] = deque()
         self._is_processing = False
-        self.stats = WorkerStats()
         self._last_idle_start: Instant | None = None
+
+        # Statistics (private counters → frozen snapshot via @property)
+        self._tasks_completed = 0
+        self._tasks_stolen = 0
+        self._total_processing_time = 0.0
+        self._idle_time = 0.0
+
+    @property
+    def stats(self) -> WorkerStats:
+        """Frozen snapshot of worker statistics."""
+        return WorkerStats(
+            tasks_completed=self._tasks_completed,
+            tasks_stolen=self._tasks_stolen,
+            total_processing_time=self._total_processing_time,
+            idle_time=self._idle_time,
+        )
 
     @property
     def queue_depth(self) -> int:
@@ -92,11 +107,11 @@ class _Worker(Entity):
             return [self._make_process_event(task)]
 
         # Try to steal
-        self._pool.stats.total_steal_attempts += 1
+        self._pool._total_steal_attempts += 1
         stolen = self._pool._steal_for(self._index)
         if stolen is not None:
-            self.stats.tasks_stolen += 1
-            self._pool.stats.total_steals += 1
+            self._tasks_stolen += 1
+            self._pool._total_steals += 1
             return [self._make_process_event(stolen)]
 
         # Idle
@@ -109,7 +124,7 @@ class _Worker(Entity):
         self._is_processing = True
         if self._last_idle_start is not None:
             idle_duration = (self.now - self._last_idle_start).to_seconds()
-            self.stats.idle_time += idle_duration
+            self._idle_time += idle_duration
             self._last_idle_start = None
 
         # Extract processing time
@@ -117,9 +132,9 @@ class _Worker(Entity):
 
         yield processing_time
 
-        self.stats.tasks_completed += 1
-        self.stats.total_processing_time += processing_time
-        self._pool.stats.tasks_completed += 1
+        self._tasks_completed += 1
+        self._total_processing_time += processing_time
+        self._pool._tasks_completed += 1
 
         # Forward to downstream if configured
         result_events: list[Event] = []
@@ -162,7 +177,7 @@ class WorkStealingPool(Entity):
     Attributes:
         name: Pool identifier.
         num_workers: Number of worker entities.
-        stats: Aggregate pool statistics.
+        stats: Frozen statistics snapshot (via property).
     """
 
     def __init__(
@@ -199,7 +214,12 @@ class WorkStealingPool(Entity):
             _Worker(f"{name}.worker_{i}", self, i)
             for i in range(num_workers)
         ]
-        self.stats = WorkStealingPoolStats()
+
+        # Statistics (private counters → frozen snapshot via @property)
+        self._tasks_submitted = 0
+        self._tasks_completed = 0
+        self._total_steals = 0
+        self._total_steal_attempts = 0
 
         logger.debug(
             "[%s] WorkStealingPool initialized: workers=%d",
@@ -218,8 +238,18 @@ class WorkStealingPool(Entity):
 
     @property
     def worker_stats(self) -> list[WorkerStats]:
-        """Per-worker statistics."""
+        """Per-worker statistics (frozen snapshots)."""
         return [w.stats for w in self._workers]
+
+    @property
+    def stats(self) -> WorkStealingPoolStats:
+        """Frozen snapshot of aggregate pool statistics."""
+        return WorkStealingPoolStats(
+            tasks_submitted=self._tasks_submitted,
+            tasks_completed=self._tasks_completed,
+            total_steals=self._total_steals,
+            total_steal_attempts=self._total_steal_attempts,
+        )
 
     def set_clock(self, clock: Clock) -> None:
         """Propagate clock to all workers."""
@@ -229,7 +259,7 @@ class WorkStealingPool(Entity):
 
     def handle_event(self, event: Event) -> list[Event] | None:
         """Accept incoming work and assign to shortest queue."""
-        self.stats.tasks_submitted += 1
+        self._tasks_submitted += 1
 
         # Find worker with shortest queue
         target_worker = min(self._workers, key=lambda w: w.queue_depth)

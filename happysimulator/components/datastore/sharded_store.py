@@ -160,7 +160,7 @@ class ConsistentHashSharding:
         return self._ring[idx][1]
 
 
-@dataclass
+@dataclass(frozen=True)
 class ShardedStoreStats:
     """Statistics tracked by ShardedStore."""
 
@@ -215,10 +215,22 @@ class ShardedStore(Entity):
         self._sharding_strategy = sharding_strategy or HashSharding()
 
         # Statistics
-        self.stats = ShardedStoreStats()
-        for i in range(len(shards)):
-            self.stats.shard_reads[i] = 0
-            self.stats.shard_writes[i] = 0
+        self._reads = 0
+        self._writes = 0
+        self._deletes = 0
+        self._shard_reads: dict[int, int] = {i: 0 for i in range(len(shards))}
+        self._shard_writes: dict[int, int] = {i: 0 for i in range(len(shards))}
+
+    @property
+    def stats(self) -> ShardedStoreStats:
+        """Frozen snapshot of sharded store statistics."""
+        return ShardedStoreStats(
+            reads=self._reads,
+            writes=self._writes,
+            deletes=self._deletes,
+            shard_reads=dict(self._shard_reads),
+            shard_writes=dict(self._shard_writes),
+        )
 
     @property
     def num_shards(self) -> int:
@@ -252,9 +264,9 @@ class ShardedStore(Entity):
         Returns:
             The value if found, None otherwise.
         """
-        self.stats.reads += 1
+        self._reads += 1
         shard_idx, shard = self._get_shard_for_key(key)
-        self.stats.shard_reads[shard_idx] = self.stats.shard_reads.get(shard_idx, 0) + 1
+        self._shard_reads[shard_idx] = self._shard_reads.get(shard_idx, 0) + 1
 
         value = yield from shard.get(key)
         return value
@@ -269,9 +281,9 @@ class ShardedStore(Entity):
         Yields:
             Write latency delay.
         """
-        self.stats.writes += 1
+        self._writes += 1
         shard_idx, shard = self._get_shard_for_key(key)
-        self.stats.shard_writes[shard_idx] = self.stats.shard_writes.get(shard_idx, 0) + 1
+        self._shard_writes[shard_idx] = self._shard_writes.get(shard_idx, 0) + 1
 
         yield from shard.put(key, value)
 
@@ -287,7 +299,7 @@ class ShardedStore(Entity):
         Returns:
             True if key existed.
         """
-        self.stats.deletes += 1
+        self._deletes += 1
         shard_idx, shard = self._get_shard_for_key(key)
 
         result = yield from shard.delete(key)

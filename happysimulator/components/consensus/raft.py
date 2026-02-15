@@ -43,14 +43,14 @@ class RaftStats:
         elections_started: Total elections initiated.
         votes_received: Total votes received in current/past elections.
     """
-    state: RaftState
-    current_term: int
-    current_leader: str | None
-    log_length: int
-    commit_index: int
-    commands_committed: int
-    elections_started: int
-    votes_received: int
+    state: RaftState = RaftState.FOLLOWER
+    current_term: int = 0
+    current_leader: str | None = None
+    log_length: int = 0
+    commit_index: int = 0
+    commands_committed: int = 0
+    elections_started: int = 0
+    votes_received: int = 0
 
 
 class RaftNode(Entity):

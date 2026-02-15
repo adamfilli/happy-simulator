@@ -26,6 +26,7 @@ Example:
             return cache_lock.release_write()
 """
 
+import logging
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
@@ -33,6 +34,8 @@ from typing import Generator, Callable, Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
+
+logger = logging.getLogger(__name__)
 
 
 class _WaiterType(Enum):
@@ -42,19 +45,19 @@ class _WaiterType(Enum):
     WRITER = "writer"
 
 
-@dataclass
+@dataclass(frozen=True)
 class RWLockStats:
-    """Statistics tracked by RWLock."""
+    """Frozen snapshot of read-write lock statistics."""
 
     read_acquisitions: int = 0
     write_acquisitions: int = 0
     read_releases: int = 0
     write_releases: int = 0
-    read_contentions: int = 0  # Readers that had to wait
-    write_contentions: int = 0  # Writers that had to wait
+    read_contentions: int = 0
+    write_contentions: int = 0
     total_read_wait_ns: int = 0
     total_write_wait_ns: int = 0
-    peak_readers: int = 0  # Maximum concurrent readers
+    peak_readers: int = 0
 
 
 @dataclass
@@ -101,8 +104,16 @@ class RWLock(Entity):
         self._write_locked = False
         self._waiters: deque[_Waiter] = deque()
 
-        # Statistics
-        self.stats = RWLockStats()
+        # Statistics (private counters → frozen snapshot via @property)
+        self._read_acquisitions = 0
+        self._write_acquisitions = 0
+        self._read_releases = 0
+        self._write_releases = 0
+        self._read_contentions = 0
+        self._write_contentions = 0
+        self._total_read_wait_ns = 0
+        self._total_write_wait_ns = 0
+        self._peak_readers = 0
 
     @property
     def active_readers(self) -> int:
@@ -118,6 +129,21 @@ class RWLock(Entity):
     def max_readers(self) -> int | None:
         """Maximum concurrent readers."""
         return self._max_readers
+
+    @property
+    def stats(self) -> RWLockStats:
+        """Frozen snapshot of current read-write lock statistics."""
+        return RWLockStats(
+            read_acquisitions=self._read_acquisitions,
+            write_acquisitions=self._write_acquisitions,
+            read_releases=self._read_releases,
+            write_releases=self._write_releases,
+            read_contentions=self._read_contentions,
+            write_contentions=self._write_contentions,
+            total_read_wait_ns=self._total_read_wait_ns,
+            total_write_wait_ns=self._total_write_wait_ns,
+            peak_readers=self._peak_readers,
+        )
 
     @property
     def waiters(self) -> int:
@@ -143,10 +169,10 @@ class RWLock(Entity):
             return False
 
         self._active_readers += 1
-        self.stats.read_acquisitions += 1
+        self._read_acquisitions += 1
 
-        if self._active_readers > self.stats.peak_readers:
-            self.stats.peak_readers = self._active_readers
+        if self._active_readers > self._peak_readers:
+            self._peak_readers = self._active_readers
 
         return True
 
@@ -160,7 +186,7 @@ class RWLock(Entity):
             return False
 
         self._write_locked = True
-        self.stats.write_acquisitions += 1
+        self._write_acquisitions += 1
         return True
 
     def acquire_read(self) -> Generator[float, None, None]:
@@ -176,7 +202,7 @@ class RWLock(Entity):
             return
 
         # Must wait
-        self.stats.read_contentions += 1
+        self._read_contentions += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
 
         acquired = [False]
@@ -194,11 +220,11 @@ class RWLock(Entity):
         while not acquired[0]:
             yield 0.0
 
-        self.stats.read_acquisitions += 1
+        self._read_acquisitions += 1
 
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_read_wait_ns += wait_time
+            self._total_read_wait_ns += wait_time
 
     def acquire_write(self) -> Generator[float, None, None]:
         """Acquire a write lock, blocking if necessary.
@@ -213,7 +239,7 @@ class RWLock(Entity):
             return
 
         # Must wait
-        self.stats.write_contentions += 1
+        self._write_contentions += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
 
         acquired = [False]
@@ -231,11 +257,11 @@ class RWLock(Entity):
         while not acquired[0]:
             yield 0.0
 
-        self.stats.write_acquisitions += 1
+        self._write_acquisitions += 1
 
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_write_wait_ns += wait_time
+            self._total_write_wait_ns += wait_time
 
     def release_read(self) -> list[Event]:
         """Release a read lock.
@@ -250,7 +276,7 @@ class RWLock(Entity):
             raise RuntimeError(f"RWLock {self.name}: release_read when no readers")
 
         self._active_readers -= 1
-        self.stats.read_releases += 1
+        self._read_releases += 1
 
         self._wake_waiters()
         return []
@@ -268,7 +294,7 @@ class RWLock(Entity):
             raise RuntimeError(f"RWLock {self.name}: release_write when not write-locked")
 
         self._write_locked = False
-        self.stats.write_releases += 1
+        self._write_releases += 1
 
         self._wake_waiters()
         return []
@@ -308,8 +334,8 @@ class RWLock(Entity):
                 self._active_readers += 1
                 waiter.callback()
 
-                if self._active_readers > self.stats.peak_readers:
-                    self.stats.peak_readers = self._active_readers
+                if self._active_readers > self._peak_readers:
+                    self._peak_readers = self._active_readers
 
     def handle_event(self, event: Event) -> None:
         """RWLock doesn't directly handle events."""

@@ -26,11 +26,11 @@ class PhiAccrualStats:
         std_interval: Standard deviation of inter-arrival times.
         is_suspected: Whether phi exceeds the threshold.
     """
-    heartbeats_received: int
-    current_phi: float
-    mean_interval: float
-    std_interval: float
-    is_suspected: bool
+    heartbeats_received: int = 0
+    current_phi: float = 0.0
+    mean_interval: float = 0.0
+    std_interval: float = 0.0
+    is_suspected: bool = False
 
 
 class PhiAccrualDetector:

@@ -25,9 +25,10 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from happysimulator.components.queue_policy import FIFOQueue
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -35,9 +36,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class InductorStats:
-    """Statistics tracked by Inductor."""
+    """Frozen snapshot of Inductor statistics."""
 
     received: int = 0
     forwarded: int = 0
@@ -77,7 +78,10 @@ class Inductor(Entity):
         self._last_output_time: Instant | None = None
 
         # Observability
-        self.stats = InductorStats()
+        self._received = 0
+        self._forwarded = 0
+        self._queued = 0
+        self._dropped = 0
         self.received_times: list[Instant] = []
         self.forwarded_times: list[Instant] = []
         self.dropped_times: list[Instant] = []
@@ -104,6 +108,21 @@ class Inductor(Entity):
     def queue_depth(self) -> int:
         return len(self._queue)
 
+    @property
+    def stats(self) -> InductorStats:
+        """Frozen snapshot of inductor statistics."""
+        return InductorStats(
+            received=self._received,
+            forwarded=self._forwarded,
+            queued=self._queued,
+            dropped=self._dropped,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to downstream."""
+        super().set_clock(clock)
+        self._downstream.set_clock(clock)
+
     # -- Event handling -------------------------------------------------------
 
     def handle_event(self, event: Event) -> list[Event]:
@@ -114,7 +133,7 @@ class Inductor(Entity):
 
     def _handle_arrival(self, event: Event) -> list[Event]:
         now = event.time
-        self.stats.received += 1
+        self._received += 1
         self.received_times.append(now)
 
         self._update_rate_estimate(now)
@@ -125,7 +144,7 @@ class Inductor(Entity):
 
         # Queue the event
         if self._queue.push(event):
-            self.stats.queued += 1
+            self._queued += 1
             logger.debug(
                 "[%.3f][%s] Queued request; queue_depth=%d",
                 now.to_seconds(), self.name, len(self._queue),
@@ -133,7 +152,7 @@ class Inductor(Entity):
             return self._ensure_poll_scheduled(now)
 
         # Queue full — drop
-        self.stats.dropped += 1
+        self._dropped += 1
         self.dropped_times.append(now)
         logger.debug(
             "[%.3f][%s] Dropped request; queue full (%d)",
@@ -197,7 +216,7 @@ class Inductor(Entity):
         return elapsed >= self._smoothed_interval
 
     def _forward(self, event: Event, now: Instant) -> list[Event]:
-        self.stats.forwarded += 1
+        self._forwarded += 1
         self.forwarded_times.append(now)
         self._last_output_time = now
         logger.debug(

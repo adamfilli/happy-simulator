@@ -31,7 +31,7 @@ Typical usage::
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
@@ -111,7 +111,7 @@ class AudienceTier:
         return self.monthly_ad_spend
 
 
-@dataclass
+@dataclass(frozen=True)
 class AdvertiserStats:
     """Aggregate statistics for an advertiser."""
 
@@ -161,7 +161,10 @@ class Advertiser(Entity):
 
         self._sentiment = 1.0
         self.active_tiers: list[AudienceTier] = list(tiers)
-        self.stats = AdvertiserStats()
+        self._periods_evaluated = 0
+        self._total_profit = 0.0
+        self._total_platform_revenue = 0.0
+        self._tier_shutoff_events = 0
 
         # Time-series data
         self.profit_data = Data()
@@ -176,6 +179,16 @@ class Advertiser(Entity):
     @sentiment.setter
     def sentiment(self, value: float):
         self._sentiment = max(0.0, min(1.0, value))
+
+    @property
+    def stats(self) -> AdvertiserStats:
+        """Return a frozen snapshot of advertiser statistics."""
+        return AdvertiserStats(
+            periods_evaluated=self._periods_evaluated,
+            total_profit=self._total_profit,
+            total_platform_revenue=self._total_platform_revenue,
+            tier_shutoff_events=self._tier_shutoff_events,
+        )
 
     def start_events(self) -> list[Event]:
         """Generate the initial evaluation event."""
@@ -206,7 +219,7 @@ class Advertiser(Entity):
         new_count = len(self.active_tiers)
 
         if new_count < prev_count:
-            self.stats.tier_shutoff_events += prev_count - new_count
+            self._tier_shutoff_events += prev_count - new_count
 
         monthly_profit = sum(
             t.tier_profit(self._sentiment, self.margin) for t in self.active_tiers
@@ -216,9 +229,9 @@ class Advertiser(Entity):
             for t in self.active_tiers
         )
 
-        self.stats.periods_evaluated += 1
-        self.stats.total_profit += monthly_profit
-        self.stats.total_platform_revenue += monthly_platform_rev
+        self._periods_evaluated += 1
+        self._total_profit += monthly_profit
+        self._total_platform_revenue += monthly_platform_rev
 
         self.profit_data.add_stat(monthly_profit, self.now)
         self.platform_revenue_data.add_stat(monthly_platform_rev, self.now)
@@ -275,7 +288,7 @@ class Advertiser(Entity):
         return results
 
 
-@dataclass
+@dataclass(frozen=True)
 class AdPlatformStats:
     """Aggregate statistics for an ad platform."""
 
@@ -295,13 +308,22 @@ class AdPlatform(Entity):
 
     def __init__(self, name: str):
         super().__init__(name)
-        self.stats = AdPlatformStats()
+        self._revenue_events = 0
+        self._total_revenue = 0.0
         self.revenue_data = Data()
+
+    @property
+    def stats(self) -> AdPlatformStats:
+        """Return a frozen snapshot of platform statistics."""
+        return AdPlatformStats(
+            revenue_events=self._revenue_events,
+            total_revenue=self._total_revenue,
+        )
 
     def handle_event(self, event: Event) -> None:
         if event.event_type == "AdRevenue":
             meta = event.context.get("metadata", {})
             revenue = meta.get("revenue", 0.0)
-            self.stats.revenue_events += 1
-            self.stats.total_revenue += revenue
+            self._revenue_events += 1
+            self._total_revenue += revenue
             self.revenue_data.add_stat(revenue, self.now)

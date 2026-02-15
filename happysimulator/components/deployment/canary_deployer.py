@@ -22,7 +22,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Protocol, runtime_checkable
 
 from happysimulator.core.entity import Entity
@@ -140,7 +140,7 @@ class LatencyEvaluator:
         return 0.0
 
 
-@dataclass
+@dataclass(frozen=True)
 class CanaryDeployerStats:
     """Statistics tracked by CanaryDeployer."""
 
@@ -163,7 +163,7 @@ class CanaryDeployer(Entity):
 
     Attributes:
         name: Deployer identifier.
-        stats: Mutable statistics dataclass.
+        stats: Frozen statistics snapshot.
         state: Current deployment state.
     """
 
@@ -206,12 +206,31 @@ class CanaryDeployer(Entity):
         self._stage_start_time: Instant | None = None
         self._original_strategy = None
 
-        self.stats = CanaryDeployerStats()
+        self._deployments_started = 0
+        self._deployments_completed = 0
+        self._deployments_rolled_back = 0
+        self._stages_completed = 0
+        self._evaluations_performed = 0
+        self._evaluations_passed = 0
+        self._evaluations_failed = 0
         self.state = CanaryState()
 
         logger.debug(
             "[%s] CanaryDeployer initialized: stages=%d",
             name, len(self._stages),
+        )
+
+    @property
+    def stats(self) -> CanaryDeployerStats:
+        """Return a frozen snapshot of current statistics."""
+        return CanaryDeployerStats(
+            deployments_started=self._deployments_started,
+            deployments_completed=self._deployments_completed,
+            deployments_rolled_back=self._deployments_rolled_back,
+            stages_completed=self._stages_completed,
+            evaluations_performed=self._evaluations_performed,
+            evaluations_passed=self._evaluations_passed,
+            evaluations_failed=self._evaluations_failed,
         )
 
     @property
@@ -266,7 +285,7 @@ class CanaryDeployer(Entity):
             status="in_progress",
             total_stages=len(self._stages),
         )
-        self.stats.deployments_started += 1
+        self._deployments_started += 1
 
         logger.info("[%s] Canary deployment started", self.name)
 
@@ -313,14 +332,14 @@ class CanaryDeployer(Entity):
         if self.state.status != "in_progress":
             return []
 
-        self.stats.evaluations_performed += 1
+        self._evaluations_performed += 1
 
         is_healthy = self._metric_evaluator.is_healthy(
             self._canary, self._baseline_backends,
         )
 
         if not is_healthy:
-            self.stats.evaluations_failed += 1
+            self._evaluations_failed += 1
             logger.warning("[%s] Canary evaluation failed", self.name)
             return [Event(
                 time=self.now,
@@ -329,7 +348,7 @@ class CanaryDeployer(Entity):
                 context={},
             )]
 
-        self.stats.evaluations_passed += 1
+        self._evaluations_passed += 1
 
         # Check if stage evaluation period is complete
         stage = self._stages[self.state.current_stage]
@@ -337,7 +356,7 @@ class CanaryDeployer(Entity):
 
         if elapsed >= stage.evaluation_period:
             # Advance to next stage
-            self.stats.stages_completed += 1
+            self._stages_completed += 1
             self.state.current_stage += 1
 
             if self.state.current_stage >= len(self._stages):
@@ -383,7 +402,7 @@ class CanaryDeployer(Entity):
     def _do_rollback(self) -> list[Event]:
         """Roll back: remove canary, restore weights."""
         self.state.status = "rolled_back"
-        self.stats.deployments_rolled_back += 1
+        self._deployments_rolled_back += 1
 
         if self._canary is not None:
             self._load_balancer.remove_backend(self._canary)
@@ -397,7 +416,7 @@ class CanaryDeployer(Entity):
     def _complete(self) -> list[Event]:
         """Mark deployment as completed."""
         self.state.status = "completed"
-        self.stats.deployments_completed += 1
+        self._deployments_completed += 1
         logger.info("[%s] Canary deployment completed", self.name)
         return []
 

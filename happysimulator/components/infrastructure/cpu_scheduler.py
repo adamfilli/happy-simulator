@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.core.entity import Entity
@@ -131,13 +131,13 @@ class CPUSchedulerStats:
         peak_queue_depth: Maximum concurrent tasks observed.
     """
 
-    tasks_completed: int
-    context_switches: int
-    total_cpu_time_s: float
-    total_context_switch_overhead_s: float
-    total_wait_time_s: float
-    ready_queue_depth: int
-    peak_queue_depth: int
+    tasks_completed: int = 0
+    context_switches: int = 0
+    total_cpu_time_s: float = 0.0
+    total_context_switch_overhead_s: float = 0.0
+    total_wait_time_s: float = 0.0
+    ready_queue_depth: int = 0
+    peak_queue_depth: int = 0
 
     @property
     def overhead_fraction(self) -> float:

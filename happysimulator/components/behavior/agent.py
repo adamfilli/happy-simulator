@@ -66,8 +66,13 @@ class Agent(Entity):
         self.state = state or AgentState()
         self.action_delay = action_delay
         self.heartbeat_interval = heartbeat_interval
-        self.stats = AgentStats()
         self._rng = random.Random(seed)
+
+        # Statistics (private counters → frozen snapshot via @property)
+        self._events_received = 0
+        self._decisions_made = 0
+        self._actions_by_type: dict[str, int] = {}
+        self._social_messages_received = 0
         self._action_handlers: dict[str, ActionHandler] = {}
         self._last_event_time: float | None = None
         self._heartbeat_scheduled = False
@@ -85,10 +90,20 @@ class Agent(Entity):
     # Event dispatch
     # -----------------------------------------------------------------
 
+    @property
+    def stats(self) -> AgentStats:
+        """Frozen snapshot of agent statistics."""
+        return AgentStats(
+            events_received=self._events_received,
+            decisions_made=self._decisions_made,
+            actions_by_type=dict(self._actions_by_type),
+            social_messages_received=self._social_messages_received,
+        )
+
     def handle_event(
         self, event: Event
     ) -> Generator[float, None, list[Event]] | list[Event] | None:
-        self.stats.events_received += 1
+        self._events_received += 1
         current_time_s = self.now.to_seconds()
 
         # Apply passive decay since last event
@@ -142,7 +157,7 @@ class Agent(Entity):
 
     def _handle_social_message(self, event: Event) -> list[Event] | None:
         """Update beliefs/knowledge based on incoming social influence."""
-        self.stats.social_messages_received += 1
+        self._social_messages_received += 1
         metadata = event.context.get("metadata", {})
         topic = metadata.get("topic", "")
         opinion = metadata.get("opinion", 0.0)
@@ -211,8 +226,8 @@ class Agent(Entity):
         if chosen is None:
             return None
 
-        self.stats.decisions_made += 1
-        self.stats.record_action(chosen.action)
+        self._decisions_made += 1
+        self._actions_by_type[chosen.action] = self._actions_by_type.get(chosen.action, 0) + 1
 
         # Execute action
         return self._execute_action(chosen, event)

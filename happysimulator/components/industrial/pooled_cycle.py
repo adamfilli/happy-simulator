@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 class PooledCycleStats:
     """Snapshot of pooled cycle resource statistics."""
 
-    pool_size: int
-    available: int
-    active: int
-    queued: int
-    completed: int
-    rejected: int
-    utilization: float
+    pool_size: int = 0
+    available: int = 0
+    active: int = 0
+    queued: int = 0
+    completed: int = 0
+    rejected: int = 0
+    utilization: float = 0.0
 
 
 class PooledCycleResource(Entity):

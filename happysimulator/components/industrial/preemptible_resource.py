@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 class PreemptibleResourceStats:
     """Snapshot of preemptible resource statistics."""
 
-    capacity: int
-    available: int
-    acquisitions: int
-    releases: int
-    preemptions: int
-    contentions: int
+    capacity: int = 0
+    available: int = 0
+    acquisitions: int = 0
+    releases: int = 0
+    preemptions: int = 0
+    contentions: int = 0
 
 
 class PreemptibleGrant:

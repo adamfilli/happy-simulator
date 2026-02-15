@@ -18,22 +18,25 @@ Example:
         yield 0.02
 """
 
+import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator, Callable, Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(frozen=True)
 class BarrierStats:
-    """Statistics tracked by Barrier."""
+    """Frozen snapshot of barrier statistics."""
 
-    wait_calls: int = 0  # Total wait() calls
-    barrier_breaks: int = 0  # Times barrier was broken (all parties arrived)
-    resets: int = 0  # Manual resets
-    total_wait_time_ns: int = 0  # Total time spent waiting (nanoseconds)
+    wait_calls: int = 0
+    barrier_breaks: int = 0
+    resets: int = 0
+    total_wait_time_ns: int = 0
 
 
 @dataclass
@@ -81,13 +84,26 @@ class Barrier(Entity):
         self._generation = 0
         self._broken = False
 
-        # Statistics
-        self.stats = BarrierStats()
+        # Statistics (private counters → frozen snapshot via @property)
+        self._wait_calls = 0
+        self._barrier_breaks = 0
+        self._resets = 0
+        self._total_wait_time_ns = 0
 
     @property
     def parties(self) -> int:
         """Number of parties required to break the barrier."""
         return self._parties
+
+    @property
+    def stats(self) -> BarrierStats:
+        """Frozen snapshot of current barrier statistics."""
+        return BarrierStats(
+            wait_calls=self._wait_calls,
+            barrier_breaks=self._barrier_breaks,
+            resets=self._resets,
+            total_wait_time_ns=self._total_wait_time_ns,
+        )
 
     @property
     def waiting(self) -> int:
@@ -130,7 +146,7 @@ class Barrier(Entity):
         if self._broken:
             raise RuntimeError(f"Barrier {self.name} is broken")
 
-        self.stats.wait_calls += 1
+        self._wait_calls += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
         my_generation = self._generation
 
@@ -165,13 +181,13 @@ class Barrier(Entity):
         # Record wait time
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_wait_time_ns += wait_time
+            self._total_wait_time_ns += wait_time
 
         return arrival_index
 
     def _break_barrier(self, trigger_time_ns: int) -> None:
         """Break the barrier and release all waiting parties."""
-        self.stats.barrier_breaks += 1
+        self._barrier_breaks += 1
 
         # Wake all waiters
         while self._waiters:
@@ -179,7 +195,7 @@ class Barrier(Entity):
             # Record wait time for each waiter
             if self._clock:
                 wait_time = self._clock.now.nanoseconds - waiter.enqueue_time_ns
-                self.stats.total_wait_time_ns += wait_time
+                self._total_wait_time_ns += wait_time
             waiter.callback()
 
         # Advance to next generation
@@ -194,7 +210,7 @@ class Barrier(Entity):
         This is useful for recovery scenarios or reusing the barrier
         after an error condition.
         """
-        self.stats.resets += 1
+        self._resets += 1
         self._broken = True
 
         # Wake all waiters (they'll see broken state)

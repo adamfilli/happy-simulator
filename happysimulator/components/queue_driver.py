@@ -7,8 +7,6 @@ manages polling based on target capacity and re-polls after work completion.
 
 import logging
 from dataclasses import dataclass
-from typing import Generator
-
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
@@ -84,24 +82,3 @@ class QueueDriver(Entity):
         logger.debug("[%s] Notify received, polling queue", self.name)
         return [QueuePollEvent(time=self.now, target=self.queue, requestor=self)]
 
-    def _handle_work(self, event: Event) -> Generator[Instant, None, list[Event]]:
-        # 1. Re-target to downstream target
-        event.target = self.target
-        
-        # 2. Define the Hook
-        # "When you finish (at time 't'), please check the queue again."
-        def schedule_poll(finish_time: Instant):
-            # Check capacity again NOW (at finish time)
-            if self.target.has_capacity():
-                return QueuePollEvent(
-                    time=finish_time,
-                    target=self.queue,
-                    requestor=self
-                )
-            return []
-
-        # 3. Attach it
-        event.add_completion_hook(schedule_poll)
-        
-        # 4. Re-emit
-        return [event]

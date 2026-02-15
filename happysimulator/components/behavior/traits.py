@@ -7,7 +7,10 @@ across a population.
 
 from __future__ import annotations
 
+import logging
 import random
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from typing import Protocol, Sequence, runtime_checkable
 

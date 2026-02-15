@@ -24,7 +24,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.core.entity import Entity
@@ -34,7 +34,7 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class HealthCheckStats:
     """Statistics tracked by HealthChecker."""
 
@@ -127,7 +127,12 @@ class HealthChecker(Entity):
         self._next_check_id = 0
 
         # Statistics
-        self.stats = HealthCheckStats()
+        self._checks_performed = 0
+        self._checks_passed = 0
+        self._checks_failed = 0
+        self._checks_timed_out = 0
+        self._backends_marked_healthy = 0
+        self._backends_marked_unhealthy = 0
 
         # Running state
         self._is_running = False
@@ -141,6 +146,18 @@ class HealthChecker(Entity):
             timeout,
             healthy_threshold,
             unhealthy_threshold,
+        )
+
+    @property
+    def stats(self) -> HealthCheckStats:
+        """Return a frozen snapshot of health check statistics."""
+        return HealthCheckStats(
+            checks_performed=self._checks_performed,
+            checks_passed=self._checks_passed,
+            checks_failed=self._checks_failed,
+            checks_timed_out=self._checks_timed_out,
+            backends_marked_healthy=self._backends_marked_healthy,
+            backends_marked_unhealthy=self._backends_marked_unhealthy,
         )
 
     @property
@@ -269,7 +286,7 @@ class HealthChecker(Entity):
         check_id = self._next_check_id
         self._pending_checks[backend.name] = check_id
 
-        self.stats.checks_performed += 1
+        self._checks_performed += 1
 
         logger.debug(
             "[%s] Sending health check to %s (id=%d)",
@@ -345,7 +362,7 @@ class HealthChecker(Entity):
         state.consecutive_successes += 1
         state.consecutive_failures = 0
 
-        self.stats.checks_passed += 1
+        self._checks_passed += 1
 
         logger.debug(
             "[%s] Health check passed: %s (consecutive=%d)",
@@ -360,7 +377,7 @@ class HealthChecker(Entity):
             if state.consecutive_successes >= self._healthy_threshold:
                 backend = backend_info.backend
                 self._load_balancer.mark_healthy(backend)
-                self.stats.backends_marked_healthy += 1
+                self._backends_marked_healthy += 1
                 logger.info(
                     "[%s] Backend marked healthy: %s",
                     self.name,
@@ -389,8 +406,8 @@ class HealthChecker(Entity):
         state.consecutive_failures += 1
         state.consecutive_successes = 0
 
-        self.stats.checks_failed += 1
-        self.stats.checks_timed_out += 1
+        self._checks_failed += 1
+        self._checks_timed_out += 1
 
         logger.debug(
             "[%s] Health check timeout: %s (consecutive=%d)",
@@ -405,7 +422,7 @@ class HealthChecker(Entity):
             if state.consecutive_failures >= self._unhealthy_threshold:
                 backend = backend_info.backend
                 self._load_balancer.mark_unhealthy(backend)
-                self.stats.backends_marked_unhealthy += 1
+                self._backends_marked_unhealthy += 1
                 logger.info(
                     "[%s] Backend marked unhealthy: %s",
                     self.name,
@@ -415,14 +432,3 @@ class HealthChecker(Entity):
     def get_backend_state_by_name(self, name: str) -> BackendHealthState | None:
         """Get health state by backend name."""
         return self._backend_states.get(name)
-
-
-# Add helper method to LoadBalancer for name-based lookup
-def _get_backend_info_by_name(self, name: str):
-    """Get backend info by name."""
-    return self._backends.get(name)
-
-
-# Monkey-patch the method onto LoadBalancer
-from happysimulator.components.load_balancer.load_balancer import LoadBalancer
-LoadBalancer.get_backend_info_by_name = _get_backend_info_by_name

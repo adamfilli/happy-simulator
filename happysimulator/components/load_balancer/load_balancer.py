@@ -19,7 +19,7 @@ Example:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.components.load_balancer.strategies import (
@@ -47,7 +47,7 @@ class BackendInfo:
     total_failures: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class LoadBalancerStats:
     """Statistics tracked by LoadBalancer."""
 
@@ -110,13 +110,30 @@ class LoadBalancer(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = LoadBalancerStats()
+        self._requests_received = 0
+        self._requests_forwarded = 0
+        self._requests_failed = 0
+        self._no_backend_available = 0
+        self._backends_marked_unhealthy = 0
+        self._backends_marked_healthy = 0
 
         logger.debug(
             "[%s] LoadBalancer initialized: backends=%d, strategy=%s",
             name,
             len(self._backends),
             type(self._strategy).__name__,
+        )
+
+    @property
+    def stats(self) -> LoadBalancerStats:
+        """Return a frozen snapshot of load balancer statistics."""
+        return LoadBalancerStats(
+            requests_received=self._requests_received,
+            requests_forwarded=self._requests_forwarded,
+            requests_failed=self._requests_failed,
+            no_backend_available=self._no_backend_available,
+            backends_marked_unhealthy=self._backends_marked_unhealthy,
+            backends_marked_healthy=self._backends_marked_healthy,
         )
 
     @property
@@ -156,6 +173,10 @@ class LoadBalancer(Entity):
     def healthy_count(self) -> int:
         """Number of healthy backends."""
         return len(self.healthy_backends)
+
+    def get_backend_info_by_name(self, name: str) -> "BackendInfo | None":
+        """Get backend info by backend name."""
+        return self._backends.get(name)
 
     def add_backend(self, backend: Entity, weight: int = 1) -> None:
         """Add a backend to the load balancer.
@@ -246,7 +267,7 @@ class LoadBalancer(Entity):
         if info.is_healthy:
             info.is_healthy = False
             info.consecutive_successes = 0
-            self.stats.backends_marked_unhealthy += 1
+            self._backends_marked_unhealthy += 1
             logger.info(
                 "[%s] Marked backend unhealthy: %s",
                 self.name,
@@ -273,7 +294,7 @@ class LoadBalancer(Entity):
         if not info.is_healthy:
             info.is_healthy = True
             info.consecutive_failures = 0
-            self.stats.backends_marked_healthy += 1
+            self._backends_marked_healthy += 1
             logger.info(
                 "[%s] Marked backend healthy: %s",
                 self.name,
@@ -330,19 +351,19 @@ class LoadBalancer(Entity):
 
     def _forward_request(self, event: Event) -> list[Event] | None:
         """Forward a request to a selected backend."""
-        self.stats.requests_received += 1
+        self._requests_received += 1
 
         # Select a backend
         backends = self.healthy_backends
         if not backends:
-            self.stats.no_backend_available += 1
+            self._no_backend_available += 1
             logger.warning(
                 "[%s] No healthy backends available",
                 self.name,
             )
 
             if self._on_no_backend == "reject":
-                self.stats.requests_failed += 1
+                self._requests_failed += 1
                 # Could invoke failure callback if present
                 return None
 
@@ -351,8 +372,8 @@ class LoadBalancer(Entity):
 
         backend = self._strategy.select(backends, event)
         if backend is None:
-            self.stats.no_backend_available += 1
-            self.stats.requests_failed += 1
+            self._no_backend_available += 1
+            self._requests_failed += 1
             return None
 
         # Track the request
@@ -370,7 +391,7 @@ class LoadBalancer(Entity):
         if backend.name in self._backends:
             self._backends[backend.name].total_requests += 1
 
-        self.stats.requests_forwarded += 1
+        self._requests_forwarded += 1
 
         logger.debug(
             "[%s] Forwarding request %d to %s",

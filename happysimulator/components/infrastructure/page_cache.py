@@ -51,13 +51,13 @@ class PageCacheStats:
         dirty_pages: Current number of dirty pages.
     """
 
-    hits: int
-    misses: int
-    evictions: int
-    dirty_writebacks: int
-    readaheads: int
-    pages_cached: int
-    dirty_pages: int
+    hits: int = 0
+    misses: int = 0
+    evictions: int = 0
+    dirty_writebacks: int = 0
+    readaheads: int = 0
+    pages_cached: int = 0
+    dirty_pages: int = 0
 
     @property
     def hit_rate(self) -> float:

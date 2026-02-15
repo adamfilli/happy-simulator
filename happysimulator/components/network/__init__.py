@@ -4,7 +4,7 @@ This package provides abstractions for modeling network behavior including
 latency, bandwidth constraints, packet loss, and network topologies.
 """
 
-from happysimulator.components.network.link import NetworkLink
+from happysimulator.components.network.link import NetworkLink, NetworkLinkStats
 from happysimulator.components.network.network import Network, Partition, LinkStats
 from happysimulator.components.network.conditions import (
     local_network,
@@ -20,6 +20,7 @@ from happysimulator.components.network.conditions import (
 
 __all__ = [
     "NetworkLink",
+    "NetworkLinkStats",
     "Network",
     "Partition",
     "LinkStats",

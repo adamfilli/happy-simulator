@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 class InspectionStats:
     """Snapshot of inspection station statistics."""
 
-    inspected: int
-    passed: int
-    failed: int
+    inspected: int = 0
+    passed: int = 0
+    failed: int = 0
 
 
 class InspectionStation(QueuedResource):

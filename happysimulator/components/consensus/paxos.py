@@ -53,13 +53,13 @@ class PaxosStats:
         accepts_received: Number of accepted responses received.
         decided_value: The decided value, or None if not yet decided.
     """
-    proposals_started: int
-    proposals_succeeded: int
-    proposals_failed: int
-    promises_received: int
-    nacks_received: int
-    accepts_received: int
-    decided_value: Any
+    proposals_started: int = 0
+    proposals_succeeded: int = 0
+    proposals_failed: int = 0
+    promises_received: int = 0
+    nacks_received: int = 0
+    accepts_received: int = 0
+    decided_value: Any = None
 
 
 class PaxosNode(Entity):

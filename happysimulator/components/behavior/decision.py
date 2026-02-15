@@ -7,8 +7,11 @@ conformity, and composite voting.
 
 from __future__ import annotations
 
+import logging
 import math
 import random
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol, runtime_checkable
 

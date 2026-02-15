@@ -16,22 +16,25 @@ Example:
             return mutex.release()
 """
 
+import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator, Callable, Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(frozen=True)
 class MutexStats:
-    """Statistics tracked by Mutex."""
+    """Frozen snapshot of mutex statistics."""
 
-    acquisitions: int = 0  # Successful lock acquisitions
-    releases: int = 0  # Lock releases
-    contentions: int = 0  # Times a waiter had to queue
-    total_wait_time_ns: int = 0  # Total time spent waiting (nanoseconds)
+    acquisitions: int = 0
+    releases: int = 0
+    contentions: int = 0
+    total_wait_time_ns: int = 0
 
 
 @dataclass
@@ -68,8 +71,11 @@ class Mutex(Entity):
         self._waiters: deque[_Waiter] = deque()
         self._owner: str | None = None
 
-        # Statistics
-        self.stats = MutexStats()
+        # Statistics (private counters → frozen snapshot via @property)
+        self._acquisitions = 0
+        self._contentions = 0
+        self._releases = 0
+        self._total_wait_time_ns = 0
 
     @property
     def is_locked(self) -> bool:
@@ -80,6 +86,16 @@ class Mutex(Entity):
     def waiters(self) -> int:
         """Number of entities waiting to acquire."""
         return len(self._waiters)
+
+    @property
+    def stats(self) -> MutexStats:
+        """Frozen snapshot of current mutex statistics."""
+        return MutexStats(
+            acquisitions=self._acquisitions,
+            contentions=self._contentions,
+            releases=self._releases,
+            total_wait_time_ns=self._total_wait_time_ns,
+        )
 
     @property
     def owner(self) -> str | None:
@@ -100,7 +116,7 @@ class Mutex(Entity):
 
         self._locked = True
         self._owner = owner
-        self.stats.acquisitions += 1
+        self._acquisitions += 1
         return True
 
     def acquire(self, owner: str | None = None) -> Generator[float, None, None]:
@@ -127,7 +143,7 @@ class Mutex(Entity):
             return
 
         # Must wait - record contention
-        self.stats.contentions += 1
+        self._contentions += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
 
         # Create a flag that will be set when we get the lock
@@ -145,11 +161,11 @@ class Mutex(Entity):
 
         # Now we have the lock
         self._owner = owner
-        self.stats.acquisitions += 1
+        self._acquisitions += 1
 
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_wait_time_ns += wait_time
+            self._total_wait_time_ns += wait_time
 
     def release(self) -> list[Event]:
         """Release the lock and wake the next waiter.
@@ -163,7 +179,7 @@ class Mutex(Entity):
         if not self._locked:
             raise RuntimeError(f"Mutex {self.name} released when not locked")
 
-        self.stats.releases += 1
+        self._releases += 1
         self._owner = None
 
         if self._waiters:

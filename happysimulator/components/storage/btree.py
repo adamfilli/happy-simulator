@@ -39,13 +39,13 @@ class BTreeStats:
         total_keys: Total number of keys stored.
     """
 
-    reads: int
-    writes: int
-    page_reads: int
-    page_writes: int
-    node_splits: int
-    tree_depth: int
-    total_keys: int
+    reads: int = 0
+    writes: int = 0
+    page_reads: int = 0
+    page_writes: int = 0
+    node_splits: int = 0
+    tree_depth: int = 0
+    total_keys: int = 0
 
 
 class _BTreeNode:

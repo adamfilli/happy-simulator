@@ -18,13 +18,16 @@ Example:
         yield from notifications.publish(notification_event)
 """
 
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass
 from typing import Generator
 from collections import deque
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -37,7 +40,7 @@ class Subscription:
     active: bool = True
 
 
-@dataclass
+@dataclass(frozen=True)
 class TopicStats:
     """Statistics tracked by Topic."""
 
@@ -45,7 +48,7 @@ class TopicStats:
     messages_delivered: int = 0
     subscribers_added: int = 0
     subscribers_removed: int = 0
-    delivery_latencies: list[float] = field(default_factory=list)
+    delivery_latencies: tuple[float, ...] = ()
 
     @property
     def avg_delivery_latency(self) -> float:
@@ -97,7 +100,22 @@ class Topic(Entity):
         self._retain_messages = False
 
         # Statistics
-        self.stats = TopicStats()
+        self._messages_published = 0
+        self._messages_delivered = 0
+        self._subscribers_added = 0
+        self._subscribers_removed = 0
+        self._delivery_latencies: list[float] = []
+
+    @property
+    def stats(self) -> TopicStats:
+        """Return a frozen snapshot of current statistics."""
+        return TopicStats(
+            messages_published=self._messages_published,
+            messages_delivered=self._messages_delivered,
+            subscribers_added=self._subscribers_added,
+            subscribers_removed=self._subscribers_removed,
+            delivery_latencies=tuple(self._delivery_latencies),
+        )
 
     @property
     def subscriber_count(self) -> int:
@@ -149,7 +167,7 @@ class Topic(Entity):
                 subscriber=subscriber,
                 subscribed_at=now,
             )
-            self.stats.subscribers_added += 1
+            self._subscribers_added += 1
 
         # Optionally replay history
         events = []
@@ -177,7 +195,7 @@ class Topic(Entity):
         """
         if subscriber in self._subscriptions:
             self._subscriptions[subscriber].active = False
-            self.stats.subscribers_removed += 1
+            self._subscribers_removed += 1
 
     def publish(self, message: Event) -> Generator[float, None, list[Event]]:
         """Publish a message to all subscribers.
@@ -192,7 +210,7 @@ class Topic(Entity):
             List of delivery events for each subscriber.
         """
         now = self._clock.now if self._clock else Instant.Epoch
-        self.stats.messages_published += 1
+        self._messages_published += 1
 
         # Store in history if retaining
         if self._retain_messages:
@@ -210,8 +228,8 @@ class Topic(Entity):
             yield self._delivery_latency
 
             subscription.messages_received += 1
-            self.stats.messages_delivered += 1
-            self.stats.delivery_latencies.append(self._delivery_latency)
+            self._messages_delivered += 1
+            self._delivery_latencies.append(self._delivery_latency)
 
             delivery_event = Event(
                 time=now,
@@ -237,7 +255,7 @@ class Topic(Entity):
             List of delivery events for each subscriber.
         """
         now = self._clock.now if self._clock else Instant.Epoch
-        self.stats.messages_published += 1
+        self._messages_published += 1
 
         if self._retain_messages:
             self._message_history.append(message)
@@ -246,7 +264,7 @@ class Topic(Entity):
         for subscription in self._subscriptions.values():
             if subscription.active:
                 subscription.messages_received += 1
-                self.stats.messages_delivered += 1
+                self._messages_delivered += 1
 
                 delivery_event = Event(
                     time=now,

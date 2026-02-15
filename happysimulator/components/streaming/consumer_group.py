@@ -26,7 +26,7 @@ Example::
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator, Protocol
 from abc import abstractmethod
 from enum import Enum
@@ -155,7 +155,7 @@ class ConsumerState(Enum):
     REBALANCING = "rebalancing"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ConsumerGroupStats:
     """Statistics tracked by ConsumerGroup.
 
@@ -220,7 +220,24 @@ class ConsumerGroup(Entity):
         self._committed_offsets: dict[str, dict[int, int]] = {}  # name -> {pid: offset}
         self._generation: int = 0
 
-        self.stats = ConsumerGroupStats()
+        self._joins = 0
+        self._leaves = 0
+        self._rebalances = 0
+        self._polls = 0
+        self._commits = 0
+        self._records_polled = 0
+
+    @property
+    def stats(self) -> ConsumerGroupStats:
+        """Return a frozen snapshot of current statistics."""
+        return ConsumerGroupStats(
+            joins=self._joins,
+            leaves=self._leaves,
+            rebalances=self._rebalances,
+            polls=self._polls,
+            commits=self._commits,
+            records_polled=self._records_polled,
+        )
 
     @property
     def consumer_count(self) -> int:
@@ -278,7 +295,7 @@ class ConsumerGroup(Entity):
         partitions = list(range(self._event_log.num_partitions))
         consumer_names = sorted(self._consumers.keys())
         self._assignments = self._strategy.assign(partitions, consumer_names)
-        self.stats.rebalances += 1
+        self._rebalances += 1
 
     # Convenience generators for yield-from composition
 
@@ -393,7 +410,7 @@ class ConsumerGroup(Entity):
             self._consumers[consumer_name] = consumer_entity
             if consumer_name not in self._committed_offsets:
                 self._committed_offsets[consumer_name] = {}
-            self.stats.joins += 1
+            self._joins += 1
 
             yield self._rebalance_delay
             self._rebalance()
@@ -411,7 +428,7 @@ class ConsumerGroup(Entity):
             self._consumers.pop(consumer_name, None)
             self._assignments.pop(consumer_name, None)
             # Keep committed offsets for potential rejoin
-            self.stats.leaves += 1
+            self._leaves += 1
 
             yield self._rebalance_delay
             self._rebalance()
@@ -440,8 +457,8 @@ class ConsumerGroup(Entity):
                 partition_records = self._event_log._do_read(pid, offset, remaining)
                 records.extend(partition_records)
 
-            self.stats.polls += 1
-            self.stats.records_polled += len(records)
+            self._polls += 1
+            self._records_polled += len(records)
 
             if reply_future is not None:
                 reply_future.resolve(records)
@@ -458,7 +475,7 @@ class ConsumerGroup(Entity):
             for pid, offset in offsets.items():
                 self._committed_offsets[consumer_name][pid] = offset
 
-            self.stats.commits += 1
+            self._commits += 1
             return None
 
         return None

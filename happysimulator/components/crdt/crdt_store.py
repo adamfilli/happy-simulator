@@ -28,7 +28,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Generator
 
 from happysimulator.core.entity import Entity
@@ -40,7 +40,7 @@ from happysimulator.components.crdt.lww_register import LWWRegister
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class CRDTStoreStats:
     """Statistics for a CRDTStore node.
 
@@ -91,7 +91,24 @@ class CRDTStore(Entity):
         self._peers: list[Entity] = []
         self._crdts: dict[str, CRDT] = {}
         self._last_peer_hash: str = ""
-        self.stats = CRDTStoreStats()
+        self._writes = 0
+        self._reads = 0
+        self._gossip_sent = 0
+        self._gossip_received = 0
+        self._keys_merged = 0
+        self._convergence_checks = 0
+
+    @property
+    def stats(self) -> CRDTStoreStats:
+        """Return a frozen snapshot of store statistics."""
+        return CRDTStoreStats(
+            writes=self._writes,
+            reads=self._reads,
+            gossip_sent=self._gossip_sent,
+            gossip_received=self._gossip_received,
+            keys_merged=self._keys_merged,
+            convergence_checks=self._convergence_checks,
+        )
 
     @property
     def crdts(self) -> dict[str, CRDT]:
@@ -104,7 +121,7 @@ class CRDTStore(Entity):
 
         A rough indicator — not authoritative across all peers.
         """
-        self.stats.convergence_checks += 1
+        self._convergence_checks += 1
         return self._state_hash() != self._last_peer_hash
 
     def add_peers(self, peers: list[Entity]) -> None:
@@ -180,7 +197,7 @@ class CRDTStore(Entity):
         operation = metadata.get("operation", "set")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.writes += 1
+        self._writes += 1
 
         crdt = self.get_or_create(key)
         self._apply_operation(crdt, operation, value)
@@ -204,7 +221,7 @@ class CRDTStore(Entity):
         key = metadata.get("key")
         reply_future: SimFuture | None = metadata.get("reply_future")
 
-        self.stats.reads += 1
+        self._reads += 1
 
         crdt = self._crdts.get(key)
         value = crdt.value if crdt is not None else None
@@ -233,7 +250,7 @@ class CRDTStore(Entity):
                 "state_hash": state_hash,
             },
         )
-        self.stats.gossip_sent += 1
+        self._gossip_sent += 1
 
         # Schedule next gossip tick
         from happysimulator.core.temporal import Instant
@@ -258,7 +275,7 @@ class CRDTStore(Entity):
         remote_hash: str = metadata.get("state_hash", "")
         source_name: str = metadata.get("source", "")
 
-        self.stats.gossip_received += 1
+        self._gossip_received += 1
         self._last_peer_hash = remote_hash
 
         # Merge remote state into local
@@ -283,7 +300,7 @@ class CRDTStore(Entity):
                 "state_hash": self._state_hash(),
             },
         )
-        self.stats.gossip_sent += 1
+        self._gossip_sent += 1
 
         yield 0.0, [resp]
         return None
@@ -296,7 +313,7 @@ class CRDTStore(Entity):
         remote_state: dict = metadata.get("state", {})
         remote_hash: str = metadata.get("state_hash", "")
 
-        self.stats.gossip_received += 1
+        self._gossip_received += 1
         self._last_peer_hash = remote_hash
 
         self._merge_remote_state(remote_state)
@@ -347,13 +364,13 @@ class CRDTStore(Entity):
                 local_crdt = self._crdts[key]
                 remote_crdt = local_crdt.__class__.from_dict(remote_dict)
                 local_crdt.merge(remote_crdt)
-                self.stats.keys_merged += 1
+                self._keys_merged += 1
             else:
                 # Create from remote state
                 remote_crdt = self._reconstruct_crdt(remote_dict)
                 if remote_crdt is not None:
                     self._crdts[key] = remote_crdt
-                    self.stats.keys_merged += 1
+                    self._keys_merged += 1
 
     def _reconstruct_crdt(self, data: dict) -> CRDT | None:
         """Reconstruct a CRDT from serialized data.

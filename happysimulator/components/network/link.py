@@ -18,6 +18,21 @@ from happysimulator.distributions.latency_distribution import LatencyDistributio
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class NetworkLinkStats:
+    """Frozen snapshot of NetworkLink statistics.
+
+    Attributes:
+        bytes_transmitted: Total bytes successfully transmitted.
+        packets_sent: Number of packets successfully transmitted.
+        packets_dropped: Number of packets dropped (loss).
+    """
+
+    bytes_transmitted: int = 0
+    packets_sent: int = 0
+    packets_dropped: int = 0
+
+
 @dataclass
 class NetworkLink(Entity):
     """Simulates network transmission delay and bandwidth constraints.
@@ -83,6 +98,15 @@ class NetworkLink(Entity):
         # Rough estimate based on bytes currently in flight
         # More accurate tracking would require maintaining transmission windows
         return min(1.0, (self._bytes_in_flight * 8) / self.bandwidth_bps)
+
+    @property
+    def link_stats(self) -> NetworkLinkStats:
+        """Frozen snapshot of current link statistics."""
+        return NetworkLinkStats(
+            bytes_transmitted=self.bytes_transmitted,
+            packets_sent=self.packets_sent,
+            packets_dropped=self.packets_dropped,
+        )
 
     def handle_event(
         self, event: Event

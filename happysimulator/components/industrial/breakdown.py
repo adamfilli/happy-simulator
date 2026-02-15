@@ -26,9 +26,9 @@ _REPAIR_COMPLETE = "_RepairComplete"
 class BreakdownStats:
     """Snapshot of breakdown statistics."""
 
-    breakdown_count: int
-    total_downtime_s: float
-    total_uptime_s: float
+    breakdown_count: int = 0
+    total_downtime_s: float = 0.0
+    total_uptime_s: float = 0.0
 
     @property
     def availability(self) -> float:

@@ -7,7 +7,10 @@ entity. Follows the pattern of network condition factories
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Sequence
+
+logger = logging.getLogger(__name__)
 
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant

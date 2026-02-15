@@ -33,7 +33,7 @@ Example:
     )
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generator, Optional
 from enum import Enum
 
@@ -49,20 +49,16 @@ class PromotionPolicy(Enum):
     NEVER = "never"  # Never promote (each tier independent)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MultiTierCacheStats:
     """Statistics tracked by MultiTierCache."""
 
     reads: int = 0
     writes: int = 0
-    tier_hits: dict[int, int] = None  # Hits per tier (0=L1, 1=L2, etc.)
+    tier_hits: dict[int, int] = field(default_factory=dict)  # Hits per tier (0=L1, 1=L2, etc.)
     backing_store_hits: int = 0
     misses: int = 0  # Not found anywhere
     promotions: int = 0
-
-    def __post_init__(self):
-        if self.tier_hits is None:
-            self.tier_hits = {}
 
 
 class MultiTierCache(Entity):
@@ -113,9 +109,24 @@ class MultiTierCache(Entity):
         self._access_counts: dict[str, int] = {}
 
         # Statistics
-        self.stats = MultiTierCacheStats()
-        for i in range(len(tiers)):
-            self.stats.tier_hits[i] = 0
+        self._reads = 0
+        self._writes = 0
+        self._tier_hits: dict[int, int] = {i: 0 for i in range(len(tiers))}
+        self._backing_store_hits = 0
+        self._misses = 0
+        self._promotions = 0
+
+    @property
+    def stats(self) -> MultiTierCacheStats:
+        """Frozen snapshot of multi-tier cache statistics."""
+        return MultiTierCacheStats(
+            reads=self._reads,
+            writes=self._writes,
+            tier_hits=dict(self._tier_hits),
+            backing_store_hits=self._backing_store_hits,
+            misses=self._misses,
+            promotions=self._promotions,
+        )
 
     @property
     def num_tiers(self) -> int:
@@ -140,10 +151,10 @@ class MultiTierCache(Entity):
     @property
     def hit_rate(self) -> float:
         """Overall cache hit rate across all tiers."""
-        if self.stats.reads == 0:
+        if self._reads == 0:
             return 0.0
-        total_hits = sum(self.stats.tier_hits.values())
-        return total_hits / self.stats.reads
+        total_hits = sum(self._tier_hits.values())
+        return total_hits / self._reads
 
     def get(self, key: str) -> Generator[float, None, Optional[Any]]:
         """Get a value, checking tiers from fastest to slowest.
@@ -157,7 +168,7 @@ class MultiTierCache(Entity):
         Returns:
             The value if found, None otherwise.
         """
-        self.stats.reads += 1
+        self._reads += 1
         self._access_counts[key] = self._access_counts.get(key, 0) + 1
 
         # Check each tier in order
@@ -166,7 +177,7 @@ class MultiTierCache(Entity):
             if hasattr(tier, 'contains_cached') and tier.contains_cached(key):
                 value = yield from tier.get(key)
                 if value is not None:
-                    self.stats.tier_hits[tier_idx] = self.stats.tier_hits.get(tier_idx, 0) + 1
+                    self._tier_hits[tier_idx] = self._tier_hits.get(tier_idx, 0) + 1
 
                     # Promote to higher tier if applicable
                     if tier_idx > 0:
@@ -178,11 +189,11 @@ class MultiTierCache(Entity):
         value = yield from self._backing_store.get(key)
 
         if value is not None:
-            self.stats.backing_store_hits += 1
+            self._backing_store_hits += 1
             # Cache in appropriate tier(s)
             self._cache_value(key, value)
         else:
-            self.stats.misses += 1
+            self._misses += 1
 
         return value
 
@@ -198,7 +209,7 @@ class MultiTierCache(Entity):
         Yields:
             Write latency.
         """
-        self.stats.writes += 1
+        self._writes += 1
 
         # Write to backing store
         yield from self._backing_store.put(key, value)
@@ -280,7 +291,7 @@ class MultiTierCache(Entity):
         target_tier = self._tiers[0]
         if hasattr(target_tier, '_cache_put'):
             target_tier._cache_put(key, value)
-            self.stats.promotions += 1
+            self._promotions += 1
 
     def _cache_value(self, key: str, value: Any) -> None:
         """Cache a value in the appropriate tier(s)."""
@@ -300,7 +311,7 @@ class MultiTierCache(Entity):
         for i, tier in enumerate(self._tiers):
             if hasattr(tier, 'stats'):
                 result[i] = {
-                    'hits': self.stats.tier_hits.get(i, 0),
+                    'hits': self._tier_hits.get(i, 0),
                     'cache_size': tier.cache_size if hasattr(tier, 'cache_size') else 0,
                     'capacity': tier.cache_capacity if hasattr(tier, 'cache_capacity') else 0,
                 }

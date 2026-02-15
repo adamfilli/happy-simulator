@@ -68,7 +68,7 @@ class JobState:
     failure_count: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class JobSchedulerStats:
     """Statistics tracked by JobScheduler."""
 
@@ -89,7 +89,7 @@ class JobScheduler(Entity):
     Attributes:
         name: Scheduler identifier.
         tick_interval: Seconds between scheduler ticks.
-        stats: Mutable statistics dataclass.
+        stats: Frozen statistics snapshot (via property).
     """
 
     def __init__(self, name: str, tick_interval: float = 1.0):
@@ -111,7 +111,11 @@ class JobScheduler(Entity):
         self._jobs: dict[str, JobDefinition] = {}
         self._job_states: dict[str, JobState] = {}
         self._is_running = False
-        self.stats = JobSchedulerStats()
+        self._ticks = 0
+        self._jobs_triggered = 0
+        self._jobs_completed = 0
+        self._jobs_skipped_dependency = 0
+        self._jobs_skipped_running = 0
 
         logger.debug(
             "[%s] JobScheduler initialized: tick_interval=%.1fs",
@@ -140,6 +144,17 @@ class JobScheduler(Entity):
     def is_running(self) -> bool:
         """Whether the scheduler is active."""
         return self._is_running
+
+    @property
+    def stats(self) -> JobSchedulerStats:
+        """Frozen snapshot of current statistics."""
+        return JobSchedulerStats(
+            ticks=self._ticks,
+            jobs_triggered=self._jobs_triggered,
+            jobs_completed=self._jobs_completed,
+            jobs_skipped_dependency=self._jobs_skipped_dependency,
+            jobs_skipped_running=self._jobs_skipped_running,
+        )
 
     def add_job(self, job: JobDefinition) -> None:
         """Register a job with the scheduler.
@@ -219,7 +234,7 @@ class JobScheduler(Entity):
         if not self._is_running:
             return []
 
-        self.stats.ticks += 1
+        self._ticks += 1
         result_events: list[Event] = []
 
         # Collect due jobs, sort by priority (highest first)
@@ -231,12 +246,12 @@ class JobScheduler(Entity):
 
             # Skip if already running
             if state.is_running:
-                self.stats.jobs_skipped_running += 1
+                self._jobs_skipped_running += 1
                 continue
 
             # Check DAG dependencies
             if not self._deps_satisfied(job):
-                self.stats.jobs_skipped_dependency += 1
+                self._jobs_skipped_dependency += 1
                 continue
 
             # Fire the job
@@ -269,7 +284,7 @@ class JobScheduler(Entity):
             state.is_running = True
             state.last_run_time = self.now
             state.run_count += 1
-            self.stats.jobs_triggered += 1
+            self._jobs_triggered += 1
 
             result_events.append(job_event)
             logger.debug("[%s] Triggered job: %s", self.name, job.name)
@@ -335,5 +350,5 @@ class JobScheduler(Entity):
             state = self._job_states[job_name]
             state.is_running = False
             state.last_completion_time = self.now
-            self.stats.jobs_completed += 1
+            self._jobs_completed += 1
             logger.debug("[%s] Job completed: %s", self.name, job_name)

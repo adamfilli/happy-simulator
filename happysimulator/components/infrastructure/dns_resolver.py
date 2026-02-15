@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator
 
 from happysimulator.core.entity import Entity
@@ -66,13 +66,13 @@ class DNSStats:
         total_resolution_latency_s: Cumulative resolution latency.
     """
 
-    lookups: int
-    cache_hits: int
-    cache_misses: int
-    cache_expirations: int
-    cache_evictions: int
-    cache_size: int
-    total_resolution_latency_s: float
+    lookups: int = 0
+    cache_hits: int = 0
+    cache_misses: int = 0
+    cache_expirations: int = 0
+    cache_evictions: int = 0
+    cache_size: int = 0
+    total_resolution_latency_s: float = 0.0
 
     @property
     def hit_rate(self) -> float:
@@ -238,7 +238,7 @@ class DNSResolver(Entity):
         self._evict_lru()
         self._cache[hostname] = _CacheEntry(
             record=record,
-            expires_at_s=now_s + total_latency + record.ttl_s,
+            expires_at_s=now_s + record.ttl_s,
         )
 
         return record.ip_address

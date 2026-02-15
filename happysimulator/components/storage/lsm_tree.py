@@ -125,7 +125,7 @@ class LeveledCompaction(CompactionStrategy):
             if total_keys > limit:
                 return i, list(levels[i])
         # Fallback: compact L0
-        return 0, list(levels[0]) if levels and levels[0] else (0, [])
+        return (0, list(levels[0])) if levels and levels[0] else (0, [])
 
 
 class FIFOCompaction(CompactionStrategy):
@@ -178,19 +178,19 @@ class LSMTreeStats:
         bloom_filter_saves: Reads avoided by bloom filter.
     """
 
-    writes: int
-    reads: int
-    read_hits: int
-    read_misses: int
-    wal_writes: int
-    memtable_flushes: int
-    compactions: int
-    total_sstables: int
-    levels: int
-    read_amplification: float
-    write_amplification: float
-    space_amplification: float
-    bloom_filter_saves: int
+    writes: int = 0
+    reads: int = 0
+    read_hits: int = 0
+    read_misses: int = 0
+    wal_writes: int = 0
+    memtable_flushes: int = 0
+    compactions: int = 0
+    total_sstables: int = 0
+    levels: int = 0
+    read_amplification: float = 0.0
+    write_amplification: float = 0.0
+    space_amplification: float = 0.0
+    bloom_filter_saves: int = 0
 
 
 # ---------------------------------------------------------------------------

@@ -24,11 +24,11 @@ _GATE_CLOSE = "_GateClose"
 class GateStats:
     """Snapshot of gate controller statistics."""
 
-    passed_through: int
-    queued_while_closed: int
-    rejected: int
-    open_cycles: int
-    is_open: bool
+    passed_through: int = 0
+    queued_while_closed: int = 0
+    rejected: int = 0
+    open_cycles: int = 0
+    is_open: bool = True
 
 
 class GateController(Entity):

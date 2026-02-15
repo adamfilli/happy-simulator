@@ -25,7 +25,7 @@ from happysimulator.components.queue_policy import QueuePolicy
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(frozen=True)
 class WeightedFairQueueStats:
     """Statistics tracked by WeightedFairQueue."""
 
@@ -97,7 +97,22 @@ class WeightedFairQueue(QueuePolicy[T]):
         self._total_items = 0
 
         # Statistics
-        self.stats = WeightedFairQueueStats()
+        self._enqueued = 0
+        self._dequeued = 0
+        self._rejected_capacity = 0
+        self._flows_created = 0
+        self._flows_removed = 0
+
+    @property
+    def stats(self) -> WeightedFairQueueStats:
+        """Return a frozen snapshot of queue statistics."""
+        return WeightedFairQueueStats(
+            enqueued=self._enqueued,
+            dequeued=self._dequeued,
+            rejected_capacity=self._rejected_capacity,
+            flows_created=self._flows_created,
+            flows_removed=self._flows_removed,
+        )
 
     @property
     def capacity(self) -> float:
@@ -132,7 +147,7 @@ class WeightedFairQueue(QueuePolicy[T]):
         """
         # Check total capacity
         if self._total_items >= self._capacity:
-            self.stats.rejected_capacity += 1
+            self._rejected_capacity += 1
             return False
 
         flow_id = self._get_flow_id(item)
@@ -147,18 +162,18 @@ class WeightedFairQueue(QueuePolicy[T]):
                 weight=weight,
                 credits=weight,  # Start with full credits
             )
-            self.stats.flows_created += 1
+            self._flows_created += 1
 
         flow_state = self._flows[flow_id]
 
         # Check per-flow capacity
         if len(flow_state.queue) >= self._per_flow_capacity:
-            self.stats.rejected_capacity += 1
+            self._rejected_capacity += 1
             return False
 
         flow_state.queue.append(item)
         self._total_items += 1
-        self.stats.enqueued += 1
+        self._enqueued += 1
         return True
 
     def pop(self) -> Optional[T]:
@@ -193,7 +208,7 @@ class WeightedFairQueue(QueuePolicy[T]):
                 item = flow_state.queue.popleft()
                 self._total_items -= 1
                 flow_state.credits -= 1
-                self.stats.dequeued += 1
+                self._dequeued += 1
 
                 # If flow exhausted credits, move to end and reset
                 if flow_state.credits <= 0:
@@ -216,7 +231,7 @@ class WeightedFairQueue(QueuePolicy[T]):
         """Remove a flow from the queue."""
         if flow_id in self._flows:
             del self._flows[flow_id]
-            self.stats.flows_removed += 1
+            self._flows_removed += 1
 
     def peek(self) -> Optional[T]:
         """Return the next item without removing it."""

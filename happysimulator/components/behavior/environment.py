@@ -60,8 +60,13 @@ class Environment(Entity):
         self.social_graph = social_graph or SocialGraph()
         self.shared_state: dict[str, Any] = shared_state or {}
         self.influence_model = influence_model or DeGrootModel()
-        self.stats = EnvironmentStats()
         self._rng = random.Random(seed)
+
+        # Statistics (private counters → frozen snapshot via @property)
+        self._broadcasts_sent = 0
+        self._targeted_sends = 0
+        self._influence_rounds = 0
+        self._state_changes = 0
 
         for agent in (agents or []):
             self.register_agent(agent)
@@ -82,6 +87,16 @@ class Environment(Entity):
         for agent in self._agents.values():
             agent.set_clock(clock)
 
+    @property
+    def stats(self) -> EnvironmentStats:
+        """Frozen snapshot of environment statistics."""
+        return EnvironmentStats(
+            broadcasts_sent=self._broadcasts_sent,
+            targeted_sends=self._targeted_sends,
+            influence_rounds=self._influence_rounds,
+            state_changes=self._state_changes,
+        )
+
     def handle_event(self, event: Event) -> list[Event] | None:
         if event.event_type == "BroadcastStimulus":
             return self._handle_broadcast(event)
@@ -95,7 +110,7 @@ class Environment(Entity):
 
     def _handle_broadcast(self, event: Event) -> list[Event]:
         """Forward stimulus to all registered agents."""
-        self.stats.broadcasts_sent += 1
+        self._broadcasts_sent += 1
         metadata = event.context.get("metadata", {})
         stimulus_type = metadata.get("stimulus_type", "Stimulus")
 
@@ -112,7 +127,7 @@ class Environment(Entity):
 
     def _handle_targeted(self, event: Event) -> list[Event]:
         """Forward stimulus to named agents only."""
-        self.stats.targeted_sends += 1
+        self._targeted_sends += 1
         metadata = event.context.get("metadata", {})
         stimulus_type = metadata.get("stimulus_type", "Stimulus")
         targets: list[str] = metadata.get("targets", [])
@@ -132,7 +147,7 @@ class Environment(Entity):
 
     def _handle_influence(self, event: Event) -> list[Event]:
         """Execute one round of social influence propagation."""
-        self.stats.influence_rounds += 1
+        self._influence_rounds += 1
         metadata = event.context.get("metadata", {})
         topic = metadata.get("topic", "")
 
@@ -186,7 +201,7 @@ class Environment(Entity):
 
     def _handle_state_change(self, event: Event) -> list[Event] | None:
         """Update shared state from event metadata."""
-        self.stats.state_changes += 1
+        self._state_changes += 1
         metadata = event.context.get("metadata", {})
         key = metadata.get("key")
         value = metadata.get("value")

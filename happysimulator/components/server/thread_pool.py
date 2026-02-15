@@ -20,7 +20,7 @@ from happysimulator.core.event import Event
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class ThreadPoolStats:
     """Statistics tracked by ThreadPool."""
 
@@ -89,7 +89,9 @@ class ThreadPool(QueuedResource):
         self._default_processing_time = default_processing_time
 
         # Statistics
-        self.stats = ThreadPoolStats()
+        self._tasks_completed = 0
+        self._tasks_rejected = 0
+        self._total_processing_time = 0.0
 
         # Time series for analysis
         self._processing_times: list[float] = []
@@ -138,6 +140,15 @@ class ThreadPool(QueuedResource):
         if not self._processing_times:
             return 0.0
         return sum(self._processing_times) / len(self._processing_times)
+
+    @property
+    def stats(self) -> ThreadPoolStats:
+        """Frozen snapshot of current statistics."""
+        return ThreadPoolStats(
+            tasks_completed=self._tasks_completed,
+            tasks_rejected=self._tasks_rejected,
+            total_processing_time=self._total_processing_time,
+        )
 
     def has_capacity(self) -> bool:
         """Check if the pool has an idle worker available.
@@ -214,7 +225,7 @@ class ThreadPool(QueuedResource):
                 self.name,
                 event.event_type,
             )
-            self.stats.tasks_rejected += 1
+            self._tasks_rejected += 1
             return None
 
         # Get processing time for this task
@@ -239,8 +250,8 @@ class ThreadPool(QueuedResource):
         self._worker_pool.release()
 
         # Update statistics
-        self.stats.tasks_completed += 1
-        self.stats.total_processing_time += processing_time
+        self._tasks_completed += 1
+        self._total_processing_time += processing_time
 
         logger.debug(
             "[%s] Task completed: type=%s processing_time=%.4fs active=%d/%d",

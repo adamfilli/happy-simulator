@@ -30,7 +30,7 @@ from happysimulator.components.datastore.eviction_policies import CacheEvictionP
 from happysimulator.components.datastore.kv_store import KVStore
 
 
-@dataclass
+@dataclass(frozen=True)
 class CachedStoreStats:
     """Statistics tracked by CachedStore."""
 
@@ -95,7 +95,24 @@ class CachedStore(Entity):
         self._dirty_keys: set[str] = set()  # For write-back
 
         # Statistics
-        self.stats = CachedStoreStats()
+        self._reads = 0
+        self._writes = 0
+        self._hits = 0
+        self._misses = 0
+        self._evictions = 0
+        self._writebacks = 0
+
+    @property
+    def stats(self) -> CachedStoreStats:
+        """Frozen snapshot of cached store statistics."""
+        return CachedStoreStats(
+            reads=self._reads,
+            writes=self._writes,
+            hits=self._hits,
+            misses=self._misses,
+            evictions=self._evictions,
+            writebacks=self._writebacks,
+        )
 
     @property
     def backing_store(self) -> KVStore:
@@ -115,16 +132,16 @@ class CachedStore(Entity):
     @property
     def hit_rate(self) -> float:
         """Ratio of cache hits to total reads."""
-        if self.stats.reads == 0:
+        if self._reads == 0:
             return 0.0
-        return self.stats.hits / self.stats.reads
+        return self._hits / self._reads
 
     @property
     def miss_rate(self) -> float:
         """Ratio of cache misses to total reads."""
-        if self.stats.reads == 0:
+        if self._reads == 0:
             return 0.0
-        return self.stats.misses / self.stats.reads
+        return self._misses / self._reads
 
     def get(self, key: str) -> Generator[float, None, Optional[Any]]:
         """Get a value, checking cache first.
@@ -138,11 +155,11 @@ class CachedStore(Entity):
         Returns:
             The value if found, None otherwise.
         """
-        self.stats.reads += 1
+        self._reads += 1
 
         # Check cache first
         if key in self._cache:
-            self.stats.hits += 1
+            self._hits += 1
             self._eviction_policy.on_access(key)
             # Capture value before yielding to avoid TOCTOU race
             value = self._cache[key]
@@ -150,7 +167,7 @@ class CachedStore(Entity):
             return value
 
         # Cache miss - fetch from backing store
-        self.stats.misses += 1
+        self._misses += 1
         value = yield from self._backing_store.get(key)
 
         if value is not None:
@@ -172,7 +189,7 @@ class CachedStore(Entity):
         Yields:
             Write latency.
         """
-        self.stats.writes += 1
+        self._writes += 1
 
         # Update cache
         self._cache_put(key, value)
@@ -235,7 +252,7 @@ class CachedStore(Entity):
             if key in self._cache:
                 yield from self._backing_store.put(key, self._cache[key])
                 self._dirty_keys.discard(key)
-                self.stats.writebacks += 1
+                self._writebacks += 1
                 flushed += 1
         return flushed
 
@@ -249,7 +266,7 @@ class CachedStore(Entity):
                     break
                 self._cache.pop(evict_key, None)
                 self._dirty_keys.discard(evict_key)
-                self.stats.evictions += 1
+                self._evictions += 1
 
             self._eviction_policy.on_insert(key)
         else:

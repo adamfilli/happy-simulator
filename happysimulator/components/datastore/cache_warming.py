@@ -30,7 +30,7 @@ from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
 
 
-@dataclass
+@dataclass(frozen=True)
 class CacheWarmerStats:
     """Statistics tracked by CacheWarmer."""
 
@@ -96,7 +96,20 @@ class CacheWarmer(Entity):
         self._end_time: Instant | None = None
 
         # Statistics
-        self.stats = CacheWarmerStats()
+        self._keys_to_warm = 0
+        self._keys_warmed = 0
+        self._keys_failed = 0
+        self._warmup_time_seconds = 0.0
+
+    @property
+    def stats(self) -> CacheWarmerStats:
+        """Frozen snapshot of cache warmer statistics."""
+        return CacheWarmerStats(
+            keys_to_warm=self._keys_to_warm,
+            keys_warmed=self._keys_warmed,
+            keys_failed=self._keys_failed,
+            warmup_time_seconds=self._warmup_time_seconds,
+        )
 
     @property
     def progress(self) -> float:
@@ -143,9 +156,9 @@ class CacheWarmer(Entity):
         self._started = True
         self._completed = False
 
-        self.stats.keys_to_warm = len(self._keys)
-        self.stats.keys_warmed = 0
-        self.stats.keys_failed = 0
+        self._keys_to_warm = len(self._keys)
+        self._keys_warmed = 0
+        self._keys_failed = 0
 
         # Create initial warming event
         return Event(
@@ -182,11 +195,11 @@ class CacheWarmer(Entity):
                     value = e.value
 
                 if value is not None:
-                    self.stats.keys_warmed += 1
+                    self._keys_warmed += 1
                 else:
-                    self.stats.keys_failed += 1
+                    self._keys_failed += 1
             except Exception:
-                self.stats.keys_failed += 1
+                self._keys_failed += 1
 
             self._current_index += 1
 
@@ -197,7 +210,7 @@ class CacheWarmer(Entity):
         if self._clock:
             self._end_time = self._clock.now
             if self._start_time:
-                self.stats.warmup_time_seconds = (
+                self._warmup_time_seconds = (
                     self._end_time - self._start_time
                 ).to_seconds()
 

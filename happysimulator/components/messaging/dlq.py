@@ -24,7 +24,8 @@ Example:
     events = dlq.reprocess_all(queue)
 """
 
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from collections import deque
 
@@ -32,11 +33,13 @@ from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from happysimulator.components.messaging.message_queue import Message, MessageQueue
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeadLetterStats:
     """Statistics tracked by DeadLetterQueue."""
 
@@ -79,7 +82,18 @@ class DeadLetterQueue(Entity):
         self._message_times: deque[Instant] = deque()
 
         # Statistics
-        self.stats = DeadLetterStats()
+        self._messages_received = 0
+        self._messages_reprocessed = 0
+        self._messages_discarded = 0
+
+    @property
+    def stats(self) -> DeadLetterStats:
+        """Return a frozen snapshot of current statistics."""
+        return DeadLetterStats(
+            messages_received=self._messages_received,
+            messages_reprocessed=self._messages_reprocessed,
+            messages_discarded=self._messages_discarded,
+        )
 
     @property
     def message_count(self) -> int:
@@ -120,12 +134,12 @@ class DeadLetterQueue(Entity):
             if self._messages:
                 self._messages.popleft()
                 self._message_times.popleft()
-                self.stats.messages_discarded += 1
+                self._messages_discarded += 1
 
         now = self._clock.now if self._clock else Instant.Epoch
         self._messages.append(message)
         self._message_times.append(now)
-        self.stats.messages_received += 1
+        self._messages_received += 1
 
         return True
 
@@ -143,7 +157,7 @@ class DeadLetterQueue(Entity):
             if age > self._retention_period:
                 self._messages.popleft()
                 self._message_times.popleft()
-                self.stats.messages_discarded += 1
+                self._messages_discarded += 1
             else:
                 break
 
@@ -190,7 +204,7 @@ class DeadLetterQueue(Entity):
         count = len(self._messages)
         self._messages.clear()
         self._message_times.clear()
-        self.stats.messages_discarded += count
+        self._messages_discarded += count
         return count
 
     def reprocess(self, message: 'Message', target_queue: 'MessageQueue') -> Event | None:
@@ -211,7 +225,7 @@ class DeadLetterQueue(Entity):
         except (ValueError, IndexError):
             return None
 
-        self.stats.messages_reprocessed += 1
+        self._messages_reprocessed += 1
 
         # Create republish event
         now = self._clock.now if self._clock else Instant.Epoch
@@ -239,7 +253,7 @@ class DeadLetterQueue(Entity):
         while self._messages:
             message = self._messages.popleft()
             self._message_times.popleft()
-            self.stats.messages_reprocessed += 1
+            self._messages_reprocessed += 1
 
             now = self._clock.now if self._clock else Instant.Epoch
             event = Event(

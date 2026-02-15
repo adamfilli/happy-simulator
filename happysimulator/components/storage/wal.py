@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator
 
 from happysimulator.core.entity import Entity
@@ -110,11 +110,11 @@ class WALStats:
         entries_recovered: Number of entries returned by last recover().
     """
 
-    writes: int
-    bytes_written: int
-    syncs: int
-    total_sync_latency_s: float
-    entries_recovered: int
+    writes: int = 0
+    bytes_written: int = 0
+    syncs: int = 0
+    total_sync_latency_s: float = 0.0
+    entries_recovered: int = 0
 
 
 # ---------------------------------------------------------------------------

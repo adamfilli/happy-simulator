@@ -23,9 +23,9 @@ _BATCH_TIMEOUT = "_BatchTimeout"
 class BatchProcessorStats:
     """Snapshot of batch processor statistics."""
 
-    batches_processed: int
-    items_processed: int
-    timeouts: int
+    batches_processed: int = 0
+    items_processed: int = 0
+    timeouts: int = 0
 
 
 class BatchProcessor(Entity):

@@ -40,7 +40,7 @@ class ConsistencyLevel(Enum):
     ALL = "all"  # All replicas required
 
 
-@dataclass
+@dataclass(frozen=True)
 class ReplicatedStoreStats:
     """Statistics tracked by ReplicatedStore."""
 
@@ -145,7 +145,30 @@ class ReplicatedStore(Entity):
         self._validate_consistency()
 
         # Statistics
-        self.stats = ReplicatedStoreStats()
+        self._reads = 0
+        self._writes = 0
+        self._read_successes = 0
+        self._read_failures = 0
+        self._write_successes = 0
+        self._write_failures = 0
+        self._replica_timeouts = 0
+        self._read_latencies: list[float] = []
+        self._write_latencies: list[float] = []
+
+    @property
+    def stats(self) -> ReplicatedStoreStats:
+        """Frozen snapshot of replicated store statistics."""
+        return ReplicatedStoreStats(
+            reads=self._reads,
+            writes=self._writes,
+            read_successes=self._read_successes,
+            read_failures=self._read_failures,
+            write_successes=self._write_successes,
+            write_failures=self._write_failures,
+            replica_timeouts=self._replica_timeouts,
+            read_latencies=list(self._read_latencies),
+            write_latencies=list(self._write_latencies),
+        )
 
     @property
     def num_replicas(self) -> int:
@@ -204,7 +227,7 @@ class ReplicatedStore(Entity):
         Returns:
             The value if found, None otherwise.
         """
-        self.stats.reads += 1
+        self._reads += 1
         required = self._required_responses(self._read_consistency)
         start_time = 0.0
         total_latency = 0.0
@@ -234,24 +257,24 @@ class ReplicatedStore(Entity):
                     # Use the first non-None value (simple conflict resolution)
                     for resp in responses:
                         if resp is not None:
-                            self.stats.read_successes += 1
+                            self._read_successes += 1
                             total_latency = min(latencies[:required])
-                            self.stats.read_latencies.append(total_latency)
+                            self._read_latencies.append(total_latency)
                             return resp
 
             except Exception:
-                self.stats.replica_timeouts += 1
+                self._replica_timeouts += 1
                 continue
 
         # Check if we met the consistency requirement
         if len(responses) >= required:
-            self.stats.read_successes += 1
+            self._read_successes += 1
             if latencies:
-                self.stats.read_latencies.append(min(latencies))
+                self._read_latencies.append(min(latencies))
             # All responses were None
             return None
         else:
-            self.stats.read_failures += 1
+            self._read_failures += 1
             return None
 
     def put(self, key: str, value: Any) -> Generator[float, None, bool]:
@@ -270,7 +293,7 @@ class ReplicatedStore(Entity):
         Returns:
             True if write met consistency requirement.
         """
-        self.stats.writes += 1
+        self._writes += 1
         required = self._required_responses(self._write_consistency)
 
         # Write to all replicas
@@ -293,19 +316,19 @@ class ReplicatedStore(Entity):
                 acks += 1
 
             except Exception:
-                self.stats.replica_timeouts += 1
+                self._replica_timeouts += 1
                 continue
 
         # Check if we met the consistency requirement
         if acks >= required:
-            self.stats.write_successes += 1
+            self._write_successes += 1
             if latencies:
                 # Latency is time until we got required acks
                 sorted_latencies = sorted(latencies)
-                self.stats.write_latencies.append(sorted_latencies[required - 1])
+                self._write_latencies.append(sorted_latencies[required - 1])
             return True
         else:
-            self.stats.write_failures += 1
+            self._write_failures += 1
             return False
 
     def delete(self, key: str) -> Generator[float, None, bool]:
@@ -342,7 +365,7 @@ class ReplicatedStore(Entity):
                     existed = True
 
             except Exception:
-                self.stats.replica_timeouts += 1
+                self._replica_timeouts += 1
                 continue
 
         return acks >= required and existed

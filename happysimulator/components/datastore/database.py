@@ -42,7 +42,7 @@ class TransactionState(Enum):
     ROLLED_BACK = "rolled_back"
 
 
-@dataclass
+@dataclass(frozen=True)
 class DatabaseStats:
     """Statistics tracked by Database."""
 
@@ -237,7 +237,30 @@ class Database(Entity):
         self._tables: dict[str, list[dict]] = {}
 
         # Statistics
-        self.stats = DatabaseStats()
+        self._queries_executed = 0
+        self._transactions_started = 0
+        self._transactions_committed = 0
+        self._transactions_rolled_back = 0
+        self._connections_created = 0
+        self._connections_closed = 0
+        self._connection_wait_count = 0
+        self._connection_wait_time_total = 0.0
+        self._query_latencies: list[float] = []
+
+    @property
+    def stats(self) -> DatabaseStats:
+        """Frozen snapshot of database statistics."""
+        return DatabaseStats(
+            queries_executed=self._queries_executed,
+            transactions_started=self._transactions_started,
+            transactions_committed=self._transactions_committed,
+            transactions_rolled_back=self._transactions_rolled_back,
+            connections_created=self._connections_created,
+            connections_closed=self._connections_closed,
+            connection_wait_count=self._connection_wait_count,
+            connection_wait_time_total=self._connection_wait_time_total,
+            query_latencies=list(self._query_latencies),
+        )
 
     @property
     def max_connections(self) -> int:
@@ -273,7 +296,7 @@ class Database(Entity):
         now = self._clock.now if self._clock else Instant.Epoch
         conn = Connection(id=conn_id, created_at=now)
         self._connections[conn_id] = conn
-        self.stats.connections_created += 1
+        self._connections_created += 1
 
         return conn
 
@@ -299,7 +322,7 @@ class Database(Entity):
             return conn
 
         # Must wait for a connection
-        self.stats.connection_wait_count += 1
+        self._connection_wait_count += 1
         wait_start = self._clock.now if self._clock else Instant.Epoch
 
         acquired = [False]
@@ -318,7 +341,7 @@ class Database(Entity):
 
         if self._clock:
             wait_time = (self._clock.now - wait_start).to_seconds()
-            self.stats.connection_wait_time_total += wait_time
+            self._connection_wait_time_total += wait_time
 
         yield self._connection_latency
         return acquired_conn[0]
@@ -354,8 +377,8 @@ class Database(Entity):
         latency = self._get_query_latency(query)
         yield latency
 
-        self.stats.queries_executed += 1
-        self.stats.query_latencies.append(latency)
+        self._queries_executed += 1
+        self._query_latencies.append(latency)
 
         # Simple query parsing for simulation
         query_upper = query.upper().strip()
@@ -413,16 +436,16 @@ class Database(Entity):
         conn.in_transaction = True
         conn.transaction_id = tx_id
 
-        self.stats.transactions_started += 1
+        self._transactions_started += 1
 
         return Transaction(tx_id, self, conn)
 
     def _end_transaction(self, tx: Transaction) -> None:
         """End a transaction and release its connection."""
         if tx.state == TransactionState.COMMITTED:
-            self.stats.transactions_committed += 1
+            self._transactions_committed += 1
         elif tx.state == TransactionState.ROLLED_BACK:
-            self.stats.transactions_rolled_back += 1
+            self._transactions_rolled_back += 1
 
         self._release_connection(tx._connection)
 

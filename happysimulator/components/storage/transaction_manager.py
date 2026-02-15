@@ -14,7 +14,7 @@ conflict checks.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Generator, Protocol, runtime_checkable
 
@@ -72,14 +72,14 @@ class TransactionStats:
         avg_transaction_duration_s: Average transaction duration.
     """
 
-    transactions_started: int
-    transactions_committed: int
-    transactions_aborted: int
-    conflicts_detected: int
-    deadlocks_detected: int
-    reads: int
-    writes: int
-    avg_transaction_duration_s: float
+    transactions_started: int = 0
+    transactions_committed: int = 0
+    transactions_aborted: int = 0
+    conflicts_detected: int = 0
+    deadlocks_detected: int = 0
+    reads: int = 0
+    writes: int = 0
+    avg_transaction_duration_s: float = 0.0
 
 
 # ---------------------------------------------------------------------------

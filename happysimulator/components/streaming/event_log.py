@@ -131,7 +131,7 @@ class SizeRetention:
         return True  # pragma: no cover — trimming handled in EventLog
 
 
-@dataclass
+@dataclass(frozen=True)
 class EventLogStats:
     """Statistics tracked by EventLog.
 
@@ -140,14 +140,14 @@ class EventLogStats:
         records_read: Total records returned by read operations.
         records_expired: Total records removed by retention.
         per_partition_appends: Append count per partition.
-        append_latencies: List of individual append latencies.
+        append_latencies: Tuple of individual append latencies.
     """
 
     records_appended: int = 0
     records_read: int = 0
     records_expired: int = 0
     per_partition_appends: dict[int, int] = field(default_factory=dict)
-    append_latencies: list[float] = field(default_factory=list)
+    append_latencies: tuple[float, ...] = ()
 
     @property
     def avg_append_latency(self) -> float:
@@ -209,9 +209,24 @@ class EventLog(Entity):
 
         self._retention_scheduled = False
 
-        self.stats = EventLogStats()
+        self._records_appended = 0
+        self._records_read = 0
+        self._records_expired = 0
+        self._per_partition_appends: dict[int, int] = {}
+        self._append_latencies: list[float] = []
         for i in range(num_partitions):
-            self.stats.per_partition_appends[i] = 0
+            self._per_partition_appends[i] = 0
+
+    @property
+    def stats(self) -> EventLogStats:
+        """Return a frozen snapshot of current statistics."""
+        return EventLogStats(
+            records_appended=self._records_appended,
+            records_read=self._records_read,
+            records_expired=self._records_expired,
+            per_partition_appends=dict(self._per_partition_appends),
+            append_latencies=tuple(self._append_latencies),
+        )
 
     @property
     def num_partitions(self) -> int:
@@ -321,8 +336,8 @@ class EventLog(Entity):
         partition.records.append(record)
         partition.high_watermark += 1
 
-        self.stats.records_appended += 1
-        self.stats.per_partition_appends[pid] = self.stats.per_partition_appends.get(pid, 0) + 1
+        self._records_appended += 1
+        self._per_partition_appends[pid] = self._per_partition_appends.get(pid, 0) + 1
 
         return record
 
@@ -339,7 +354,7 @@ class EventLog(Entity):
                 if len(result) >= max_records:
                     break
 
-        self.stats.records_read += len(result)
+        self._records_read += len(result)
         return result
 
     def _apply_retention(self) -> int:
@@ -369,7 +384,7 @@ class EventLog(Entity):
                 ]
                 total_expired += before - len(partition.records)
 
-        self.stats.records_expired += total_expired
+        self._records_expired += total_expired
         return total_expired
 
     def handle_event(self, event: Event) -> Generator[float, None, list[Event] | None]:
@@ -382,7 +397,7 @@ class EventLog(Entity):
             reply_future: SimFuture | None = event.context.get("reply_future")
 
             yield self._append_latency
-            self.stats.append_latencies.append(self._append_latency)
+            self._append_latencies.append(self._append_latency)
 
             record = self._do_append(key, value)
 

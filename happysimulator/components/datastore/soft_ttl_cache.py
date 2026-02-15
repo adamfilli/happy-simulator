@@ -27,7 +27,7 @@ Example:
         value = yield from cache.get("user:123")
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Generator, Optional
 
 from happysimulator.core.entity import Entity
@@ -75,7 +75,7 @@ class CacheEntry:
         return age < hard_ttl
 
 
-@dataclass
+@dataclass(frozen=True)
 class SoftTTLCacheStats:
     """Statistics tracked by SoftTTLCache.
 
@@ -206,7 +206,28 @@ class SoftTTLCache(Entity):
         self._access_order: list[str] = []  # For LRU eviction
 
         # Statistics
-        self.stats = SoftTTLCacheStats()
+        self._reads = 0
+        self._fresh_hits = 0
+        self._stale_hits = 0
+        self._hard_misses = 0
+        self._background_refreshes = 0
+        self._refresh_successes = 0
+        self._coalesced_requests = 0
+        self._evictions = 0
+
+    @property
+    def stats(self) -> SoftTTLCacheStats:
+        """Frozen snapshot of soft TTL cache statistics."""
+        return SoftTTLCacheStats(
+            reads=self._reads,
+            fresh_hits=self._fresh_hits,
+            stale_hits=self._stale_hits,
+            hard_misses=self._hard_misses,
+            background_refreshes=self._background_refreshes,
+            refresh_successes=self._refresh_successes,
+            coalesced_requests=self._coalesced_requests,
+            evictions=self._evictions,
+        )
 
     @property
     def backing_store(self) -> KVStore:
@@ -250,7 +271,7 @@ class SoftTTLCache(Entity):
         Returns:
             The value if found, None otherwise.
         """
-        self.stats.reads += 1
+        self._reads += 1
         now = self.now
 
         if key in self._cache:
@@ -259,13 +280,13 @@ class SoftTTLCache(Entity):
 
             # Fresh hit - serve immediately
             if entry.is_fresh(now, self._soft_ttl):
-                self.stats.fresh_hits += 1
+                self._fresh_hits += 1
                 yield self._cache_read_latency
                 return entry.value
 
             # Stale hit - serve AND trigger background refresh
             if entry.is_valid(now, self._hard_ttl):
-                self.stats.stale_hits += 1
+                self._stale_hits += 1
                 side_effects = self._maybe_start_refresh(key)
                 if side_effects:
                     yield self._cache_read_latency, side_effects
@@ -274,11 +295,11 @@ class SoftTTLCache(Entity):
                 return entry.value
 
         # Hard miss - need to fetch from backing store
-        self.stats.hard_misses += 1
+        self._hard_misses += 1
 
         # Request coalescing: if refresh is in progress, wait for it
         if key in self._refreshing_keys:
-            self.stats.coalesced_requests += 1
+            self._coalesced_requests += 1
             # Wait for backing store latency (simulating waiting for the refresh)
             yield self._backing_store.read_latency
             # Check if the refresh completed
@@ -374,7 +395,7 @@ class SoftTTLCache(Entity):
                 value = yield from self._backing_store.get(key)
                 if value is not None:
                     self._store(key, value)
-                    self.stats.refresh_successes += 1
+                    self._refresh_successes += 1
             finally:
                 self._refreshing_keys.discard(key)
         return None
@@ -392,7 +413,7 @@ class SoftTTLCache(Entity):
             return None
 
         self._refreshing_keys.add(key)
-        self.stats.background_refreshes += 1
+        self._background_refreshes += 1
 
         return [Event(
             time=self.now,
@@ -438,4 +459,4 @@ class SoftTTLCache(Entity):
         if self._access_order:
             lru_key = self._access_order.pop(0)
             self._cache.pop(lru_key, None)
-            self.stats.evictions += 1
+            self._evictions += 1

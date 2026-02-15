@@ -26,7 +26,7 @@ from happysimulator.core.temporal import Instant
 T = TypeVar("T")
 
 
-@dataclass
+@dataclass(frozen=True)
 class DeadlineQueueStats:
     """Statistics tracked by DeadlineQueue."""
 
@@ -89,7 +89,20 @@ class DeadlineQueue(QueuePolicy[T]):
         self._insert_counter = 0
 
         # Statistics
-        self.stats = DeadlineQueueStats()
+        self._enqueued = 0
+        self._dequeued = 0
+        self._expired = 0
+        self._capacity_rejected = 0
+
+    @property
+    def stats(self) -> DeadlineQueueStats:
+        """Return a frozen snapshot of queue statistics."""
+        return DeadlineQueueStats(
+            enqueued=self._enqueued,
+            dequeued=self._dequeued,
+            expired=self._expired,
+            capacity_rejected=self._capacity_rejected,
+        )
 
     @property
     def capacity(self) -> float:
@@ -116,7 +129,7 @@ class DeadlineQueue(QueuePolicy[T]):
             True if accepted, False if capacity exceeded.
         """
         if len(self._heap) >= self._capacity:
-            self.stats.capacity_rejected += 1
+            self._capacity_rejected += 1
             return False
 
         deadline = self._get_deadline(item)
@@ -129,7 +142,7 @@ class DeadlineQueue(QueuePolicy[T]):
         self._insert_counter += 1
 
         heapq.heappush(self._heap, entry)
-        self.stats.enqueued += 1
+        self._enqueued += 1
         return True
 
     def pop(self) -> Optional[T]:
@@ -147,10 +160,10 @@ class DeadlineQueue(QueuePolicy[T]):
 
             # Check if expired
             if now is not None and entry.deadline < now:
-                self.stats.expired += 1
+                self._expired += 1
                 continue
 
-            self.stats.dequeued += 1
+            self._dequeued += 1
             return entry.item
 
         return None
@@ -186,7 +199,7 @@ class DeadlineQueue(QueuePolicy[T]):
                 new_heap.append(entry)
             else:
                 removed += 1
-                self.stats.expired += 1
+                self._expired += 1
 
         if removed > 0:
             heapq.heapify(new_heap)

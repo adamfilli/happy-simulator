@@ -17,23 +17,26 @@ Example:
             return db_pool.release()
 """
 
+import logging
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Generator, Callable, Any
 
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 
+logger = logging.getLogger(__name__)
 
-@dataclass
+
+@dataclass(frozen=True)
 class SemaphoreStats:
-    """Statistics tracked by Semaphore."""
+    """Frozen snapshot of semaphore statistics."""
 
-    acquisitions: int = 0  # Successful permit acquisitions
-    releases: int = 0  # Permit releases
-    contentions: int = 0  # Times a waiter had to queue
-    total_wait_time_ns: int = 0  # Total time spent waiting
-    peak_waiters: int = 0  # Maximum concurrent waiters
+    acquisitions: int = 0
+    releases: int = 0
+    contentions: int = 0
+    total_wait_time_ns: int = 0
+    peak_waiters: int = 0
 
 
 @dataclass
@@ -75,8 +78,12 @@ class Semaphore(Entity):
         self._capacity = initial_count
         self._waiters: deque[_Waiter] = deque()
 
-        # Statistics
-        self.stats = SemaphoreStats()
+        # Statistics (private counters → frozen snapshot via @property)
+        self._acquisitions = 0
+        self._releases = 0
+        self._contentions = 0
+        self._total_wait_time_ns = 0
+        self._peak_waiters = 0
 
     @property
     def available(self) -> int:
@@ -87,6 +94,17 @@ class Semaphore(Entity):
     def capacity(self) -> int:
         """Maximum number of permits."""
         return self._capacity
+
+    @property
+    def stats(self) -> SemaphoreStats:
+        """Frozen snapshot of current semaphore statistics."""
+        return SemaphoreStats(
+            acquisitions=self._acquisitions,
+            releases=self._releases,
+            contentions=self._contentions,
+            total_wait_time_ns=self._total_wait_time_ns,
+            peak_waiters=self._peak_waiters,
+        )
 
     @property
     def waiters(self) -> int:
@@ -107,7 +125,7 @@ class Semaphore(Entity):
 
         if self._count >= count:
             self._count -= count
-            self.stats.acquisitions += count
+            self._acquisitions += count
             return True
 
         return False
@@ -139,7 +157,7 @@ class Semaphore(Entity):
             return
 
         # Must wait
-        self.stats.contentions += 1
+        self._contentions += 1
         enqueue_time = self._clock.now.nanoseconds if self._clock else 0
 
         acquired = [False]
@@ -151,17 +169,17 @@ class Semaphore(Entity):
         self._waiters.append(waiter)
 
         # Track peak waiters
-        if len(self._waiters) > self.stats.peak_waiters:
-            self.stats.peak_waiters = len(self._waiters)
+        if len(self._waiters) > self._peak_waiters:
+            self._peak_waiters = len(self._waiters)
 
         while not acquired[0]:
             yield 0.0
 
-        self.stats.acquisitions += count
+        self._acquisitions += count
 
         if self._clock:
             wait_time = self._clock.now.nanoseconds - enqueue_time
-            self.stats.total_wait_time_ns += wait_time
+            self._total_wait_time_ns += wait_time
 
     def release(self, count: int = 1) -> list[Event]:
         """Release permits and wake waiting acquirers.
@@ -187,7 +205,7 @@ class Semaphore(Entity):
             )
 
         self._count += count
-        self.stats.releases += count
+        self._releases += count
 
         # Wake waiters that can now be satisfied
         self._wake_waiters()

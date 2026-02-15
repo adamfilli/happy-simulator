@@ -656,7 +656,7 @@ class TestSoftTTLCacheBackgroundRefresh:
 
         # Cache should have new value
         # Reset stats to check fresh hit
-        cache.stats.fresh_hits = 0
+        cache._fresh_hits = 0
         value = exhaust_generator(cache.get("key1"))
 
         # The value might still be stale depending on clock position

@@ -29,7 +29,8 @@ Example:
             queue.reject(event.context['message_id'], requeue=True)
 """
 
-from dataclasses import dataclass, field
+import logging
+from dataclasses import dataclass
 from typing import Any, Generator, Callable
 from collections import deque
 from enum import Enum
@@ -38,6 +39,8 @@ import uuid
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Instant
+
+logger = logging.getLogger(__name__)
 
 
 class MessageState(Enum):
@@ -62,7 +65,7 @@ class Message:
     consumer: Entity | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class MessageQueueStats:
     """Statistics tracked by MessageQueue."""
 
@@ -72,7 +75,7 @@ class MessageQueueStats:
     messages_rejected: int = 0
     messages_redelivered: int = 0
     messages_dead_lettered: int = 0
-    delivery_latencies: list[float] = field(default_factory=list)
+    delivery_latencies: tuple[float, ...] = ()
 
     @property
     def avg_delivery_latency(self) -> float:
@@ -149,7 +152,26 @@ class MessageQueue(Entity):
         self._redelivery_scheduled: set[str] = set()
 
         # Statistics
-        self.stats = MessageQueueStats()
+        self._messages_published = 0
+        self._messages_delivered = 0
+        self._messages_acknowledged = 0
+        self._messages_rejected = 0
+        self._messages_redelivered = 0
+        self._messages_dead_lettered = 0
+        self._delivery_latencies: list[float] = []
+
+    @property
+    def stats(self) -> MessageQueueStats:
+        """Return a frozen snapshot of current statistics."""
+        return MessageQueueStats(
+            messages_published=self._messages_published,
+            messages_delivered=self._messages_delivered,
+            messages_acknowledged=self._messages_acknowledged,
+            messages_rejected=self._messages_rejected,
+            messages_redelivered=self._messages_redelivered,
+            messages_dead_lettered=self._messages_dead_lettered,
+            delivery_latencies=tuple(self._delivery_latencies),
+        )
 
     @property
     def pending_count(self) -> int:
@@ -226,7 +248,7 @@ class MessageQueue(Entity):
 
         self._messages[message_id] = msg
         self._pending_queue.append(message_id)
-        self.stats.messages_published += 1
+        self._messages_published += 1
 
         # Small publish latency
         yield 0.0001
@@ -278,12 +300,12 @@ class MessageQueue(Entity):
         # Track delivery latency
         created_time = msg.created_at.to_seconds() if msg.created_at else 0
         now_time = now.to_seconds() if now else 0
-        self.stats.delivery_latencies.append(now_time - created_time)
+        self._delivery_latencies.append(now_time - created_time)
 
         if msg.delivery_count > 1:
-            self.stats.messages_redelivered += 1
+            self._messages_redelivered += 1
         else:
-            self.stats.messages_delivered += 1
+            self._messages_delivered += 1
 
         yield self._delivery_latency
 
@@ -319,7 +341,7 @@ class MessageQueue(Entity):
         self._messages.pop(message_id, None)
         self._redelivery_scheduled.discard(message_id)
 
-        self.stats.messages_acknowledged += 1
+        self._messages_acknowledged += 1
 
     def reject(self, message_id: str, requeue: bool = True) -> None:
         """Reject a message.
@@ -333,7 +355,7 @@ class MessageQueue(Entity):
 
         msg = self._messages[message_id]
         msg.state = MessageState.REJECTED
-        self.stats.messages_rejected += 1
+        self._messages_rejected += 1
 
         # Remove from in-flight
         self._in_flight.pop(message_id, None)
@@ -346,7 +368,7 @@ class MessageQueue(Entity):
             # Dead letter or discard
             if self._dead_letter_queue is not None:
                 self._dead_letter_queue.add_message(msg)
-                self.stats.messages_dead_lettered += 1
+                self._messages_dead_lettered += 1
             self._messages.pop(message_id, None)
             self._redelivery_scheduled.discard(message_id)
 

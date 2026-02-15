@@ -21,6 +21,7 @@ import logging
 from dataclasses import dataclass
 from typing import Callable, Generator
 
+from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import Event
 from happysimulator.core.temporal import Duration, Instant
@@ -28,9 +29,9 @@ from happysimulator.core.temporal import Duration, Instant
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class FallbackStats:
-    """Statistics tracked by Fallback."""
+    """Frozen snapshot of Fallback statistics."""
 
     total_requests: int = 0
     primary_successes: int = 0
@@ -92,7 +93,12 @@ class Fallback(Entity):
         self._next_request_id = 0
 
         # Statistics
-        self.stats = FallbackStats()
+        self._total_requests = 0
+        self._primary_successes = 0
+        self._primary_failures = 0
+        self._fallback_invocations = 0
+        self._fallback_successes = 0
+        self._fallback_failures = 0
 
         fallback_name = fallback.name if isinstance(fallback, Entity) else "callback"
         logger.debug(
@@ -116,6 +122,25 @@ class Fallback(Entity):
     def timeout(self) -> float | None:
         """Timeout before triggering fallback."""
         return self._timeout
+
+    @property
+    def stats(self) -> FallbackStats:
+        """Frozen snapshot of fallback statistics."""
+        return FallbackStats(
+            total_requests=self._total_requests,
+            primary_successes=self._primary_successes,
+            primary_failures=self._primary_failures,
+            fallback_invocations=self._fallback_invocations,
+            fallback_successes=self._fallback_successes,
+            fallback_failures=self._fallback_failures,
+        )
+
+    def set_clock(self, clock: Clock) -> None:
+        """Inject clock and propagate to primary and fallback."""
+        super().set_clock(clock)
+        self._primary.set_clock(clock)
+        if isinstance(self._fallback, Entity):
+            self._fallback.set_clock(clock)
 
     def handle_event(
         self, event: Event
@@ -141,7 +166,7 @@ class Fallback(Entity):
         if event_type == "_fb_fallback_response":
             return self._handle_fallback_response(event)
 
-        self.stats.total_requests += 1
+        self._total_requests += 1
         return self._forward_to_primary(event)
 
     def _forward_to_primary(self, event: Event) -> list[Event]:
@@ -217,7 +242,7 @@ class Fallback(Entity):
 
     def _forward_to_fallback(self, request_id: int, original_event: Event) -> list[Event] | Event | None:
         """Forward a request to the fallback service."""
-        self.stats.fallback_invocations += 1
+        self._fallback_invocations += 1
 
         if callable(self._fallback) and not isinstance(self._fallback, Entity):
             # Fallback is a callable
@@ -307,7 +332,7 @@ class Fallback(Entity):
             # Primary succeeded
             request_info["state"] = "completed"
             del self._in_flight[request_id]
-            self.stats.primary_successes += 1
+            self._primary_successes += 1
             logger.debug(
                 "[%s] Request %d succeeded on primary",
                 self.name,
@@ -316,7 +341,7 @@ class Fallback(Entity):
             return None
 
         # Primary failed, try fallback
-        self.stats.primary_failures += 1
+        self._primary_failures += 1
         request_info["state"] = "fallback"
         return self._forward_to_fallback(request_id, request_info["original_event"])
 
@@ -334,7 +359,7 @@ class Fallback(Entity):
         if request_info["state"] != "primary":
             return None
 
-        self.stats.primary_failures += 1
+        self._primary_failures += 1
         request_info["state"] = "fallback"
 
         logger.debug(
@@ -365,7 +390,7 @@ class Fallback(Entity):
 
         request_info["state"] = "completed"
         del self._in_flight[request_id]
-        self.stats.fallback_successes += 1
+        self._fallback_successes += 1
 
         logger.debug(
             "[%s] Request %d succeeded on fallback",

@@ -75,8 +75,7 @@ class CheckoutLane(QueuedResource):
         finally:
             self._active -= 1
         return [
-            Event(time=self.now, event_type="Done",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Done")
         ]
 
 
@@ -198,7 +197,7 @@ def run_grocery_simulation(config: GroceryConfig | None = None) -> GroceryResult
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 600),
+        duration=config.duration_s + 600,
         sources=[source],
         entities=entities,
     )

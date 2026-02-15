@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from happysimulator.instrumentation.data import Data
 from happysimulator.instrumentation.probe import Probe
 from happysimulator.core.entity import Entity
 from happysimulator.load.source import Source
@@ -72,9 +71,6 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     # Setup the concurrency tracking entity
     tracker = ConcurrencyTrackerEntity()
 
-    # Setup the data sink for the probe
-    concurrency_data = Data()
-
     # Create the event Source
     profile = ConstantOneProfile()
     event_source = Source.with_profile(
@@ -83,20 +79,14 @@ def test_basic_concurrency_probe(test_output_dir: Path):
     )
 
     # Create the Probe to measure concurrency
-    concurrency_probe = Probe(
-        target=tracker,
-        metric="concurrency",
-        data=concurrency_data,
-        interval=probe_interval,
-        start_time=Instant.Epoch
-    )
+    concurrency_probe, concurrency_data = Probe.on(tracker, "concurrency", interval=probe_interval)
 
     # B. INITIALIZATION
     sim = Simulation(
         sources=[event_source],
         entities=[tracker],
         probes=[concurrency_probe],
-        end_time=Instant.from_seconds(sim_duration)
+        duration=sim_duration
     )
 
     # C. EXECUTION

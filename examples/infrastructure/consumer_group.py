@@ -208,7 +208,7 @@ def run_consumer_group(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=producer_sources,
         entities=[log, group, *producers, *consumers],
     )

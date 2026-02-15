@@ -106,12 +106,7 @@ class WALWorker(Entity):
         self.writes_completed += 1
 
         return [
-            Event(
-                time=self.now,
-                event_type="WriteComplete",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="WriteComplete")
         ]
 
 
@@ -175,7 +170,7 @@ def run_single_policy(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[wal, worker, tracker],
     )

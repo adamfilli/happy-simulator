@@ -83,7 +83,7 @@ class TestAutoScalerEndToEnd:
         # Collect all entities including dynamically created ones
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[source],
             entities=[lb, initial_server, scaler],
         )
@@ -114,7 +114,7 @@ class TestRollingDeployerEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=[lb, deployer] + servers,
         )
         sim.schedule(deployer.deploy())
@@ -154,7 +154,7 @@ class TestCanaryDeployerEndToEnd:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             entities=[lb, deployer] + servers,
         )
         sim.schedule(deployer.deploy())

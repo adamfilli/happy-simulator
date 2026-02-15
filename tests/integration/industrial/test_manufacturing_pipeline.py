@@ -38,7 +38,7 @@ class TestProductionLineWithInspection:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(7.0),
+            duration=7.0,
             sources=[source],
             entities=[belt, station, pass_sink, fail_sink],
         )
@@ -65,7 +65,7 @@ class TestProductionLineWithInspection:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(4.0),
+            duration=4.0,
             sources=[source],
             entities=[belt, station, pass_sink, fail_sink],
         )
@@ -97,7 +97,7 @@ class TestMultiStageWithBatchProcessing:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[belt, station, batch, sink, fail_sink],
         )
@@ -127,7 +127,7 @@ class TestMultiStageWithBatchProcessing:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[belt, station, batch, sink, fail_sink],
         )
@@ -163,7 +163,7 @@ class TestProductionLineWithBreakdowns:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(55.0),
+            duration=55.0,
             sources=[source],
             entities=[station, breakdown, pass_sink, fail_sink],
         )

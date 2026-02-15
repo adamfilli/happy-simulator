@@ -246,7 +246,7 @@ class TestAsyncServerExplained:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             sources=[],
             entities=[server, tracker, collector],
         )
@@ -442,7 +442,7 @@ class TestAsyncServerExplained:
 
         async_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(duration_s + 2.0),
+            duration=duration_s + 2.0,
             sources=[async_source],
             entities=[async_server, async_tracker, async_collector],
         )
@@ -472,7 +472,7 @@ class TestAsyncServerExplained:
 
         threaded_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(duration_s + 2.0),
+            duration=duration_s + 2.0,
             sources=[threaded_source],
             entities=[threaded_server, threaded_tracker, threaded_collector],
         )
@@ -631,7 +631,7 @@ class TestAsyncServerExplained:
 
         low_conn_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(duration_s + 2.0),
+            duration=duration_s + 2.0,
             sources=[low_conn_source],
             entities=[low_conn_server, low_conn_collector],
         )
@@ -648,7 +648,7 @@ class TestAsyncServerExplained:
 
         slow_cpu_sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(duration_s + 15.0),  # More time to drain
+            duration=duration_s + 15.0,  # More time to drain
             sources=[slow_cpu_source],
             entities=[slow_cpu_server, slow_cpu_collector],
         )
@@ -816,7 +816,7 @@ class TestAsyncServerExplained:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             sources=[],
             entities=[server, collector],
         )

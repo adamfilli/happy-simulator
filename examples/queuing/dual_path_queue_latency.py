@@ -260,12 +260,7 @@ class Server(QueuedResource):
         if self.downstream is None:
             return []
 
-        completed = Event(
-            time=self.now,
-            event_type="Completed",
-            target=self.downstream,
-            context=event.context,
-        )
+        completed = self.forward(event, self.downstream, event_type="Completed")
         return [completed]
 
 
@@ -398,32 +393,11 @@ def run_dual_path_simulation(
     )
 
     # Create probes for queue depths (QueuedResource exposes depth property)
-    queue1_depth_data = Data()
-    queue1_probe = Probe(
-        target=entity1,
-        metric="depth",
-        data=queue1_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
 
-    queue2_depth_data = Data()
-    queue2_probe = Probe(
-        target=entity2,
-        metric="depth",
-        data=queue2_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+    queue1_probe, queue1_depth_data = Probe.on(entity1, "depth", interval=probe_interval_s)
 
-    queue3_depth_data = Data()
-    queue3_probe = Probe(
-        target=entity3,
-        metric="depth",
-        data=queue3_depth_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+    queue2_probe, queue2_depth_data = Probe.on(entity2, "depth", interval=probe_interval_s)
+    queue3_probe, queue3_depth_data = Probe.on(entity3, "depth", interval=probe_interval_s)
 
     # Create sources with stepwise load profiles
     stop_after = Instant.from_seconds(duration_s)
@@ -451,7 +425,7 @@ def run_dual_path_simulation(
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + drain_s),
+        duration=duration_s + drain_s,
         sources=[source1, source2],
         entities=[entity1, entity2, entity3, sink],
         probes=[queue1_probe, queue2_probe, queue3_probe],

@@ -114,7 +114,7 @@ def run_auto_scaler_demo(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        duration=duration_s,
         sources=[source],
         entities=[lb, scaler, sink] + servers,
     )

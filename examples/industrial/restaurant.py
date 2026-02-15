@@ -117,8 +117,7 @@ class HostStand(RenegingQueuedResource):
         self._active -= 1
         self.guests_seated += 1
         return [
-            Event(time=self.now, event_type="Seat",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Seat")
         ]
 
 
@@ -189,8 +188,7 @@ class KitchenStation(QueuedResource):
             self._active -= 1
         self.orders_processed += 1
         return [
-            Event(time=self.now, event_type=event.event_type,
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream)
         ]
 
 
@@ -222,8 +220,7 @@ class DiningStage(Entity):
 
         self.guests_finished += 1
         return [
-            Event(time=self.now, event_type="Finished",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Finished")
         ]
 
 
@@ -311,7 +308,7 @@ def run_restaurant_simulation(config: RestaurantConfig | None = None) -> Restaur
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 3600),  # 1hr drain
+        duration=config.duration_s + 3600,  # 1hr drain
         sources=[walkin_source],
         entities=entities,
     )

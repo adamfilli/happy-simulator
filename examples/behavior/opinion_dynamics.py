@@ -43,7 +43,7 @@ def run_degroot_consensus():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(25.0),
+        duration=25.0,
         entities=[env] + agents,
     )
 
@@ -103,7 +103,7 @@ def run_bounded_confidence():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(15.0),
+        duration=15.0,
         entities=[env] + agents,
     )
 

@@ -84,11 +84,11 @@ class Server(Entity):
 The `Simulation` class ties everything together. It manages the event heap, injects clocks into entities, and runs the main loop.
 
 ```python
-from happysimulator import Simulation, Instant
+from happysimulator import Simulation
 
 sim = Simulation(
     entities=[source, server, sink],   # register all entities
-    end_time=Instant.from_seconds(100),
+    duration=100,
 )
 summary = sim.run()
 ```

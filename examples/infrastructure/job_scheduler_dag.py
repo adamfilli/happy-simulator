@@ -71,7 +71,7 @@ def run_dag_scheduler(duration_s: float = 30.0, seed: int = 42) -> None:
     # Run simulation
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        duration=duration_s,
         entities=[scheduler, extract_worker, transform_worker, load_worker],
     )
     sim.schedule(scheduler.start())

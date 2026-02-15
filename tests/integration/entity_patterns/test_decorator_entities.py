@@ -115,7 +115,7 @@ class TestDecoratedCounterSimulation:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             sources=[source],
             entities=[counter],
         )
@@ -133,7 +133,7 @@ class TestDecoratedCounterSimulation:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             sources=[source],
             entities=[counter],
         )
@@ -156,7 +156,7 @@ class TestDecoratedClientServerSimulation:
         # This gives us precise control over timing
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             entities=[client, server],
         )
 
@@ -182,7 +182,7 @@ class TestDecoratedClientServerSimulation:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             entities=[client, server],
         )
 
@@ -234,7 +234,7 @@ class TestMixedEntityTypes:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(1.0),
+            duration=1.0,
             entities=[traditional, decorated],
         )
 

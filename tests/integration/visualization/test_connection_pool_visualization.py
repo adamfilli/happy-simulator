@@ -185,7 +185,7 @@ class TestConnectionPoolVisualization:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             sources=[source],
             entities=[server, pool, client],
         )
@@ -311,7 +311,7 @@ Reuse Ratio:            {pool.stats.acquisitions / max(1, pool.stats.connections
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(sim_duration + 1.0),
+                duration=sim_duration + 1.0,
                 sources=[source],
                 entities=[server, pool, client],
             )
@@ -444,7 +444,7 @@ Reuse Ratio:            {pool.stats.acquisitions / max(1, pool.stats.connections
 
         sim1 = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(sim_duration + 0.5),
+            duration=sim_duration + 0.5,
             sources=[source1],
             entities=[server1, pool, pooled_client],
         )
@@ -476,7 +476,7 @@ Reuse Ratio:            {pool.stats.acquisitions / max(1, pool.stats.connections
 
         sim2 = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(sim_duration + 0.5),
+            duration=sim_duration + 0.5,
             sources=[source2],
             entities=[server2, direct_client],
         )
@@ -651,7 +651,7 @@ Benefits of Pooling:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[],
             entities=[server, pool, client],
         )
@@ -813,7 +813,7 @@ Results:
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(2.0),
+                duration=2.0,
                 sources=[],
                 entities=[server, pool, client],
             )

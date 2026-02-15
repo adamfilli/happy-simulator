@@ -164,12 +164,7 @@ class ElevatorCar(Entity):
         self._passengers_carried += 1
 
         return [
-            Event(
-                time=self.now,
-                event_type="Arrived",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Arrived")
         ]
 
 
@@ -188,12 +183,7 @@ class ElevatorDispatcher(Entity):
         self._dispatched += 1
 
         return [
-            Event(
-                time=self.now,
-                event_type="Passenger",
-                target=elevator,
-                context=event.context,
-            )
+            self.forward(event, elevator, event_type="Passenger")
         ]
 
 

@@ -66,8 +66,7 @@ class PriorityWorker(Entity):
         if not grant.preempted:
             grant.release()
             self.completed = True
-            return [Event(time=self.now, event_type="Done", target=self.downstream,
-                          context=event.context)]
+            return [self.forward(event, self.downstream, event_type="Done")]
         return []
 
 
@@ -85,7 +84,7 @@ class TestPooledCycleUnderLoad:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(8.0),
+            duration=8.0,
             sources=[source],
             entities=[pool, sink],
         )
@@ -107,7 +106,7 @@ class TestPooledCycleUnderLoad:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[pool, sink],
         )
@@ -130,7 +129,7 @@ class TestPreemptibleResourcePriority:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[resource, low, high, sink],
         )
         # Low priority starts first
@@ -156,7 +155,7 @@ class TestPreemptibleResourcePriority:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             entities=[resource, *workers, sink],
         )
         # Schedule all workers with slight staggering
@@ -185,7 +184,7 @@ class TestSplitMergeFanOut:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[sm, w1, w2, w3, sink],
         )
         # Send 5 tasks
@@ -212,7 +211,7 @@ class TestSplitMergeFanOut:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(3.0),
+            duration=3.0,
             entities=[sm, fast, slow, sink],
         )
         sim.schedule(Event(
@@ -253,7 +252,7 @@ class TestSplitMergeWithPooledCycleResource:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[sm, w1, w2, sink],
         )
         for i in range(3):

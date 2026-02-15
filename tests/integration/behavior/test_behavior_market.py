@@ -89,7 +89,7 @@ class TestBehaviorMarket:
         # Schedule two price changes
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             entities=[env] + pop.agents,
         )
 
@@ -128,7 +128,7 @@ class TestBehaviorMarket:
         env = Environment(name="env", agents=pop.agents, seed=42)
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             entities=[env] + pop.agents,
         )
         sim.schedule(Event(

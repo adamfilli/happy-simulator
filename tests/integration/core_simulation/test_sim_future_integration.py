@@ -59,7 +59,7 @@ class RequestResponseClient(Entity):
 def _make_sim(*entities):
     """Create a Simulation with clock injection for the given entities."""
     return Simulation(
-        end_time=Instant.from_seconds(60),
+        duration=60,
         entities=list(entities),
     )
 

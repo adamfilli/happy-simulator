@@ -243,8 +243,7 @@ class ParkedCarHandler(Entity):
         self.departures += 1
 
         return [
-            Event(time=self.now, event_type="Departed",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Departed")
         ]
 
 
@@ -309,7 +308,7 @@ def run_parking_simulation(config: ParkingConfig | None = None) -> ParkingResult
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + config.max_stay_s + 600),
+        duration=config.duration_s + config.max_stay_s + 600,
         sources=[source],
         entities=entities,
     )

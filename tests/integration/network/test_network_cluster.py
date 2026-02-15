@@ -200,7 +200,7 @@ class TestGossipCluster:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[],
             entities=[network, *nodes, sampler],
         )
@@ -233,7 +233,7 @@ class TestGossipCluster:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             sources=[],
             entities=[network, *nodes, sampler],
         )
@@ -315,7 +315,7 @@ class TestGossipCluster:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             sources=[],
             entities=[network, *nodes, sampler],
         )
@@ -391,7 +391,7 @@ class TestGossipCluster:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[],
             entities=[network, *nodes, sampler],
         )
@@ -422,7 +422,7 @@ class TestGossipCluster:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(30.0),
+            duration=30.0,
             sources=[],
             entities=[network, *nodes, sampler],
         )

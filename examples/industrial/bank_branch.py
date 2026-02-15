@@ -223,12 +223,7 @@ class BankTeller(RenegingQueuedResource):
         self._service_time_total += service_time
 
         return [
-            Event(
-                time=self.now,
-                event_type="Served",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Served")
         ]
 
 
@@ -292,14 +287,8 @@ def run_bank_simulation(config: BankConfig | None = None) -> BankResult:
     )
 
     # Queue depth probe
-    queue_depth_data = Data()
-    queue_probe = Probe(
-        target=teller,
-        metric="depth",
-        data=queue_depth_data,
-        interval=10.0,
-        start_time=Instant.Epoch,
-    )
+
+    queue_probe, queue_depth_data = Probe.on(teller, "depth", interval=10.0)
 
     # Customer source (Poisson arrivals)
     arrival_rate_per_s = config.arrival_rate_per_min / 60.0

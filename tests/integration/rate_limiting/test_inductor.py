@@ -127,7 +127,7 @@ def test_inductor_burst_suppression(profile_name: str, test_output_dir: Path):
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(end_s),
+        duration=end_s,
         sources=[source],
         entities=[inductor, sink],
     )
@@ -189,7 +189,7 @@ def test_inductor_time_constants(test_output_dir: Path):
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(end_s),
+            duration=end_s,
             sources=[source],
             entities=[inductor, sink],
         )
@@ -273,7 +273,7 @@ def test_inductor_vs_rate_limiters_comparison(test_output_dir: Path):
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(end_s),
+            duration=end_s,
             sources=[source],
             entities=entities_list,
         )
@@ -375,7 +375,7 @@ def test_inductor_vs_rate_limiters_ramp(test_output_dir: Path):
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(end_s),
+            duration=end_s,
             sources=[source],
             entities=entities_list,
         )

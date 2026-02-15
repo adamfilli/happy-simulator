@@ -192,7 +192,7 @@ class TestLoadBalancerVisualization:
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(sim_duration + 0.5),
+                duration=sim_duration + 0.5,
                 sources=[source],
                 entities=backends + [lb],
             )
@@ -284,7 +284,7 @@ class TestLoadBalancerVisualization:
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(sim_duration + 0.5),
+                duration=sim_duration + 0.5,
                 sources=[source],
                 entities=backends + [lb],
             )
@@ -371,7 +371,7 @@ class TestLoadBalancerVisualization:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(4.0),
+            duration=4.0,
             sources=[source],
             entities=backends + [lb, hc],
         )
@@ -508,7 +508,7 @@ Result:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.5),
+            duration=2.5,
             sources=[source],
             entities=backends + [lb],
         )

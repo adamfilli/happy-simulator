@@ -273,12 +273,7 @@ class CachedServer(QueuedResource):
             return []
 
         return [
-            Event(
-                time=self.now,
-                event_type="Response",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Response")
         ]
 
 
@@ -396,57 +391,17 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     source = Source(name="Source", event_provider=provider, arrival_time_provider=arrival)
 
     # Create probes for metrics
-    hit_rate_data = Data()
-    miss_rate_data = Data()
-    cache_size_data = Data()
-    datastore_reads_data = Data()
-    queue_depth_data = Data()
-    in_flight_data = Data()
-
-    probes = [
-        Probe(
-            target=server,
-            metric="hit_rate",
-            data=hit_rate_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-        Probe(
-            target=server,
-            metric="miss_rate",
-            data=miss_rate_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-        Probe(
-            target=server,
-            metric="cache_size",
-            data=cache_size_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-        Probe(
-            target=server,
-            metric="datastore_reads",
-            data=datastore_reads_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-        Probe(
-            target=server,
-            metric="depth",
-            data=queue_depth_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-        Probe(
-            target=server,
-            metric="in_flight",
-            data=in_flight_data,
-            interval=config.probe_interval_s,
-            start_time=Instant.Epoch,
-        ),
-    ]
+    probes, probe_data = Probe.on_many(
+        server,
+        ["hit_rate", "miss_rate", "cache_size", "datastore_reads", "depth", "in_flight"],
+        interval=config.probe_interval_s,
+    )
+    hit_rate_data = probe_data["hit_rate"]
+    miss_rate_data = probe_data["miss_rate"]
+    cache_size_data = probe_data["cache_size"]
+    datastore_reads_data = probe_data["datastore_reads"]
+    queue_depth_data = probe_data["depth"]
+    in_flight_data = probe_data["in_flight"]
 
     # Create cache reset event if configured
     extra_events: list[Event] = []
@@ -466,7 +421,7 @@ def run_cold_start_simulation(config: ColdStartConfig) -> SimulationResult:
     # Run simulation - datastore is a separate entity
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 10.0),  # Extra drain time
+        duration=config.duration_s + 10.0,  # Extra drain time
         sources=[source],
         entities=[datastore, server, sink],  # Datastore is a separate entity
         probes=probes,

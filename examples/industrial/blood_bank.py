@@ -109,12 +109,7 @@ class DonationStation(QueuedResource):
         yield self.donation_time
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="BloodUnit",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="BloodUnit")
         ]
 
 

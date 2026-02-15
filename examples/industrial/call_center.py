@@ -94,8 +94,7 @@ class SkillRouter(Entity):
         skill = event.context.get("skill", "support")
         target = self.queues.get(skill, list(self.queues.values())[0])
         return [
-            Event(time=self.now, event_type=event.event_type,
-                  target=target, context=event.context)
+            self.forward(event, target)
         ]
 
 
@@ -128,8 +127,7 @@ class AgentPool(RenegingQueuedResource):
             self._active -= 1
         self.calls_handled += 1
         return [
-            Event(time=self.now, event_type="Completed",
-                  target=self.downstream, context=event.context)
+            self.forward(event, self.downstream, event_type="Completed")
         ]
 
 
@@ -174,7 +172,7 @@ def run_call_center_simulation(config: CallCenterConfig | None = None) -> CallCe
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 1800),
+        duration=config.duration_s + 1800,
         sources=[source],
         entities=entities,
     )

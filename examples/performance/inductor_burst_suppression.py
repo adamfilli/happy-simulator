@@ -39,12 +39,7 @@ class InputCounter(Entity):
 
     def handle_event(self, event: Event) -> list[Event]:
         self.data.add_stat(1.0, event.time)
-        return [Event(
-            time=event.time,
-            event_type=event.event_type,
-            target=self._downstream,
-            context=event.context,
-        )]
+        return [self.forward(event, self._downstream)]
 
 
 # -- Multi-phase profile ------------------------------------------------------
@@ -104,17 +99,14 @@ source = Source.with_profile(
 )
 
 # Probes on inductor internals
-rate_data = Data()
-rate_probe = Probe(target=inductor, metric="estimated_rate", data=rate_data, interval=0.1)
-
-depth_data = Data()
-depth_probe = Probe(target=inductor, metric="queue_depth", data=depth_data, interval=0.1)
+rate_probe, rate_data = Probe.on(inductor, "estimated_rate", interval=0.1)
+depth_probe, depth_data = Probe.on(inductor, "queue_depth", interval=0.1)
 
 sim = Simulation(
     sources=[source],
     entities=[input_counter, inductor, output_tracker],
     probes=[rate_probe, depth_probe],
-    end_time=Instant.from_seconds(180.0),
+    duration=180.0,
 )
 
 serve(sim, charts=[

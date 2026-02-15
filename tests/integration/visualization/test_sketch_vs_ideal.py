@@ -114,7 +114,7 @@ class TestTopKAccuracy:
         sim = Simulation(
             sources=[source],
             entities=[router, topk_collector, ideal_sink],
-            end_time=Instant.from_seconds(100),
+            duration=100,
         )
         sim.run()
 

@@ -33,7 +33,7 @@ class TestAppointmentSchedulingWithNoShows:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(35.0),
+            duration=35.0,
             entities=[scheduler, sink],
         )
         for e in scheduler.start_events():
@@ -70,7 +70,7 @@ class TestConditionalRoutingByContextField:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             entities=[router, sink_express, sink_standard, sink_economy, default_sink],
         )
 
@@ -107,7 +107,7 @@ class TestGateControllerWithSchedule:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[gate, sink],
         )
@@ -146,7 +146,7 @@ class TestCombinedRoutingAndGate:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[router, gate, sink, urgent_sink],
         )
         for ev in gate.start_events():

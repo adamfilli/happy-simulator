@@ -90,12 +90,7 @@ class IOWorkloadDriver(Entity):
         self._ops_completed += 1
 
         if self._downstream:
-            return [Event(
-                time=self.now,
-                event_type="Completed",
-                target=self._downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self._downstream, event_type="Completed")]
         return []
 
 
@@ -142,18 +137,11 @@ def _run_profile(
         stop_after=Instant.from_seconds(duration_s),
     )
 
-    ops_data = Data()
-    probe = Probe(
-        target=driver,
-        metric="ops_completed",
-        data=ops_data,
-        interval=0.5,
-        start_time=Instant.Epoch,
-    )
+    probe, ops_data = Probe.on(driver, "ops_completed", interval=0.5)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[disk, driver, sink],
         probes=[probe],

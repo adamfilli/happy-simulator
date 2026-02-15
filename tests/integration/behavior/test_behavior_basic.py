@@ -40,7 +40,7 @@ class TestBehaviorBasic:
         all_entities = [env] + agents
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=all_entities,
         )
 
@@ -79,7 +79,7 @@ class TestBehaviorBasic:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             entities=[env] + agents,
         )
         sim.schedule(Event(

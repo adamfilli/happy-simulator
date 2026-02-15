@@ -139,7 +139,7 @@ class TestZipfDistributionVisualization:
         # Run simulation
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(num_events / rate_per_second + 1.0),
+            duration=num_events / rate_per_second + 1.0,
             sources=[source],
             entities=[sink],
         )
@@ -290,7 +290,7 @@ class TestZipfDistributionVisualization:
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(num_events / 1000.0 + 1.0),
+                duration=num_events / 1000.0 + 1.0,
                 sources=[source],
                 entities=[sink],
             )
@@ -431,7 +431,7 @@ class TestZipfDistributionVisualization:
 
             sim = Simulation(
                 start_time=Instant.Epoch,
-                end_time=Instant.from_seconds(num_accesses / 1000.0 + 1.0),
+                duration=num_accesses / 1000.0 + 1.0,
                 sources=[source],
                 entities=[sink],
             )
@@ -510,7 +510,7 @@ class TestMultiFieldDistribution:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(11.0),
+            duration=11.0,
             sources=[source],
             entities=[sink],
         )

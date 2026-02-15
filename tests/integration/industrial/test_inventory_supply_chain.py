@@ -35,7 +35,7 @@ class TestBasicReordering:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             sources=[source],
             entities=[inv, downstream],
         )
@@ -69,7 +69,7 @@ class TestStockoutScenario:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(20.0),
+            duration=20.0,
             sources=[source],
             entities=[inv, downstream, stockout_sink],
         )
@@ -102,7 +102,7 @@ class TestPerishableInventoryWithSpoilage:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[inv, downstream, waste_sink],
         )
@@ -136,7 +136,7 @@ class TestPerishableUnderLowDemand:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[inv, downstream, waste_sink],
         )

@@ -40,7 +40,7 @@ tests/
 Integration tests need a `Simulation` to inject clocks into entities:
 
 ```python
-from happysimulator import Simulation, Instant
+from happysimulator import Simulation
 
 def test_server_processes_request():
     sink = Sink()
@@ -49,7 +49,7 @@ def test_server_processes_request():
 
     sim = Simulation(
         entities=[source, server, sink],
-        end_time=Instant.from_seconds(10),
+        duration=10,
     )
     sim.run()
 

@@ -38,7 +38,7 @@ from happysimulator.components.industrial import (
 Industrial simulations are built by composing these components into pipelines:
 
 ```python
-from happysimulator import Simulation, Source, Sink, Instant
+from happysimulator import Simulation, Source, Sink
 from happysimulator.components.industrial import (
     ConveyorBelt, InspectionStation, BatchProcessor,
 )
@@ -53,7 +53,7 @@ source = Source.constant(rate=1, target=belt)
 
 sim = Simulation(
     entities=[source, belt, inspector, sink],
-    end_time=Instant.from_seconds(100),
+    duration=100,
 )
 sim.run()
 ```

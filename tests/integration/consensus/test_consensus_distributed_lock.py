@@ -34,7 +34,7 @@ class TestDistributedLock:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[lock],
         )
 
@@ -93,7 +93,7 @@ class TestDistributedLock:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=[lock],
         )
 
@@ -173,7 +173,7 @@ class TestDistributedLock:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[lock],
         )
 
@@ -218,7 +218,7 @@ class TestDistributedLock:
         )
 
         sim = Simulation(
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             entities=[lock],
         )
 

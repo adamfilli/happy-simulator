@@ -138,12 +138,7 @@ class StorageWorkloadDriver(Entity):
             self._ops_completed += 1
 
         if self._downstream is not None:
-            return [Event(
-                time=self.now,
-                event_type="Completed",
-                target=self._downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self._downstream, event_type="Completed")]
         return []
 
 
@@ -199,18 +194,11 @@ def _run_single_strategy(
         stop_after=Instant.from_seconds(duration_s),
     )
 
-    ops_data = Data()
-    ops_probe = Probe(
-        target=driver,
-        metric="ops_completed",
-        data=ops_data,
-        interval=probe_interval_s,
-        start_time=Instant.Epoch,
-    )
+    ops_probe, ops_data = Probe.on(driver, "ops_completed", interval=probe_interval_s)
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[lsm, driver, sink],
         probes=[ops_probe],

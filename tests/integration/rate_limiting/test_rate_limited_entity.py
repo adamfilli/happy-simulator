@@ -41,7 +41,7 @@ class TestRateLimitedEntityTokenBucket:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -63,7 +63,7 @@ class TestRateLimitedEntityTokenBucket:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -86,7 +86,7 @@ class TestRateLimitedEntityTokenBucket:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(2.0),
+            duration=2.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -111,7 +111,7 @@ class TestRateLimitedEntityLeakyBucket:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -138,7 +138,7 @@ class TestRateLimitedEntitySlidingWindow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -165,7 +165,7 @@ class TestRateLimitedEntityFixedWindow:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -195,7 +195,7 @@ class TestRateLimitedEntityAdaptive:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -226,7 +226,7 @@ class TestInvariants:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[limiter, sink],
         )
@@ -245,7 +245,7 @@ class TestInvariants:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[source],
             entities=[limiter, sink],
         )

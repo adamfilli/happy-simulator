@@ -205,7 +205,7 @@ def run_idempotency_simulation(
 
     sim_with = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=[source_with],
         entities=[client_with, store, payment_with],
     )
@@ -228,7 +228,7 @@ def run_idempotency_simulation(
 
     sim_without = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 5.0),
+        duration=duration_s + 5.0,
         sources=[source_without],
         entities=[client_without, payment_without],
     )

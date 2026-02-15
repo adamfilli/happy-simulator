@@ -220,7 +220,7 @@ class TestLogicalClocksIntegration:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[],
             entities=[network, *nodes],
         )
@@ -254,7 +254,7 @@ class TestLogicalClocksIntegration:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(5.0),
+            duration=5.0,
             sources=[],
             entities=[network, *nodes],
         )
@@ -290,7 +290,7 @@ class TestLogicalClocksIntegration:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(10.0),
+            duration=10.0,
             sources=[],
             entities=[network, *nodes],
         )
@@ -324,7 +324,7 @@ class TestLogicalClocksIntegration:
 
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             sources=[],
             entities=[network, *nodes],
         )

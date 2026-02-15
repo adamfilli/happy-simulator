@@ -142,7 +142,7 @@ def test_tracing_spans_through_pipeline():
         sources=[event_source],
         entities=[first, middle, sink],
         probes=[],
-        end_time=Instant.from_seconds(sim_duration + 1)  # Extra time for pipeline to drain
+        duration=sim_duration + 1  # Extra time for pipeline to drain
     )
     sim.run()
 
@@ -239,7 +239,7 @@ def test_tracing_preserves_event_identity():
         sources=[event_source],
         entities=[first, middle, sink],
         probes=[],
-        end_time=Instant.from_seconds(3.0)
+        duration=3.0
     )
     sim.run()
 
@@ -297,7 +297,7 @@ def test_tracing_captures_errors():
         sources=[event_source],
         entities=[failing_entity],
         probes=[],
-        end_time=Instant.from_seconds(10.0)
+        duration=10.0
     )
 
     # Run simulation - it should propagate the error

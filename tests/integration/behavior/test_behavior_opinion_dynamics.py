@@ -37,7 +37,7 @@ class TestOpinionDynamics:
         all_entities = [env] + agents
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(25.0),
+            duration=25.0,
             entities=all_entities,
         )
         for t in range(1, 21):
@@ -85,7 +85,7 @@ class TestOpinionDynamics:
         all_entities = [env] + agents
         sim = Simulation(
             start_time=Instant.Epoch,
-            end_time=Instant.from_seconds(15.0),
+            duration=15.0,
             entities=all_entities,
         )
         for t in range(1, 11):

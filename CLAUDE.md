@@ -402,8 +402,7 @@ serve(sim, charts=[...], port=8765)           # with predefined dashboard charts
 ```python
 from happysimulator.visual import serve, Chart
 
-depth_data = Data()
-depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+depth_probe, depth_data = Probe.on(server, "depth", interval=0.1)
 
 serve(sim, charts=[
     Chart(depth_data, title="Queue Depth", y_label="items"),
@@ -518,7 +517,7 @@ docs/               # MkDocs Material site (deployed to GitHub Pages)
 | Queue grows forever | Ensure arrival rate < service rate |
 | Events not processed | Register entities in `Simulation(entities=[...])` |
 
-Debug: `happysimulator.enable_console_logging("DEBUG")` or `Probe(target=server, metric="depth", data=data, interval=0.1)`
+Debug: `happysimulator.enable_console_logging("DEBUG")` or `probe, data = Probe.on(server, "depth", interval=0.1)`
 
 ---
 

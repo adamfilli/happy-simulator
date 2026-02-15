@@ -94,12 +94,7 @@ class CacheWorkloadDriver(Entity):
         self._ops += 1
 
         if self._downstream:
-            return [Event(
-                time=self.now,
-                event_type="Done",
-                target=self._downstream,
-                context=event.context,
-            )]
+            return [self.forward(event, self._downstream, event_type="Done")]
         return []
 
 
@@ -150,7 +145,7 @@ def _run_config(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[cache, driver, sink],
     )

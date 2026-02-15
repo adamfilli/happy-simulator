@@ -145,21 +145,11 @@ class RideEntrance(Entity):
         if total_busy >= self.balk_threshold:
             self._balked += 1
             return [
-                Event(
-                    time=self.now,
-                    event_type="Balked",
-                    target=self.balk_counter,
-                    context=event.context,
-                )
+                self.forward(event, self.balk_counter, event_type="Balked")
             ]
         self._entered += 1
         return [
-            Event(
-                time=self.now,
-                event_type=event.event_type,
-                target=self.ride,
-                context=event.context,
-            )
+            self.forward(event, self.ride)
         ]
 
 

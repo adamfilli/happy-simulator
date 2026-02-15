@@ -156,12 +156,7 @@ class FrontDesk(QueuedResource):
 
         grant.release()
         return [
-            Event(
-                time=self.now,
-                event_type="CheckOut",
-                target=self.checkout_entity,
-                context=event.context,
-            )
+            self.forward(event, self.checkout_entity, event_type="CheckOut")
         ]
 
 
@@ -178,12 +173,7 @@ class CheckOutDesk(QueuedResource):
         yield self.checkout_time
         self._processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type="Housekeeping",
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream, event_type="Housekeeping")
         ]
 
 

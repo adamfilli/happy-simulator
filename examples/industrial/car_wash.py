@@ -88,12 +88,7 @@ class WashStation(QueuedResource):
         yield self.service_time_s
         self.cars_processed += 1
         return [
-            Event(
-                time=self.now,
-                event_type=event.event_type,
-                target=self.downstream,
-                context=event.context,
-            )
+            self.forward(event, self.downstream)
         ]
 
 
@@ -117,8 +112,7 @@ class TierRouter(Entity):
         else:
             target = self.premium_next
         return [
-            Event(time=self.now, event_type=event.event_type,
-                  target=target, context=event.context)
+            self.forward(event, target)
         ]
 
 
@@ -189,7 +183,7 @@ def run_car_wash_simulation(config: CarWashConfig | None = None) -> CarWashResul
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(config.duration_s + 600),  # drain time
+        duration=config.duration_s + 600,  # drain time
         sources=[source],
         entities=entities,
     )

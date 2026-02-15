@@ -48,12 +48,7 @@ class SimpleServer(QueuedResource):
         self._in_flight += 1
         yield self._service_time
         self._in_flight -= 1
-        return [Event(
-            time=self.now,
-            event_type="Done",
-            target=self._downstream,
-            context=event.context,
-        )]
+        return [self.forward(event, self._downstream, event_type="Done")]
 
 
 # -------------------------------------------------------
@@ -67,7 +62,7 @@ def test_pause_inspect_resume():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[counter],
     )
@@ -98,7 +93,7 @@ def test_step_through_events():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[source],
         entities=[counter],
     )
@@ -125,7 +120,7 @@ def test_time_breakpoint():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[counter],
     )
@@ -148,7 +143,7 @@ def test_event_type_breakpoint():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[source],
         entities=[counter],
     )
@@ -173,7 +168,7 @@ def test_metric_breakpoint_on_queue_depth():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[server, counter],
     )
@@ -198,7 +193,7 @@ def test_condition_breakpoint():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[counter],
     )
@@ -221,7 +216,7 @@ def test_multiple_breakpoints():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[counter],
     )
@@ -244,7 +239,7 @@ def test_event_hooks_count_events():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[source],
         entities=[counter],
     )
@@ -266,7 +261,7 @@ def test_peek_and_find_while_paused():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[source],
         entities=[counter],
     )
@@ -292,7 +287,7 @@ def test_run_reset_run():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[source],
         entities=[counter],
     )
@@ -318,7 +313,7 @@ def test_no_overhead_without_control():
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(10.0),
+        duration=10.0,
         sources=[source],
         entities=[counter],
     )

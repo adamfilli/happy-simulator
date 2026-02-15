@@ -45,7 +45,7 @@ def test_queue_driver_single_event_trace_flow(caplog):
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[],
         entities=[queue, driver, server],
         trace_recorder=trace,
@@ -113,7 +113,7 @@ def test_queue_driver_overload_serializes_requests(caplog):
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(5.0),
+        duration=5.0,
         sources=[],
         entities=[queue, driver, server],
         trace_recorder=trace,

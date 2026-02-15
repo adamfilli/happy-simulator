@@ -99,7 +99,7 @@ def run_rolling_deployment(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s),
+        duration=duration_s,
         sources=[source],
         entities=[lb, deployer, sink] + v1_servers,
     )

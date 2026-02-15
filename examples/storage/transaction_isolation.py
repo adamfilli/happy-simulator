@@ -235,7 +235,7 @@ def _run_single_isolation(
 
     sim = Simulation(
         start_time=Instant.Epoch,
-        end_time=Instant.from_seconds(duration_s + 1.0),
+        duration=duration_s + 1.0,
         sources=[source],
         entities=[lsm, tx_manager, driver],
     )

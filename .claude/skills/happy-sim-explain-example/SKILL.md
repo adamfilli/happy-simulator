@@ -1,5 +1,5 @@
 ---
-name: explain-example
+name: happy-sim-explain-example
 description: Walk through a library example with detailed explanation
 ---
 

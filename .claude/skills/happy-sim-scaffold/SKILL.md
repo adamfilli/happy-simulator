@@ -1,5 +1,5 @@
 ---
-name: scaffold
+name: happy-sim-scaffold
 description: Generate a complete simulation from a high-level description
 ---
 

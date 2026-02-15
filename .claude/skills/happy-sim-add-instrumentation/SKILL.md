@@ -1,5 +1,5 @@
 ---
-name: add-instrumentation
+name: happy-sim-add-instrumentation
 description: Add observability (probes, trackers, charts) to a simulation
 ---
 

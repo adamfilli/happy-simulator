@@ -1,5 +1,5 @@
 ---
-name: component-guide
+name: happy-sim-component-guide
 description: Help choose the right happysimulator components for a use case
 ---
 
@@ -99,4 +99,4 @@ Interactive wizard to help users pick the right happysimulator components for th
    - A minimal wiring example showing how they connect
    - The most relevant example file(s) from `examples/` for reference
 
-5. Ask if the user wants to scaffold the full simulation (`/scaffold`).
+5. Ask if the user wants to scaffold the full simulation (`/happy-sim-scaffold`).

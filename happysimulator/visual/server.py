@@ -70,6 +70,10 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
     def get_charts() -> JSONResponse:
         return JSONResponse(bridge.get_chart_configs())
 
+    @app.get("/api/entity_history")
+    def get_entity_history(entity: str) -> JSONResponse:
+        return JSONResponse(bridge.get_entity_history(entity))
+
     @app.get("/api/chart_data")
     def get_chart_data(
         chart_id: str, start_s: float | None = None, end_s: float | None = None

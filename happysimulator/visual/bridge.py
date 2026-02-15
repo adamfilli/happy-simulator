@@ -102,6 +102,11 @@ class SimulationBridge:
 
     MAX_EVENT_LOG = 5000
     MAX_LOG_BUFFER = 5000
+    # PERF: Each entity accumulates up to MAX_HISTORY_SAMPLES snapshots, each a
+    # full serialized dict (~5-10 keys).  With 20 entities this caps at ~50 MB.
+    # Future optimisation: store only numeric fields at write time instead of the
+    # full dict, and consider adaptive snapshot intervals for long-running sims.
+    MAX_HISTORY_SAMPLES = 10_000
 
     def __init__(self, sim: Simulation, charts: list | None = None) -> None:
         from happysimulator.visual.dashboard import Chart
@@ -119,6 +124,8 @@ class SimulationBridge:
         self._edge_counts: dict[tuple[str, str], int] = {}
         self._edge_timestamps: dict[tuple[str, str], deque] = {}
         self._topology_node_ids: set[str] = {n.id for n in self._topology.nodes}
+        self._entity_history: dict[str, list[tuple[float, dict]]] = {}
+        self._last_snapshot_time: float = -1.0
         self._lock = threading.Lock()
 
         # Install event hook
@@ -197,6 +204,26 @@ class SimulationBridge:
             self._edge_timestamps[edge_key].append(event.time.to_seconds())
 
         self._last_handler_name = target_name
+
+        # --- Entity state history snapshots ---
+        # PERF: The time check (float subtraction + comparison) runs on every
+        # event but is negligible.  The expensive part — iterating all entities
+        # and calling serialize_entity() — only fires every 0.1 s of sim time.
+        time_s = event.time.to_seconds()
+        if time_s - self._last_snapshot_time >= 0.1:
+            self._last_snapshot_time = time_s
+            for entity in (
+                list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
+            ):
+                name = getattr(entity, "name", type(entity).__name__)
+                snapshot = serialize_entity(entity)
+                history = self._entity_history.setdefault(name, [])
+                history.append((time_s, snapshot))
+                # PERF: Halving discards every other sample, losing temporal
+                # resolution on older data.  A ring-buffer or logarithmic
+                # downsampling would preserve more detail at the edges.
+                if len(history) > self.MAX_HISTORY_SAMPLES:
+                    self._entity_history[name] = history[::2]
 
     def _resolve_to_topology_node(self, name: str) -> str:
         """Map a sub-entity name (e.g. 'Server.worker') to its topology-level parent ('Server')."""
@@ -336,6 +363,8 @@ class SimulationBridge:
         self._last_handler_name = None
         self._edge_counts.clear()
         self._edge_timestamps.clear()
+        self._entity_history.clear()
+        self._last_snapshot_time = -1.0
         self._topology = discover(self._sim)
         self._topology_node_ids = {n.id for n in self._topology.nodes}
         for chart in self._charts:
@@ -411,6 +440,32 @@ class SimulationBridge:
                 result["config"] = chart.to_config()
                 return result
         return {"chart_id": chart_id, "times": [], "values": [], "config": {}}
+
+    # --- Entity history ---
+
+    def get_entity_history(self, entity_name: str) -> dict[str, Any]:
+        """Return per-metric time series extracted from snapshot history."""
+        snapshots = self._entity_history.get(entity_name, [])
+        if not snapshots:
+            return {"entity": entity_name, "metrics": {}}
+
+        # Collect all numeric metric names from the first snapshot
+        metric_names = [
+            k for k, v in snapshots[0][1].items() if isinstance(v, (int, float))
+        ]
+
+        metrics: dict[str, dict[str, list]] = {}
+        for name in metric_names:
+            times: list[float] = []
+            values: list[float] = []
+            for t, state in snapshots:
+                val = state.get(name)
+                if isinstance(val, (int, float)):
+                    times.append(t)
+                    values.append(val)
+            metrics[name] = {"times": times, "values": values}
+
+        return {"entity": entity_name, "metrics": metrics}
 
     # --- Edge stats ---
 

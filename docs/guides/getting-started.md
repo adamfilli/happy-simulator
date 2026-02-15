@@ -9,7 +9,7 @@ The simplest simulation schedules one event using `Event.once()`:
 ```python
 from happysimulator import Simulation, Event, Instant
 
-sim = Simulation(end_time=Instant.from_seconds(10))
+sim = Simulation(duration=10)
 sim.schedule(Event.once(
     time=Instant.from_seconds(1.0),
     event_type="Ping",
@@ -97,7 +97,7 @@ source = Source.constant(rate=5, target=server)
 # Run the simulation
 sim = Simulation(
     entities=[source, server, sink],
-    end_time=Instant.from_seconds(10),
+    duration=10,
 )
 summary = sim.run()
 
@@ -133,7 +133,7 @@ source = Source.poisson(rate=5, target=server)
 
 sim = Simulation(
     entities=[source, server, sink],
-    end_time=Instant.from_seconds(1000),
+    duration=1000,
 )
 summary = sim.run()
 

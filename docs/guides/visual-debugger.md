@@ -22,10 +22,9 @@ Add predefined charts to the dashboard:
 
 ```python
 from happysimulator.visual import serve, Chart
-from happysimulator import Data, Probe
+from happysimulator import Probe
 
-depth_data = Data()
-depth_probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+depth_probe, depth_data = Probe.on(server, "depth", interval=0.1)
 
 serve(sim, charts=[
     Chart(depth_data, title="Queue Depth", y_label="items"),

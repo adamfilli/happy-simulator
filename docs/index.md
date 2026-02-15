@@ -54,7 +54,7 @@ source = Source.constant(rate=5, target=server)
 
 sim = Simulation(
     entities=[source, server, sink],
-    end_time=Instant.from_seconds(10),
+    duration=10,
 )
 summary = sim.run()
 print(f"Processed {sink.events_received} requests")

@@ -34,13 +34,17 @@ bucketed.to_dict()  # export
 `Probe` periodically samples an entity attribute and records it to a `Data` object:
 
 ```python
-from happysimulator import Probe, Data
+from happysimulator import Probe
 
-depth_data = Data()
-probe = Probe(target=server, metric="depth", data=depth_data, interval=0.1)
+probe, depth_data = Probe.on(server, "depth", interval=0.1)
 ```
 
-Register the probe as an entity: `Simulation(entities=[..., probe])`.
+Register the probe: `Simulation(probes=[probe])`. For multiple metrics on the same target:
+
+```python
+probes, data = Probe.on_many(server, ["depth", "in_flight"], interval=0.1)
+# data["depth"], data["in_flight"] are the Data objects
+```
 
 ## Collectors
 

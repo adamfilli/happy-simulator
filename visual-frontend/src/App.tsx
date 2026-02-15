@@ -114,6 +114,14 @@ export default function App() {
     setTopology(topo);
   };
 
+  const handleCodeStep = () => send("code_step");
+  const handleCodeStepOver = () => send("code_step_over");
+  const handleCodeStepOut = () => send("code_step_out");
+  const handleCodeContinue = () => {
+    useSimStore.getState().clearCodePaused();
+    send("code_continue");
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100">
       <ControlBar
@@ -124,6 +132,10 @@ export default function App() {
         onReset={handleReset}
         onRunTo={handleRunTo}
         onRunToEvent={handleRunToEvent}
+        onCodeStep={handleCodeStep}
+        onCodeStepOver={handleCodeStepOver}
+        onCodeStepOut={handleCodeStepOut}
+        onCodeContinue={handleCodeContinue}
       />
       <Timeline
         currentTime={state?.time_s ?? 0}

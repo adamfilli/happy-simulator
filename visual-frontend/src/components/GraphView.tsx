@@ -12,8 +12,10 @@ import {
 import "@xyflow/react/dist/style.css";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { useSimStore } from "../hooks/useSimState";
+import { useWebSocket } from "../hooks/useWebSocket";
 import EntityNode from "./EntityNode";
 import AnimatedEdge from "./AnimatedEdge";
+import CodePanelNode from "./CodePanelNode";
 
 const elk = new ELK();
 
@@ -28,7 +30,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
-const nodeTypes = { entity: EntityNode };
+const nodeTypes = { entity: EntityNode, codePanel: CodePanelNode };
 const edgeTypes = { animated: AnimatedEdge };
 
 export default function GraphView() {
@@ -36,9 +38,45 @@ export default function GraphView() {
   const state = useSimStore((s) => s.state);
   const selectEntity = useSimStore((s) => s.selectEntity);
   const selectedEntity = useSimStore((s) => s.selectedEntity);
+  const codePanels = useSimStore((s) => s.codePanels);
+  const codeBreakpoints = useSimStore((s) => s.codeBreakpoints);
+  const { send } = useWebSocket();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [layoutDone, setLayoutDone] = useState(false);
+
+  const handleOpenCodePanel = useCallback(
+    (entityName: string) => {
+      if (codePanels.has(entityName)) {
+        // Already open — close it
+        send("deactivate_code_debug", { entity_name: entityName });
+      } else {
+        send("activate_code_debug", { entity_name: entityName });
+      }
+    },
+    [codePanels, send]
+  );
+
+  const handleCloseCodePanel = useCallback(
+    (entityName: string) => {
+      send("deactivate_code_debug", { entity_name: entityName });
+    },
+    [send]
+  );
+
+  const handleToggleBreakpoint = useCallback(
+    (entityName: string, lineNumber: number) => {
+      const existing = codeBreakpoints.find(
+        (bp) => bp.entity_name === entityName && bp.line_number === lineNumber
+      );
+      if (existing) {
+        send("remove_code_breakpoint", { breakpoint_id: existing.id });
+      } else {
+        send("set_code_breakpoint", { entity_name: entityName, line_number: lineNumber });
+      }
+    },
+    [codeBreakpoints, send]
+  );
 
   // Build edges from topology
   const flowEdges: Edge[] = useMemo(() => {
@@ -153,6 +191,7 @@ export default function GraphView() {
     if (!state) return;
     setNodes((nds) =>
       nds.map((n) => {
+        if (n.type === "codePanel") return n; // Don't touch code panels here
         const entityState = state.entities[n.id];
         return {
           ...n,
@@ -160,11 +199,76 @@ export default function GraphView() {
             ...n.data,
             metrics: entityState || {},
             selected: n.id === selectedEntity,
+            onOpenCodePanel: handleOpenCodePanel,
+            hasCodePanel: codePanels.has(n.id),
           },
         };
       })
     );
-  }, [state, selectedEntity, setNodes]);
+  }, [state, selectedEntity, codePanels, handleOpenCodePanel, setNodes]);
+
+  // Manage code panel nodes and edges
+  useEffect(() => {
+    setNodes((nds) => {
+      // Remove closed panels
+      const withoutStale = nds.filter(
+        (n) => n.type !== "codePanel" || codePanels.has(n.data.entityName as string)
+      );
+
+      // Add new panels
+      const existingPanelIds = new Set(
+        withoutStale.filter((n) => n.type === "codePanel").map((n) => n.id)
+      );
+
+      const newPanels: Node[] = [];
+      for (const [entityName, config] of codePanels) {
+        const panelId = `code-${entityName}`;
+        if (!existingPanelIds.has(panelId)) {
+          // Position the code panel to the right of the entity node
+          const entityNode = withoutStale.find((n) => n.id === entityName);
+          const x = entityNode ? entityNode.position.x + 220 : 400;
+          const y = entityNode ? entityNode.position.y : 0;
+
+          newPanels.push({
+            id: panelId,
+            type: "codePanel",
+            position: { x, y },
+            data: {
+              entityName,
+              classname: config.source.class_name,
+              methodName: config.source.method_name,
+              sourceLines: config.source.source_lines,
+              startLine: config.source.start_line,
+              onClose: handleCloseCodePanel,
+              onToggleBreakpoint: handleToggleBreakpoint,
+            },
+            style: { width: 450, height: 350 },
+            dragHandle: ".drag-handle",
+          });
+        }
+      }
+
+      return [...withoutStale, ...newPanels];
+    });
+
+    // Update edges for code panels
+    setEdges((eds) => {
+      const withoutCodeEdges = eds.filter((e) => !e.id.startsWith("code-edge-"));
+      const codeEdges: Edge[] = [];
+      for (const entityName of codePanels.keys()) {
+        codeEdges.push({
+          id: `code-edge-${entityName}`,
+          source: entityName,
+          target: `code-${entityName}`,
+          sourceHandle: "right",
+          targetHandle: "code-left",
+          style: { stroke: "#d97706", strokeWidth: 1.5, strokeDasharray: "4 3" },
+          animated: true,
+        });
+      }
+      return [...withoutCodeEdges, ...codeEdges];
+    });
+  }, [codePanels, handleCloseCodePanel, handleToggleBreakpoint, setNodes, setEdges]);
 
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {

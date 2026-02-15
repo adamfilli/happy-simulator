@@ -7,6 +7,7 @@ import type {
   TopologyEdge,
   DashboardPanelConfig,
   EdgeStats,
+  PinnedChart,
   CodePanelConfig,
   CodeTrace,
   CodePausedState,
@@ -26,6 +27,7 @@ interface SimStore {
   activeView: "graph" | "dashboard";
   dashboardTimeRange: { start: number | null; end: number | null };
   edgeStats: EdgeStats;
+  pinnedCharts: PinnedChart[];
 
   // Code debug state
   codePanels: Map<string, CodePanelConfig>;
@@ -49,6 +51,10 @@ interface SimStore {
   setActiveView: (view: "graph" | "dashboard") => void;
   setDashboardTimeRange: (range: { start: number | null; end: number | null }) => void;
   setEdgeStats: (stats: EdgeStats) => void;
+  addPinnedChart: (chart: PinnedChart) => void;
+  removePinnedChart: (id: string) => void;
+  updatePinnedChartPosition: (id: string, x: number, y: number) => void;
+  updatePinnedChartMode: (id: string, mode: PinnedChart["displayMode"]) => void;
 
   // Code debug actions
   openCodePanel: (entityName: string, config: CodePanelConfig) => void;
@@ -78,6 +84,7 @@ export const useSimStore = create<SimStore>((set) => ({
   activeView: "graph",
   dashboardTimeRange: { start: null, end: null },
   edgeStats: {},
+  pinnedCharts: [],
 
   // Code debug state
   codePanels: new Map(),
@@ -126,6 +133,18 @@ export const useSimStore = create<SimStore>((set) => ({
   setActiveView: (view) => set({ activeView: view }),
   setDashboardTimeRange: (range) => set({ dashboardTimeRange: range }),
   setEdgeStats: (stats) => set({ edgeStats: stats }),
+  addPinnedChart: (chart) =>
+    set((prev) => ({ pinnedCharts: [...prev.pinnedCharts, chart] })),
+  removePinnedChart: (id) =>
+    set((prev) => ({ pinnedCharts: prev.pinnedCharts.filter((c) => c.id !== id) })),
+  updatePinnedChartPosition: (id, x, y) =>
+    set((prev) => ({
+      pinnedCharts: prev.pinnedCharts.map((c) => (c.id === id ? { ...c, x, y } : c)),
+    })),
+  updatePinnedChartMode: (id, mode) =>
+    set((prev) => ({
+      pinnedCharts: prev.pinnedCharts.map((c) => (c.id === id ? { ...c, displayMode: mode } : c)),
+    })),
 
   // Code debug actions
   openCodePanel: (entityName, config) =>
@@ -160,6 +179,7 @@ export const useSimStore = create<SimStore>((set) => ({
   reset: () => set({
     eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null,
     dashboardTimeRange: { start: null, end: null }, edgeStats: {},
+    pinnedCharts: [],
     codePanels: new Map(), codeTraces: new Map(),
     codePausedEntity: null, codePausedState: null, codeBreakpoints: [],
   }),

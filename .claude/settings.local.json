@@ -45,7 +45,16 @@
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
       "Bash(git checkout:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(GIT_EDITOR=true git rebase:*)",
+      "Bash(ls:*)",
+      "Bash(git push:*)",
+      "Bash(netstat:*)",
+      "Bash(while read pid)",
+      "Bash(do echo \"Killing PID $pid\")",
+      "Bash(taskkill //PID $pid //F)",
+      "Bash(done)"
     ]
   },
   "hooks": {

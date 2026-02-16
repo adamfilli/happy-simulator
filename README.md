@@ -31,7 +31,7 @@ Happy Simulator is a discrete-event simulation engine and library for education,
 ## Features
 
 - **Intuitive modeling** — convert real-world components into simulated equivalents.
-- **Rich component library** — queues, load balancers, rate limiters, circuit breakers, consensus protocols, industrial components, and more
+- **Rich component library** — queues, load balancers, rate limiters, industrial components, behavioural models and more
 - **Visual debugger** — browser-based UI generated from simulation model.
 - **AI Compatible** - use your generative AI of choice to convert scenarios to simulations.
 

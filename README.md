@@ -6,7 +6,7 @@
 <h1 align="center">happy-simulator</h1>
 
 <p align="center">
-  <strong>A discrete-event simulation library for Python 3.13+</strong>
+  <strong>A discrete-event simulation library.</strong>
 </p>
 
 <p align="center">

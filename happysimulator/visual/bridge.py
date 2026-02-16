@@ -109,10 +109,11 @@ class SimulationBridge:
     # full dict, and consider adaptive snapshot intervals for long-running sims.
     MAX_HISTORY_SAMPLES = 10_000
 
-    def __init__(self, sim: Simulation, charts: list | None = None) -> None:
+    def __init__(self, sim: Simulation, charts: list | None = None, time_unit: str = "s") -> None:
 
         self._sim = sim
         self._charts: list[Chart] = charts or []
+        self._time_unit = time_unit
         self._topology = discover(sim)
         self._event_log: deque[RecordedEvent] = deque(maxlen=self.MAX_EVENT_LOG)
         self._last_handler_name: str | None = None
@@ -280,6 +281,7 @@ class SimulationBridge:
             "entities": entity_states,
             "upcoming": upcoming,
             "end_time_s": end_time_s,
+            "time_unit": self._time_unit,
         }
 
     def _clear_new_buffers(self) -> None:

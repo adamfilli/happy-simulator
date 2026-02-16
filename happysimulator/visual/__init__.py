@@ -28,6 +28,7 @@ def serve(
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = True,
+    time_unit: str = "s",
 ) -> None:
     """Launch the simulation debugger in a browser.
 
@@ -40,7 +41,11 @@ def serve(
         host: Bind address for the web server.
         port: Port for the web server.
         open_browser: Whether to open the default browser automatically.
+        time_unit: Display unit for time axes — ``"s"`` (seconds),
+            ``"min"`` (minutes), or ``"h"`` (hours).
     """
+    if time_unit not in ("s", "min", "h"):
+        raise ValueError(f"time_unit must be 's', 'min', or 'h', got {time_unit!r}")
     try:
         import uvicorn
     except ImportError:
@@ -55,7 +60,7 @@ def serve(
     if sim._is_running:
         raise RuntimeError("Cannot serve a simulation that is already running.")
 
-    bridge = SimulationBridge(sim, charts=charts or [])
+    bridge = SimulationBridge(sim, charts=charts or [], time_unit=time_unit)
     app = create_app(bridge)
 
     # Pause at t=0 then prime the heap

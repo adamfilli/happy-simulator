@@ -4,6 +4,7 @@ import "react-grid-layout/css/styles.css";
 import { useSimStore } from "../hooks/useSimState";
 import DashboardPanel from "./DashboardPanel";
 import type { ChartConfig } from "../types";
+import { formatTime, getTimeConfig } from "../utils/timeFormat";
 
 interface ProbeInfo {
   name: string;
@@ -20,6 +21,7 @@ export default function DashboardView() {
   const timeRange = useSimStore((s) => s.dashboardTimeRange);
   const setTimeRange = useSimStore((s) => s.setDashboardTimeRange);
   const simTime = useSimStore((s) => s.state?.time_s ?? 0);
+  const timeUnit = useSimStore((s) => s.state?.time_unit);
   const [showDropdown, setShowDropdown] = useState(false);
   const [probes, setProbes] = useState<ProbeInfo[]>([]);
   const [chartsLoaded, setChartsLoaded] = useState(false);
@@ -131,7 +133,7 @@ export default function DashboardView() {
           <span className="text-[10px] text-gray-500 uppercase tracking-wide">Time Range</span>
           <input
             type="number"
-            placeholder="Start (s)"
+            placeholder={`Start (${getTimeConfig(timeUnit).suffix})`}
             value={startInput}
             onChange={(e) => setStartInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && applyTimeRange()}
@@ -141,7 +143,7 @@ export default function DashboardView() {
           <span className="text-gray-600 text-xs">&ndash;</span>
           <input
             type="number"
-            placeholder="End (s)"
+            placeholder={`End (${getTimeConfig(timeUnit).suffix})`}
             value={endInput}
             onChange={(e) => setEndInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && applyTimeRange()}
@@ -163,8 +165,8 @@ export default function DashboardView() {
             </button>
           )}
           <span className="text-[10px] text-gray-600 ml-1">
-            sim: {simTime.toFixed(1)}s
-            {hasTimeFilter && ` | showing ${timeRange.start ?? 0}s – ${timeRange.end ?? simTime.toFixed(1)}s`}
+            sim: {formatTime(simTime, timeUnit, 1)}
+            {hasTimeFilter && ` | showing ${formatTime(timeRange.start ?? 0, timeUnit, 1)} – ${formatTime(timeRange.end ?? simTime, timeUnit, 1)}`}
           </span>
         </div>
       )}
@@ -189,6 +191,7 @@ export default function DashboardView() {
                 chartConfig={panel.chartConfig}
                 label={panel.label}
                 onClose={() => removeDashboardPanel(panel.id)}
+                timeUnit={timeUnit}
               />
             </div>
           ))}

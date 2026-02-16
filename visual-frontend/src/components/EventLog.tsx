@@ -1,10 +1,12 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
 import { useSimStore } from "../hooks/useSimState";
+import { formatTime } from "../utils/timeFormat";
 
 export default function EventLog() {
   const eventLog = useSimStore((s) => s.eventLog);
   const showInternal = useSimStore((s) => s.showInternal);
   const toggleInternal = useSimStore((s) => s.toggleInternal);
+  const timeUnit = useSimStore((s) => s.state?.time_unit);
   const endRef = useRef<HTMLDivElement>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -275,8 +277,8 @@ export default function EventLog() {
                 <span className="text-gray-600 shrink-0 w-4">
                   {e.context ? (isExpanded ? "▼" : "▶") : " "}
                 </span>
-                <span className="text-gray-500 w-16 shrink-0 text-right">
-                  {e.time_s.toFixed(4)}
+                <span className="text-gray-500 w-20 shrink-0 text-right">
+                  {formatTime(e.time_s, timeUnit, 4)}
                 </span>
                 <span className="text-blue-400 truncate w-24 shrink-0">{e.event_type}</span>
                 {e.source_name && (

@@ -1,7 +1,5 @@
 <p align="center">
-  <a href="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0">
-    <img src="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0" alt="Happy Simulator Demo" width="100%" />
-  </a>
+  <video src="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0" width="100%" autoplay loop muted playsinline></video>
 </p>
 
 <h1 align="center">happy-simulator</h1>

@@ -1,6 +1,6 @@
 <p align="center">
   <!-- Replace with project banner/logo (recommended: 1200x400px) -->
-  <img src="docs/assets/banner-placeholder.png" alt="happy-simulator" width="100%" />
+  <img src="docs/assets/banner-placeholder.png" alt="Happy Simulator" width="100%" />
 </p>
 
 <h1 align="center">happy-simulator</h1>

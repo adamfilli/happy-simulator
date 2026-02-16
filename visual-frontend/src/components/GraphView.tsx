@@ -394,22 +394,25 @@ function GraphViewInner() {
     });
   }, [extractedEntities, setNodes, setEdges]);
 
-  // Fetch state for extracted entities on each tick
+  // Fetch state for extracted entities on each tick — batched into one setNodes call
   useEffect(() => {
     if (!state || extractedEntities.size === 0) return;
-    for (const entityName of extractedEntities.keys()) {
-      fetch(`/api/entity_state?entity=${encodeURIComponent(entityName)}`)
-        .then((r) => r.json())
-        .then((data: { entity: string; state: Record<string, unknown> }) => {
-          setNodes((nds) =>
-            nds.map((n) =>
-              n.id === `extracted-${data.entity}`
-                ? { ...n, data: { ...n.data, metrics: data.state } }
-                : n
-            )
-          );
-        });
-    }
+    const names = [...extractedEntities.keys()];
+    Promise.all(
+      names.map((name) =>
+        fetch(`/api/entity_state?entity=${encodeURIComponent(name)}`)
+          .then((r) => r.json())
+          .then((d: { entity: string; state: Record<string, unknown> }) => d)
+      )
+    ).then((results) => {
+      const stateMap = new Map(results.map((r) => [`extracted-${r.entity}`, r.state]));
+      setNodes((nds) =>
+        nds.map((n) => {
+          const s = stateMap.get(n.id);
+          return s ? { ...n, data: { ...n.data, metrics: s } } : n;
+        })
+      );
+    });
   }, [state?.events_processed, extractedEntities, setNodes, state]);
 
   // Drop handler for inspector drag

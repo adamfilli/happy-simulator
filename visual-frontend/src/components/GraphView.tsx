@@ -188,6 +188,7 @@ function GraphViewInner() {
             id: topoNode.id,
             type: "group",
             position: { x: pos.x, y: pos.y },
+            style: { background: "none", border: "none", padding: 0 },
             data: {
               label: topoNode.type,
               entityType: topoNode.type,

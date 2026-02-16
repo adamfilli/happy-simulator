@@ -3,6 +3,23 @@ export interface TopologyNode {
   type: string;
   category: string;
   profile?: { times: number[]; values: number[] };
+  is_group?: boolean;
+  member_count?: number;
+  member_ids?: string[];
+}
+
+export interface GroupMember {
+  name: string;
+  state: Record<string, unknown>;
+}
+
+export interface GroupMembersResponse {
+  group_id: string;
+  members: GroupMember[];
+  total: number;
+  offset: number;
+  type: string;
+  category: string;
 }
 
 export interface TopologyEdge {

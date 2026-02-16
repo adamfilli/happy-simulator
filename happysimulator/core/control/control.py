@@ -164,6 +164,9 @@ class SimulationControl:
             for event in initial_events:
                 self._sim._event_heap.push(event)
 
+        # Replay events that were scheduled before the first run()
+        self._sim._replay_pre_run_events()
+
         logger.info("Reset complete, heap size: %d", self._sim._event_heap.size())
 
     # ------------------------------------------------------------------

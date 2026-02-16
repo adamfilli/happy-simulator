@@ -1,11 +1,12 @@
 <p align="center">
   <video src="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0" width="100%" autoplay loop muted playsinline></video>
 </p>
+<p align="center"><sub>Visual debugger output from <a href="examples/visual/chash_example.py">examples/visual/chash_example.py</a></sub></p>
 
-<h1 align="center">happy-simulator</h1>
+<h1 align="center">Happy Simulator</h1>
 
 <p align="center">
-  <strong>A discrete-event simulation library.</strong>
+  <strong>A simulation library built for the modern world.</strong>
 </p>
 
 <p align="center">

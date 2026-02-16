@@ -171,6 +171,29 @@ class Advertiser(Entity):
         self.platform_revenue_data = Data()
         self.active_tier_data = Data()
         self.sentiment_data = Data()
+        self.total_sales_data = Data()
+        self.gross_revenue_data = Data()
+        self.ad_spend_data = Data()
+        self.blended_cpa_data = Data()
+        self.margin_pct_data = Data()
+
+    def reset(self) -> None:
+        """Reset internal state for simulation replay."""
+        self._sentiment = 1.0
+        self.active_tiers = list(self.tiers)
+        self._periods_evaluated = 0
+        self._total_profit = 0.0
+        self._total_platform_revenue = 0.0
+        self._tier_shutoff_events = 0
+        self.profit_data.clear()
+        self.platform_revenue_data.clear()
+        self.active_tier_data.clear()
+        self.sentiment_data.clear()
+        self.total_sales_data.clear()
+        self.gross_revenue_data.clear()
+        self.ad_spend_data.clear()
+        self.blended_cpa_data.clear()
+        self.margin_pct_data.clear()
 
     @property
     def sentiment(self) -> float:
@@ -223,6 +246,11 @@ class Advertiser(Entity):
         monthly_platform_rev = sum(
             t.tier_platform_revenue(self._sentiment, self.margin) for t in self.active_tiers
         )
+        total_sales = sum(t.monthly_sales(self._sentiment) for t in self.active_tiers)
+        gross_revenue = total_sales * self.product_price
+        total_ad_spend = sum(t.monthly_ad_spend for t in self.active_tiers)
+        blended_cpa = total_ad_spend / total_sales if total_sales > 0 else 0.0
+        margin_pct = (monthly_profit / gross_revenue * 100) if gross_revenue > 0 else 0.0
 
         self._periods_evaluated += 1
         self._total_profit += monthly_profit
@@ -232,6 +260,11 @@ class Advertiser(Entity):
         self.platform_revenue_data.add_stat(monthly_platform_rev, self.now)
         self.active_tier_data.add_stat(new_count, self.now)
         self.sentiment_data.add_stat(self._sentiment, self.now)
+        self.total_sales_data.add_stat(total_sales, self.now)
+        self.gross_revenue_data.add_stat(gross_revenue, self.now)
+        self.ad_spend_data.add_stat(total_ad_spend, self.now)
+        self.blended_cpa_data.add_stat(blended_cpa, self.now)
+        self.margin_pct_data.add_stat(margin_pct, self.now)
 
         return [
             Event(
@@ -306,6 +339,12 @@ class AdPlatform(Entity):
         self._revenue_events = 0
         self._total_revenue = 0.0
         self.revenue_data = Data()
+
+    def reset(self) -> None:
+        """Reset internal state for simulation replay."""
+        self._revenue_events = 0
+        self._total_revenue = 0.0
+        self.revenue_data.clear()
 
     @property
     def stats(self) -> AdPlatformStats:

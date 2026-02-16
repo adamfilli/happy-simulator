@@ -302,8 +302,21 @@ class SimulationBridge:
             self._new_logs_buffer.clear()
         return new_events, new_edges, new_logs
 
+    def _completed_result(self) -> dict[str, Any]:
+        """Return a no-op result when the simulation is already complete."""
+        return {
+            "state": self.get_state(),
+            "new_events": [],
+            "new_edges": [],
+            "new_logs": [],
+            "edge_stats": self.get_edge_stats(),
+        }
+
     def step(self, count: int = 1) -> dict[str, Any]:
         """Step the simulation and return new state + processed events."""
+        if not self._sim._is_running:
+            return self._completed_result()
+
         self._clear_new_buffers()
 
         self._sim.control.step(count)
@@ -326,6 +339,9 @@ class SimulationBridge:
 
     def run_to(self, time_s: float) -> dict[str, Any]:
         """Run the simulation until the given time, then return state."""
+        if not self._sim._is_paused:
+            return self._completed_result()
+
         from happysimulator.core.control.breakpoints import TimeBreakpoint
         from happysimulator.core.temporal import Instant
 
@@ -347,6 +363,9 @@ class SimulationBridge:
 
     def run_to_event(self, event_number: int) -> dict[str, Any]:
         """Run the simulation until the given event number, then return state."""
+        if not self._sim._is_paused:
+            return self._completed_result()
+
         from happysimulator.core.control.breakpoints import EventCountBreakpoint
 
         self._clear_new_buffers()
@@ -367,6 +386,12 @@ class SimulationBridge:
     def reset(self) -> dict[str, Any]:
         """Reset the simulation and return the initial state."""
         self._code_debugger.reset()
+
+        # Reset entity internal state (if they support it)
+        for entity in list(self._sim._entities):
+            if hasattr(entity, "reset") and callable(entity.reset):
+                entity.reset()
+
         self._sim.control.reset()
         self._event_log.clear()
         self._log_buffer.clear()

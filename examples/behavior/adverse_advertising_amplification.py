@@ -11,11 +11,11 @@ Based on the AAA essay: .dev/aaa.md
 ```
                      +-----------------------------------------------+
                      |           Broad Audience (Men 25-34)           |
-                     |    CPA: $40  |  1000 sales/mo  |  s_min: 0.80 |
+                     |    CPA: $40  |  600 sales/mo   |  s_min: 0.80 |
                      |                                               |
                      |       +-------------------------------+       |
                      |       |    Niche (Stock Art Lovers)    |       |
-                     |       | CPA: $10 | 100 sales | s: 0.20|       |
+                     |       | CPA: $10 | 400 sales | s: 0.20|       |
                      |       +-------------------------------+       |
                      |                                               |
                      +-----------------------------------------------+
@@ -32,10 +32,10 @@ When consumer sentiment drops by 20% (1.0 -> 0.80):
   - Tier 2 (Broad):  CPA $40 -> $50.00, hits breakeven, SHUT OFF
 
 Result:
-  - Advertiser profit:  $14,000 -> $3,000  (-78.6%)
-  - Platform revenue:   $41,000 -> $1,000  (-97.6%)
+  - Advertiser profit:  $22,000 -> $12,000  (-45.5%)
+  - Platform revenue:   $28,000 -> $4,000   (-85.7%)
 
-A 20% consumer sentiment drop causes a 97.6% platform revenue drop.
+A 20% consumer sentiment drop causes an 85.7% platform revenue drop.
 That's the AAA effect.
 
 ## Extended Model (4 Tiers)
@@ -43,14 +43,15 @@ That's the AAA effect.
 Adds intermediate tiers to show the cascading shutoff effect as sentiment
 gradually decreases. Each tier has a different breakeven sentiment:
 
-  Tier 1 "Core Niche"     :  100 sales,  CPA $10  -> breakeven s=0.20
-  Tier 2 "Adjacent Interest": 300 sales,  CPA $25  -> breakeven s=0.50
-  Tier 3 "Demographic Match": 1000 sales, CPA $40  -> breakeven s=0.80
-  Tier 4 "Broad Audience"  : 2000 sales,  CPA $48  -> breakeven s=0.96
+  Tier 1 "Core Niche"     :  300 sales,  CPA $10  -> breakeven s=0.20
+  Tier 2 "Adjacent Interest": 500 sales,  CPA $20  -> breakeven s=0.40
+  Tier 3 "Demographic Match": 700 sales,  CPA $35  -> breakeven s=0.70
+  Tier 4 "Broad Audience"  : 900 sales,  CPA $45  -> breakeven s=0.90
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,15 +73,15 @@ from happysimulator.components.advertising import (
 
 
 ESSAY_TIERS = [
-    AudienceTier("Niche (Stock Art)", base_monthly_sales=100, base_cpa=10.0),
-    AudienceTier("Broad (Men 25-34)", base_monthly_sales=1000, base_cpa=40.0),
+    AudienceTier("Niche (Stock Art)", base_monthly_sales=400, base_cpa=10.0),
+    AudienceTier("Broad (Men 25-34)", base_monthly_sales=600, base_cpa=40.0),
 ]
 
 EXTENDED_TIERS = [
-    AudienceTier("Core Niche", base_monthly_sales=100, base_cpa=10.0),
-    AudienceTier("Adjacent Interest", base_monthly_sales=300, base_cpa=25.0),
-    AudienceTier("Demographic Match", base_monthly_sales=1000, base_cpa=40.0),
-    AudienceTier("Broad Audience", base_monthly_sales=2000, base_cpa=48.0),
+    AudienceTier("Core Niche", base_monthly_sales=300, base_cpa=10.0),
+    AudienceTier("Adjacent Interest", base_monthly_sales=500, base_cpa=20.0),
+    AudienceTier("Demographic Match", base_monthly_sales=700, base_cpa=35.0),
+    AudienceTier("Broad Audience", base_monthly_sales=900, base_cpa=45.0),
 ]
 
 PRODUCT_PRICE = 100.0
@@ -196,8 +197,57 @@ def analyze_sentiment_shift(
 
 
 # =============================================================================
+# Smooth sentiment curve
+# =============================================================================
+
+
+def _cosine_interp(t: float, t_start: float, t_end: float, v_start: float, v_end: float) -> float:
+    """Cosine interpolation between two values (smooth acceleration/deceleration)."""
+    if t <= t_start:
+        return v_start
+    if t >= t_end:
+        return v_end
+    progress = (t - t_start) / (t_end - t_start)
+    return v_start + (v_end - v_start) * (1 - math.cos(math.pi * progress)) / 2
+
+
+def _schedule_smooth_sentiment(
+    sim: Simulation,
+    advertiser: Advertiser,
+    t_start: float,
+    t_end: float,
+    s_start: float,
+    s_end: float,
+    step: float = 0.1,
+) -> None:
+    """Schedule frequent SentimentChange events along a smooth cosine curve."""
+    t = t_start
+    while t <= t_end:
+        s = _cosine_interp(t, t_start, t_end, s_start, s_end)
+        sim.schedule(
+            Event(
+                time=Instant.from_seconds(t),
+                event_type="SentimentChange",
+                target=advertiser,
+                context={"metadata": {"sentiment": s}},
+            )
+        )
+        t += step
+
+
+# =============================================================================
 # Dynamic simulation
 # =============================================================================
+
+
+@dataclass
+class AAAScenario:
+    """A prepared scenario (simulation built but not yet run)."""
+
+    sim: Simulation
+    advertiser: Advertiser
+    platform: AdPlatform
+    tiers: list[AudienceTier]
 
 
 @dataclass
@@ -209,12 +259,12 @@ class AAAResult:
     summary: SimulationSummary
 
 
-def run_essay_scenario(duration_months: int = 24) -> AAAResult:
-    """Run the 2-tier scenario from the essay.
+def build_essay_scenario(duration_months: int = 24) -> AAAScenario:
+    """Build the 2-tier scenario from the essay (without running).
 
-    Months 1-12:  Normal sentiment (1.0)
-    Month 12.5:   Recession hits (sentiment -> 0.80)
-    Months 13-24: Reduced sentiment
+    Months 1-6:   Normal sentiment (1.0)
+    Months 6-20:  Smooth decline (1.0 -> 0.60)
+    Months 20-24: Steady at 0.60
     """
     platform = AdPlatform("Meta")
     advertiser = Advertiser(
@@ -223,7 +273,7 @@ def run_essay_scenario(duration_months: int = 24) -> AAAResult:
         production_cost=PRODUCTION_COST,
         tiers=ESSAY_TIERS,
         platform=platform,
-        evaluation_interval=1.0,  # 1 second = 1 month
+        evaluation_interval=1.0,
     )
 
     sim = Simulation(
@@ -234,29 +284,17 @@ def run_essay_scenario(duration_months: int = 24) -> AAAResult:
     for e in advertiser.start_events():
         sim.schedule(e)
 
-    # Recession at month 12.5
-    sim.schedule(
-        Event(
-            time=Instant.from_seconds(12.5),
-            event_type="SentimentChange",
-            target=advertiser,
-            context={"metadata": {"sentiment": 0.80}},
-        )
-    )
+    _schedule_smooth_sentiment(sim, advertiser, t_start=6, t_end=20, s_start=1.0, s_end=0.60)
 
-    summary = sim.run()
-    return AAAResult(advertiser=advertiser, platform=platform, summary=summary)
+    return AAAScenario(sim=sim, advertiser=advertiser, platform=platform, tiers=ESSAY_TIERS)
 
 
-def run_extended_scenario(duration_months: int = 36) -> AAAResult:
-    """Run the 4-tier extended scenario with gradual sentiment changes.
+def build_extended_scenario(duration_months: int = 36) -> AAAScenario:
+    """Build the 4-tier extended scenario (without running).
 
     Months 1-6:   Normal sentiment (1.0)
-    Month 6.5:    Mild slowdown (sentiment -> 0.90)
-    Month 12.5:   Recession deepens (sentiment -> 0.70)
-    Month 18.5:   Trough (sentiment -> 0.40)
-    Month 24.5:   Recovery begins (sentiment -> 0.80)
-    Month 30.5:   Full recovery (sentiment -> 1.0)
+    Months 6-30:  Smooth decline (1.0 -> 0.10)
+    Months 30-36: Steady at 0.10
     """
     platform = AdPlatform("AdGiant")
     advertiser = Advertiser(
@@ -276,172 +314,237 @@ def run_extended_scenario(duration_months: int = 36) -> AAAResult:
     for e in advertiser.start_events():
         sim.schedule(e)
 
-    # Sentiment schedule
-    shifts = [
-        (6.5, 0.90),  # Mild slowdown
-        (12.5, 0.70),  # Recession
-        (18.5, 0.40),  # Deep recession
-        (24.5, 0.80),  # Recovery
-        (30.5, 1.00),  # Full recovery
-    ]
-    for time_s, sentiment in shifts:
-        sim.schedule(
-            Event(
-                time=Instant.from_seconds(time_s),
-                event_type="SentimentChange",
-                target=advertiser,
-                context={"metadata": {"sentiment": sentiment}},
-            )
-        )
+    _schedule_smooth_sentiment(sim, advertiser, t_start=6, t_end=30, s_start=1.0, s_end=0.10)
 
-    summary = sim.run()
-    return AAAResult(advertiser=advertiser, platform=platform, summary=summary)
+    return AAAScenario(sim=sim, advertiser=advertiser, platform=platform, tiers=EXTENDED_TIERS)
+
+
+def run_scenario(scenario: AAAScenario) -> AAAResult:
+    """Run a prepared scenario and return results."""
+    summary = scenario.sim.run()
+    return AAAResult(
+        advertiser=scenario.advertiser,
+        platform=scenario.platform,
+        summary=summary,
+    )
 
 
 # =============================================================================
 # Visualization
 # =============================================================================
 
+# Regime background colors (number of active tiers -> color)
+_REGIME_COLORS = {
+    0: "#ef9a9a",  # red
+    1: "#ffcc80",  # orange
+    2: "#fff176",  # yellow
+    3: "#a5d6a7",  # green
+    4: "#81c784",  # dark green
+}
 
-def visualize_sensitivity(
-    tiers: list[AudienceTier],
-    margin: float,
-    output_dir: Path,
-    filename: str = "aaa_sensitivity.png",
+_REGIME_LABELS = {
+    0: "0 tiers",
+    1: "1 tier",
+    2: "2 tiers",
+    3: "3 tiers",
+    4: "4 tiers",
+}
+
+
+def _add_regime_background(
+    ax,
+    times: list[float],
+    tier_counts: list[float],
+    max_tiers: int,
+    x_max: float,
 ) -> None:
-    """Generate a sensitivity chart showing the AAA amplification effect."""
-    import matplotlib.pyplot as plt
+    """Draw colored vertical bands showing the advertising regime (active tier count)."""
+    for i in range(len(times)):
+        count = int(tier_counts[i])
+        color = _REGIME_COLORS.get(count, _REGIME_COLORS[0])
+        x_start = times[i]
+        x_end = times[i + 1] if i + 1 < len(times) else x_max
+        ax.axvspan(x_start, x_end, alpha=0.35, color=color, linewidth=0, zorder=0)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
 
-    sentiments = [i / 100 for i in range(1, 101)]
-    profits = []
-    revenues = []
-    active_counts = []
+def _add_regime_legend(ax, max_tiers: int) -> None:
+    """Add a compact legend for the regime background colors."""
+    import matplotlib.patches as mpatches
 
-    for s in sentiments:
-        active = [t for t in tiers if t.is_profitable(s, margin)]
-        profits.append(sum(t.tier_profit(s, margin) for t in active))
-        revenues.append(sum(t.tier_platform_revenue(s, margin) for t in active))
-        active_counts.append(len(active))
+    handles = []
+    for n in range(max_tiers, -1, -1):
+        color = _REGIME_COLORS.get(n, _REGIME_COLORS[0])
+        label = _REGIME_LABELS.get(n, f"{n} tiers")
+        handles.append(mpatches.Patch(facecolor=color, alpha=0.5, label=label))
+    ax.legend(handles=handles, loc="upper right", fontsize=7, framealpha=0.8, title="Ad Tiers")
 
-    # Normalize to percentage of baseline (sentiment=1.0)
-    base_profit = profits[-1] if profits[-1] > 0 else 1
-    base_revenue = revenues[-1] if revenues[-1] > 0 else 1
-    profit_pct = [p / base_profit * 100 for p in profits]
-    revenue_pct = [r / base_revenue * 100 for r in revenues]
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
+def _fmt_dollars(x, _pos) -> str:
+    """Format axis tick as dollars."""
+    if abs(x) >= 1000:
+        return f"${x:,.0f}"
+    return f"${x:.0f}"
 
-    # Top: absolute values
-    ax1.plot(sentiments, [p / 1000 for p in profits], "b-", linewidth=2, label="Advertiser Profit")
-    ax1.plot(sentiments, [r / 1000 for r in revenues], "r-", linewidth=2, label="Platform Revenue")
-    ax1.set_ylabel("$/month (thousands)")
-    ax1.set_title("Adverse Advertising Amplification: Revenue vs. Consumer Sentiment")
-    ax1.legend(loc="upper left")
-    ax1.grid(True, alpha=0.3)
 
-    # Mark breakeven points
-    for t in tiers:
-        be = t.breakeven_sentiment(margin)
-        if 0 < be < 1:
-            ax1.axvline(x=be, color="gray", linestyle=":", alpha=0.5)
-            ax1.annotate(
-                f"{t.name}\nshuts off",
-                xy=(be, 0),
-                xytext=(be, ax1.get_ylim()[1] * 0.3),
-                ha="center",
-                fontsize=8,
-                color="gray",
-                arrowprops={"arrowstyle": "->", "color": "gray", "alpha": 0.5},
-            )
-
-    # Active tier count on secondary axis
-    ax1b = ax1.twinx()
-    ax1b.fill_between(sentiments, active_counts, alpha=0.1, color="green", step="post")
-    ax1b.set_ylabel("Active Tiers", color="green")
-    ax1b.tick_params(axis="y", labelcolor="green")
-    ax1b.set_ylim(0, len(tiers) + 1)
-
-    # Bottom: percentage of baseline
-    ax2.plot(sentiments, profit_pct, "b-", linewidth=2, label="Advertiser Profit (% of baseline)")
-    ax2.plot(sentiments, revenue_pct, "r-", linewidth=2, label="Platform Revenue (% of baseline)")
-    ax2.plot(
-        sentiments,
-        [s * 100 for s in sentiments],
-        "k--",
-        linewidth=1,
-        alpha=0.5,
-        label="Linear (no amplification)",
-    )
-    ax2.set_xlabel("Consumer Sentiment")
-    ax2.set_ylabel("% of Baseline")
-    ax2.set_title("Amplification Effect: % Loss vs. Sentiment Drop")
-    ax2.legend(loc="upper left")
-    ax2.grid(True, alpha=0.3)
-    ax2.set_xlim(0, 1.05)
-    ax2.set_ylim(-5, 110)
-
-    fig.tight_layout()
-    path = output_dir / filename
-    fig.savefig(path, dpi=150)
-    plt.close(fig)
-    print(f"  Saved: {path}")
+def _fmt_dollars_k(x, _pos) -> str:
+    """Format axis tick as dollars in thousands."""
+    return f"${x / 1000:,.0f}k"
 
 
 def visualize_timeline(
-    result: AAAResult, output_dir: Path, filename: str = "aaa_timeline.png"
+    result: AAAResult,
+    tiers: list[AudienceTier],
+    margin: float,
+    output_dir: Path,
+    filename: str = "aaa_timeline.png",
 ) -> None:
-    """Generate a timeline chart from simulation results."""
+    """Generate stacked time series charts from simulation results.
+
+    Charts (top to bottom):
+      1. Consumer Sentiment
+      2. Seller Sales (units/month)
+      3. Seller Revenue ($/month)
+      4. Seller Ad Spend per Sale (CPA, $/sale)
+      5. Seller Margin %
+      6. Seller Profit ($/month)
+      7. Advertiser (Platform) Revenue ($/month)
+
+    Each chart has background shading showing the advertising regime
+    (how many audience tiers are active).
+    """
     import matplotlib.pyplot as plt
+    import matplotlib.ticker as mticker
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     adv = result.advertiser
-    fig, axes = plt.subplots(4, 1, figsize=(14, 12), sharex=True)
+    max_tiers = len(tiers)
 
-    # Sentiment
-    ax = axes[0]
+    # Extract data
     times = adv.sentiment_data.times()
-    values = adv.sentiment_data.raw_values()
-    ax.plot(times, values, "k-", linewidth=2)
-    ax.fill_between(times, values, alpha=0.15, color="blue")
-    ax.set_ylabel("Consumer Sentiment")
-    ax.set_title("AAA Simulation Timeline")
-    ax.set_ylim(0, 1.1)
-    ax.grid(True, alpha=0.3)
+    sentiments = adv.sentiment_data.raw_values()
+    tier_counts = adv.active_tier_data.raw_values()
+    sales = adv.total_sales_data.raw_values()
+    revenues = adv.gross_revenue_data.raw_values()
+    cpas = adv.blended_cpa_data.raw_values()
+    margin_pcts = adv.margin_pct_data.raw_values()
+    profits = adv.profit_data.raw_values()
+    plat_revs = adv.platform_revenue_data.raw_values()
 
-    # Active tiers
-    ax = axes[1]
-    times = adv.active_tier_data.times()
-    values = adv.active_tier_data.raw_values()
-    ax.step(times, values, "g-", linewidth=2, where="post")
-    ax.fill_between(times, values, alpha=0.15, color="green", step="post")
-    ax.set_ylabel("Active Tiers")
-    ax.set_ylim(0, len(adv.tiers) + 0.5)
-    ax.set_yticks(range(len(adv.tiers) + 1))
-    ax.grid(True, alpha=0.3)
+    x_max = max(times) + 1 if times else 1
 
-    # Advertiser profit
-    ax = axes[2]
-    times = adv.profit_data.times()
-    values = adv.profit_data.raw_values()
-    ax.bar(times, [v / 1000 for v in values], width=0.8, alpha=0.7, color="blue")
-    ax.set_ylabel("Advertiser Profit\n($k/month)")
-    ax.grid(True, alpha=0.3, axis="y")
+    fig, axes = plt.subplots(7, 1, figsize=(14, 22), sharex=True)
+    fig.suptitle(
+        "Adverse Advertising Amplification (AAA)",
+        fontsize=16,
+        fontweight="bold",
+        y=0.995,
+    )
 
-    # Platform revenue
-    ax = axes[3]
-    times = adv.platform_revenue_data.times()
-    values = adv.platform_revenue_data.raw_values()
-    ax.bar(times, [v / 1000 for v in values], width=0.8, alpha=0.7, color="red")
-    ax.set_ylabel("Platform Revenue\n($k/month)")
-    ax.set_xlabel("Month")
-    ax.grid(True, alpha=0.3, axis="y")
+    chart_specs = [
+        {
+            "data": sentiments,
+            "ylabel": "Consumer\nSentiment",
+            "color": "#212121",
+            "ylim": (0, 1.1),
+            "fmt": None,
+            "fill": True,
+            "fill_color": "#90CAF9",
+        },
+        {
+            "data": sales,
+            "ylabel": "Seller\nSales/mo",
+            "color": "#1976D2",
+            "ylim": None,
+            "fmt": "{x:,.0f}",
+            "fill": False,
+        },
+        {
+            "data": revenues,
+            "ylabel": "Seller\nRevenue/mo",
+            "color": "#388E3C",
+            "ylim": None,
+            "fmt": _fmt_dollars_k,
+            "fill": False,
+        },
+        {
+            "data": cpas,
+            "ylabel": "Seller Ad\nSpend/Sale",
+            "color": "#E64A19",
+            "ylim": None,
+            "fmt": _fmt_dollars,
+            "fill": False,
+        },
+        {
+            "data": margin_pcts,
+            "ylabel": "Seller\nMargin %",
+            "color": "#7B1FA2",
+            "ylim": (0, max(margin_pcts) * 1.15) if margin_pcts else (0, 50),
+            "fmt": "{x:.0f}%",
+            "fill": False,
+        },
+        {
+            "data": profits,
+            "ylabel": "Seller\nProfit/mo",
+            "color": "#0D47A1",
+            "ylim": None,
+            "fmt": _fmt_dollars_k,
+            "fill": False,
+        },
+        {
+            "data": plat_revs,
+            "ylabel": "Platform\nRevenue/mo",
+            "color": "#C62828",
+            "ylim": None,
+            "fmt": _fmt_dollars_k,
+            "fill": False,
+        },
+    ]
 
-    fig.tight_layout()
+    for ax, spec in zip(axes, chart_specs):
+        _add_regime_background(ax, times, tier_counts, max_tiers, x_max)
+
+        ax.plot(times, spec["data"], "-", linewidth=2.2, color=spec["color"], zorder=2)
+
+        if spec.get("fill"):
+            ax.fill_between(
+                times,
+                spec["data"],
+                alpha=0.12,
+                color=spec.get("fill_color", spec["color"]),
+                zorder=1,
+            )
+
+        ax.set_ylabel(spec["ylabel"], fontsize=10, fontweight="bold")
+
+        if spec["ylim"]:
+            ax.set_ylim(spec["ylim"])
+        else:
+            vals = spec["data"]
+            if vals:
+                ymax = max(vals)
+                ymin = min(vals)
+                pad = (ymax - ymin) * 0.1 if ymax > ymin else ymax * 0.1
+                ax.set_ylim(max(0, ymin - pad), ymax + pad)
+
+        if spec["fmt"]:
+            if callable(spec["fmt"]):
+                ax.yaxis.set_major_formatter(mticker.FuncFormatter(spec["fmt"]))
+            else:
+                ax.yaxis.set_major_formatter(mticker.StrMethodFormatter(spec["fmt"]))
+
+        ax.grid(True, alpha=0.25, zorder=0)
+        ax.tick_params(axis="both", labelsize=9)
+
+    # Regime legend on the top chart
+    _add_regime_legend(axes[0], max_tiers)
+
+    # X-axis label on bottom chart
+    axes[-1].set_xlabel("Month", fontsize=11, fontweight="bold")
+
+    fig.tight_layout(rect=[0, 0, 1, 0.99])
     path = output_dir / filename
-    fig.savefig(path, dpi=150)
+    fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved: {path}")
 
@@ -464,7 +567,51 @@ def print_summary(label: str, result: AAAResult) -> None:
     print(f"  {result.summary}")
 
 
+def _build_visual_charts(scenario: AAAScenario) -> list:
+    """Build Chart objects for the visual debugger."""
+    from happysimulator.visual import Chart
+
+    adv = scenario.advertiser
+    return [
+        Chart(adv.sentiment_data, title="Consumer Sentiment", y_label="sentiment"),
+        Chart(adv.total_sales_data, title="Seller Sales/mo", y_label="units"),
+        Chart(adv.gross_revenue_data, title="Seller Revenue/mo", y_label="$"),
+        Chart(adv.blended_cpa_data, title="Seller Ad Spend/Sale", y_label="$/sale"),
+        Chart(adv.margin_pct_data, title="Seller Margin %", y_label="%"),
+        Chart(adv.profit_data, title="Seller Profit/mo", y_label="$"),
+        Chart(adv.platform_revenue_data, title="Platform Revenue/mo", y_label="$"),
+        Chart(adv.active_tier_data, title="Active Tiers", y_label="tiers"),
+    ]
+
+
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Adverse Advertising Amplification (AAA)")
+    parser.add_argument(
+        "--visual",
+        action="store_true",
+        help="Launch the browser-based visual debugger instead of saving charts",
+    )
+    parser.add_argument(
+        "--scenario",
+        choices=["essay", "extended"],
+        default="extended",
+        help="Which scenario to run in visual mode (default: extended)",
+    )
+    args = parser.parse_args()
+
+    if args.visual:
+        from happysimulator.visual import serve
+
+        scenario = (
+            build_essay_scenario() if args.scenario == "essay" else build_extended_scenario()
+        )
+        charts = _build_visual_charts(scenario)
+        print(f"  Launching visual debugger for {args.scenario} scenario...")
+        serve(scenario.sim, charts=charts)
+        return
+
     print("=" * 74)
     print("  ADVERSE ADVERTISING AMPLIFICATION (AAA)")
     print("  Demonstrating asymmetric impact of consumer sentiment on ad platforms")
@@ -496,18 +643,20 @@ def main() -> None:
 
     # -- Dynamic Simulation: Essay Scenario -------------------------------
     print("\n\n" + "-" * 74)
-    print("  SIMULATION: Essay Scenario (recession at month 12)")
+    print("  SIMULATION: Essay Scenario (smooth decline)")
     print("-" * 74)
 
-    essay_result = run_essay_scenario()
+    essay_scenario = build_essay_scenario()
+    essay_result = run_scenario(essay_scenario)
     print_summary("Essay (2-tier)", essay_result)
 
     # -- Dynamic Simulation: Extended Scenario ----------------------------
     print("\n\n" + "-" * 74)
-    print("  SIMULATION: Extended Scenario (gradual recession + recovery)")
+    print("  SIMULATION: Extended Scenario (smooth decline, 4 tiers)")
     print("-" * 74)
 
-    extended_result = run_extended_scenario()
+    extended_scenario = build_extended_scenario()
+    extended_result = run_scenario(extended_scenario)
     print_summary("Extended (4-tier)", extended_result)
 
     # -- Visualization ----------------------------------------------------
@@ -522,10 +671,10 @@ def main() -> None:
     output_dir = Path("output/aaa")
     print(f"\n\n  Generating visualizations -> {output_dir.absolute()}")
 
-    visualize_sensitivity(ESSAY_TIERS, MARGIN, output_dir, "aaa_essay_sensitivity.png")
-    visualize_sensitivity(EXTENDED_TIERS, MARGIN, output_dir, "aaa_extended_sensitivity.png")
-    visualize_timeline(essay_result, output_dir, "aaa_essay_timeline.png")
-    visualize_timeline(extended_result, output_dir, "aaa_extended_timeline.png")
+    visualize_timeline(essay_result, ESSAY_TIERS, MARGIN, output_dir, "aaa_essay_timeline.png")
+    visualize_timeline(
+        extended_result, EXTENDED_TIERS, MARGIN, output_dir, "aaa_extended_timeline.png"
+    )
 
     print(f"\n  All visualizations saved to: {output_dir.absolute()}")
 

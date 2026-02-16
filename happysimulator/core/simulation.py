@@ -107,6 +107,9 @@ class Simulation:
         self._last_event: Event | None = None
         self._events_cancelled: int = 0
 
+        # Pre-run scheduled events — replayed on reset()
+        self._pre_run_event_specs: list[tuple[Instant, str, object, bool, dict]] = []
+
         # Control surface — lazy-created on first access
         self._control = None
 
@@ -182,8 +185,35 @@ class Simulation:
 
         Useful for adding events programmatically after initialization but before
         or during simulation execution.
+
+        Events scheduled before ``run()`` is called are remembered so they can
+        be replayed on ``control.reset()``.
         """
         self._event_heap.push(events)
+        if not self._is_running:
+            self._save_event_specs(events)
+
+    def _save_event_specs(self, events: Event | list[Event]) -> None:
+        """Save event construction specs for replay on reset()."""
+        items = events if isinstance(events, list) else [events]
+        for e in items:
+            meta = e.context.get("metadata", {}) if e.context else {}
+            self._pre_run_event_specs.append(
+                (e.time, e.event_type, e.target, e.daemon, dict(meta))
+            )
+
+    def _replay_pre_run_events(self) -> None:
+        """Recreate and push all events that were scheduled before the first run."""
+        for time, event_type, target, daemon, meta in self._pre_run_event_specs:
+            ctx = {"metadata": dict(meta)} if meta else None
+            fresh = Event(
+                time=time,
+                event_type=event_type,
+                target=target,
+                daemon=daemon,
+                context=ctx,
+            )
+            self._event_heap.push(fresh)
 
     def run(self) -> SimulationSummary:
         """Execute the simulation until termination or pause.

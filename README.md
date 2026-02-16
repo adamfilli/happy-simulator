@@ -24,7 +24,7 @@
 
 ---
 
-> **Alpha** — Still in active development. Interfaces may change drastically between releases.
+> **Alpha** — Still in active development. Some features may not work as expected. Interfaces may change drastically.
 
 Happy Simulator is a code-first simulation library for education, research, design, or entertainment.
 
@@ -42,28 +42,15 @@ pip install happysim
 ```
 
 ```python
-from happysimulator import Simulation, Source, Sink, Event, Instant
-from happysimulator.components.queued_resource import QueuedResource
-from happysimulator.components.queue_policies import FIFOQueue
-
-class Server(QueuedResource):
-    def __init__(self, downstream):
-        super().__init__("Server", policy=FIFOQueue())
-        self.downstream = downstream
-
-    def handle_queued_event(self, event):
-        yield 0.1  # process for 100ms
-        return [Event(time=self.now, event_type="Done", target=self.downstream)]
+from happysimulator import Simulation, Source, Sink, Server, Instant
+from happysimulator.distributions import ExponentialLatency
 
 sink = Sink()
-server = Server(downstream=sink)
+server = Server("Server", service_time=ExponentialLatency(0.1), downstream=sink)
 source = Source.poisson(rate=8, target=server)
 
-sim = Simulation(entities=[source, server, sink], end_time=Instant.from_seconds(60))
+sim = Simulation(sources=[source], entities=[server, sink], end_time=Instant.from_seconds(60))
 summary = sim.run()
-
-print(f"Processed {summary.total_events_processed} events in {summary.wall_clock_seconds:.2f}s")
-print(f"Latency: {sink.latency_stats()}")
 ```
 
 ## Visual Debugger

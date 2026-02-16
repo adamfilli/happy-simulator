@@ -18,6 +18,7 @@ Example:
 
 import math
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
@@ -71,7 +72,7 @@ class CoDelQueue(QueuePolicy[T]):
         target_delay: float = 0.005,
         interval: float = 0.100,
         capacity: int | None = None,
-        clock_func: callable | None = None,
+        clock_func: Callable[[], Instant] | None = None,
     ):
         """Initialize the CoDel queue.
 

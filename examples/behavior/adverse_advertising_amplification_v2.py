@@ -26,10 +26,11 @@ CPA = CPC / (conv_rate * eff_sentiment). Breakeven when CPA >= margin ($25).
 | Core Niche    | 1,000 |   8%   |  50% | $0.50 |  $1.18  |   0.04    |
 | Adjacent      | 1,500 |   5%   |  20% | $2.60 | $15.29  |   0.52    |
 | Demographic   | 3,000 |   3%   |  10% | $1.60 | $18.82  |   0.64    |
-| Broad         | 4,500 |  1.5%  |   6% | $1.20 | $23.53  |   0.80    |
+| Broad         | 4,500 |  1.5%  |   7% | $1.20 | $20.17  |   0.69    |
 
-Time: 1 unit = 1 hour, 8 weeks = 1,344 hours.
-Sentiment decline: weeks 3-6 via cosine interpolation.
+Time: 1 unit = 1 hour, 16 weeks = 2,688 hours.
+Seller starts with core_niche only, expands when profitable.
+Sentiment decline: weeks 9-13 via cosine interpolation (after full expansion stabilizes).
 """
 
 from __future__ import annotations
@@ -54,8 +55,8 @@ from happysimulator import (
 # =============================================================================
 
 HOURS_PER_WEEK = 168
-DURATION_WEEKS = 8
-DURATION_HOURS = DURATION_WEEKS * HOURS_PER_WEEK  # 1,344
+DURATION_WEEKS = 24
+DURATION_HOURS = DURATION_WEEKS * HOURS_PER_WEEK  # 4,032
 
 PRODUCT_PRICE = 50.0
 COGS = 25.0
@@ -71,7 +72,7 @@ SEGMENTS = {
     "core_niche": {"size": 1_000, "click_rate": 0.08, "conv_rate": 0.50, "cpc": 0.50},
     "adjacent": {"size": 1_500, "click_rate": 0.05, "conv_rate": 0.20, "cpc": 2.60},
     "demographic": {"size": 3_000, "click_rate": 0.03, "conv_rate": 0.10, "cpc": 1.60},
-    "broad": {"size": 4_500, "click_rate": 0.015, "conv_rate": 0.06, "cpc": 1.20},
+    "broad": {"size": 4_500, "click_rate": 0.015, "conv_rate": 0.07, "cpc": 1.20},
 }
 
 SEGMENT_NAMES = list(SEGMENTS.keys())
@@ -81,17 +82,18 @@ TOTAL_CONSUMERS = sum(s["size"] for s in SEGMENTS.values())  # 10,000
 VISIT_RATE_PER_CONSUMER = 3.5 / HOURS_PER_WEEK  # ~0.02083/hr
 AGGREGATE_VISIT_RATE = TOTAL_CONSUMERS * VISIT_RATE_PER_CONSUMER  # ~208/hr
 
-# Sentiment schedule: decline from 0.0 adjustor to -0.35 during weeks 3-6
-SENTIMENT_DECLINE_START = 3 * HOURS_PER_WEEK  # hour 504
-SENTIMENT_DECLINE_END = 6 * HOURS_PER_WEEK  # hour 1008
+# Sentiment schedule: decline from 0.0 adjustor to -0.35 during weeks 9-13
+# (after seller has fully expanded and stabilized at 4 segments)
+SENTIMENT_DECLINE_START = 9 * HOURS_PER_WEEK  # hour 1512
+SENTIMENT_DECLINE_END = 13 * HOURS_PER_WEEK  # hour 2184
 SENTIMENT_DECLINE_TARGET = -0.35
 
 # Seller evaluation interval
 EVAL_INTERVAL = HOURS_PER_WEEK  # weekly
 
-# Saturation parameters
+# Saturation parameters (high decay = short memory, effectively negligible)
 SATURATION_INCREASE = 0.02  # per ad exposure
-SATURATION_DECAY = 0.005  # per visit (even without ad)
+SATURATION_DECAY = 0.10  # per visit — fast decay means consumers "forget" ads quickly
 
 # Regime background colors (number of active segments -> color)
 _REGIME_COLORS = {
@@ -178,7 +180,8 @@ class AdvertiserEntity(Entity):
 
     def __init__(self, name: str = "AdPlatform"):
         super().__init__(name)
-        self.active_segments: set[str] = set(SEGMENT_NAMES)
+        # Start with only core_niche; seller expands as profitability is proven
+        self.active_segments: set[str] = {"core_niche"}
         self.revenue_data = Data()
         self._period_revenue = 0.0
 
@@ -215,6 +218,16 @@ class SellerEntity(Entity):
         self._segment_revenue: dict[str, float] = {s: 0.0 for s in SEGMENT_NAMES}
         self._segment_ad_spend: dict[str, float] = {s: 0.0 for s in SEGMENT_NAMES}
 
+        # Hysteresis: consecutive unprofitable weeks before deactivation
+        self._consecutive_loss: dict[str, int] = {s: 0 for s in SEGMENT_NAMES}
+        self._loss_weeks_to_deactivate = 3  # must lose money 3 weeks in a row
+
+        # Cooldown: weeks to wait before re-trying a deactivated segment
+        # Doubles each time a segment is deactivated (4 → 8 → 16 → ...)
+        self._cooldown: dict[str, int] = {s: 0 for s in SEGMENT_NAMES}
+        self._cooldown_base = 52  # ~1 year: once burned, don't retry
+        self._deactivation_count: dict[str, int] = {s: 0 for s in SEGMENT_NAMES}
+
         # Time series data for visualization
         self.sales_data = Data()  # total sales per week
         self.revenue_data = Data()  # gross revenue per week
@@ -222,6 +235,7 @@ class SellerEntity(Entity):
         self.cpa_data = Data()  # blended CPA per week
         self.margin_pct_data = Data()  # margin % per week
         self.profit_data = Data()  # net profit per week
+        self.segment_profit_data: dict[str, Data] = {s: Data() for s in SEGMENT_NAMES}
         self.active_segment_data = Data()  # count of active segments
 
     def start_events(self) -> list[Event]:
@@ -251,7 +265,12 @@ class SellerEntity(Entity):
         return None
 
     def _evaluate(self, event: Event) -> list[Event]:
-        """Weekly evaluation: deactivate unprofitable segments."""
+        """Weekly evaluation: expand, contract, or hold segments.
+
+        Expansion: if overall profit is positive and there's a next segment
+        to try in the expansion order, activate it (one per week).
+        Contraction: deactivate any active segment that lost money this week.
+        """
         total_sales = sum(self._segment_sales.values())
         total_revenue = sum(self._segment_revenue.values())
         total_ad_spend = sum(self._segment_ad_spend.values())
@@ -264,6 +283,12 @@ class SellerEntity(Entity):
         self.ad_spend_data.add_stat(total_ad_spend, event.time)
         self.profit_data.add_stat(total_profit, event.time)
 
+        for seg_name in SEGMENT_NAMES:
+            s = self._segment_sales[seg_name]
+            r = self._segment_revenue[seg_name]
+            sp = self._segment_ad_spend[seg_name]
+            self.segment_profit_data[seg_name].add_stat(r - s * COGS - sp, event.time)
+
         # Blended CPA
         cpa = total_ad_spend / total_sales if total_sales > 0 else 0.0
         self.cpa_data.add_stat(cpa, event.time)
@@ -275,8 +300,14 @@ class SellerEntity(Entity):
             margin_pct = 0.0
         self.margin_pct_data.add_stat(margin_pct, event.time)
 
-        # Per-segment profitability check
         control_events: list[Event] = []
+
+        # Tick down cooldowns
+        for seg_name in SEGMENT_NAMES:
+            if self._cooldown[seg_name] > 0:
+                self._cooldown[seg_name] -= 1
+
+        # --- Contraction: deactivate segments unprofitable for multiple weeks ---
         for seg_name in SEGMENT_NAMES:
             sales = self._segment_sales[seg_name]
             revenue = self._segment_revenue[seg_name]
@@ -287,27 +318,43 @@ class SellerEntity(Entity):
             currently_active = seg_name in self._advertiser.active_segments
 
             if currently_active and seg_profit < 0 and sales > 0:
-                # Unprofitable — deactivate
-                control_events.append(
-                    Event(
-                        time=event.time,
-                        event_type="SegmentControl",
-                        target=self._advertiser,
-                        context={"segment": seg_name, "active": False},
+                self._consecutive_loss[seg_name] += 1
+                if self._consecutive_loss[seg_name] >= self._loss_weeks_to_deactivate:
+                    control_events.append(
+                        Event(
+                            time=event.time,
+                            event_type="SegmentControl",
+                            target=self._advertiser,
+                            context={"segment": seg_name, "active": False},
+                        )
                     )
-                )
-            elif not currently_active and seg_profit >= 0 and sales > 5:
-                # Profitable again — reactivate
-                control_events.append(
-                    Event(
-                        time=event.time,
-                        event_type="SegmentControl",
-                        target=self._advertiser,
-                        context={"segment": seg_name, "active": True},
+                    self._consecutive_loss[seg_name] = 0
+                    self._deactivation_count[seg_name] += 1
+                    self._cooldown[seg_name] = self._cooldown_base * (
+                        2 ** (self._deactivation_count[seg_name] - 1)
                     )
-                )
+            else:
+                self._consecutive_loss[seg_name] = 0
 
-        # Record active segment count (after control events will be processed)
+        # --- Expansion: if profitable, try the next segment in order ---
+        # Only expand if we didn't just contract anything this week
+        if not control_events and total_profit > 0:
+            for seg_name in SEGMENT_NAMES:
+                if (
+                    seg_name not in self._advertiser.active_segments
+                    and self._cooldown[seg_name] == 0
+                ):
+                    control_events.append(
+                        Event(
+                            time=event.time,
+                            event_type="SegmentControl",
+                            target=self._advertiser,
+                            context={"segment": seg_name, "active": True},
+                        )
+                    )
+                    break  # one expansion per week
+
+        # Record active segment count
         active_count = len(self._advertiser.active_segments)
         self.active_segment_data.add_stat(active_count, event.time)
 
@@ -479,18 +526,8 @@ def build_scenario(seed: int = SEED) -> AAAv2Scenario:
     for e in seller.start_events():
         sim.schedule(e)
 
-    # Schedule sentiment decline: weeks 3-6 (hours 504-1008), adjustor 0.0 → -0.35
+    # Schedule sentiment events across entire simulation
     _schedule_sentiment(sim, platform)
-
-    # Record initial sentiment
-    sim.schedule(
-        Event(
-            time=Instant.from_seconds(0.1),
-            event_type="SentimentAdjust",
-            target=platform,
-            context={"adjustor": 0.0},
-        )
-    )
 
     return AAAv2Scenario(
         sim=sim, platform=platform, seller=seller, advertiser=advertiser
@@ -498,13 +535,24 @@ def build_scenario(seed: int = SEED) -> AAAv2Scenario:
 
 
 def _schedule_sentiment(sim: Simulation, platform: Platform) -> None:
-    """Schedule SentimentAdjust events along a cosine decline curve."""
-    step = 1.0  # every hour
-    t = SENTIMENT_DECLINE_START
-    while t <= SENTIMENT_DECLINE_END:
-        adj = _cosine_interp(
-            t, SENTIMENT_DECLINE_START, SENTIMENT_DECLINE_END, 0.0, SENTIMENT_DECLINE_TARGET
-        )
+    """Schedule SentimentAdjust events across the entire simulation.
+
+    Before and after the decline window the adjustor is flat (0.0 before,
+    SENTIMENT_DECLINE_TARGET after).  During the decline window it follows
+    a cosine interpolation.  Events are emitted every hour so the sentiment
+    chart always has data.
+    """
+    step = 12.0  # every 12 hours — enough for a smooth chart without excess events
+    t = 0.1  # start just after t=0
+    while t <= DURATION_HOURS:
+        if t < SENTIMENT_DECLINE_START:
+            adj = 0.0
+        elif t > SENTIMENT_DECLINE_END:
+            adj = SENTIMENT_DECLINE_TARGET
+        else:
+            adj = _cosine_interp(
+                t, SENTIMENT_DECLINE_START, SENTIMENT_DECLINE_END, 0.0, SENTIMENT_DECLINE_TARGET
+            )
         sim.schedule(
             Event(
                 time=Instant.from_seconds(t),
@@ -551,12 +599,12 @@ def _add_regime_legend(ax, max_tiers: int) -> None:
 
 def _fmt_dollars(x, _pos) -> str:
     if abs(x) >= 1000:
-        return f"${x:,.0f}"
-    return f"${x:.0f}"
+        return f"${x:,.1f}"
+    return f"${x:.1f}"
 
 
 def _fmt_dollars_k(x, _pos) -> str:
-    return f"${x / 1000:,.0f}k"
+    return f"${x / 1000:,.1f}k"
 
 
 def _hours_to_weeks(times: list[float]) -> list[float]:
@@ -564,12 +612,13 @@ def _hours_to_weeks(times: list[float]) -> list[float]:
     return [t / HOURS_PER_WEEK for t in times]
 
 
+
 def visualize_timeline(
     scenario: AAAv2Scenario,
     output_dir: Path,
     filename: str = "aaa_v2_timeline.png",
 ) -> None:
-    """Generate 7 stacked time series charts."""
+    """Generate 6 stacked time series charts."""
     import matplotlib.pyplot as plt
     import matplotlib.ticker as mticker
 
@@ -586,9 +635,19 @@ def visualize_timeline(
     sales = seller.sales_data.raw_values()
     revenues = seller.revenue_data.raw_values()
     cpas = seller.cpa_data.raw_values()
-    margin_pcts = seller.margin_pct_data.raw_values()
     profits = seller.profit_data.raw_values()
     tier_counts = seller.active_segment_data.raw_values()
+
+    # Per-segment profit
+    seg_profit_colors = {
+        "core_niche": "#4CAF50",
+        "adjacent": "#FF9800",
+        "demographic": "#9C27B0",
+        "broad": "#F44336",
+    }
+    seg_profits = {
+        s: seller.segment_profit_data[s].raw_values() for s in SEGMENT_NAMES
+    }
 
     # Sentiment data (higher frequency)
     sent_times = platform.sentiment_data.times()
@@ -601,9 +660,10 @@ def visualize_timeline(
     # We'll bucket advertiser revenue into weekly windows
     adv_rev_weekly = _bucket_advertiser_revenue(advertiser, eval_times)
 
-    x_max = DURATION_WEEKS + 0.5
+    x_min = 0
+    x_max = DURATION_WEEKS
 
-    fig, axes = plt.subplots(7, 1, figsize=(14, 22), sharex=True)
+    fig, axes = plt.subplots(6, 1, figsize=(14, 20), sharex=True)
     fig.suptitle(
         "Adverse Advertising Amplification v2 (Agent-Based)",
         fontsize=16,
@@ -655,16 +715,6 @@ def visualize_timeline(
         },
         {
             "times": eval_weeks,
-            "data": margin_pcts,
-            "ylabel": "Seller\nMargin %",
-            "color": "#7B1FA2",
-            "ylim": None,
-            "fmt": "{x:.0f}%",
-            "fill": False,
-            "use_regime": True,
-        },
-        {
-            "times": eval_weeks,
             "data": profits,
             "ylabel": "Seller\nProfit/wk",
             "color": "#0D47A1",
@@ -672,6 +722,10 @@ def visualize_timeline(
             "fmt": _fmt_dollars_k,
             "fill": False,
             "use_regime": True,
+            "extra_lines": [
+                {"times": eval_weeks, "data": seg_profits[s], "color": seg_profit_colors[s], "label": s}
+                for s in SEGMENT_NAMES
+            ],
         },
         {
             "times": eval_weeks,
@@ -695,7 +749,7 @@ def visualize_timeline(
         t = spec["times"]
         d = spec["data"]
         if t and d:
-            ax.plot(t, d, "-", linewidth=2.2, color=spec["color"], zorder=2)
+            ax.plot(t, d, "-", linewidth=2.2, color=spec["color"], zorder=3, label="Total")
 
             if spec.get("fill"):
                 ax.fill_between(
@@ -706,13 +760,24 @@ def visualize_timeline(
                     zorder=1,
                 )
 
+        # Per-segment overlay lines
+        all_vals = list(d) if d else []
+        for extra in spec.get("extra_lines", []):
+            et, ed = extra["times"], extra["data"]
+            if et and ed:
+                ax.plot(et, ed, "-", linewidth=1.2, color=extra["color"],
+                        alpha=0.8, zorder=2, label=extra.get("label"))
+                all_vals.extend(ed)
+        if spec.get("extra_lines"):
+            ax.legend(fontsize=7, loc="upper right", framealpha=0.8, ncol=3)
+
         ax.set_ylabel(spec["ylabel"], fontsize=10, fontweight="bold")
 
         if spec["ylim"]:
             ax.set_ylim(spec["ylim"])
-        elif d:
-            ymax = max(d)
-            ymin = min(d)
+        elif all_vals:
+            ymax = max(all_vals)
+            ymin = min(all_vals)
             pad = (ymax - ymin) * 0.1 if ymax > ymin else max(abs(ymax) * 0.1, 1)
             ax.set_ylim(min(0, ymin - pad), ymax + pad)
 
@@ -722,6 +787,7 @@ def visualize_timeline(
             else:
                 ax.yaxis.set_major_formatter(mticker.StrMethodFormatter(spec["fmt"]))
 
+        ax.set_xlim(x_min, x_max)
         ax.grid(True, alpha=0.25, zorder=0)
         ax.tick_params(axis="both", labelsize=9)
 
@@ -775,7 +841,6 @@ def _build_visual_charts(scenario: AAAv2Scenario) -> list:
         Chart(seller.sales_data, title="Seller Sales/wk", y_label="units"),
         Chart(seller.revenue_data, title="Seller Revenue/wk", y_label="$"),
         Chart(seller.cpa_data, title="Seller CPA", y_label="$/sale"),
-        Chart(seller.margin_pct_data, title="Seller Margin %", y_label="%"),
         Chart(seller.profit_data, title="Seller Profit/wk", y_label="$"),
         Chart(advertiser.revenue_data, title="Platform Revenue (clicks)", y_label="$"),
         Chart(seller.active_segment_data, title="Active Segments", y_label="count"),

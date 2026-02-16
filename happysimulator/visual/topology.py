@@ -250,22 +250,22 @@ def discover(sim: Simulation) -> Topology:
 
     for entity in all_entities:
         name = getattr(entity, "name", type(entity).__name__)
-        if name in seen_names:
-            continue
-        seen_names.add(name)
 
-        profile = None
-        if isinstance(entity, SourceCls):
-            profile = _sample_profile(entity, end_s)
+        if name not in seen_names:
+            seen_names.add(name)
 
-        topology.nodes.append(
-            Node(
-                id=name,
-                type=type(entity).__name__,
-                category=classify(entity),
-                profile=profile,
+            profile = None
+            if isinstance(entity, SourceCls):
+                profile = _sample_profile(entity, end_s)
+
+            topology.nodes.append(
+                Node(
+                    id=name,
+                    type=type(entity).__name__,
+                    category=classify(entity),
+                    profile=profile,
+                )
             )
-        )
 
         for downstream in _find_downstream(entity):
             ds_name = getattr(downstream, "name", type(downstream).__name__)

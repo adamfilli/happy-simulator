@@ -1,6 +1,7 @@
 <p align="center">
-  <!-- Replace with project banner/logo (recommended: 1200x400px) -->
-  <img src="docs/assets/banner-placeholder.png" alt="Happy Simulator" width="100%" />
+  <a href="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0">
+    <img src="https://github.com/user-attachments/assets/a1c5ec2b-6dcc-48a3-9618-417cd9e58ed0" alt="Happy Simulator Demo" width="100%" />
+  </a>
 </p>
 
 <h1 align="center">happy-simulator</h1>

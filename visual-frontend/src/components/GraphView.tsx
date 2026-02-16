@@ -16,6 +16,7 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import { useSimStore } from "../hooks/useSimState";
 import { useWebSocket } from "../hooks/useWebSocket";
 import EntityNode from "./EntityNode";
+import GroupNode from "./GroupNode";
 import AnimatedEdge from "./AnimatedEdge";
 import ChartNode from "./ChartNode";
 import CodePanelNode from "./CodePanelNode";
@@ -35,7 +36,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
-const nodeTypes = { entity: EntityNode, chart: ChartNode, codePanel: CodePanelNode };
+const nodeTypes = { entity: EntityNode, group: GroupNode, chart: ChartNode, codePanel: CodePanelNode };
 const edgeTypes = { animated: AnimatedEdge };
 
 const DRAG_MIME = "application/happysim-chart";
@@ -74,6 +75,7 @@ function GraphViewInner() {
   const pinnedCharts = useSimStore((s) => s.pinnedCharts);
   const addPinnedChart = useSimStore((s) => s.addPinnedChart);
   const updatePinnedChartPosition = useSimStore((s) => s.updatePinnedChartPosition);
+  const extractedEntities = useSimStore((s) => s.extractedEntities);
   const { send } = useWebSocket();
   const { screenToFlowPosition } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -146,8 +148,8 @@ function GraphViewInner() {
       },
       children: dataNodes.map((n) => ({
         id: n.id,
-        width: 180,
-        height: 80,
+        width: n.is_group ? 220 : 180,
+        height: n.is_group ? 100 : 80,
       })),
       edges: dataEdges.map((e, i) => ({
         id: `elk-${i}`,
@@ -181,6 +183,20 @@ function GraphViewInner() {
 
       const rfNodes: Node[] = topology.nodes.map((topoNode) => {
         const pos = posMap.get(topoNode.id) ?? { x: 0, y: 0 };
+        if (topoNode.is_group) {
+          return {
+            id: topoNode.id,
+            type: "group",
+            position: { x: pos.x, y: pos.y },
+            data: {
+              label: topoNode.type,
+              entityType: topoNode.type,
+              category: topoNode.category,
+              color: CATEGORY_COLORS[topoNode.category] || CATEGORY_COLORS.other,
+              memberCount: topoNode.member_count ?? 0,
+            },
+          };
+        }
         return {
           id: topoNode.id,
           type: "entity",
@@ -215,6 +231,12 @@ function GraphViewInner() {
     setNodes((nds) =>
       nds.map((n) => {
         if (n.type === "codePanel" || n.type === "chart") return n;
+        if (n.type === "group") {
+          return {
+            ...n,
+            data: { ...n.data, selected: n.id === selectedEntity },
+          };
+        }
         const entityState = state.entities[n.id];
         return {
           ...n,
@@ -317,6 +339,79 @@ function GraphViewInner() {
     });
   }, [pinnedCharts, setNodes]);
 
+  // Sync extracted entities → React Flow nodes and dashed "member-of" edges
+  useEffect(() => {
+    setNodes((nds) => {
+      const extractedIds = new Set([...extractedEntities.keys()].map((n) => `extracted-${n}`));
+      // Remove retracted entities
+      const withoutStale = nds.filter(
+        (n) => !n.id.startsWith("extracted-") || extractedIds.has(n.id)
+      );
+      // Add new extracted entities
+      const existingIds = new Set(withoutStale.map((n) => n.id));
+      const newNodes: Node[] = [];
+      for (const [entityName, groupId] of extractedEntities) {
+        const nodeId = `extracted-${entityName}`;
+        if (!existingIds.has(nodeId)) {
+          // Position near the group node
+          const groupNode = withoutStale.find((n) => n.id === groupId);
+          const x = groupNode ? groupNode.position.x + 250 : 400;
+          const y = groupNode
+            ? groupNode.position.y + (newNodes.length * 100)
+            : newNodes.length * 100;
+          newNodes.push({
+            id: nodeId,
+            type: "entity",
+            position: { x, y },
+            data: {
+              label: entityName,
+              entityType: "",
+              category: groupNode?.data?.category ?? "other",
+              color: (groupNode?.data?.color as string) ?? CATEGORY_COLORS.other,
+              metrics: {},
+            },
+          });
+        }
+      }
+      return [...withoutStale, ...newNodes];
+    });
+
+    // Update edges: add dashed "member-of" edges
+    setEdges((eds) => {
+      const withoutExtracted = eds.filter((e) => !e.id.startsWith("extracted-edge-"));
+      const extractedEdges: Edge[] = [];
+      for (const [entityName, groupId] of extractedEntities) {
+        extractedEdges.push({
+          id: `extracted-edge-${entityName}`,
+          source: groupId,
+          target: `extracted-${entityName}`,
+          sourceHandle: "right",
+          targetHandle: "left",
+          style: { stroke: "#6b7280", strokeWidth: 1.5, strokeDasharray: "6 4" },
+        });
+      }
+      return [...withoutExtracted, ...extractedEdges];
+    });
+  }, [extractedEntities, setNodes, setEdges]);
+
+  // Fetch state for extracted entities on each tick
+  useEffect(() => {
+    if (!state || extractedEntities.size === 0) return;
+    for (const entityName of extractedEntities.keys()) {
+      fetch(`/api/entity_state?entity=${encodeURIComponent(entityName)}`)
+        .then((r) => r.json())
+        .then((data: { entity: string; state: Record<string, unknown> }) => {
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === `extracted-${data.entity}`
+                ? { ...n, data: { ...n.data, metrics: data.state } }
+                : n
+            )
+          );
+        });
+    }
+  }, [state?.events_processed, extractedEntities, setNodes, state]);
+
   // Drop handler for inspector drag
   const onDragOver = useCallback((e: React.DragEvent) => {
     if (e.dataTransfer.types.includes(DRAG_MIME)) {
@@ -353,10 +448,15 @@ function GraphViewInner() {
     [updatePinnedChartPosition]
   );
 
-  // Click handler — skip chart nodes
+  // Click handler — skip chart nodes, handle extracted entities
   const onNodeClick: NodeMouseHandler = useCallback(
     (_, node) => {
       if (node.type === "chart") return;
+      // For extracted entities, select with the original entity name
+      if (node.id.startsWith("extracted-")) {
+        selectEntity(node.id.replace("extracted-", ""));
+        return;
+      }
       selectEntity(node.id);
     },
     [selectEntity]

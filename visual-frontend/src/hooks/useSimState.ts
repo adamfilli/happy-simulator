@@ -29,6 +29,9 @@ interface SimStore {
   edgeStats: EdgeStats;
   pinnedCharts: PinnedChart[];
 
+  // Entity grouping state
+  extractedEntities: Map<string, string>; // entityName → groupId
+
   // Code debug state
   codePanels: Map<string, CodePanelConfig>;
   codeTraces: Map<string, CodeTrace>;
@@ -55,6 +58,10 @@ interface SimStore {
   removePinnedChart: (id: string) => void;
   updatePinnedChartPosition: (id: string, x: number, y: number) => void;
   updatePinnedChartMode: (id: string, mode: PinnedChart["displayMode"]) => void;
+
+  // Entity grouping actions
+  extractEntity: (name: string, groupId: string) => void;
+  retractEntity: (name: string) => void;
 
   // Code debug actions
   openCodePanel: (entityName: string, config: CodePanelConfig) => void;
@@ -85,6 +92,9 @@ export const useSimStore = create<SimStore>((set) => ({
   dashboardTimeRange: { start: null, end: null },
   edgeStats: {},
   pinnedCharts: [],
+
+  // Entity grouping state
+  extractedEntities: new Map(),
 
   // Code debug state
   codePanels: new Map(),
@@ -146,6 +156,20 @@ export const useSimStore = create<SimStore>((set) => ({
       pinnedCharts: prev.pinnedCharts.map((c) => (c.id === id ? { ...c, displayMode: mode } : c)),
     })),
 
+  // Entity grouping actions
+  extractEntity: (name, groupId) =>
+    set((prev) => {
+      const extracted = new Map(prev.extractedEntities);
+      extracted.set(name, groupId);
+      return { extractedEntities: extracted };
+    }),
+  retractEntity: (name) =>
+    set((prev) => {
+      const extracted = new Map(prev.extractedEntities);
+      extracted.delete(name);
+      return { extractedEntities: extracted };
+    }),
+
   // Code debug actions
   openCodePanel: (entityName, config) =>
     set((prev) => {
@@ -179,7 +203,7 @@ export const useSimStore = create<SimStore>((set) => ({
   reset: () => set({
     eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null,
     dashboardTimeRange: { start: null, end: null }, edgeStats: {},
-    pinnedCharts: [],
+    pinnedCharts: [], extractedEntities: new Map(),
     codePanels: new Map(), codeTraces: new Map(),
     codePausedEntity: null, codePausedState: null, codeBreakpoints: [],
   }),

@@ -75,6 +75,16 @@ def create_app(bridge: SimulationBridge) -> FastAPI:
     def get_entity_history(entity: str) -> JSONResponse:
         return JSONResponse(bridge.get_entity_history(entity))
 
+    @app.get("/api/group_members")
+    def get_group_members(
+        group_id: str, offset: int = 0, limit: int = 50, search: str | None = None
+    ) -> JSONResponse:
+        return JSONResponse(bridge.get_group_members(group_id, offset, limit, search))
+
+    @app.get("/api/entity_state")
+    def get_entity_state(entity: str) -> JSONResponse:
+        return JSONResponse(bridge.get_single_entity_state(entity))
+
     @app.get("/api/chart_data")
     def get_chart_data(
         chart_id: str, start_s: float | None = None, end_s: float | None = None

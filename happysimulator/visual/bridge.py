@@ -129,6 +129,9 @@ class SimulationBridge:
         self._last_snapshot_time: float = -1.0
         self._lock = threading.Lock()
 
+        # Build grouped entity lookup from topology grouping
+        self._build_grouped_entity_sets()
+
         # Code debugger — injected into the simulation for ProcessContinuation access
         self._code_debugger = CodeDebugger()
         sim._code_debugger = self._code_debugger
@@ -221,6 +224,9 @@ class SimulationBridge:
                 list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
             ):
                 name = getattr(entity, "name", type(entity).__name__)
+                # Skip grouped entities — they are not rendered individually
+                if name in self._grouped_entity_names:
+                    continue
                 snapshot = serialize_entity(entity)
                 history = self._entity_history.setdefault(name, [])
                 history.append((time_s, snapshot))
@@ -230,14 +236,37 @@ class SimulationBridge:
                 if len(history) > self.MAX_HISTORY_SAMPLES:
                     self._entity_history[name] = history[::2]
 
+    def _build_grouped_entity_sets(self) -> None:
+        """Build lookup sets for grouped entities from topology."""
+        self._grouped_entity_names: set[str] = set(self._topology.member_to_group.keys())
+        # Build name→entity map for grouped entities (for on-demand serialization)
+        self._grouped_entities_by_name: dict[str, Any] = {}
+        if self._grouped_entity_names:
+            for entity in (
+                list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
+            ):
+                name = getattr(entity, "name", type(entity).__name__)
+                if name in self._grouped_entity_names:
+                    self._grouped_entities_by_name[name] = entity
+
     def _resolve_to_topology_node(self, name: str) -> str:
-        """Map a sub-entity name (e.g. 'Server.worker') to its topology-level parent ('Server')."""
+        """Map a sub-entity name (e.g. 'Server.worker') to its topology-level parent ('Server').
+
+        Also maps grouped entity names to their group node ID.
+        """
+        # Check group membership first
+        group_id = self._topology.member_to_group.get(name)
+        if group_id:
+            return group_id
         if name in self._topology_node_ids:
             return name
         # Walk up dotted segments: Server.driver.foo → Server.driver → Server
         parts = name.split(".")
         for i in range(len(parts) - 1, 0, -1):
             candidate = ".".join(parts[:i])
+            group_id = self._topology.member_to_group.get(candidate)
+            if group_id:
+                return group_id
             if candidate in self._topology_node_ids:
                 return candidate
         return name
@@ -261,6 +290,8 @@ class SimulationBridge:
             list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes)
         ):
             name = getattr(entity, "name", type(entity).__name__)
+            if name in self._grouped_entity_names:
+                continue
             entity_states[name] = serialize_entity(entity)
 
         upcoming: list[dict] = []
@@ -403,6 +434,7 @@ class SimulationBridge:
         self._last_snapshot_time = -1.0
         self._topology = discover(self._sim)
         self._topology_node_ids = {n.id for n in self._topology.nodes}
+        self._build_grouped_entity_sets()
         for chart in self._charts:
             chart.data.clear()
 
@@ -499,6 +531,58 @@ class SimulationBridge:
             metrics[name] = {"times": times, "values": values}
 
         return {"entity": entity_name, "metrics": metrics}
+
+    # --- Group member access ---
+
+    def get_group_members(
+        self, group_id: str, offset: int = 0, limit: int = 50, search: str | None = None
+    ) -> dict[str, Any]:
+        """Return a paginated list of group members with their current state."""
+        # Find the group node
+        group_node = None
+        for node in self._topology.nodes:
+            if node.id == group_id and node.is_group:
+                group_node = node
+                break
+        if group_node is None:
+            return {"group_id": group_id, "members": [], "total": 0, "offset": offset}
+
+        member_ids = group_node.member_ids
+        if search:
+            search_lower = search.lower()
+            member_ids = [m for m in member_ids if search_lower in m.lower()]
+
+        total = len(member_ids)
+        page = member_ids[offset : offset + limit]
+
+        members = []
+        for name in page:
+            entity = self._grouped_entities_by_name.get(name)
+            state = serialize_entity(entity) if entity else {}
+            members.append({"name": name, "state": state})
+
+        return {
+            "group_id": group_id,
+            "members": members,
+            "total": total,
+            "offset": offset,
+            "type": group_node.type,
+            "category": group_node.category,
+        }
+
+    def get_single_entity_state(self, entity_name: str) -> dict[str, Any]:
+        """Return the current state of a single entity by name."""
+        # Check grouped entities first
+        entity = self._grouped_entities_by_name.get(entity_name)
+        if entity is None:
+            # Check non-grouped entities
+            for e in list(self._sim._sources) + list(self._sim._entities) + list(self._sim._probes):
+                if getattr(e, "name", type(e).__name__) == entity_name:
+                    entity = e
+                    break
+        if entity is None:
+            return {"entity": entity_name, "state": {}}
+        return {"entity": entity_name, "state": serialize_entity(entity)}
 
     # --- Edge stats ---
 

@@ -6,6 +6,7 @@ attribute patterns. Used at serve-time to build the initial graph.
 
 from __future__ import annotations
 
+from collections import Counter as _Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,8 @@ from happysimulator.core.entity import Entity
 if TYPE_CHECKING:
     from happysimulator.core.simulation import Simulation
 
+GROUP_THRESHOLD = 20
+
 
 @dataclass
 class Node:
@@ -21,6 +24,9 @@ class Node:
     type: str
     category: str
     profile: dict | None = None  # {times: [...], values: [...]} for sources
+    is_group: bool = False
+    member_count: int = 0
+    member_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -34,6 +40,7 @@ class Edge:
 class Topology:
     nodes: list[Node] = field(default_factory=list)
     edges: list[Edge] = field(default_factory=list)
+    member_to_group: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -43,6 +50,15 @@ class Topology:
                     "type": n.type,
                     "category": n.category,
                     **({"profile": n.profile} if n.profile else {}),
+                    **(
+                        {
+                            "is_group": True,
+                            "member_count": n.member_count,
+                            "member_ids": n.member_ids[:50],
+                        }
+                        if n.is_group
+                        else {}
+                    ),
                 }
                 for n in self.nodes
             ],
@@ -107,7 +123,7 @@ _DOWNSTREAM_ATTRS = ["downstream", "targets", "target", "_downstream", "_target"
 def _find_downstream(entity: object) -> list[Entity]:
     """Find downstream entities by scanning known attribute patterns.
 
-    Probes are excluded — their ``target`` is a monitoring relationship,
+    Probes are excluded --- their ``target`` is a monitoring relationship,
     not a data-flow edge.
     """
     try:
@@ -149,6 +165,61 @@ def _sample_profile(source: object, end_s: float, num_points: int = 200) -> dict
         times.append(round(t, 6))
         values.append(profile.get_rate(Instant.from_seconds(t)))
     return {"times": times, "values": values}
+
+
+def _group_topology(topology: Topology) -> None:
+    """Collapse same-type nodes that exceed GROUP_THRESHOLD into group nodes."""
+    # Count nodes by type
+    type_counts: _Counter[str] = _Counter()
+    for node in topology.nodes:
+        type_counts[node.type] += 1
+
+    types_to_group = {t for t, count in type_counts.items() if count > GROUP_THRESHOLD}
+    if not types_to_group:
+        return
+
+    # Partition nodes into kept vs grouped
+    kept_nodes: list[Node] = []
+    grouped_by_type: dict[str, list[Node]] = {}
+    for node in topology.nodes:
+        if node.type in types_to_group:
+            grouped_by_type.setdefault(node.type, []).append(node)
+        else:
+            kept_nodes.append(node)
+
+    # Create group nodes and populate member_to_group
+    group_nodes: list[Node] = []
+    for entity_type, members in grouped_by_type.items():
+        group_id = f"group:{entity_type}"
+        member_ids = [m.id for m in members]
+        # Use the category of the first member (all same type = same category)
+        category = members[0].category if members else "other"
+        group_node = Node(
+            id=group_id,
+            type=entity_type,
+            category=category,
+            is_group=True,
+            member_count=len(members),
+            member_ids=member_ids,
+        )
+        group_nodes.append(group_node)
+        for mid in member_ids:
+            topology.member_to_group[mid] = group_id
+
+    # Rewrite edges: replace member node IDs with group IDs, deduplicate
+    member_set = set(topology.member_to_group.keys())
+    seen_edges: set[tuple[str, str, str]] = set()
+    new_edges: list[Edge] = []
+    for edge in topology.edges:
+        source = topology.member_to_group.get(edge.source, edge.source)
+        target = topology.member_to_group.get(edge.target, edge.target)
+        edge_key = (source, target, edge.kind)
+        if edge_key not in seen_edges:
+            seen_edges.add(edge_key)
+            new_edges.append(Edge(source=source, target=target, kind=edge.kind))
+
+    topology.nodes = kept_nodes + group_nodes
+    topology.edges = new_edges
 
 
 def discover(sim: Simulation) -> Topology:
@@ -224,5 +295,8 @@ def discover(sim: Simulation) -> Topology:
         if isinstance(probe, Probe):
             t_name = getattr(probe.target, "name", type(probe.target).__name__)
             topology.add_edge_if_new(probe.name, t_name, kind="probe")
+
+    # Collapse large same-type groups
+    _group_topology(topology)
 
     return topology

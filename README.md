@@ -24,7 +24,7 @@
 
 ---
 
-> **Alpha** — Still in active development. APIs may change between releases.
+> **Alpha** — Still in active development. Interfaces may change drastically between releases.
 
 Happy Simulator is a discrete-event simulation engine. Simulate systems for education, research, design, or entertainment.
 

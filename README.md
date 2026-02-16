@@ -24,6 +24,7 @@
 
 ---
 
+> [!WARNING]
 > **Alpha** — Still in active development. Some features may not work as expected. Interfaces may change drastically.
 
 Happy Simulator is a code-first simulation library for education, research, design, or entertainment.

@@ -500,8 +500,8 @@ export default function InspectorPanel() {
               Upcoming
             </span>
           </div>
-          <div className="text-xs font-mono px-3 pb-2 space-y-1">
-            {state.upcoming.slice(0, 8).map((e, i) => (
+          <div className="text-xs font-mono px-3 pb-2 space-y-1 h-[7.5rem] overflow-y-auto">
+            {state.upcoming.map((e, i) => (
               <div key={i} className="flex gap-2 text-gray-400">
                 <span className="w-14 text-right text-gray-500">
                   {e.time_s.toFixed(4)}

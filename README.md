@@ -26,7 +26,7 @@
 
 > **Alpha** — Still in active development. Interfaces may change drastically between releases.
 
-Happy Simulator is a discrete-event simulation engine and library for education, research, design, or entertainment.
+Happy Simulator is a code-first simulation library for education, research, design, or entertainment.
 
 ## Features
 

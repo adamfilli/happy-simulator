@@ -73,11 +73,12 @@ pip install happysim[visual]
 ```
 
 ```python
+# define sim
 from happysimulator.visual import serve
 serve(sim)  # opens browser at http://127.0.0.1:8765
 ```
 
-Step through events, inspect entity state, pin live charts to the graph, and set breakpoints — all from the browser.
+Step through events, inspect entity state, and create interactive dashboards from the browser.
 
 ## Installation
 

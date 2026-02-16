@@ -29,6 +29,10 @@
 
 Happy Simulator is a code-first simulation library for education, research, design, or entertainment.
 
+**Some articles using the library:**
+- [Simulation-Enhanced Reasoning](https://adamfillion.com/posts/simulation-enhanced-reasoning/) - enhancing AI with simulation.
+- [Adverse Advertising Amplification](https://adamfillion.com/posts/adverse-advertising-amplification/) - consumer behaviour simulation.
+
 ## Features
 
 - **Intuitive modeling** — convert real-world components into simulated equivalents.

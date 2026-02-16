@@ -503,7 +503,7 @@ def build_scenario(seed: int = SEED) -> AAAv2Scenario:
 
     # Create entities
     advertiser = AdvertiserEntity("AdPlatform")
-    seller = SellerEntity("PosterShop", advertiser)
+    seller = SellerEntity("SellerShop", advertiser)
     consumers = _build_consumer_pool(rng)
     platform = Platform("Platform", consumers, advertiser, seller, rng)
 

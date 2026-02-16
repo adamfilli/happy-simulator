@@ -506,7 +506,7 @@ def build_scenario(seed: int = SEED) -> AAAv3Scenario:
 
     # Create core entities
     advertiser = AdvertiserEntity("AdPlatform")
-    seller = SellerEntity("PosterShop", advertiser)
+    seller = SellerEntity("SellerShop", advertiser)
 
     # Platform created first (consumers need a reference to it)
     # Consumers list populated after construction

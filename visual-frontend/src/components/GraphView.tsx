@@ -211,10 +211,18 @@ function GraphViewInner() {
           },
         };
       });
-      // Preserve existing pinned chart nodes across ELK re-layout
+      // Preserve existing pinned chart and extracted entity nodes across ELK re-layout
       const chartNodes = useSimStore.getState().pinnedCharts.map(pinnedChartToNode);
-      setNodes([...rfNodes, ...chartNodes]);
-      setEdges(flowEdges);
+      setNodes((prev) => {
+        const extractedNodes = prev.filter((n) => n.id.startsWith("extracted-"));
+        const codePanelNodes = prev.filter((n) => n.type === "codePanel");
+        return [...rfNodes, ...chartNodes, ...extractedNodes, ...codePanelNodes];
+      });
+      setEdges((prev) => {
+        const extractedEdges = prev.filter((e) => e.id.startsWith("extracted-edge-"));
+        const codeEdges = prev.filter((e) => e.id.startsWith("code-edge-"));
+        return [...flowEdges, ...extractedEdges, ...codeEdges];
+      });
       setLayoutDone(true);
     });
   }, [topology, flowEdges, setNodes, setEdges]);
@@ -231,7 +239,7 @@ function GraphViewInner() {
     if (!state) return;
     setNodes((nds) =>
       nds.map((n) => {
-        if (n.type === "codePanel" || n.type === "chart") return n;
+        if (n.type === "codePanel" || n.type === "chart" || n.id.startsWith("extracted-")) return n;
         if (n.type === "group") {
           return {
             ...n,

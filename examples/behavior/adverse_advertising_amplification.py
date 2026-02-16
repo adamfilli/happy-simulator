@@ -268,7 +268,7 @@ def build_essay_scenario(duration_months: int = 24) -> AAAScenario:
     """
     platform = AdPlatform("Meta")
     advertiser = Advertiser(
-        "PosterShop",
+        "SellerShop",
         product_price=PRODUCT_PRICE,
         production_cost=PRODUCTION_COST,
         tiers=ESSAY_TIERS,
@@ -298,7 +298,7 @@ def build_extended_scenario(duration_months: int = 36) -> AAAScenario:
     """
     platform = AdPlatform("AdGiant")
     advertiser = Advertiser(
-        "PosterShop",
+        "SellerShop",
         product_price=PRODUCT_PRICE,
         production_cost=PRODUCTION_COST,
         tiers=EXTENDED_TIERS,

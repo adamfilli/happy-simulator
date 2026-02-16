@@ -203,7 +203,6 @@ export const useSimStore = create<SimStore>((set) => ({
   reset: () => set({
     eventLog: [], simLogs: [], isPlaying: false, selectedEntity: null,
     dashboardTimeRange: { start: null, end: null }, edgeStats: {},
-    pinnedCharts: [], extractedEntities: new Map(),
     codePanels: new Map(), codeTraces: new Map(),
     codePausedEntity: null, codePausedState: null, codeBreakpoints: [],
   }),

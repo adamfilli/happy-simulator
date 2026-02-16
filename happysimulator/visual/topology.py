@@ -110,7 +110,11 @@ def classify(entity: object) -> str:
         return "queued_resource"
     if isinstance(entity, (RateLimitedEntity, Inductor)):
         return "rate_limiter"
-    if isinstance(entity, RandomRouter):
+    try:
+        from happysimulator.components.load_balancer.load_balancer import LoadBalancer
+    except ImportError:
+        LoadBalancer = type(None)
+    if isinstance(entity, (RandomRouter, LoadBalancer)):
         return "router"
     if isinstance(entity, Resource):
         return "resource"
@@ -134,6 +138,14 @@ def _find_downstream(entity: object) -> list[Entity]:
     if isinstance(entity, Probe):
         return []  # handled separately with kind="probe"
 
+    # Prefer explicit declaration via downstream_entities()
+    declared = getattr(entity, "downstream_entities", None)
+    if callable(declared):
+        result = declared()
+        if result:
+            return result
+
+    # Fallback: scan common attribute names
     found: list[Entity] = []
     for attr_name in _DOWNSTREAM_ATTRS:
         val = getattr(entity, attr_name, None)
@@ -143,6 +155,7 @@ def _find_downstream(entity: object) -> list[Entity]:
             found.append(val)
         elif isinstance(val, list):
             found.extend(v for v in val if isinstance(v, Entity))
+
     return found
 
 

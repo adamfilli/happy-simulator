@@ -146,6 +146,9 @@ class LoadBalancer(Entity):
         """All registered backends (healthy and unhealthy)."""
         return [info.backend for info in self._backends.values()]
 
+    def downstream_entities(self) -> list[Entity]:
+        return self.all_backends
+
     @property
     def healthy_backends(self) -> list[Entity]:
         """Only healthy backends available for routing."""

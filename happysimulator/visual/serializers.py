@@ -107,9 +107,7 @@ def serialize_entity(entity: object) -> dict[str, Any]:
             "latest": last_val,
         }
     if isinstance(entity, Source):
-        ep = getattr(entity, "_event_provider", None)
-        generated = getattr(ep, "_generated", None)
-        return {"generated": generated or 0}
+        return {"generated": entity._nmb_generated}
 
     # Fallback: inspect public primitive attributes
     return _fallback_serialize(entity)

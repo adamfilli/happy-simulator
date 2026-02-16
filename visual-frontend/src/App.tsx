@@ -104,10 +104,6 @@ export default function App() {
     const res = await fetch("/api/reset", { method: "POST" });
     const state: SimState = await res.json();
     setState(state);
-    // Re-fetch topology after reset
-    const topoRes = await fetch("/api/topology");
-    const topo: Topology = await topoRes.json();
-    setTopology(topo);
   };
 
   return (

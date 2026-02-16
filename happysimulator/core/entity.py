@@ -105,3 +105,14 @@ class Entity(ABC):
         other resource constraints. Returns True by default.
         """
         return True
+
+    def downstream_entities(self) -> list[Entity]:
+        """Return downstream entities for topology discovery.
+
+        Override in subclasses that store downstream targets under
+        non-standard attribute names. The default implementation
+        returns an empty list; topology discovery falls back to
+        scanning common attribute names (``downstream``, ``targets``,
+        ``_downstream``, etc.) when this returns empty.
+        """
+        return []

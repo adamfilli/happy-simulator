@@ -88,8 +88,8 @@ export default function Timeline({ currentTime, endTime, breakpoints, onSeekTo }
       let label: string;
       if (t >= 3600) {
         label = (t / 3600).toFixed(1) + "h";
-      } else if (t >= 60) {
-        label = (t / 60).toFixed(1) + "m";
+      } else if (t >= 1000) {
+        label = (t / 60).toFixed(1) + "min";
       } else if (maxTime >= 100) {
         label = Math.round(t) + "s";
       } else {

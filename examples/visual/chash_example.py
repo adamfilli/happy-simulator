@@ -1,12 +1,12 @@
 """Consistent hashing load balancer — visual debugger demo.
 
-Simulates 5 backend nodes behind a consistent-hash load balancer.
+Simulates 3 backend nodes behind a consistent-hash load balancer.
 Traffic follows a dynamic profile: a warm-up ramp, a steady phase, a spike,
 and a cool-down — so you can watch how consistent hashing distributes load
 as traffic changes.
 
 Launch with:
-    python examples/visual/restaurant_overflow.py
+    python examples/visual/chash_example.py
 
 Opens a browser at http://127.0.0.1:8765.
 """

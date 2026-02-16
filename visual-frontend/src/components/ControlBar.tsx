@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useSimStore } from "../hooks/useSimState";
+import { formatTime, getTimeConfig } from "../utils/timeFormat";
 
 const SPEEDS = [
   { label: "1x", value: 1 },
@@ -27,14 +28,15 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
   const [runToInput, setRunToInput] = useState("");
   const [runToEventInput, setRunToEventInput] = useState("");
 
-  const timeStr = state ? state.time_s.toFixed(4) : "0.0000";
+  const cfg = getTimeConfig(state?.time_unit);
+  const timeStr = state ? formatTime(state.time_s, state.time_unit, 4) : "0.0000s";
   const eventsStr = state ? state.events_processed.toLocaleString() : "0";
   const heapStr = state ? state.heap_size.toLocaleString() : "0";
 
   const handleRunTo = () => {
     const t = parseFloat(runToInput);
-    if (!isNaN(t) && t > (state?.time_s ?? 0)) {
-      onRunTo(t);
+    if (!isNaN(t) && t > (state?.time_s ?? 0) / cfg.divisor) {
+      onRunTo(t * cfg.divisor);
     }
   };
 
@@ -49,7 +51,7 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
     <div className="flex items-center gap-4 px-4 py-2 bg-gray-900 border-b border-gray-800 text-sm">
       <div className="flex items-center gap-3 text-gray-400">
         <span>
-          t = <span className="text-white font-mono">{timeStr}s</span>
+          t = <span className="text-white font-mono">{timeStr}</span>
         </span>
         <span className="text-gray-700">|</span>
         <span>
@@ -151,7 +153,7 @@ export default function ControlBar({ onStep, onPlay, onDebug, onPause, onReset, 
             value={runToInput}
             onChange={(e) => setRunToInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleRunTo()}
-            placeholder="time (s)"
+            placeholder={`time (${cfg.suffix})`}
             disabled={isPlaying || state?.is_complete}
             className="w-20 px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs font-mono text-white placeholder-gray-600 disabled:opacity-40"
           />

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from "react";
+import { formatTime } from "../utils/timeFormat";
 
 export interface TimeSeriesChartHandle {
   getCanvas: () => HTMLCanvasElement | null;
@@ -13,6 +14,7 @@ interface Props {
   xLabel?: string;
   yMin?: number | null;
   yMax?: number | null;
+  timeUnit?: string;
 }
 
 /** Binary search for nearest data point by time. */
@@ -79,6 +81,7 @@ const TimeSeriesChart = forwardRef<TimeSeriesChartHandle, Props>(function TimeSe
     xLabel,
     yMin: fixedYMin,
     yMax: fixedYMax,
+    timeUnit,
   },
   ref,
 ) {
@@ -199,7 +202,7 @@ const TimeSeriesChart = forwardRef<TimeSeriesChartHandle, Props>(function TimeSe
     const xTicks = 5;
     for (let i = 0; i < xTicks; i++) {
       const t = tMin + (tRange * i) / (xTicks - 1 || 1);
-      ctx.fillText(t.toFixed(1) + "s", toX(t), pad.top + plotH + 4);
+      ctx.fillText(formatTime(t, timeUnit, 1), toX(t), pad.top + plotH + 4);
     }
 
     // ── Axis labels ──
@@ -309,7 +312,7 @@ const TimeSeriesChart = forwardRef<TimeSeriesChartHandle, Props>(function TimeSe
         ctx.stroke();
 
         // Tooltip
-        const timeStr = times[idx].toFixed(2) + "s";
+        const timeStr = formatTime(times[idx], timeUnit, 2);
         const valStr = formatValue(values[idx]);
         const tooltipText = `${timeStr}  ${valStr}`;
         ctx.font = "10px monospace";
@@ -349,7 +352,7 @@ const TimeSeriesChart = forwardRef<TimeSeriesChartHandle, Props>(function TimeSe
     }
 
     ctx.restore();
-  }, [times, values, color, size, yLabel, xLabel, fixedYMin, fixedYMax, zoomRange]);
+  }, [times, values, color, size, yLabel, xLabel, fixedYMin, fixedYMax, zoomRange, timeUnit]);
 
   // Draw on dependency change
   useEffect(() => {

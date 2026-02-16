@@ -3,6 +3,7 @@ import { useSimStore } from "../hooks/useSimState";
 import TimeSeriesChart from "./TimeSeriesChart";
 import type { TimeSeriesChartHandle } from "./TimeSeriesChart";
 import type { ChartConfig } from "../types";
+import { getTimeConfig } from "../utils/timeFormat";
 
 interface TimeSeriesData {
   times: number[];
@@ -15,13 +16,14 @@ interface Props {
   onClose: () => void;
   probeName?: string;
   chartConfig?: ChartConfig;
+  timeUnit?: string;
 }
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export default function DashboardPanel({ probeName, chartConfig, label, onClose }: Props) {
+export default function DashboardPanel({ probeName, chartConfig, label, onClose, timeUnit }: Props) {
   const eventsProcessed = useSimStore((s) => s.state?.events_processed);
   const timeRange = useSimStore((s) => s.dashboardTimeRange);
   const [tsData, setTsData] = useState<TimeSeriesData | null>(null);
@@ -66,7 +68,7 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
 
   const exportCsv = useCallback(() => {
     if (!tsData || tsData.times.length === 0) return;
-    const header = `Time (s),${label}\n`;
+    const header = `${getTimeConfig(timeUnit).label},${label}\n`;
     const rows = tsData.times.map((t, i) => `${t},${tsData.values[i]}`).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -75,7 +77,7 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
     a.download = `${sanitizeFilename(label)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [tsData, label]);
+  }, [tsData, label, timeUnit]);
 
   const chartColor = chartConfig?.color ?? "#3b82f6";
   const hasData = tsData && tsData.times.length > 0;
@@ -125,6 +127,7 @@ export default function DashboardPanel({ probeName, chartConfig, label, onClose 
             xLabel={chartConfig?.x_label}
             yMin={chartConfig?.y_min}
             yMax={chartConfig?.y_max}
+            timeUnit={timeUnit}
           />
         ) : (
           <div className="text-xs text-gray-500 text-center py-8">No data yet</div>

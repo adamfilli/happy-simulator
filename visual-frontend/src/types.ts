@@ -52,6 +52,7 @@ export interface SimState {
   entities: Record<string, Record<string, unknown>>;
   upcoming: SimEvent[];
   end_time_s?: number | null;
+  time_unit?: "s" | "min" | "h";
 }
 
 export interface EdgeStats {

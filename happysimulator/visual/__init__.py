@@ -54,8 +54,12 @@ def serve(
             "Install them with:  pip install happysim[visual]"
         ) from None
 
+    from happysimulator.core.event import enable_event_tracing
     from happysimulator.visual.bridge import SimulationBridge
     from happysimulator.visual.server import create_app
+
+    # Enable application-level event tracing for the visual debugger
+    enable_event_tracing()
 
     if sim._is_running:
         raise RuntimeError("Cannot serve a simulation that is already running.")

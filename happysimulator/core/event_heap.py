@@ -41,6 +41,7 @@ class EventHeap:
         self._heap = list(events) if events else []
         heapq.heapify(self._heap)
         self._trace = trace_recorder or NullTraceRecorder()
+        self._tracing_enabled = not isinstance(self._trace, NullTraceRecorder)
 
     def set_current_time(self, time: Instant) -> None:
         """Update the current simulation time for accurate trace timestamps."""
@@ -76,13 +77,14 @@ class EventHeap:
                 len(self._heap),
                 self._primary_event_count,
             )
-        self._trace.record(
-            time=self._current_time,
-            kind="heap.pop",
-            event_id=popped.context.get("id"),
-            event_type=popped.event_type,
-            heap_size=len(self._heap),
-        )
+        if self._tracing_enabled:
+            self._trace.record(
+                time=self._current_time,
+                kind="heap.pop",
+                event_id=popped.context.get("id"),
+                event_type=popped.event_type,
+                heap_size=len(self._heap),
+            )
         return popped
 
     def peek(self) -> Event:
@@ -113,11 +115,12 @@ class EventHeap:
                 event.daemon,
                 len(self._heap),
             )
-        self._trace.record(
-            time=self._current_time,
-            kind="heap.push",
-            event_id=event.context.get("id"),
-            event_type=event.event_type,
-            scheduled_for=event.time,
-            heap_size=len(self._heap),
-        )
+        if self._tracing_enabled:
+            self._trace.record(
+                time=self._current_time,
+                kind="heap.push",
+                event_id=event.context.get("id"),
+                event_type=event.event_type,
+                scheduled_for=event.time,
+                heap_size=len(self._heap),
+            )

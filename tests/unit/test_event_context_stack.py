@@ -6,12 +6,22 @@ building a trace of the event's journey through the system.
 
 from __future__ import annotations
 
+import pytest
+
 from happysimulator.components.common import Sink
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+from happysimulator.core.event import Event, disable_event_tracing, enable_event_tracing
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.load.source import Source
+
+
+@pytest.fixture(autouse=True)
+def _enable_tracing():
+    """Enable event tracing for all tests in this module."""
+    enable_event_tracing()
+    yield
+    disable_event_tracing()
 
 # --- Test entities ---
 

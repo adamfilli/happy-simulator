@@ -10,7 +10,6 @@ processes, enabling entities to yield delays and resume execution later.
 """
 
 import logging
-import uuid
 from collections.abc import Callable, Generator
 from itertools import count
 from typing import TYPE_CHECKING, Any, Optional, Union
@@ -40,6 +39,29 @@ def _clear_active_code_debugger() -> None:
 
 
 _global_event_counter = count()
+
+# Event-level tracing flag — disabled by default for performance.
+# When enabled, Event.invoke() records stack/trace spans in event.context.
+# The visual debugger enables this via enable_event_tracing().
+_event_tracing_enabled: bool = False
+
+
+def enable_event_tracing() -> None:
+    """Enable application-level event tracing (stack + trace spans).
+
+    Called by the visual debugger's serve() to enable per-event trace
+    recording. When disabled (the default), Event.invoke() skips trace()
+    and _ensure_stack() calls for better performance.
+    """
+    global _event_tracing_enabled
+    _event_tracing_enabled = True
+
+
+def disable_event_tracing() -> None:
+    """Disable application-level event tracing."""
+    global _event_tracing_enabled
+    _event_tracing_enabled = False
+
 
 CompletionHook = Callable[[Instant], Union[list["Event"], "Event", None]]
 """Signature for hooks that run when an event or process finishes."""
@@ -107,20 +129,21 @@ class Event:
         self.target = target
         self.on_complete = on_complete if on_complete is not None else []
         self._sort_index = _global_event_counter.__next__()
-        self._id = uuid.uuid4()
+        self._id = self._sort_index
         self._cancelled = False
 
-        # Lazy context: only allocate dict when caller provides one
+        # Context setup: dict literal for common case, setdefault for user-provided
         if context is not None:
             self.context = context
+            context.setdefault("id", str(self._id))
+            context.setdefault("created_at", self.time)
+            context.setdefault("metadata", {})
         else:
-            self.context = {}
-
-        # Ensure minimal context keys. Stack and trace are lazy (populated on invoke/trace).
-        # Metadata is eager because network/server components access it directly.
-        self.context.setdefault("id", str(self._id))
-        self.context.setdefault("created_at", self.time)
-        self.context.setdefault("metadata", {})
+            self.context = {
+                "id": str(self._id),
+                "created_at": self.time,
+                "metadata": {},
+            }
 
     @property
     def cancelled(self) -> bool:
@@ -202,26 +225,30 @@ class Event:
         if getattr(self.target, "_crashed", False):
             return []
 
-        handler_label = getattr(self.target, "name", type(self.target).__name__)
-        self._ensure_stack().append(handler_label)
-        self.trace("handle.start", handler="entity", handler_label=handler_label)
+        if _event_tracing_enabled:
+            handler_label = getattr(self.target, "name", type(self.target).__name__)
+            self._ensure_stack().append(handler_label)
+            self.trace("handle.start", handler="entity", handler_label=handler_label)
 
         try:
             raw_result = self.target.handle_event(self)
 
             if isinstance(raw_result, Generator):
-                self.trace("handle.end", result_kind="process")
+                if _event_tracing_enabled:
+                    self.trace("handle.end", result_kind="process")
                 return self._start_process(raw_result)
 
             normalized = self._normalize_return(raw_result)
-            self.trace("handle.end", result_kind="immediate", produced=len(normalized))
+            if _event_tracing_enabled:
+                self.trace("handle.end", result_kind="immediate", produced=len(normalized))
 
             completion_events = self._run_completion_hooks(self.time)
 
             return normalized + completion_events
 
         except Exception as exc:
-            self.trace("handle.error", error=type(exc).__name__, message=str(exc))
+            if _event_tracing_enabled:
+                self.trace("handle.error", error=type(exc).__name__, message=str(exc))
             raise
 
     def _run_completion_hooks(self, time: Instant) -> list["Event"]:
@@ -372,14 +399,17 @@ class ProcessContinuation(Event):
         context: dict[str, Any] | None = None,
         process: Generator | None = None,
     ):
-        super().__init__(
-            time=time,
-            event_type=event_type,
-            target=target,
-            daemon=daemon,
-            on_complete=on_complete,
-            context=context,
-        )
+        # Bypass Event.__init__ — continuations share their parent's context
+        # and don't need UUID generation or context.setdefault() calls.
+        self.time = time
+        self.event_type = event_type
+        self.target = target
+        self.daemon = daemon
+        self.on_complete = on_complete if on_complete is not None else []
+        self._sort_index = _global_event_counter.__next__()
+        self._id = self._sort_index
+        self._cancelled = False
+        self.context = context if context is not None else {}
         self.process = process
         self._send_value: Any = None
 
@@ -396,7 +426,9 @@ class ProcessContinuation(Event):
         """Advance the generator to its next yield and schedule the continuation."""
         from happysimulator.core.sim_future import SimFuture
 
-        self.trace("process.resume.start")
+        tracing_on = _event_tracing_enabled
+        if tracing_on:
+            self.trace("process.resume.start")
 
         # Install code tracing if debugger is active for this entity
         debugger = _active_code_debugger
@@ -414,12 +446,14 @@ class ProcessContinuation(Event):
             # 2. Check for SimFuture yield (park instead of scheduling)
             if isinstance(yielded_val, SimFuture):
                 yielded_val._park(self)
-                self.trace("process.park", future="SimFuture")
+                if tracing_on:
+                    self.trace("process.park", future="SimFuture")
                 return []
 
             # 3. Parse the yield (delay or delay+side_effects)
             delay, side_effects = self._normalize_yield(yielded_val)
-            self.trace("process.yield", delay_s=delay)
+            if tracing_on:
+                self.trace("process.yield", delay_s=delay)
 
             # 4. Schedule the next Resume (Recursive Continuation)
             resume_time = self.time + delay
@@ -441,23 +475,26 @@ class ProcessContinuation(Event):
             result = list(side_effects)
             result.append(next_continuation)
 
-            self.trace("process.resume.end", produced=len(result))
+            if tracing_on:
+                self.trace("process.resume.end", produced=len(result))
             return result
 
         except StopIteration as e:
             # Process finished. Return the final value (if any) PLUS completion hooks.
             finished = self._normalize_return(e.value)
             completion_events = self._run_completion_hooks(self.time)
-            self.trace(
-                "process.stop",
-                produced=len(finished) + len(completion_events),
-                finished_produced=len(finished),
-                completion_produced=len(completion_events),
-            )
+            if tracing_on:
+                self.trace(
+                    "process.stop",
+                    produced=len(finished) + len(completion_events),
+                    finished_produced=len(finished),
+                    completion_produced=len(completion_events),
+                )
             return finished + completion_events
 
         except Exception as exc:
-            self.trace("process.error", error=type(exc).__name__, message=str(exc))
+            if tracing_on:
+                self.trace("process.error", error=type(exc).__name__, message=str(exc))
             raise
 
         finally:

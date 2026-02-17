@@ -9,6 +9,7 @@ This module also provides ProcessContinuation for generator-based multi-step
 processes, enabling entities to yield delays and resume execution later.
 """
 
+import contextvars
 import logging
 from collections.abc import Callable, Generator
 from itertools import count
@@ -22,20 +23,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Active code debugger context — set by Simulation.run() when visual debugging
-_active_code_debugger: CodeDebugger | None = None
+# Active code debugger context — set by Simulation.run() when visual debugging.
+# Uses contextvars for thread safety in parallel simulation mode.
+_active_code_debugger_var: contextvars.ContextVar[CodeDebugger | None] = (
+    contextvars.ContextVar("_active_code_debugger", default=None)
+)
 
 
 def _set_active_code_debugger(debugger: CodeDebugger | None) -> None:
     """Set the active code debugger. Called by Simulation.run()."""
-    global _active_code_debugger
-    _active_code_debugger = debugger
+    _active_code_debugger_var.set(debugger)
 
 
 def _clear_active_code_debugger() -> None:
     """Clear the active code debugger."""
-    global _active_code_debugger
-    _active_code_debugger = None
+    _active_code_debugger_var.set(None)
 
 
 _global_event_counter = count()
@@ -431,7 +433,7 @@ class ProcessContinuation(Event):
             self.trace("process.resume.start")
 
         # Install code tracing if debugger is active for this entity
-        debugger = _active_code_debugger
+        debugger = _active_code_debugger_var.get()
         tracing = False
         if debugger is not None:
             entity_name = self._resolve_entity_name()

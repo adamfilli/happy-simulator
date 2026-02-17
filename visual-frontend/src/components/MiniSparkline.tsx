@@ -46,13 +46,14 @@ export default function MiniSparkline({
         if (v < min) min = v;
         if (v > max) max = v;
       }
-      // Avoid division by zero when all values are identical
-      const range = max - min || 1;
+      // Always include 0 so metrics like latency/connections scale properly
+      const yMin = Math.min(0, min);
+      const range = max - yMin || 1;
       const pad = 2;
 
       const toX = (i: number) => (i / (values.length - 1)) * w;
       const toY = (v: number) =>
-        h - pad - ((v - min) / range) * (h - pad * 2);
+        h - pad - ((v - yMin) / range) * (h - pad * 2);
 
       // Area fill
       ctx.beginPath();

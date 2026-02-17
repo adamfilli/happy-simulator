@@ -14,7 +14,12 @@ from happysimulator.core.control import (
 )
 from happysimulator.core.decorators import simulatable
 from happysimulator.core.entity import Entity, SimReturn, SimYield
-from happysimulator.core.event import Event, ProcessContinuation
+from happysimulator.core.event import (
+    Event,
+    ProcessContinuation,
+    disable_event_tracing,
+    enable_event_tracing,
+)
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.logical_clocks import (
     HLCTimestamp,
@@ -62,5 +67,7 @@ __all__ = [
     "VectorClock",
     "all_of",
     "any_of",
+    "disable_event_tracing",
+    "enable_event_tracing",
     "simulatable",
 ]

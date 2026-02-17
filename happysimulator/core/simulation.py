@@ -95,6 +95,7 @@ class Simulation:
                 component.set_clock(self._clock)
 
         self._trace = trace_recorder or NullTraceRecorder()
+        self._tracing_enabled = not isinstance(self._trace, NullTraceRecorder)
         self._event_heap = EventHeap(trace_recorder=self._trace)
         self._summary: SimulationSummary | None = None
 
@@ -283,9 +284,22 @@ class Simulation:
 
     def _run_loop(self) -> SimulationSummary:
         """Inner loop extracted for clean active-context scoping."""
-        while self._event_heap.has_events() and self._end_time >= self._current_time:
+        # Cache frequently-accessed attributes as locals (LOAD_FAST vs LOAD_ATTR)
+        heap = self._event_heap
+        clock = self._clock
+        end_time = self._end_time
+        control = self._control
+        tracing_enabled = self._tracing_enabled
+        trace = self._trace
+        auto_terminate = end_time == Instant.Infinity
+
+        # Fast path: no control surface, no tracing, explicit end_time
+        if control is None and not tracing_enabled and not auto_terminate:
+            return self._run_loop_fast(heap, clock, end_time)
+
+        while heap.has_events() and end_time >= self._current_time:
             # CONTROL CHECK: should we pause before popping?
-            if self._control is not None and self._control._should_pause():
+            if control is not None and control._should_pause():
                 self._is_paused = True
                 logger.info(
                     "Simulation paused at %r after %d events",
@@ -297,12 +311,12 @@ class Simulation:
             # TERMINATION CHECK:
             # If we rely on auto-termination (end_time is Infinity),
             # and we have no primary events left (only probes), STOP.
-            if self._end_time == Instant.Infinity and not self._event_heap.has_primary_events():
+            if auto_terminate and not heap.has_primary_events():
                 logger.info(
                     "Auto-terminating at %r: no primary events remaining (only daemon/probe events)",
                     self._current_time,
                 )
-                self._trace.record(
+                trace.record(
                     time=self._current_time,
                     kind="simulation.auto_terminate",
                     reason="no_primary_events",
@@ -310,7 +324,7 @@ class Simulation:
                 break
 
             # 1. Pop
-            event = self._event_heap.pop()
+            event = heap.pop()
 
             # Skip cancelled events (lazy deletion)
             if event.cancelled:
@@ -330,14 +344,14 @@ class Simulation:
 
             prev_time = self._current_time
             self._current_time = event.time  # Advance clock
-            self._clock.update(self._current_time)
-            self._event_heap.set_current_time(self._current_time)
+            clock.update(self._current_time)
+            heap.set_current_time(self._current_time)
             self._events_processed += 1
             self._last_event = event
 
             # CONTROL CHECK: notify time advance
-            if self._control is not None and self._current_time != prev_time:
-                self._control._notify_time_advance(self._current_time)
+            if control is not None and self._current_time != prev_time:
+                control._notify_time_advance(self._current_time)
 
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
@@ -346,12 +360,13 @@ class Simulation:
                     event,
                 )
 
-            self._trace.record(
-                time=self._current_time,
-                kind="simulation.dequeue",
-                event_id=event.context.get("id"),
-                event_type=event.event_type,
-            )
+            if tracing_enabled:
+                trace.record(
+                    time=self._current_time,
+                    kind="simulation.dequeue",
+                    event_id=event.context.get("id"),
+                    event_type=event.event_type,
+                )
 
             # 2. Invoke
             # The event itself knows how to run and what to return
@@ -371,20 +386,21 @@ class Simulation:
                             new_event.event_type,
                             new_event.time,
                         )
-                for new_event in new_events:
-                    self._trace.record(
-                        time=self._current_time,
-                        kind="simulation.schedule",
-                        event_id=new_event.context.get("id"),
-                        event_type=new_event.event_type,
-                        scheduled_time=new_event.time,
-                    )
-                self._event_heap.push(new_events)
+                if tracing_enabled:
+                    for new_event in new_events:
+                        trace.record(
+                            time=self._current_time,
+                            kind="simulation.schedule",
+                            event_id=new_event.context.get("id"),
+                            event_type=new_event.event_type,
+                            scheduled_time=new_event.time,
+                        )
+                heap.push(new_events)
 
             # CONTROL CHECK: notify event processed + check breakpoints
-            if self._control is not None:
-                self._control._notify_event_processed(event)
-                if self._control._check_breakpoints():
+            if control is not None:
+                control._notify_event_processed(event)
+                if control._check_breakpoints():
                     self._is_paused = True
                     logger.info(
                         "Simulation paused by breakpoint at %r after %d events",
@@ -421,6 +437,69 @@ class Simulation:
             time=self._current_time,
             kind="simulation.end",
             final_heap_size=self._event_heap.size(),
+        )
+
+        self._summary = self._build_summary()
+        return self._summary
+
+    def _run_loop_fast(self, heap: EventHeap, clock: Clock, end_time: Instant) -> SimulationSummary:
+        """Minimal hot loop for the common case: no control, no tracing, explicit end_time.
+
+        Eliminates per-event: control checks, trace recording, debug logging,
+        auto-termination check, last_event tracking, and set_current_time calls.
+        Matches the full loop's end_time boundary behavior exactly.
+        """
+        heap_pop = heap.pop
+        heap_push = heap.push
+        heap_has_events = heap.has_events
+        clock_update = clock.update
+        end_time_ns = end_time.nanoseconds
+        current_time = self._current_time
+        events_processed = self._events_processed
+        events_cancelled = self._events_cancelled
+
+        # Match full loop: check current_time <= end_time BEFORE popping
+        while heap_has_events() and current_time.nanoseconds <= end_time_ns:
+            event = heap_pop()
+
+            if event._cancelled:
+                events_cancelled += 1
+                continue
+
+            event_time = event.time
+            if event_time < current_time:
+                logger.warning(
+                    "Time travel detected: next event scheduled at %r, but current simulation time is %r. "
+                    "Skipping event. event_type=%s event_id=%s",
+                    event_time,
+                    current_time,
+                    event.event_type,
+                    event.context.get("id"),
+                )
+                continue
+
+            current_time = event_time
+            clock_update(current_time)
+            events_processed += 1
+
+            new_events = event.invoke()
+            if new_events:
+                heap_push(new_events)
+
+        # Write back to instance state
+        self._current_time = current_time
+        self._events_processed = events_processed
+        self._events_cancelled = events_cancelled
+
+        # Fall through to normal completion (matches full loop behavior)
+        self._is_running = False
+        self._is_paused = False
+
+        logger.info(
+            "Simulation complete: processed %d events, final time %r, %d event(s) remaining in heap",
+            self._events_processed,
+            self._current_time,
+            heap.size(),
         )
 
         self._summary = self._build_summary()

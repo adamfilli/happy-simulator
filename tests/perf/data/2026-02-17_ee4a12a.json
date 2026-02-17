@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-02-17T04:04:01.481489+00:00",
+  "git_hash": "ee4a12a",
+  "system": {
+    "python_version": "3.14.3",
+    "python_implementation": "CPython",
+    "python_build": "tags/v3.14.3:323c59a Feb  3 2026 16:04:56",
+    "os": "Windows",
+    "os_version": "10.0.26100",
+    "os_release": "11",
+    "platform": "Windows-11-10.0.26100-SP0",
+    "architecture": "AMD64",
+    "processor": "Intel64 Family 6 Model 198 Stepping 2, GenuineIntel",
+    "cpu_count_logical": 24,
+    "cpu_count_physical": 24,
+    "cpu_freq_mhz": 2700.0,
+    "cpu_freq_max_mhz": 2700.0,
+    "ram_total_gb": 31.43,
+    "ram_available_gb": 4.99
+  },
+  "results": {
+    "throughput": {
+      "name": "throughput",
+      "events_processed": 4508709,
+      "wall_clock_s": 33.50202710001031,
+      "events_per_second": 134580.18485092244,
+      "peak_memory_mb": 53.782230377197266,
+      "extra": {}
+    },
+    "generator_heavy": {
+      "name": "generator_heavy",
+      "events_processed": 1301053,
+      "wall_clock_s": 8.63887630001409,
+      "events_per_second": 150604.4252535342,
+      "peak_memory_mb": 10.692779541015625,
+      "extra": {
+        "yields_per_event": 5
+      }
+    },
+    "instrumented": {
+      "name": "instrumented",
+      "events_processed": 1802147,
+      "wall_clock_s": 12.984951699967496,
+      "events_per_second": 138787.34720318683,
+      "peak_memory_mb": 23.062935829162598,
+      "extra": {
+        "probe_interval_s": 0.01
+      }
+    },
+    "memory_footprint": {
+      "name": "memory_footprint",
+      "events_processed": 100000,
+      "wall_clock_s": 0.6027342999586836,
+      "events_per_second": 0.0,
+      "peak_memory_mb": 54.157325744628906,
+      "extra": {
+        "bytes_per_event": 567.9,
+        "total_memory_mb": 54.16
+      }
+    },
+    "large_heap": {
+      "name": "large_heap",
+      "events_processed": 100000,
+      "wall_clock_s": 0.6820960000040941,
+      "events_per_second": 146606.92922902317,
+      "peak_memory_mb": 70.19797992706299,
+      "extra": {
+        "peak_heap_size": 100000
+      }
+    },
+    "cancellation": {
+      "name": "cancellation",
+      "events_processed": 521023,
+      "wall_clock_s": 6.811828000005335,
+      "events_per_second": 76487.98531019749,
+      "peak_memory_mb": 13.444097518920898,
+      "extra": {
+        "cancelled_ratio": 0.8,
+        "events_cancelled": 80000
+      }
+    }
+  }
+}

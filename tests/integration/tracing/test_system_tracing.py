@@ -6,14 +6,24 @@ with Simulation and EventHeap. This is separate from application-level
 tracing (Event.context["trace"]) which is tested in test_tracing_basic.py.
 """
 
+import pytest
+
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event
+from happysimulator.core.event import Event, disable_event_tracing, enable_event_tracing
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.simulation import Simulation
 from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation import InMemoryTraceRecorder, NullTraceRecorder
 from happysimulator.load.profile import Profile
 from happysimulator.load.source import Source
+
+
+@pytest.fixture(autouse=True)
+def _enable_tracing():
+    """Enable event tracing for all tests in this module."""
+    enable_event_tracing()
+    yield
+    disable_event_tracing()
 
 # --- Test Fixtures ---
 

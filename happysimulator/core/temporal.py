@@ -32,6 +32,8 @@ class Duration:
         nanoseconds: The duration in nanoseconds.
     """
 
+    __slots__ = ("nanoseconds",)
+
     def __init__(self, nanoseconds: int):
         """Create a Duration from nanoseconds.
 
@@ -173,6 +175,8 @@ class Instant:
         nanoseconds: The time value in nanoseconds since epoch.
     """
 
+    __slots__ = ("nanoseconds",)
+
     def __init__(self, nanoseconds: int):
         """Create an Instant from nanoseconds since epoch.
 
@@ -298,6 +302,8 @@ class _InfiniteInstant(Instant):
     Greater than all finite Instants. Arithmetic with infinity yields
     infinity (absorbing).
     """
+
+    __slots__ = ()
 
     def __init__(self):
         import sys

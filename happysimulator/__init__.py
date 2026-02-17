@@ -306,6 +306,9 @@ from happysimulator.core import (
 )
 from happysimulator.core.temporal import Duration
 
+# Parallel execution
+from happysimulator.parallel import ParallelResult, ParallelRunner, RunConfig
+
 # Distributions
 from happysimulator.distributions import (
     ConstantLatency,

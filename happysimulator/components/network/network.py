@@ -163,12 +163,12 @@ class Network(Entity):
         """
         import copy
 
-        # Forward direction: a -> b
-        forward_link = link
+        # Forward direction: a -> b (copy to avoid mutating caller's link)
+        forward_link = copy.copy(link)
         forward_link.egress = b
         self._routes[(a.name, b.name)] = forward_link
 
-        # Reverse direction: b -> a (create a copy for independent stats)
+        # Reverse direction: b -> a (independent copy for independent stats)
         reverse_link = copy.copy(link)
         reverse_link.name = f"{link.name}_reverse"
         reverse_link.egress = a

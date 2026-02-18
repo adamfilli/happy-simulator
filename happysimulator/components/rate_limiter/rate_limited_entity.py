@@ -147,7 +147,8 @@ class RateLimitedEntity(Entity):
 
         if self._policy.try_acquire(now):
             queued_event = self._queue.pop()
-            assert queued_event is not None
+            if queued_event is None:
+                raise RuntimeError("Queue reported non-empty but pop() returned None")
             result = self._forward(queued_event, now)
             # If queue still has items, schedule next poll
             if not self._queue.is_empty():

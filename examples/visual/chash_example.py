@@ -73,7 +73,7 @@ class ClientRequestProvider(EventProvider):
         self._stop_after = stop_after
         self._rng = random.Random(seed)
 
-    def get_events(self, time: Instant) -> Event | list[Event]:
+    def get_events(self, time: Instant) -> list[Event]:
         if self._stop_after and time >= self._stop_after:
             return []
         client_id = self._rng.randint(0, NUM_CLIENTS - 1)

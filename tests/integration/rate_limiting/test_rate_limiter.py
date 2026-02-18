@@ -304,66 +304,80 @@ def test_rate_limiter_with_profile(
     print(f"Saved plots/data for {test_name} to: {test_output_dir}")
 
 
-def test_rate_limiter_basic_functionality():
-    """Basic test for TokenBucketPolicy + RateLimitedEntity without simulation."""
+def _make_rate_limiter(policy, queue_capacity=100):
+    """Create a rate limiter with a simulation for unit-style testing."""
     sink = Sink("sink")
-    policy = TokenBucketPolicy(capacity=5.0, refill_rate=2.0, initial_tokens=5.0)
     rate_limiter = RateLimitedEntity(
         name="limiter",
         downstream=sink,
         policy=policy,
-        queue_capacity=100,
+        queue_capacity=queue_capacity,
     )
-
-    # Create a simulation to provide clock
     Simulation(
         start_time=Instant.Epoch,
         duration=10.0,
         sources=[],
         entities=[rate_limiter, sink],
     )
+    return rate_limiter, sink
 
-    # Manually create and dispatch events
-    results: list[Event] = []
-    for i in range(5):
-        event = Event(time=Instant.from_seconds(i * 0.1), event_type="Request", target=rate_limiter)
+
+@pytest.mark.parametrize(
+    "policy,queue_capacity,event_times,forward_to_sink,expected",
+    [
+        pytest.param(
+            TokenBucketPolicy(capacity=5.0, refill_rate=2.0, initial_tokens=5.0),
+            100,
+            [i * 0.1 for i in range(5)],
+            True,
+            {"forwarded": 5, "dropped": 0, "sink_count": 5},
+            id="token_bucket_basic",
+        ),
+        pytest.param(
+            TokenBucketPolicy(capacity=5.0, refill_rate=1.0, initial_tokens=0.0),
+            100,
+            [0.0],
+            False,
+            {"queued": 1, "dropped": 0, "sink_count": 0},
+            id="token_bucket_empty_bucket",
+        ),
+        pytest.param(
+            LeakyBucketPolicy(leak_rate=2.0),
+            100,
+            [0.0, 0.0],
+            True,
+            {"forwarded": 1, "queued": 1},
+            id="leaky_bucket_basic",
+        ),
+        pytest.param(
+            LeakyBucketPolicy(leak_rate=1.0),
+            3,
+            [0.0] * 5,
+            False,
+            {"forwarded": 1, "dropped": 1, "queue_depth": 3},
+            id="leaky_bucket_full_queue",
+        ),
+    ],
+)
+def test_rate_limiter_scenarios(policy, queue_capacity, event_times, forward_to_sink, expected):
+    """Parametrized test covering basic rate limiter scenarios."""
+    rate_limiter, sink = _make_rate_limiter(policy, queue_capacity)
+
+    for time_s in event_times:
+        event = Event(time=Instant.from_seconds(time_s), event_type="Request", target=rate_limiter)
         result = rate_limiter.handle_event(event)
-        results.extend(result)
-        for evt in result:
-            if evt.target is sink:
-                sink.handle_event(evt)
+        if forward_to_sink:
+            for evt in result:
+                if evt.target is sink:
+                    sink.handle_event(evt)
 
-    assert rate_limiter.stats.forwarded == 5
-    assert rate_limiter.stats.dropped == 0
-    assert len(sink.completion_times) == 5
-
-
-def test_rate_limiter_empty_bucket():
-    """Test that requests are queued (not dropped) when bucket is empty."""
-    sink = Sink("sink")
-    policy = TokenBucketPolicy(capacity=5.0, refill_rate=1.0, initial_tokens=0.0)
-    rate_limiter = RateLimitedEntity(
-        name="limiter",
-        downstream=sink,
-        policy=policy,
-        queue_capacity=100,
-    )
-
-    Simulation(
-        start_time=Instant.Epoch,
-        duration=10.0,
-        sources=[],
-        entities=[rate_limiter, sink],
-    )
-
-    # Request should be queued since no tokens available
-    event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    rate_limiter.handle_event(event)
-
-    # Should return a poll event (not a forward)
-    assert rate_limiter.stats.queued == 1
-    assert rate_limiter.stats.dropped == 0
-    assert len(sink.completion_times) == 0
+    for attr, val in expected.items():
+        if attr == "sink_count":
+            assert len(sink.completion_times) == val, f"sink_count: expected {val}"
+        elif attr == "queue_depth":
+            assert rate_limiter.queue_depth == val, f"queue_depth: expected {val}"
+        else:
+            assert getattr(rate_limiter.stats, attr) == val, f"{attr}: expected {val}"
 
 
 # =============================================================================
@@ -503,75 +517,6 @@ def test_leaky_bucket_with_profile(
     print(f"Saved plots/data for {test_name} to: {test_output_dir}")
 
 
-def test_leaky_bucket_basic_functionality():
-    """Basic test for LeakyBucketPolicy + RateLimitedEntity."""
-    sink = Sink("sink")
-    policy = LeakyBucketPolicy(leak_rate=2.0)
-    rate_limiter = RateLimitedEntity(
-        name="limiter",
-        downstream=sink,
-        policy=policy,
-        queue_capacity=100,
-    )
-
-    Simulation(
-        start_time=Instant.Epoch,
-        duration=10.0,
-        sources=[],
-        entities=[rate_limiter, sink],
-    )
-
-    # First request at t=0 should be forwarded immediately
-    event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    result = rate_limiter.handle_event(event)
-    for evt in result:
-        if evt.target is sink:
-            sink.handle_event(evt)
-
-    assert rate_limiter.stats.forwarded == 1
-
-    # Second request at t=0 should be queued (leaky bucket interval not elapsed)
-    event2 = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    rate_limiter.handle_event(event2)
-    assert rate_limiter.stats.queued == 1
-
-
-def test_leaky_bucket_full_queue():
-    """Test that requests are dropped when queue is full."""
-    sink = Sink("sink")
-    policy = LeakyBucketPolicy(leak_rate=1.0)
-    rate_limiter = RateLimitedEntity(
-        name="limiter",
-        downstream=sink,
-        policy=policy,
-        queue_capacity=3,
-    )
-
-    Simulation(
-        start_time=Instant.Epoch,
-        duration=10.0,
-        sources=[],
-        entities=[rate_limiter, sink],
-    )
-
-    # First request forwarded
-    event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    rate_limiter.handle_event(event)
-    assert rate_limiter.stats.forwarded == 1
-
-    # Fill the queue (3 more)
-    for _ in range(3):
-        event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-        rate_limiter.handle_event(event)
-
-    assert rate_limiter.queue_depth == 3
-    assert rate_limiter.stats.dropped == 0
-
-    # Next request should be dropped (queue full)
-    event = Event(time=Instant.Epoch, event_type="Request", target=rate_limiter)
-    rate_limiter.handle_event(event)
-
-    assert rate_limiter.stats.dropped == 1
 
 
 def test_leaky_bucket_vs_token_bucket_comparison(test_output_dir: Path):

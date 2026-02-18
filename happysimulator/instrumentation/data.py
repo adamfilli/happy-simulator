@@ -182,7 +182,7 @@ class Data:
         """
         bucketed = self.bucket(window_s)
         result = Data()
-        for t, c in zip(bucketed.times(), bucketed.counts(), strict=False):
+        for t, c in zip(bucketed.times(), bucketed.counts(), strict=True):
             # Build Instant from seconds for add_stat
             result._samples.append((t, c / window_s))
         return result

@@ -191,7 +191,7 @@ class Event:
         """
         self.on_complete.append(hook)
 
-    _MAX_STACK_DEPTH = 50
+    _MAX_STACK_DEPTH = 50  # Prevents unbounded stack growth in deeply-chained event processing
 
     def _ensure_stack(self) -> list:
         """Lazily initialize and return the context stack (capped at _MAX_STACK_DEPTH)."""

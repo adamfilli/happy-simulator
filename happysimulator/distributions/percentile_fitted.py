@@ -80,6 +80,14 @@ class PercentileFittedLatency(LatencyDistribution):
         if not targets:
             raise ValueError("At least one percentile must be provided")
 
+        if not all(
+            targets[i].value <= targets[i + 1].value for i in range(len(targets) - 1)
+        ):
+            raise ValueError(
+                "Percentile values must be monotonically increasing "
+                "(e.g. p50 <= p90 <= p99)"
+            )
+
         self._lambda = self._fit_exponential(targets)
         mean_latency = 1.0 / self._lambda
 

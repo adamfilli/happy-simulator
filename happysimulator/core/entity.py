@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SimYield = Union[float, tuple[float, list[Event], Event], "SimFuture"]
+SimYield = Union[float, tuple[float, list[Event] | Event | None], "SimFuture"]
 """Type alias for generator yield values: delay, (delay, side_effects), or SimFuture."""
 
 SimReturn = list[Event] | Event | None
@@ -81,15 +81,21 @@ class Entity(ABC):
         raise NotImplementedError
 
     def forward(self, event: Event, target: Entity, event_type: str | None = None) -> Event:
-        """Create a forwarding event that preserves context.
+        """Create a forwarding event that preserves the original event's context.
+
+        This method only *creates* the event — it does not schedule it.
+        The caller must include the returned event in their return value
+        (e.g., ``return [self.forward(event, downstream)]``) for the
+        simulation loop to schedule it.
 
         Args:
-            event: The original event to forward.
-            target: The downstream entity to receive the event.
+            event: The original event whose context to preserve.
+            target: The downstream entity to receive the new event.
             event_type: Override the event type (default: keep original).
 
         Returns:
-            A new Event with the same context, targeted at the downstream entity.
+            A new Event at the current time with the same context, targeted
+            at the given downstream entity.
         """
         return Event(
             time=self.now,

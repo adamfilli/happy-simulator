@@ -415,11 +415,12 @@ class ProcessContinuation(Event):
 
     def _resolve_entity_name(self) -> str | None:
         """Resolve the actual entity name, handling QueuedResource indirection."""
-        from happysimulator.components.queued_resource import _QueuedResourceWorkerAdapter
-
         target = self.target
-        if isinstance(target, _QueuedResourceWorkerAdapter):
-            target = target._resource
+        # Duck-type: if this is a wrapper with a _resource attribute (e.g.
+        # _QueuedResourceWorkerAdapter), resolve through to the wrapped entity.
+        wrapped = getattr(target, "_resource", None)
+        if wrapped is not None:
+            target = wrapped
         return getattr(target, "name", None)
 
     def invoke(self) -> list["Event"]:

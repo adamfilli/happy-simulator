@@ -24,9 +24,9 @@ def test_basic_constant_simulation():
     sim.run()
 
     # We expect events at t=1, 2, ... 60 → 60 events handled by the counter.
-    # source._nmb_generated includes the Source's self-scheduling events.
-    assert source._nmb_generated == 61, (
-        f"Expected 61 generated, but source generated {source._nmb_generated}"
+    # source.generated_count includes the Source's self-scheduling events.
+    assert source.generated_count == 61, (
+        f"Expected 61 generated, but source generated {source.generated_count}"
     )
 
     assert counter.total == 60, f"Expected 60 events counted, but there were {counter.total}"

@@ -107,7 +107,7 @@ def serialize_entity(entity: object) -> dict[str, Any]:
             "latest": last_val,
         }
     if isinstance(entity, Source):
-        return {"generated": entity._nmb_generated}
+        return {"generated": entity.generated_count}
 
     # Fallback: inspect public primitive attributes
     return _fallback_serialize(entity)

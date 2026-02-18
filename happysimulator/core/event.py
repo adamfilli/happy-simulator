@@ -308,6 +308,10 @@ class Event:
         return self._sort_index < other._sort_index
 
     def __hash__(self):
+        # Hash is based on _id (UUID4), consistent with __eq__ which also
+        # compares _id. __eq__ returns NotImplemented for non-Event types,
+        # which is correct Python practice -- it delegates to the other
+        # operand's __eq__.
         return hash(self._id)
 
     def __eq__(self, other):

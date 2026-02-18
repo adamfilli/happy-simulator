@@ -36,6 +36,7 @@ Example::
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import logging
 from typing import TYPE_CHECKING, Any
@@ -69,6 +70,16 @@ def _clear_active_context() -> None:
     """Clear the active simulation context. Called when Simulation.run() exits."""
     _active_heap_var.set(None)
     _active_clock_var.set(None)
+
+
+@contextlib.contextmanager
+def _active_sim_context(heap: EventHeap, clock: Clock):
+    """Context manager for simulation-scoped SimFuture context."""
+    _set_active_context(heap, clock)
+    try:
+        yield
+    finally:
+        _clear_active_context()
 
 
 def _get_active_heap() -> EventHeap | None:

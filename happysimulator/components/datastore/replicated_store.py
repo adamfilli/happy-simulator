@@ -261,7 +261,7 @@ class ReplicatedStore(Entity):
                             self._read_latencies.append(total_latency)
                             return resp
 
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 self._replica_timeouts += 1
                 continue
 
@@ -314,7 +314,7 @@ class ReplicatedStore(Entity):
                 latencies.append(replica_latency)
                 acks += 1
 
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 self._replica_timeouts += 1
                 continue
 
@@ -363,7 +363,7 @@ class ReplicatedStore(Entity):
                 if result:
                     existed = True
 
-            except Exception:
+            except (TimeoutError, RuntimeError, OSError):
                 self._replica_timeouts += 1
                 continue
 

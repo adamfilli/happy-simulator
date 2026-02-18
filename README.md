@@ -13,6 +13,7 @@
   <a href="https://pypi.org/project/happysim/"><img src="https://img.shields.io/pypi/v/happysim" alt="PyPI" /></a>
   <a href="https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml"><img src="https://github.com/adamfilli/happy-simulator/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
   <a href="https://adamfilli.github.io/happy-simulator/"><img src="https://github.com/adamfilli/happy-simulator/actions/workflows/docs.yml/badge.svg" alt="Docs" /></a>
+  <a href="https://deepwiki.com/adamfilli/happy-simulator"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
   <a href="https://github.com/adamfilli/happy-simulator/blob/main/license"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="License" /></a>
 </p>
 

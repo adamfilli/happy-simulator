@@ -24,14 +24,14 @@ class RandomRouter(Entity):
 
         # Stats
         self.stats_routed: int = 0
-        self.target_counts: dict[int, int] = defaultdict(int)
+        self.target_counts: dict[str, int] = defaultdict(int)
 
     def handle_event(self, event: Event) -> list[Event]:
         """Route event to a randomly selected target."""
         self.stats_routed += 1
 
         idx = random.randint(0, len(self.targets) - 1)
-        self.target_counts[idx] += 1
+        self.target_counts[self.targets[idx].name] += 1
 
         routed_event = Event(
             time=self.now,

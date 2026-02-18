@@ -314,14 +314,14 @@ class TestExports:
     def test_importable_from_components(self):
         from happysimulator.components import Counter, Sink
 
-        assert Sink is not None
-        assert Counter is not None
+        assert issubclass(Sink, Entity)
+        assert issubclass(Counter, Entity)
 
     def test_importable_from_top_level(self):
         from happysimulator import Counter, Sink
 
-        assert Sink is not None
-        assert Counter is not None
+        assert issubclass(Sink, Entity)
+        assert issubclass(Counter, Entity)
 
     def test_sink_is_entity(self):
         assert issubclass(Sink, Entity)

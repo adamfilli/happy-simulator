@@ -55,7 +55,7 @@ class QueueDriver(Entity):
         if isinstance(event, QueueDeliverEvent):
             return self._handle_delivery(event)
 
-        return None
+        return []
 
     def _handle_delivery(self, event: QueueDeliverEvent) -> list[Event]:
         """Queue delivered one payload event; clone/retarget and re-emit."""

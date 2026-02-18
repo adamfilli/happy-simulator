@@ -314,7 +314,7 @@ def _detect_anomalies(
 
         # Use bucketed data to detect per-window anomalies
         bucketed = data.bucket(window_s=5.0)
-        for t, m in zip(bucketed.times(), bucketed.means(), strict=False):
+        for t, m in zip(bucketed.times(), bucketed.means(), strict=True):
             deviation = abs(m - overall_mean) / overall_std
             if deviation > threshold:
                 severity = "critical" if deviation > threshold * 2 else "warning"

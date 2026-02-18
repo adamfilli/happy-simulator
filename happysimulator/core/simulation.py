@@ -7,6 +7,7 @@ resulting events are pushed back for future processing.
 
 import logging
 import time as _time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from happysimulator.core.clock import Clock
@@ -110,6 +111,10 @@ class Simulation:
 
         # Pre-run scheduled events — replayed on reset()
         self._pre_run_event_specs: list[tuple[Instant, str, object, bool, dict]] = []
+
+        # Optional event validator — used by ParallelSimulation for
+        # runtime cross-partition detection. None = no validation.
+        self._event_validator: Callable | None = None
 
         # Control surface — lazy-created on first access
         self._control = None
@@ -293,8 +298,8 @@ class Simulation:
         trace = self._trace
         auto_terminate = end_time == Instant.Infinity
 
-        # Fast path: no control surface, no tracing, explicit end_time
-        if control is None and not tracing_enabled and not auto_terminate:
+        # Fast path: no control surface, no tracing, explicit end_time, no validator
+        if control is None and not tracing_enabled and not auto_terminate and self._event_validator is None:
             return self._run_loop_fast(heap, clock, end_time)
 
         while heap.has_events() and end_time >= self._current_time:
@@ -368,11 +373,15 @@ class Simulation:
                     event_type=event.event_type,
                 )
 
-            # 2. Invoke
+            # 2. Validate (optional — used by ParallelSimulation)
+            if self._event_validator is not None:
+                self._event_validator(event)
+
+            # 3. Invoke
             # The event itself knows how to run and what to return
             new_events = event.invoke()
 
-            # 3. Push
+            # 4. Push
             if new_events:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug(

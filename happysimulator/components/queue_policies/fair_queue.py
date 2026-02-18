@@ -168,29 +168,29 @@ class FairQueue(QueuePolicy[T]):
         Returns:
             The next item, or None if empty.
         """
-        if not self._flows:
-            return None
+        while self._flows:
+            # Get the first flow (round-robin order)
+            flow_id, flow_queue = next(iter(self._flows.items()))
 
-        # Get the first flow (round-robin order)
-        flow_id, flow_queue = next(iter(self._flows.items()))
+            if not flow_queue:
+                # Empty flow, remove it and try next flow
+                self._remove_flow(flow_id)
+                continue
 
-        if not flow_queue:
-            # Empty flow, remove it and try again
-            self._remove_flow(flow_id)
-            return self.pop()
+            item = flow_queue.popleft()
+            self._total_items -= 1
+            self._dequeued += 1
 
-        item = flow_queue.popleft()
-        self._total_items -= 1
-        self._dequeued += 1
+            # Move this flow to the end (round-robin)
+            self._flows.move_to_end(flow_id)
 
-        # Move this flow to the end (round-robin)
-        self._flows.move_to_end(flow_id)
+            # Clean up empty flows
+            if not flow_queue:
+                self._remove_flow(flow_id)
 
-        # Clean up empty flows
-        if not flow_queue:
-            self._remove_flow(flow_id)
+            return item
 
-        return item
+        return None
 
     def _remove_flow(self, flow_id: str) -> None:
         """Remove a flow from the queue."""

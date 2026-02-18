@@ -201,7 +201,7 @@ def test_rate_limiter_with_profile(
     # Verify basic invariants
     total = rate_limiter.stats.forwarded + rate_limiter.queue_depth + rate_limiter.stats.dropped
     assert rate_limiter.stats.received == total
-    assert len(received_s) > 0, "Should have received some requests"
+    assert len(received_s) >= 50, f"Expected at least 50 requests, got {len(received_s)}"
 
     # Print summary
     print(f"\n=== {test_name} ===")
@@ -434,7 +434,7 @@ def test_leaky_bucket_with_profile(
     # Verify basic invariants
     total = rate_limiter.stats.forwarded + rate_limiter.queue_depth + rate_limiter.stats.dropped
     assert rate_limiter.stats.received == total
-    assert len(received_s) > 0, "Should have received some requests"
+    assert len(received_s) >= 50, f"Expected at least 50 requests, got {len(received_s)}"
 
     # Print summary
     print(f"\n=== {test_name} (Leaky Bucket) ===")
@@ -806,7 +806,7 @@ def test_sliding_window_with_profile(
     # Verify basic invariants
     total = rate_limiter.stats.forwarded + rate_limiter.queue_depth + rate_limiter.stats.dropped
     assert rate_limiter.stats.received == total
-    assert len(received_s) > 0, "Should have received some requests"
+    assert len(received_s) >= 50, f"Expected at least 50 requests, got {len(received_s)}"
 
     # Print summary
     print(f"\n=== {test_name} (Sliding Window) ===")

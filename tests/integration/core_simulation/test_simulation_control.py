@@ -134,9 +134,9 @@ def test_time_breakpoint():
     state = sim.control.get_state()
     assert state.is_paused
     assert state.current_time >= Instant.from_seconds(5.0)
-    # At 10 req/s with source self-scheduling, we expect ~100 events
+    # At 10 req/s with source self-scheduling, we expect ~101 events
     # by t=5s (50 Ping + 50 self-scheduling + 1 initial)
-    assert state.events_processed > 0
+    assert 80 <= state.events_processed <= 120
 
 
 def test_event_type_breakpoint():

@@ -157,6 +157,16 @@ class Saga(Entity):
             [s.name for s in steps],
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        seen: set[str] = set()
+        result: list[Entity] = []
+        for step in self._steps:
+            for target in (step.action_target, step.compensation_target):
+                if target.name not in seen:
+                    seen.add(target.name)
+                    result.append(target)
+        return result
+
     @property
     def stats(self) -> SagaStats:
         """Return a frozen snapshot of current statistics."""

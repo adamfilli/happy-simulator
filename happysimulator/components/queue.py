@@ -102,6 +102,11 @@ class Queue(Entity):
         if self.policy is None:
             self.policy = FIFOQueue()
 
+    def downstream_entities(self) -> list[Entity]:
+        if self.egress is not None:
+            return [self.egress]
+        return []
+
     def has_capacity(self) -> bool:
         """Return True if the queue can accept more items."""
         # Delegate capacity check to policy

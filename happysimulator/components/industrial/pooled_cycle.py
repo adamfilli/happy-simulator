@@ -74,6 +74,11 @@ class PooledCycleResource(Entity):
         self._completed = 0
         self._rejected = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        if self.downstream is not None:
+            return [self.downstream]
+        return []
+
     @property
     def available(self) -> int:
         return self._available

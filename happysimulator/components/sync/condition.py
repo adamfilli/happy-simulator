@@ -94,6 +94,9 @@ class Condition(Entity):
         self._wakeups = 0
         self._total_wait_time_ns = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._lock]
+
     def set_clock(self, clock: Clock) -> None:
         """Attach clock to this condition and its internal mutex."""
         super().set_clock(clock)

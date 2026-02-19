@@ -67,6 +67,9 @@ class InspectionStation(QueuedResource):
         self._passed = 0
         self._failed = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.pass_target, self.fail_target]
+
     @property
     def inspected(self) -> int:
         return self._inspected

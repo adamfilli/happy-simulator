@@ -154,6 +154,9 @@ class Sidecar(Entity):
             max_retries,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def stats(self) -> SidecarStats:
         """Return a frozen snapshot of current statistics."""

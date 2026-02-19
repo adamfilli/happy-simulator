@@ -152,6 +152,9 @@ class DistributedRateLimiter(Entity):
         self.dropped_times: list[Instant] = []
         self.global_counts: list[tuple[Instant, int]] = []
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._downstream, self._backing_store]
+
     @property
     def downstream(self) -> Entity:
         """The entity receiving forwarded requests."""

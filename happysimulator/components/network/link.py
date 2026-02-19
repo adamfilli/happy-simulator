@@ -67,6 +67,11 @@ class NetworkLink(Entity):
     packets_dropped: int = field(default=0, init=False)
     _bytes_in_flight: int = field(default=0, init=False)
 
+    def downstream_entities(self) -> list[Entity]:
+        if self.egress is not None:
+            return [self.egress]
+        return []
+
     def __post_init__(self):
         if self.packet_loss_rate < 0.0 or self.packet_loss_rate > 1.0:
             raise ValueError(f"packet_loss_rate must be in [0, 1], got {self.packet_loss_rate}")

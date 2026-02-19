@@ -220,6 +220,9 @@ class ShardedStore(Entity):
         self._shard_reads: dict[int, int] = dict.fromkeys(range(len(shards)), 0)
         self._shard_writes: dict[int, int] = dict.fromkeys(range(len(shards)), 0)
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._shards)
+
     @property
     def stats(self) -> ShardedStoreStats:
         """Frozen snapshot of sharded store statistics."""

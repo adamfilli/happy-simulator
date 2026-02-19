@@ -113,6 +113,9 @@ class RaftNode(Entity):
         self._elections_started: int = 0
         self._total_votes_received: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._peers)
+
     def set_peers(self, peers: list[RaftNode]) -> None:
         self._peers = [p for p in peers if p.name != self.name]
 

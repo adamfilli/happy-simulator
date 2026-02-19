@@ -122,6 +122,9 @@ class PrimaryNode(Entity):
         self._acks_received = 0
         self._write_latency_sum = 0.0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._backups)
+
     @property
     def stats(self) -> PrimaryBackupStats:
         """Frozen snapshot of primary node statistics."""
@@ -329,6 +332,9 @@ class BackupNode(Entity):
         self._replications_applied = 0
         self._backup_reads = 0
         self._last_applied_seq = 0
+
+    def downstream_entities(self) -> list[Entity]:
+        return [self._primary]
 
     @property
     def stats(self) -> BackupStats:

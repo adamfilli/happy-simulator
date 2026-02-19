@@ -71,6 +71,9 @@ class Environment(Entity):
         for agent in agents or []:
             self.register_agent(agent)
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._agents.values())
+
     def register_agent(self, agent: Agent) -> None:
         """Add an agent to this environment."""
         self._agents[agent.name] = agent

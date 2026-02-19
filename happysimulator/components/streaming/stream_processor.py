@@ -265,6 +265,12 @@ class StreamProcessor(Entity):
         self._late_events_updated = 0
         self._late_events_side_output = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = [self._downstream]
+        if self._side_output is not None:
+            result.append(self._side_output)
+        return result
+
     @property
     def stats(self) -> StreamProcessorStats:
         """Return a frozen snapshot of current statistics."""

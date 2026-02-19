@@ -122,6 +122,9 @@ class PooledClient(Entity):
             type(self._retry_policy).__name__,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._pool]
+
     @property
     def connection_pool(self) -> ConnectionPool:
         """The connection pool used for requests."""

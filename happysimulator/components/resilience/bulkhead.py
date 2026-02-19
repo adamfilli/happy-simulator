@@ -132,6 +132,9 @@ class Bulkhead(Entity):
             max_wait_queue,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def target(self) -> Entity:
         """The protected target entity."""

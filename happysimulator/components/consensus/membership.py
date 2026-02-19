@@ -120,6 +120,9 @@ class MembershipProtocol(Entity):
         self._acks_received: int = 0
         self._updates_disseminated: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [info.entity for info in self._members.values()]
+
     def add_member(self, entity: Entity) -> None:
         """Register a peer member."""
         if entity.name == self.name:

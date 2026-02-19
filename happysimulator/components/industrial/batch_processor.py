@@ -74,6 +74,9 @@ class BatchProcessor(Entity):
         self._items_processed = 0
         self._timeouts = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.downstream]
+
     @property
     def batches_processed(self) -> int:
         return self._batches_processed

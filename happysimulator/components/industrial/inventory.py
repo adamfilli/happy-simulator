@@ -91,6 +91,16 @@ class InventoryBuffer(Entity):
         self._items_replenished = 0
         self._order_pending = False
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = []
+        if self.downstream is not None:
+            result.append(self.downstream)
+        if self.supplier is not None:
+            result.append(self.supplier)
+        if self.stockout_target is not None:
+            result.append(self.stockout_target)
+        return result
+
     @property
     def stock(self) -> int:
         return self._stock

@@ -84,6 +84,9 @@ class BreakdownScheduler(Entity):
         self._last_state_change_s = 0.0
         self._is_down = False
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.target]  # type: ignore[list-item]
+
     @property
     def is_down(self) -> bool:
         return self._is_down

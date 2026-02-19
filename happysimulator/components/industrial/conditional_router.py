@@ -63,6 +63,12 @@ class ConditionalRouter(Entity):
         self._total_routed = 0
         self._dropped = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        result = [target for _, target in self.routes]
+        if self.default is not None:
+            result.append(self.default)
+        return result
+
     @property
     def routed_counts(self) -> dict[str, int]:
         return dict(self._routed_counts)

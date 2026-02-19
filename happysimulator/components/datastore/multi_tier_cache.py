@@ -117,6 +117,11 @@ class MultiTierCache(Entity):
         self._misses = 0
         self._promotions = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        result = list(self._tiers)
+        result.append(self._backing_store)
+        return result
+
     @property
     def stats(self) -> MultiTierCacheStats:
         """Frozen snapshot of multi-tier cache statistics."""

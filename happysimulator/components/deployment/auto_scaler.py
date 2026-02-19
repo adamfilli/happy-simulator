@@ -262,6 +262,11 @@ class AutoScaler(Entity):
             evaluation_interval,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = [self._load_balancer]
+        result.extend(self._managed_servers)
+        return result
+
     @property
     def stats(self) -> AutoScalerStats:
         """Return a frozen snapshot of current statistics."""

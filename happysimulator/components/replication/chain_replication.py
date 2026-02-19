@@ -123,6 +123,16 @@ class ChainNode(Entity):
         self._acks_sent = 0
         self._reads_served = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = []
+        if self.next_node is not None:
+            result.append(self.next_node)
+        if self.prev_node is not None:
+            result.append(self.prev_node)
+        if self.head_node is not None and self.head_node is not self:
+            result.append(self.head_node)
+        return result
+
     @property
     def stats(self) -> ChainReplicationStats:
         """Frozen snapshot of chain node statistics."""

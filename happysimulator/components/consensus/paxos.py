@@ -109,6 +109,9 @@ class PaxosNode(Entity):
         self._nacks_received: int = 0
         self._accepts_received: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._peers)
+
     def set_peers(self, peers: list[PaxosNode]) -> None:
         """Set the peer list (excluding self)."""
         self._peers = [p for p in peers if p.name != self.name]

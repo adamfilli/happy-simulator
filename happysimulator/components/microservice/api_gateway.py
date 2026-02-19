@@ -146,6 +146,16 @@ class APIGateway(Entity):
             list(routes.keys()),
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        seen: set[str] = set()
+        result: list[Entity] = []
+        for route in self._routes.values():
+            for backend in route.backends:
+                if backend.name not in seen:
+                    seen.add(backend.name)
+                    result.append(backend)
+        return result
+
     @property
     def stats(self) -> APIGatewayStats:
         """Return a frozen snapshot of current statistics."""

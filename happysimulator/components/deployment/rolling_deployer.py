@@ -123,6 +123,12 @@ class RollingDeployer(Entity):
             max_failures,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = [self._load_balancer]
+        result.extend(self._old_backends)
+        result.extend(self._new_backends)
+        return result
+
     @property
     def stats(self) -> RollingDeployerStats:
         """Return a frozen snapshot of current statistics."""

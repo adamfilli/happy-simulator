@@ -113,6 +113,9 @@ class FlexiblePaxosNode(Entity):
         # Stats
         self._commands_committed: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._peers)
+
     def set_peers(self, peers: list[FlexiblePaxosNode]) -> None:
         self._peers = [p for p in peers if p.name != self.name]
         total = len(self._peers) + 1

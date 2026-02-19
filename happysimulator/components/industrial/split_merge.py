@@ -66,6 +66,9 @@ class SplitMerge(Entity):
         self._splits_initiated = 0
         self._merges_completed = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self.targets) + [self.downstream]
+
     @property
     def fan_out(self) -> int:
         return len(self.targets)

@@ -127,6 +127,9 @@ class LeaderNode(Entity):
         self._anti_entropy_syncs = 0
         self._anti_entropy_keys_repaired = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._peers)
+
     @property
     def stats(self) -> MultiLeaderStats:
         """Frozen snapshot of leader node statistics."""

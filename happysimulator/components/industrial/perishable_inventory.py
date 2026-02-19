@@ -99,6 +99,14 @@ class PerishableInventory(Entity):
         self._reorders = 0
         self._order_pending = False
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = []
+        if self.downstream is not None:
+            result.append(self.downstream)
+        if self.waste_target is not None:
+            result.append(self.waste_target)
+        return result
+
     @property
     def stock(self) -> int:
         return self._deferred_initial_stock + sum(qty for _, qty in self._items)

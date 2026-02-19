@@ -48,6 +48,12 @@ class QueueDriver(Entity):
     queue: Entity = None
     target: Entity = None
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = []
+        if self.target is not None:
+            result.append(self.target)
+        return result
+
     def handle_event(self, event: Event) -> Generator[Instant, None, list[Event]] | list[Event]:
         if isinstance(event, QueueNotifyEvent):
             return self._handle_notify(event)

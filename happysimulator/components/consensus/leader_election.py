@@ -79,6 +79,9 @@ class LeaderElection(Entity):
         self._elections_won: int = 0
         self._elections_participated: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._members.values())
+
     def add_member(self, entity: Entity) -> None:
         """Register a member for election participation."""
         self._members[entity.name] = entity

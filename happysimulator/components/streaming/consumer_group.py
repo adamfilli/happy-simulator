@@ -233,6 +233,11 @@ class ConsumerGroup(Entity):
         self._commits = 0
         self._records_polled = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = [self._event_log]
+        result.extend(self._consumers.values())
+        return result
+
     @property
     def stats(self) -> ConsumerGroupStats:
         """Return a frozen snapshot of current statistics."""

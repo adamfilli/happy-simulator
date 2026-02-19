@@ -13,7 +13,7 @@ import contextlib
 import logging
 from collections.abc import Callable, Generator
 from itertools import count
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from happysimulator.core.temporal import Instant
 from happysimulator.visual.code_debugger import CodeDebugger
@@ -125,7 +125,7 @@ class Event:
         self,
         time: Instant,
         event_type: str,
-        target: Optional["Simulatable"] = None,
+        target: "Simulatable | None" = None,
         *,
         daemon: bool = False,
         on_complete: list[CompletionHook] | None = None,
@@ -407,7 +407,7 @@ class ProcessContinuation(Event):
         self,
         time: Instant,
         event_type: str,
-        target: Optional["Simulatable"] = None,
+        target: "Simulatable | None" = None,
         *,
         daemon: bool = False,
         on_complete: list[CompletionHook] | None = None,

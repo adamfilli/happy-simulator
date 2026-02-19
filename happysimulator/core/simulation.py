@@ -60,8 +60,8 @@ class Simulation:
 
     def __init__(
         self,
-        start_time: Instant = None,
-        end_time: Instant = None,
+        start_time: Instant | None = None,
+        end_time: Instant | None = None,
         sources: list[Source] | None = None,
         entities: list[Simulatable] | None = None,
         probes: list[Source] | None = None,

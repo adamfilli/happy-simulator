@@ -96,9 +96,11 @@ from happysimulator.components.behavior import (
     Choice,
     CompositeModel,
     DecisionContext,
+    DecisionModel,
     DeGrootModel,
     DemographicSegment,
     EnvironmentStats,
+    InfluenceModel,
     Memory,
     NormalTraitDistribution,
     PersonalityTraits,
@@ -109,6 +111,7 @@ from happysimulator.components.behavior import (
     RuleBasedModel,
     SocialGraph,
     SocialInfluenceModel,
+    TraitDistribution,
     TraitSet,
     UniformTraitDistribution,
     UtilityModel,
@@ -444,6 +447,7 @@ __all__ = [
     "Data",
     "DeGrootModel",
     "DecisionContext",
+    "DecisionModel",
     "DemographicSegment",
     "DeploymentState",
     # Infrastructure Primitives
@@ -487,6 +491,7 @@ __all__ = [
     # Microservice patterns
     "IdempotencyStore",
     "Inductor",
+    "InfluenceModel",
     "InductorStats",
     "InspectionStation",
     "Instant",
@@ -648,6 +653,7 @@ __all__ = [
     "TopK",
     "TopKCollector",
     # Behavior
+    "TraitDistribution",
     "TraitSet",
     "TransactionManager",
     "TumblingWindow",

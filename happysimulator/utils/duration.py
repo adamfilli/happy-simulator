@@ -35,7 +35,7 @@ class Duration:
         # support Instant + Duration by handling Instant on the right-hand side
         try:
             from happysimulator.core.temporal import Instant
-        except Exception:  # pragma: no cover - defensive import
+        except ImportError:  # pragma: no cover - defensive import
             Instant = None
 
         if Instant is not None and isinstance(other, Instant):
@@ -53,7 +53,7 @@ class Duration:
     def __rsub__(self, other: Union[Instant, int, float]):
         try:
             from happysimulator.core.temporal import Instant
-        except Exception:  # pragma: no cover - defensive import
+        except ImportError:  # pragma: no cover - defensive import
             Instant = None
 
         if Instant is not None and isinstance(other, Instant):

@@ -13,6 +13,12 @@ import logging
 from abc import ABC, abstractmethod
 
 from happysimulator.core.temporal import Instant
+
+# Numerical integration / bracket search constants
+_INTEGRATION_TOLERANCE = 1e-10  # Simpson's rule convergence threshold
+_MIN_INTER_ARRIVAL_S = 1e-9  # Floor to prevent zero-delay events
+_MAX_EXPLORATION_TIME_S = 3600.0  # Maximum search window (1 hour)
+_MIN_STEP_SIZE = 1e-6  # Minimum geometric expansion step
 from happysimulator.load.profile import ConstantRateProfile, Profile
 from happysimulator.numerics import brentq, integrate_adaptive_simpson
 
@@ -81,7 +87,7 @@ class ArrivalTimeProvider(ABC):
 
         def objective_func(t_candidate_sec: float) -> float:
             current_area, _ = integrate_adaptive_simpson(
-                rate_fn, t_start_sec, t_candidate_sec, tol=1e-10
+                rate_fn, t_start_sec, t_candidate_sec, tol=_INTEGRATION_TOLERANCE
             )
             return current_area - target_area
 
@@ -93,7 +99,7 @@ class ArrivalTimeProvider(ABC):
             # Multiply by 2.0 to be optimistic and try to bracket immediately
             estimated_delay = (target_area / current_rate) * 2.0
             # Clamp to reasonable bounds
-            estimated_delay = max(1e-9, min(estimated_delay, 3600.0))
+            estimated_delay = max(_MIN_INTER_ARRIVAL_S, min(estimated_delay, _MAX_EXPLORATION_TIME_S))
             t_high = t_start_sec + estimated_delay
         else:
             # Rate is 0? Fallback to probe for future rate increases
@@ -112,7 +118,7 @@ class ArrivalTimeProvider(ABC):
                 break
 
             # Geometric expansion: double the window
-            step = max(1e-6, t_high - t_low)
+            step = max(_MIN_STEP_SIZE, t_high - t_low)
             t_high += step * 2.0
 
         if not found_bracket:

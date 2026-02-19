@@ -9,6 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+# Phase classification thresholds (ratio of current window mean to phase mean)
+_STABLE_RATIO_THRESHOLD = 1.5  # Below this: "stable" phase
+_DEGRADED_RATIO_THRESHOLD = 3.0  # Below this: "degraded"; above: "overloaded"
+_STD_NORMALIZATION_COEFF = 0.1  # Minimum effective std as fraction of mean
+
 if TYPE_CHECKING:
     from happysimulator.instrumentation.data import Data
 
@@ -92,7 +97,7 @@ def detect_phases(
         phase_std = _pstdev(phase_values) if len(phase_values) > 1 else 0.0
 
         # Check if this window represents a significant shift
-        effective_std = max(phase_std, abs(phase_mean) * 0.1) if phase_mean != 0 else 1.0
+        effective_std = max(phase_std, abs(phase_mean) * _STD_NORMALIZATION_COEFF) if phase_mean != 0 else 1.0
         deviation = abs(means[i] - phase_mean) / effective_std
 
         if deviation > threshold:
@@ -143,9 +148,9 @@ def _classify_phase(mean: float, baseline: float, std: float) -> str:
         return "degraded"
 
     ratio = mean / baseline
-    if ratio < 1.5:
+    if ratio < _STABLE_RATIO_THRESHOLD:
         return "stable"
-    if ratio < 3.0:
+    if ratio < _DEGRADED_RATIO_THRESHOLD:
         return "degraded"
     return "overloaded"
 

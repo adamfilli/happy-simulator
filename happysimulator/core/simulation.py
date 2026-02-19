@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event, _clear_active_code_debugger, _set_active_code_debugger
+from happysimulator.core.event import Event, _active_debugger_context
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.protocols import Simulatable
-from happysimulator.core.sim_future import _clear_active_context, _set_active_context
+from happysimulator.core.sim_future import _active_sim_context
 from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.recorder import NullTraceRecorder, TraceRecorder
 from happysimulator.instrumentation.summary import (
@@ -270,17 +270,11 @@ class Simulation:
                 self._event_heap.size(),
             )
 
-        # Set active context so SimFuture.resolve()/fail() can schedule events
-        _set_active_context(self._event_heap, self._clock)
-
-        # Set code debugger context if one has been injected by the visual bridge
-        _set_active_code_debugger(getattr(self, "_code_debugger", None))
-
-        try:
-            return self._run_loop()
-        finally:
-            _clear_active_code_debugger()
-            _clear_active_context()
+        # Set active contexts so SimFuture.resolve()/fail() can schedule events
+        # and so ProcessContinuation can access the code debugger.
+        with _active_sim_context(self._event_heap, self._clock):
+            with _active_debugger_context(getattr(self, "_code_debugger", None)):
+                return self._run_loop()
 
     def _run_loop(self) -> SimulationSummary:
         """Inner loop extracted for clean active-context scoping."""

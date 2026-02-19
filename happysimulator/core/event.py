@@ -9,6 +9,7 @@ This module also provides ProcessContinuation for generator-based multi-step
 processes, enabling entities to yield delays and resume execution later.
 """
 
+import contextlib
 import logging
 from collections.abc import Callable, Generator
 from itertools import count
@@ -36,6 +37,16 @@ def _clear_active_code_debugger() -> None:
     """Clear the active code debugger."""
     global _active_code_debugger
     _active_code_debugger = None
+
+
+@contextlib.contextmanager
+def _active_debugger_context(debugger: CodeDebugger | None):
+    """Context manager for simulation-scoped code debugger context."""
+    _set_active_code_debugger(debugger)
+    try:
+        yield
+    finally:
+        _clear_active_code_debugger()
 
 
 _global_event_counter = count()

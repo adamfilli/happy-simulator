@@ -11,7 +11,13 @@ from typing import TYPE_CHECKING
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
-from happysimulator.core.event import Event, _active_debugger_context
+from happysimulator.core.event import (
+    Event,
+    _clear_active_code_debugger,
+    _set_active_code_debugger,
+    reset_event_counter,
+    _active_debugger_context
+)
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.protocols import Simulatable
 from happysimulator.core.sim_future import _active_sim_context
@@ -69,6 +75,8 @@ class Simulation:
         fault_schedule: "FaultSchedule | None" = None,
         duration: float | None = None,
     ):
+        reset_event_counter()
+
         if duration is not None and end_time is not None:
             raise ValueError("Cannot specify both 'duration' and 'end_time'")
 

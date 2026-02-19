@@ -51,6 +51,16 @@ def _active_debugger_context(debugger: CodeDebugger | None):
 
 _global_event_counter = count()
 
+
+def reset_event_counter() -> None:
+    """Reset the global event counter to zero.
+
+    Called by Simulation.__init__() so each simulation run gets
+    deterministic sort indices starting from 0.
+    """
+    global _global_event_counter
+    _global_event_counter = count()
+
 # Event-level tracing flag — disabled by default for performance.
 # When enabled, Event.invoke() records stack/trace spans in event.context.
 # The visual debugger enables this via enable_event_tracing().

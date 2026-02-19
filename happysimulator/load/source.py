@@ -45,7 +45,7 @@ class SimpleEventProvider(EventProvider):
     Args:
         target: Entity to receive generated events.
         event_type: Type string for generated events.
-        stop_after: Stop generating after this time.
+        stop_after: Stop generating after this time (Instant).
         context_fn: Optional function(time: Instant, count: int) -> dict
             to generate custom event context. When None, generates
             ``{"created_at": time, "request_id": count}``.

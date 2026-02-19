@@ -125,3 +125,14 @@ class Entity(ABC):
         have no downstream connections.
         """
         return []
+
+    def visual_widget(self) -> dict | None:
+        """Optional widget definition for the visual debugger graph view.
+
+        Return a dict describing how to render this entity. The dict must
+        include a ``"type"`` key (e.g. ``"slots"``, ``"queue"``) and
+        metric-mapping keys that reference serialized state field names.
+
+        Return ``None`` (default) to use the standard metrics box.
+        """
+        return None

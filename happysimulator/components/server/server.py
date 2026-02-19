@@ -126,6 +126,13 @@ class Server(QueuedResource):
             return [self._downstream]
         return []
 
+    def visual_widget(self) -> dict | None:
+        return {
+            "type": "slots",
+            "total": "concurrency",
+            "active": "active_requests",
+        }
+
     @property
     def downstream(self) -> Entity | None:
         """Optional downstream entity for event forwarding."""

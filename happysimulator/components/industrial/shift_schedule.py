@@ -116,6 +116,11 @@ class ShiftedServer(QueuedResource):
         self._processed = 0
         self._initialized = False
 
+    def downstream_entities(self) -> list[Entity]:
+        if self.downstream is not None:
+            return [self.downstream]
+        return []
+
     @property
     def current_capacity(self) -> int:
         return self._current_capacity

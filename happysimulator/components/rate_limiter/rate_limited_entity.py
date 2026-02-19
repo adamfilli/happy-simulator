@@ -75,6 +75,9 @@ class RateLimitedEntity(Entity):
         self.forwarded_times: list[Instant] = []
         self.dropped_times: list[Instant] = []
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._downstream]
+
     @property
     def downstream(self) -> Entity:
         return self._downstream

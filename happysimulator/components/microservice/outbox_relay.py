@@ -127,6 +127,9 @@ class OutboxRelay(Entity):
             batch_size,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._downstream]
+
     @property
     def stats(self) -> OutboxRelayStats:
         """Return a frozen snapshot of current statistics."""

@@ -153,6 +153,9 @@ class HealthChecker(Entity):
             unhealthy_threshold,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._load_balancer]
+
     @property
     def stats(self) -> HealthCheckStats:
         """Return a frozen snapshot of health check statistics."""

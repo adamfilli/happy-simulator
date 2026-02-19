@@ -115,10 +115,13 @@ class Entity(ABC):
     def downstream_entities(self) -> list[Entity]:
         """Return downstream entities for topology discovery.
 
-        Override in subclasses that store downstream targets under
-        non-standard attribute names. The default implementation
-        returns an empty list; topology discovery falls back to
-        scanning common attribute names (``downstream``, ``targets``,
-        ``_downstream``, etc.) when this returns empty.
+        The visual debugger calls this method to build the entity
+        graph.  Subclasses that hold references to other entities
+        should override this and return all referenced entities so
+        that edges appear in the topology view.
+
+        The base implementation returns an empty list, which is
+        correct for leaf entities (sinks, counters, resources) that
+        have no downstream connections.
         """
         return []

@@ -110,6 +110,9 @@ class Hedge(Entity):
             max_hedges,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def target(self) -> Entity:
         """The target entity."""

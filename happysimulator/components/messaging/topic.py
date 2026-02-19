@@ -106,6 +106,9 @@ class Topic(Entity):
         self._subscribers_removed = 0
         self._delivery_latencies: list[float] = []
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._subscriptions.keys())
+
     @property
     def stats(self) -> TopicStats:
         """Return a frozen snapshot of current statistics."""

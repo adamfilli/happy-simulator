@@ -155,6 +155,9 @@ class ReplicatedStore(Entity):
         self._read_latencies: list[float] = []
         self._write_latencies: list[float] = []
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._replicas)
+
     @property
     def stats(self) -> ReplicatedStoreStats:
         """Frozen snapshot of replicated store statistics."""

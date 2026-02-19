@@ -26,6 +26,9 @@ class RandomRouter(Entity):
         self.stats_routed: int = 0
         self.target_counts: dict[str, int] = defaultdict(int)
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self.targets)
+
     def handle_event(self, event: Event) -> list[Event]:
         """Route event to a randomly selected target."""
         self.stats_routed += 1

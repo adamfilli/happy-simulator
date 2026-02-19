@@ -96,6 +96,9 @@ class TimeoutWrapper(Entity):
             timeout,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def target(self) -> Entity:
         """The wrapped target entity."""

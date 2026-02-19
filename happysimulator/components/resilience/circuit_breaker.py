@@ -152,6 +152,9 @@ class CircuitBreaker(Entity):
             timeout,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def target(self) -> Entity:
         """The protected target entity."""

@@ -228,6 +228,12 @@ class WorkStealingPool(Entity):
             num_workers,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = list(self._workers)
+        if self._downstream is not None:
+            result.append(self._downstream)
+        return result
+
     @property
     def num_workers(self) -> int:
         """Number of workers in the pool."""

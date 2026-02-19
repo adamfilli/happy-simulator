@@ -60,6 +60,9 @@ class ConveyorBelt(Entity):
         self._items_transported = 0
         self._items_rejected = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.downstream]
+
     @property
     def items_in_transit(self) -> int:
         return self._items_in_transit

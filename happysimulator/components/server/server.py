@@ -121,6 +121,11 @@ class Server(QueuedResource):
             self._service_time,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        if self._downstream is not None:
+            return [self._downstream]
+        return []
+
     @property
     def downstream(self) -> Entity | None:
         """Optional downstream entity for event forwarding."""

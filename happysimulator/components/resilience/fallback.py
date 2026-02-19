@@ -108,6 +108,13 @@ class Fallback(Entity):
             fallback_name,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        from happysimulator.core.entity import Entity
+        result = [self._primary]
+        if isinstance(self._fallback, Entity):
+            result.append(self._fallback)
+        return result
+
     @property
     def primary(self) -> Entity:
         """The primary entity."""

@@ -64,6 +64,9 @@ class AppointmentScheduler(Entity):
         self._arrivals = 0
         self._no_shows = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.target]
+
     @property
     def stats(self) -> AppointmentStats:
         return AppointmentStats(

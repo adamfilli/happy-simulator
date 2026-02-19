@@ -1,16 +1,20 @@
-"""Entity graph discovery via attribute introspection.
+"""Entity graph discovery via ``downstream_entities()`` protocol.
 
-Discovers which entities are connected by scanning known downstream
-attribute patterns. Used at serve-time to build the initial graph.
+Discovers which entities are connected by calling
+``Entity.downstream_entities()``.  Used at serve-time to build the
+initial graph for the visual debugger.
 """
 
 from __future__ import annotations
 
+import logging
 from collections import Counter as _Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from happysimulator.core.entity import Entity
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from happysimulator.core.simulation import Simulation
@@ -121,11 +125,8 @@ def classify(entity: object) -> str:
     return "other"
 
 
-_DOWNSTREAM_ATTRS = ["downstream", "targets", "target", "_downstream", "_target"]
-
-
 def _find_downstream(entity: object) -> list[Entity]:
-    """Find downstream entities by scanning known attribute patterns.
+    """Find downstream entities via ``downstream_entities()``.
 
     Probes are excluded --- their ``target`` is a monitoring relationship,
     not a data-flow edge.
@@ -138,25 +139,11 @@ def _find_downstream(entity: object) -> list[Entity]:
     if isinstance(entity, Probe):
         return []  # handled separately with kind="probe"
 
-    # Prefer explicit declaration via downstream_entities()
     declared = getattr(entity, "downstream_entities", None)
     if callable(declared):
-        result = declared()
-        if result:
-            return result
+        return declared()
 
-    # Fallback: scan common attribute names
-    found: list[Entity] = []
-    for attr_name in _DOWNSTREAM_ATTRS:
-        val = getattr(entity, attr_name, None)
-        if val is None:
-            continue
-        if isinstance(val, Entity):
-            found.append(val)
-        elif isinstance(val, list):
-            found.extend(v for v in val if isinstance(v, Entity))
-
-    return found
+    return []
 
 
 def _sample_profile(source: object, end_s: float, num_points: int = 200) -> dict | None:
@@ -267,7 +254,15 @@ def discover(sim: Simulation) -> Topology:
                 )
             )
 
-        for downstream in _find_downstream(entity):
+        downstream_list = _find_downstream(entity)
+        if not downstream_list:
+            logger.debug(
+                "Entity %r (%s) returned no downstream entities",
+                name,
+                type(entity).__name__,
+            )
+
+        for downstream in downstream_list:
             ds_name = getattr(downstream, "name", type(downstream).__name__)
             # Ensure downstream node exists
             if ds_name not in seen_names:
@@ -280,23 +275,6 @@ def discover(sim: Simulation) -> Topology:
                     )
                 )
             topology.add_edge_if_new(name, ds_name)
-
-    # Source -> target via _event_provider._target
-    for source in sim._sources:
-        ep = getattr(source, "_event_provider", None)
-        target = getattr(ep, "_target", None)
-        if target is not None and isinstance(target, Entity):
-            t_name = getattr(target, "name", type(target).__name__)
-            if t_name not in seen_names:
-                seen_names.add(t_name)
-                topology.nodes.append(
-                    Node(
-                        id=t_name,
-                        type=type(target).__name__,
-                        category=classify(target),
-                    )
-                )
-            topology.add_edge_if_new(source.name, t_name)
 
     # Probe -> target (monitoring edges)
     try:

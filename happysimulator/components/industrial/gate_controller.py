@@ -65,6 +65,9 @@ class GateController(Entity):
         self._rejected = 0
         self._open_cycles = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self.downstream]
+
     @property
     def is_open(self) -> bool:
         return self._is_open

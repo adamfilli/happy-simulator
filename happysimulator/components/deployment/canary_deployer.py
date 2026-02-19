@@ -224,6 +224,13 @@ class CanaryDeployer(Entity):
             len(self._stages),
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        result: list[Entity] = [self._load_balancer]
+        if self._canary is not None:
+            result.append(self._canary)
+        result.extend(self._baseline_backends)
+        return result
+
     @property
     def stats(self) -> CanaryDeployerStats:
         """Return a frozen snapshot of current statistics."""

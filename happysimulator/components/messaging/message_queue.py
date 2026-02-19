@@ -167,6 +167,12 @@ class MessageQueue(Entity):
         self._messages_dead_lettered = 0
         self._delivery_latencies: list[float] = []
 
+    def downstream_entities(self) -> list[Entity]:
+        result = list(self._consumers)
+        if self._dead_letter_queue is not None:
+            result.append(self._dead_letter_queue)
+        return result
+
     @property
     def stats(self) -> MessageQueueStats:
         """Return a frozen snapshot of current statistics."""

@@ -103,6 +103,9 @@ class CachedStore(Entity):
         self._evictions = 0
         self._writebacks = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._backing_store]
+
     @property
     def stats(self) -> CachedStoreStats:
         """Frozen snapshot of cached store statistics."""

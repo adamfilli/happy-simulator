@@ -92,6 +92,9 @@ class Inductor(Entity):
 
     # -- Properties -----------------------------------------------------------
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._downstream]
+
     @property
     def downstream(self) -> Entity:
         return self._downstream

@@ -270,6 +270,11 @@ class LSMTree(Entity):
         self._total_sstables_checked: int = 0
         self._total_bloom_saves: int = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        if self._wal is not None:
+            return [self._wal]
+        return []
+
     def set_clock(self, clock) -> None:
         """Inject clock into this entity and internal components."""
         super().set_clock(clock)

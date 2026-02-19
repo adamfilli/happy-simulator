@@ -119,6 +119,9 @@ class Client(Entity):
             type(self._retry_policy).__name__,
         )
 
+    def downstream_entities(self) -> list[Entity]:
+        return [self._target]
+
     @property
     def target(self) -> Entity:
         """The target entity for requests."""

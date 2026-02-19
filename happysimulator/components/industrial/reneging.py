@@ -65,6 +65,11 @@ class RenegingQueuedResource(QueuedResource):
         self._served = 0
         self._reneged = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        if self.reneged_target is not None:
+            return [self.reneged_target]
+        return []
+
     @property
     def served(self) -> int:
         return self._served

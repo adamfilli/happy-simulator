@@ -102,6 +102,9 @@ class CRDTStore(Entity):
         self._keys_merged = 0
         self._convergence_checks = 0
 
+    def downstream_entities(self) -> list[Entity]:
+        return list(self._peers)
+
     @property
     def stats(self) -> CRDTStoreStats:
         """Return a frozen snapshot of store statistics."""

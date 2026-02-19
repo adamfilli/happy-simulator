@@ -34,6 +34,7 @@ Usage::
 
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -207,6 +208,7 @@ class VectorClock:
 # =============================================================================
 
 
+@functools.total_ordering
 @dataclass(frozen=True, order=False)
 class HLCTimestamp:
     """Immutable timestamp from a Hybrid Logical Clock.
@@ -225,27 +227,6 @@ class HLCTimestamp:
 
     def __lt__(self, other: HLCTimestamp) -> bool:
         return (self.physical_ns, self.logical, self.node_id) < (
-            other.physical_ns,
-            other.logical,
-            other.node_id,
-        )
-
-    def __le__(self, other: HLCTimestamp) -> bool:
-        return (self.physical_ns, self.logical, self.node_id) <= (
-            other.physical_ns,
-            other.logical,
-            other.node_id,
-        )
-
-    def __gt__(self, other: HLCTimestamp) -> bool:
-        return (self.physical_ns, self.logical, self.node_id) > (
-            other.physical_ns,
-            other.logical,
-            other.node_id,
-        )
-
-    def __ge__(self, other: HLCTimestamp) -> bool:
-        return (self.physical_ns, self.logical, self.node_id) >= (
             other.physical_ns,
             other.logical,
             other.node_id,

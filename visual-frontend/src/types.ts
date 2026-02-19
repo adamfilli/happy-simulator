@@ -6,6 +6,7 @@ export interface TopologyNode {
   is_group?: boolean;
   member_count?: number;
   member_ids?: string[];
+  widget?: Record<string, unknown>;
 }
 
 export interface GroupMember {

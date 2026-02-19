@@ -176,7 +176,8 @@ class Inductor(Entity):
 
         if self._can_forward(now):
             queued_event = self._queue.pop()
-            assert queued_event is not None
+            if queued_event is None:
+                raise RuntimeError("Queue reported non-empty but pop() returned None")
             result = self._forward(queued_event, now)
             if not self._queue.is_empty():
                 result.extend(self._ensure_poll_scheduled(now))

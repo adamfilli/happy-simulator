@@ -8,6 +8,7 @@ for unconfigured routes.
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -161,8 +162,6 @@ class Network(Entity):
             b: Second entity.
             link: The NetworkLink to use (copied for reverse direction).
         """
-        import copy
-
         # Forward direction: a -> b
         forward_link = link
         forward_link.egress = b

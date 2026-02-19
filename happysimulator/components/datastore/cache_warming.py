@@ -198,7 +198,7 @@ class CacheWarmer(Entity):
                     self._keys_warmed += 1
                 else:
                     self._keys_failed += 1
-            except Exception:
+            except (KeyError, RuntimeError, OSError):
                 self._keys_failed += 1
 
             self._current_index += 1

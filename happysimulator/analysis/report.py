@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 from happysimulator.analysis.phases import Phase, detect_phases
 
+_CAUSAL_CORRELATION_WINDOW_S = 15.0  # Max time offset to consider phases causally related
+
 if TYPE_CHECKING:
     from happysimulator.instrumentation.data import Data
     from happysimulator.instrumentation.recorder import InMemoryTraceRecorder
@@ -314,7 +316,7 @@ def _detect_anomalies(
 
         # Use bucketed data to detect per-window anomalies
         bucketed = data.bucket(window_s=5.0)
-        for t, m in zip(bucketed.times(), bucketed.means(), strict=False):
+        for t, m in zip(bucketed.times(), bucketed.means(), strict=True):
             deviation = abs(m - overall_mean) / overall_std
             if deviation > threshold:
                 severity = "critical" if deviation > threshold * 2 else "warning"
@@ -360,7 +362,7 @@ def _detect_causal_chains(
         if qp.label in ("degraded", "overloaded"):
             # Find a latency phase that starts around the same time
             for lp in lat_phases:
-                if lp.label in ("degraded", "overloaded") and abs(qp.start_s - lp.start_s) < 15.0:
+                if lp.label in ("degraded", "overloaded") and abs(qp.start_s - lp.start_s) < _CAUSAL_CORRELATION_WINDOW_S:
                     effects = [
                         f"Queue depth entered '{qp.label}' state (mean={qp.mean:.2f})",
                         f"Latency entered '{lp.label}' state (mean={lp.mean:.4f}s)",

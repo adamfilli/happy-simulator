@@ -16,10 +16,11 @@ from happysimulator.core.event import (
     _clear_active_code_debugger,
     _set_active_code_debugger,
     reset_event_counter,
+    _active_debugger_context
 )
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.protocols import Simulatable
-from happysimulator.core.sim_future import _clear_active_context, _set_active_context
+from happysimulator.core.sim_future import _active_sim_context
 from happysimulator.core.temporal import Instant
 from happysimulator.instrumentation.recorder import NullTraceRecorder, TraceRecorder
 from happysimulator.instrumentation.summary import (
@@ -65,8 +66,8 @@ class Simulation:
 
     def __init__(
         self,
-        start_time: Instant = None,
-        end_time: Instant = None,
+        start_time: Instant | None = None,
+        end_time: Instant | None = None,
         sources: list[Source] | None = None,
         entities: list[Simulatable] | None = None,
         probes: list[Source] | None = None,
@@ -277,60 +278,41 @@ class Simulation:
                 self._event_heap.size(),
             )
 
-        # Set active context so SimFuture.resolve()/fail() can schedule events
-        _set_active_context(self._event_heap, self._clock)
-
-        # Set code debugger context if one has been injected by the visual bridge
-        _set_active_code_debugger(getattr(self, "_code_debugger", None))
-
-        try:
-            return self._run_loop()
-        finally:
-            _clear_active_code_debugger()
-            _clear_active_context()
+        # Set active contexts so SimFuture.resolve()/fail() can schedule events
+        # and so ProcessContinuation can access the code debugger.
+        with _active_sim_context(self._event_heap, self._clock):
+            with _active_debugger_context(getattr(self, "_code_debugger", None)):
+                return self._run_loop()
 
     def _run_loop(self) -> SimulationSummary:
         """Inner loop extracted for clean active-context scoping."""
-        # Cache frequently-accessed attributes as locals (LOAD_FAST vs LOAD_ATTR)
         heap = self._event_heap
-        clock = self._clock
         end_time = self._end_time
         control = self._control
-        tracing_enabled = self._tracing_enabled
-        trace = self._trace
         auto_terminate = end_time == Instant.Infinity
 
         # Fast path: no control surface, no tracing, explicit end_time
-        if control is None and not tracing_enabled and not auto_terminate:
-            return self._run_loop_fast(heap, clock, end_time)
+        if control is None and not self._tracing_enabled and not auto_terminate:
+            return self._run_loop_fast(heap, self._clock, end_time)
 
         while heap.has_events() and end_time >= self._current_time:
             # CONTROL CHECK: should we pause before popping?
             if control is not None and control._should_pause():
-                self._is_paused = True
-                logger.info(
-                    "Simulation paused at %r after %d events",
-                    self._current_time,
-                    self._events_processed,
-                )
-                return self._build_summary()
+                return self._pause_simulation(reason="requested")
 
-            # TERMINATION CHECK:
-            # If we rely on auto-termination (end_time is Infinity),
-            # and we have no primary events left (only probes), STOP.
+            # Auto-termination: no primary events remaining (only daemon/probe events)
             if auto_terminate and not heap.has_primary_events():
                 logger.info(
                     "Auto-terminating at %r: no primary events remaining (only daemon/probe events)",
                     self._current_time,
                 )
-                trace.record(
+                self._trace.record(
                     time=self._current_time,
                     kind="simulation.auto_terminate",
                     reason="no_primary_events",
                 )
                 break
 
-            # 1. Pop
             event = heap.pop()
 
             # Skip cancelled events (lazy deletion)
@@ -349,78 +331,85 @@ class Simulation:
                 )
                 continue
 
+            # Advance time, invoke, and push results
             prev_time = self._current_time
-            self._current_time = event.time  # Advance clock
-            clock.update(self._current_time)
-            heap.set_current_time(self._current_time)
-            self._events_processed += 1
-            self._last_event = event
+            self._advance_time(event)
 
-            # CONTROL CHECK: notify time advance
             if control is not None and self._current_time != prev_time:
                 control._notify_time_advance(self._current_time)
 
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    "Processing event #%d: %r",
-                    self._events_processed,
-                    event,
-                )
+                logger.debug("Processing event #%d: %r", self._events_processed, event)
 
-            if tracing_enabled:
-                trace.record(
+            if self._tracing_enabled:
+                self._trace.record(
                     time=self._current_time,
                     kind="simulation.dequeue",
                     event_id=event.context.get("id"),
                     event_type=event.event_type,
                 )
 
-            # 2. Invoke
-            # The event itself knows how to run and what to return
             new_events = event.invoke()
-
-            # 3. Push
             if new_events:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(
-                        "Event %r produced %d new event(s)",
-                        event.event_type,
-                        len(new_events),
-                    )
-                    for new_event in new_events:
-                        logger.debug(
-                            "  Scheduling %r for %r",
-                            new_event.event_type,
-                            new_event.time,
-                        )
-                if tracing_enabled:
-                    for new_event in new_events:
-                        trace.record(
-                            time=self._current_time,
-                            kind="simulation.schedule",
-                            event_id=new_event.context.get("id"),
-                            event_type=new_event.event_type,
-                            scheduled_time=new_event.time,
-                        )
-                heap.push(new_events)
+                self._push_new_events(event, new_events)
 
             # CONTROL CHECK: notify event processed + check breakpoints
             if control is not None:
                 control._notify_event_processed(event)
                 if control._check_breakpoints():
-                    self._is_paused = True
-                    logger.info(
-                        "Simulation paused by breakpoint at %r after %d events",
-                        self._current_time,
-                        self._events_processed,
-                    )
-                    return self._build_summary()
+                    return self._pause_simulation(reason="breakpoint")
 
-        # Simulation complete
+        return self._complete_run()
+
+    def _advance_time(self, event: Event) -> None:
+        """Advance the simulation clock to the event's time and update counters."""
+        self._current_time = event.time
+        self._clock.update(self._current_time)
+        self._event_heap.set_current_time(self._current_time)
+        self._events_processed += 1
+        self._last_event = event
+
+    def _push_new_events(self, source_event: Event, new_events: list[Event]) -> None:
+        """Log, trace, and push newly-produced events onto the heap."""
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "Event %r produced %d new event(s)",
+                source_event.event_type,
+                len(new_events),
+            )
+            for new_event in new_events:
+                logger.debug(
+                    "  Scheduling %r for %r",
+                    new_event.event_type,
+                    new_event.time,
+                )
+        if self._tracing_enabled:
+            for new_event in new_events:
+                self._trace.record(
+                    time=self._current_time,
+                    kind="simulation.schedule",
+                    event_id=new_event.context.get("id"),
+                    event_type=new_event.event_type,
+                    scheduled_time=new_event.time,
+                )
+        self._event_heap.push(new_events)
+
+    def _pause_simulation(self, *, reason: str) -> SimulationSummary:
+        """Mark the simulation as paused and return a partial summary."""
+        self._is_paused = True
+        logger.info(
+            "Simulation paused (%s) at %r after %d events",
+            reason,
+            self._current_time,
+            self._events_processed,
+        )
+        return self._build_summary()
+
+    def _complete_run(self) -> SimulationSummary:
+        """Finalize a completed simulation run and return the summary."""
         self._is_running = False
         self._is_paused = False
 
-        # Determine why loop ended
         if not self._event_heap.has_events():
             logger.info("Simulation ended at %r: event heap exhausted", self._current_time)
         elif self._end_time < self._current_time:

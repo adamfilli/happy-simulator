@@ -9,10 +9,11 @@ This module also provides ProcessContinuation for generator-based multi-step
 processes, enabling entities to yield delays and resume execution later.
 """
 
+import contextlib
 import logging
 from collections.abc import Callable, Generator
 from itertools import count
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from happysimulator.core.temporal import Instant
 from happysimulator.visual.code_debugger import CodeDebugger
@@ -36,6 +37,16 @@ def _clear_active_code_debugger() -> None:
     """Clear the active code debugger."""
     global _active_code_debugger
     _active_code_debugger = None
+
+
+@contextlib.contextmanager
+def _active_debugger_context(debugger: CodeDebugger | None):
+    """Context manager for simulation-scoped code debugger context."""
+    _set_active_code_debugger(debugger)
+    try:
+        yield
+    finally:
+        _clear_active_code_debugger()
 
 
 _global_event_counter = count()
@@ -124,7 +135,7 @@ class Event:
         self,
         time: Instant,
         event_type: str,
-        target: Optional["Simulatable"] = None,
+        target: "Simulatable | None" = None,
         *,
         daemon: bool = False,
         on_complete: list[CompletionHook] | None = None,
@@ -201,7 +212,7 @@ class Event:
         """
         self.on_complete.append(hook)
 
-    _MAX_STACK_DEPTH = 50
+    _MAX_STACK_DEPTH = 50  # Prevents unbounded stack growth in deeply-chained event processing
 
     def _ensure_stack(self) -> list:
         """Lazily initialize and return the context stack (capped at _MAX_STACK_DEPTH)."""
@@ -318,6 +329,10 @@ class Event:
         return self._sort_index < other._sort_index
 
     def __hash__(self):
+        # Hash is based on _id (UUID4), consistent with __eq__ which also
+        # compares _id. __eq__ returns NotImplemented for non-Event types,
+        # which is correct Python practice -- it delegates to the other
+        # operand's __eq__.
         return hash(self._id)
 
     def __eq__(self, other):
@@ -402,7 +417,7 @@ class ProcessContinuation(Event):
         self,
         time: Instant,
         event_type: str,
-        target: Optional["Simulatable"] = None,
+        target: "Simulatable | None" = None,
         *,
         daemon: bool = False,
         on_complete: list[CompletionHook] | None = None,

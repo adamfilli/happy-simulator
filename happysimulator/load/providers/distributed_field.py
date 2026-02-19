@@ -39,7 +39,7 @@ class DistributedFieldProvider(EventProvider):
         field_distributions: Dict mapping field names to ValueDistributions.
                             Each field will be sampled independently.
         static_fields: Dict of constant field values (optional).
-        stop_after: Stop generating events after this time (optional).
+        stop_after: Stop generating events after this time (Instant, optional).
 
     Attributes:
         generated: Count of events generated.

@@ -38,7 +38,8 @@ class TestLazyCreation:
     def test_accessing_control_creates_it(self):
         sim = _make_sim()
         ctrl = sim.control
-        assert ctrl is not None
+        from happysimulator.core.control.control import SimulationControl
+        assert isinstance(ctrl, SimulationControl)
         assert sim._control is ctrl
 
     def test_control_same_instance_on_repeat_access(self):

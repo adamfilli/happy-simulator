@@ -175,7 +175,7 @@ class SimulationControl:
 
     def add_breakpoint(self, bp: Breakpoint) -> str:
         """Register a breakpoint. Returns a unique ID for removal."""
-        bp_id = str(uuid.uuid4())[:8]
+        bp_id = str(uuid.uuid4())[:8]  # 8 hex chars — sufficient for human-readable IDs within a simulation
         self._breakpoints[bp_id] = bp
         logger.info("Added breakpoint %s: %s", bp_id, bp)
         return bp_id

@@ -276,7 +276,8 @@ class FixedWindowPolicy:
         if self._current_window_count < self._requests_per_window:
             return Duration.ZERO
         # Wait until next window starts
-        assert self._current_window_start is not None
+        if self._current_window_start is None:
+            return Duration.ZERO
         next_window = self._current_window_start + self._window_size
         remaining = (next_window - now).to_seconds()
         if remaining <= 0:

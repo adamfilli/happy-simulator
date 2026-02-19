@@ -75,14 +75,14 @@ class Data:
         vals = [v for _, v in self._samples]
         if not vals:
             return 0.0
-        return builtins_min(vals)
+        return min(vals)
 
     def max(self) -> float:
         """Maximum sample value. Returns 0.0 if empty."""
         vals = [v for _, v in self._samples]
         if not vals:
             return 0.0
-        return builtins_max(vals)
+        return max(vals)
 
     def percentile(self, p: float) -> float:
         """Calculate percentile from sample values.
@@ -103,7 +103,7 @@ class Data:
         n = len(vals)
         pos = p * (n - 1)
         lo = int(pos)
-        hi = builtins_min(lo + 1, n - 1)
+        hi = min(lo + 1, n - 1)
         frac = pos - lo
         return float(vals[lo] * (1.0 - frac) + vals[hi] * frac)
 
@@ -113,7 +113,7 @@ class Data:
 
     def sum(self) -> float:
         """Sum of sample values. Returns 0.0 if empty."""
-        return builtins_sum(v for _, v in self._samples)
+        return sum(v for _, v in self._samples)
 
     def std(self) -> float:
         """Population standard deviation of sample values. Returns 0.0 if fewer than 2 samples."""
@@ -150,7 +150,7 @@ class Data:
             result._times.append(bucket_start)
             result._means.append(sum(vals) / len(vals))
             result._counts.append(len(vals))
-            result._maxes.append(builtins_max(vals))
+            result._maxes.append(max(vals))
             result._sums.append(sum(vals))
             result._p50s.append(_percentile_sorted(vals_sorted, 0.50))
             result._p99s.append(_percentile_sorted(vals_sorted, 0.99))
@@ -182,7 +182,7 @@ class Data:
         """
         bucketed = self.bucket(window_s)
         result = Data()
-        for t, c in zip(bucketed.times(), bucketed.counts(), strict=False):
+        for t, c in zip(bucketed.times(), bucketed.counts(), strict=True):
             # Build Instant from seconds for add_stat
             result._samples.append((t, c / window_s))
         return result
@@ -205,7 +205,7 @@ def _percentile_sorted(sorted_values: list[float], p: float) -> float:
     n = len(sorted_values)
     pos = p * (n - 1)
     lo = int(pos)
-    hi = builtins_min(lo + 1, n - 1)
+    hi = min(lo + 1, n - 1)
     frac = pos - lo
     return float(sorted_values[lo] * (1.0 - frac) + sorted_values[hi] * frac)
 
@@ -267,11 +267,3 @@ class BucketedData:
 
     def __bool__(self) -> bool:
         return len(self._times) > 0
-
-
-# Avoid shadowing builtins
-import builtins as _builtins
-
-builtins_min = _builtins.min
-builtins_max = _builtins.max
-builtins_sum = _builtins.sum

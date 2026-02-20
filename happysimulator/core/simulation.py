@@ -7,16 +7,15 @@ resulting events are pushed back for future processing.
 
 import logging
 import time as _time
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from happysimulator.core.clock import Clock
 from happysimulator.core.entity import Entity
 from happysimulator.core.event import (
     Event,
-    _clear_active_code_debugger,
-    _set_active_code_debugger,
+    _active_debugger_context,
     reset_event_counter,
-    _active_debugger_context
 )
 from happysimulator.core.event_heap import EventHeap
 from happysimulator.core.protocols import Simulatable
@@ -121,6 +120,10 @@ class Simulation:
 
         # Control surface — lazy-created on first access
         self._control = None
+
+        # Event router — set by ParallelSimulation for cross-partition routing.
+        # When None (default), events are pushed directly to heap (zero overhead).
+        self._event_router: Callable[[list[Event], Instant], list[Event]] | None = None
 
         logger.info(
             "Simulation initialized: start=%r, end=%r, sources=%d, entities=%d, probes=%d",
@@ -291,8 +294,13 @@ class Simulation:
         control = self._control
         auto_terminate = end_time == Instant.Infinity
 
-        # Fast path: no control surface, no tracing, explicit end_time
-        if control is None and not self._tracing_enabled and not auto_terminate:
+        # Fast path: no control surface, no tracing, explicit end_time, no router
+        if (
+            control is None
+            and not self._tracing_enabled
+            and not auto_terminate
+            and self._event_router is None
+        ):
             return self._run_loop_fast(heap, self._clock, end_time)
 
         while heap.has_events() and end_time >= self._current_time:
@@ -438,23 +446,29 @@ class Simulation:
         self._summary = self._build_summary()
         return self._summary
 
-    def _run_loop_fast(self, heap: EventHeap, clock: Clock, end_time: Instant) -> SimulationSummary:
-        """Minimal hot loop for the common case: no control, no tracing, explicit end_time.
+    def _execute_until(self, end_time_ns: int) -> None:
+        """Run the pop-invoke-push loop until time exceeds end_time_ns.
 
-        Eliminates per-event: control checks, trace recording, debug logging,
-        auto-termination check, last_event tracking, and set_current_time calls.
-        Matches the full loop's end_time boundary behavior exactly.
+        This is the extracted inner loop shared by ``_run_loop_fast`` (normal
+        execution) and ``_run_window`` (parallel windowed execution).  It does
+        NOT touch ``_is_running`` or build a summary — callers are responsible
+        for finalization.
+
+        When ``_event_router`` is set, produced events are passed through the
+        router which separates local events (returned to push) from
+        cross-partition events (appended to an outbox as a side-effect).
         """
+        heap = self._event_heap
+        clock = self._clock
         heap_pop = heap.pop
         heap_push = heap.push
         heap_has_events = heap.has_events
         clock_update = clock.update
-        end_time_ns = end_time.nanoseconds
         current_time = self._current_time
         events_processed = self._events_processed
         events_cancelled = self._events_cancelled
+        router = self._event_router
 
-        # Match full loop: check current_time <= end_time BEFORE popping
         while heap_has_events() and current_time.nanoseconds <= end_time_ns:
             event = heap_pop()
 
@@ -480,14 +494,23 @@ class Simulation:
 
             new_events = event.invoke()
             if new_events:
-                heap_push(new_events)
+                if router is not None:
+                    new_events = router(new_events, current_time)
+                if new_events:
+                    heap_push(new_events)
 
         # Write back to instance state
         self._current_time = current_time
         self._events_processed = events_processed
         self._events_cancelled = events_cancelled
 
-        # Fall through to normal completion (matches full loop behavior)
+    def _run_loop_fast(self, heap: EventHeap, clock: Clock, end_time: Instant) -> SimulationSummary:
+        """Minimal hot loop for the common case: no control, no tracing, explicit end_time.
+
+        Delegates to ``_execute_until`` and then finalizes the run.
+        """
+        self._execute_until(end_time.nanoseconds)
+
         self._is_running = False
         self._is_paused = False
 
@@ -500,6 +523,22 @@ class Simulation:
 
         self._summary = self._build_summary()
         return self._summary
+
+    def _run_window(self, window_end: Instant) -> None:
+        """Run the simulation up to window_end without finalizing.
+
+        Used by ``ParallelSimulation`` / ``WindowedCoordinator`` to execute
+        one time window.  The simulation stays in ``_is_running = True`` state
+        so subsequent windows can continue.
+        """
+        if not self._is_running:
+            self._wall_start = _time.monotonic()
+            self._is_running = True
+            self._event_heap.set_current_time(self._current_time)
+
+        with _active_sim_context(self._event_heap, self._clock):
+            with _active_debugger_context(None):
+                self._execute_until(window_end.nanoseconds)
 
     def _build_summary(self) -> SimulationSummary:
         """Build a SimulationSummary from current state."""

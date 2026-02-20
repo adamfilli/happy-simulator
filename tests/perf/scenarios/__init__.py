@@ -6,6 +6,7 @@ from tests.perf.scenarios import (
     instrumented,
     large_heap,
     memory_footprint,
+    parallel_partition,
     throughput,
 )
 
@@ -16,4 +17,5 @@ SCENARIOS: dict[str, object] = {
     "memory_footprint": memory_footprint,
     "large_heap": large_heap,
     "cancellation": cancellation,
+    "parallel_partition": parallel_partition,
 }

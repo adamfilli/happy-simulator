@@ -10,6 +10,7 @@ processes, enabling entities to yield delays and resume execution later.
 """
 
 import contextlib
+import contextvars
 import logging
 from collections.abc import Callable, Generator
 from itertools import count
@@ -23,20 +24,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Active code debugger context — set by Simulation.run() when visual debugging
-_active_code_debugger: CodeDebugger | None = None
+# Active code debugger context — contextvar for thread safety in parallel mode.
+_active_code_debugger_var: contextvars.ContextVar[CodeDebugger | None] = (
+    contextvars.ContextVar("_active_code_debugger", default=None)
+)
 
 
 def _set_active_code_debugger(debugger: CodeDebugger | None) -> None:
     """Set the active code debugger. Called by Simulation.run()."""
-    global _active_code_debugger
-    _active_code_debugger = debugger
+    _active_code_debugger_var.set(debugger)
 
 
 def _clear_active_code_debugger() -> None:
     """Clear the active code debugger."""
-    global _active_code_debugger
-    _active_code_debugger = None
+    _active_code_debugger_var.set(None)
 
 
 @contextlib.contextmanager
@@ -50,6 +51,20 @@ def _active_debugger_context(debugger: CodeDebugger | None):
 
 
 _global_event_counter = count()
+
+# Per-partition event counter — when set, Event/ProcessContinuation use this
+# instead of _global_event_counter.  Enables independent ordering per partition.
+_active_counter_var: contextvars.ContextVar[count | None] = contextvars.ContextVar(
+    "_active_counter", default=None
+)
+
+
+def _next_sort_index() -> int:
+    """Return the next sort index from the active counter (or the global fallback)."""
+    counter = _active_counter_var.get(None)
+    if counter is not None:
+        return counter.__next__()
+    return _global_event_counter.__next__()
 
 
 def reset_event_counter() -> None:
@@ -149,7 +164,7 @@ class Event:
         self.daemon = daemon
         self.target = target
         self.on_complete = on_complete if on_complete is not None else []
-        self._sort_index = _global_event_counter.__next__()
+        self._sort_index = _next_sort_index()
         self._id = self._sort_index
         self._cancelled = False
 
@@ -431,7 +446,7 @@ class ProcessContinuation(Event):
         self.target = target
         self.daemon = daemon
         self.on_complete = on_complete if on_complete is not None else []
-        self._sort_index = _global_event_counter.__next__()
+        self._sort_index = _next_sort_index()
         self._id = self._sort_index
         self._cancelled = False
         self.context = context if context is not None else {}
@@ -456,7 +471,7 @@ class ProcessContinuation(Event):
             self.trace("process.resume.start")
 
         # Install code tracing if debugger is active for this entity
-        debugger = _active_code_debugger
+        debugger = _active_code_debugger_var.get(None)
         tracing = False
         if debugger is not None:
             entity_name = self._resolve_entity_name()

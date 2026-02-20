@@ -6,6 +6,7 @@ by insertion order for deterministic FIFO behavior among simultaneous events.
 
 import heapq
 import logging
+from itertools import count
 from typing import Union
 
 from happysimulator.core.event import Event
@@ -42,6 +43,9 @@ class EventHeap:
         heapq.heapify(self._heap)
         self._trace = trace_recorder or NullTraceRecorder()
         self._tracing_enabled = not isinstance(self._trace, NullTraceRecorder)
+        # Per-heap event counter for parallel partition isolation.
+        # Set via _active_sim_context so Event/ProcessContinuation use it.
+        self._event_counter: count = count()
 
     def set_current_time(self, time: Instant) -> None:
         """Update the current simulation time for accurate trace timestamps."""

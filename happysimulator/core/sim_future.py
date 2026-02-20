@@ -39,6 +39,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import logging
+from itertools import count
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -62,14 +63,23 @@ _active_clock_var: contextvars.ContextVar[Clock | None] = contextvars.ContextVar
 
 def _set_active_context(heap: EventHeap, clock: Clock) -> None:
     """Set the active simulation context. Called by Simulation.run()."""
+    from happysimulator.core.event import _active_counter_var
+
     _active_heap_var.set(heap)
     _active_clock_var.set(clock)
+    # Set per-partition event counter if the heap owns one
+    heap_counter = getattr(heap, "_event_counter", None)
+    if heap_counter is not None:
+        _active_counter_var.set(heap_counter)
 
 
 def _clear_active_context() -> None:
     """Clear the active simulation context. Called when Simulation.run() exits."""
+    from happysimulator.core.event import _active_counter_var
+
     _active_heap_var.set(None)
     _active_clock_var.set(None)
+    _active_counter_var.set(None)
 
 
 @contextlib.contextmanager

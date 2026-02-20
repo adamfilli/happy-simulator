@@ -310,7 +310,15 @@ from happysimulator.core import (
 from happysimulator.core.temporal import Duration
 
 # Parallel execution
-from happysimulator.parallel import ParallelResult, ParallelRunner, RunConfig
+from happysimulator.parallel import (
+    ParallelResult,
+    ParallelRunner,
+    ParallelSimulation,
+    ParallelSimulationSummary,
+    PartitionLink,
+    RunConfig,
+    SimulationPartition,
+)
 
 # Distributions
 from happysimulator.distributions import (
@@ -544,8 +552,11 @@ __all__ = [
     "PageCache",
     "PageCacheStats",
     "Partition",
+    "PartitionLink",
     "PaxosNode",
     "PercentileFittedLatency",
+    "ParallelSimulation",
+    "ParallelSimulationSummary",
     "PerishableInventory",
     "PersonalityTraits",
     "PhiAccrualDetector",
@@ -613,6 +624,7 @@ __all__ = [
     "Simulatable",
     # Core
     "Simulation",
+    "SimulationPartition",
     "SimulationComparison",
     # Simulation control
     "SimulationControl",

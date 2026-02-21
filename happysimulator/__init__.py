@@ -177,6 +177,15 @@ from happysimulator.components.deployment import (
     TargetUtilization,
 )
 
+# LLM Agent
+from happysimulator.components.llm_agent import (
+    HumanAgent,
+    HumanAgentStats,
+    HumanState,
+    LLMBackend,
+    MockLLMBackend,
+)
+
 # Industrial simulation components
 from happysimulator.components.industrial import (
     AppointmentScheduler,
@@ -486,6 +495,10 @@ __all__ = [
     "GenerationalGC",
     "Grant",
     "HLCTimestamp",
+    # LLM Agent
+    "HumanAgent",
+    "HumanAgentStats",
+    "HumanState",
     "HybridLogicalClock",
     "HyperLogLog",
     # Microservice patterns
@@ -504,6 +517,7 @@ __all__ = [
     "JobState",
     "KVStateMachine",
     "KeyRange",
+    "LLMBackend",
     "LIFOQueue",
     "LSMTree",
     "LWWRegister",
@@ -529,6 +543,7 @@ __all__ = [
     "MerkleTree",
     "MetricBreakpoint",
     "MetricDiff",
+    "MockLLMBackend",
     "MetricEvaluator",
     "MultiPaxosNode",
     "NVMe",

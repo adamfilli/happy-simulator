@@ -17,6 +17,7 @@ import { useSimStore } from "../hooks/useSimState";
 import { useWebSocket } from "../hooks/useWebSocket";
 import EntityNode from "./EntityNode";
 import GroupNode from "./GroupNode";
+import WidgetEntityNode, { WIDGET_SIZES, DEFAULT_WIDGET_SIZE } from "./WidgetEntityNode";
 import AnimatedEdge from "./AnimatedEdge";
 import ChartNode from "./ChartNode";
 import CodePanelNode from "./CodePanelNode";
@@ -36,7 +37,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   other: "#6b7280",
 };
 
-const nodeTypes = { entity: EntityNode, group: GroupNode, chart: ChartNode, codePanel: CodePanelNode };
+const nodeTypes = { entity: EntityNode, group: GroupNode, widget: WidgetEntityNode, chart: ChartNode, codePanel: CodePanelNode };
 const edgeTypes = { animated: AnimatedEdge };
 
 const DRAG_MIME = "application/happysim-chart";
@@ -146,11 +147,17 @@ function GraphViewInner() {
         "elk.spacing.nodeNode": "60",
         "elk.layered.spacing.nodeNodeBetweenLayers": "100",
       },
-      children: dataNodes.map((n) => ({
-        id: n.id,
-        width: n.is_group ? 220 : 180,
-        height: n.is_group ? 100 : 80,
-      })),
+      children: dataNodes.map((n) => {
+        const widgetType = n.widget?.type as string | undefined;
+        const size = n.widget?.preferred_size
+          ? { width: (n.widget.preferred_size as number[])[0], height: (n.widget.preferred_size as number[])[1] }
+          : widgetType && WIDGET_SIZES[widgetType]
+            ? WIDGET_SIZES[widgetType]
+            : n.is_group ? { width: 220, height: 100 }
+              : n.widget ? DEFAULT_WIDGET_SIZE
+                : { width: 180, height: 80 };
+        return { id: n.id, ...size };
+      }),
       edges: dataEdges.map((e, i) => ({
         id: `elk-${i}`,
         sources: [e.source],
@@ -195,6 +202,21 @@ function GraphViewInner() {
               category: topoNode.category,
               color: CATEGORY_COLORS[topoNode.category] || CATEGORY_COLORS.other,
               memberCount: topoNode.member_count ?? 0,
+            },
+          };
+        }
+        if (topoNode.widget) {
+          return {
+            id: topoNode.id,
+            type: "widget",
+            position: { x: pos.x, y: pos.y },
+            data: {
+              label: topoNode.id,
+              entityType: topoNode.type,
+              category: topoNode.category,
+              color: CATEGORY_COLORS[topoNode.category] || CATEGORY_COLORS.other,
+              metrics: {},
+              widget: topoNode.widget,
             },
           };
         }
@@ -247,6 +269,16 @@ function GraphViewInner() {
           };
         }
         const entityState = state.entities[n.id];
+        if (n.type === "widget") {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              metrics: entityState || {},
+              selected: n.id === selectedEntity,
+            },
+          };
+        }
         return {
           ...n,
           data: {

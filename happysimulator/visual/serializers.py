@@ -38,6 +38,20 @@ def serialize_entity(entity: object) -> dict[str, Any]:
     except ImportError:
         Resource = type(None)
 
+    try:
+        from happysimulator.components.server.server import Server
+    except ImportError:
+        Server = type(None)
+
+    if isinstance(entity, Server):
+        return {
+            "depth": entity.depth,
+            "accepted": entity.stats_accepted,
+            "dropped": entity.stats_dropped,
+            "active_requests": entity.active_requests,
+            "concurrency": entity.concurrency,
+            "requests_completed": entity._requests_completed,
+        }
     if isinstance(entity, QueuedResource):
         result = {
             "depth": entity.depth,

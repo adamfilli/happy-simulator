@@ -6,7 +6,7 @@
 <h1 align="center">Happy Simulator</h1>
 
 <p align="center">
-  <strong>A simulation library built for the modern world.</strong>
+  <strong>A simulation library for distributed systems.</strong>
 </p>
 
 <p align="center">

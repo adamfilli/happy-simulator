@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "happysim"
-version = "0.2.4"
+version = "0.2.5"
 description = "Discrete event simulation library for Python."
 readme = "README.md"
 license = "Apache-2.0"
@@ -59,7 +59,7 @@ where = ["."]
 include = ["happysimulator*"]
 
 [tool.setuptools.package-data]
-happysimulator = ["py.typed", "visual/static/*"]
+happysimulator = ["py.typed", "visual/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -31,6 +31,7 @@ class Node:
     is_group: bool = False
     member_count: int = 0
     member_ids: list[str] = field(default_factory=list)
+    widget: dict | None = None
 
 
 @dataclass
@@ -63,6 +64,7 @@ class Topology:
                         if n.is_group
                         else {}
                     ),
+                    **({"widget": n.widget} if n.widget else {}),
                 }
                 for n in self.nodes
             ],
@@ -245,12 +247,15 @@ def discover(sim: Simulation) -> Topology:
             if isinstance(entity, SourceCls):
                 profile = _sample_profile(entity, end_s)
 
+            widget = getattr(entity, "visual_widget", lambda: None)()
+
             topology.nodes.append(
                 Node(
                     id=name,
                     type=type(entity).__name__,
                     category=classify(entity),
                     profile=profile,
+                    widget=widget,
                 )
             )
 
@@ -267,11 +272,13 @@ def discover(sim: Simulation) -> Topology:
             # Ensure downstream node exists
             if ds_name not in seen_names:
                 seen_names.add(ds_name)
+                ds_widget = getattr(downstream, "visual_widget", lambda: None)()
                 topology.nodes.append(
                     Node(
                         id=ds_name,
                         type=type(downstream).__name__,
                         category=classify(downstream),
+                        widget=ds_widget,
                     )
                 )
             topology.add_edge_if_new(name, ds_name)
